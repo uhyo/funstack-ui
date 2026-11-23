@@ -822,26 +822,26 @@ status, a render value (`button.md` 5.2).
 - **`data-pending` / `state.pending` only, no `aria-disabled`** from pending: the part still
   acts, and telling assistive technology it is unavailable would be false. `pending` stays true
   until every run has settled and the result has committed;
-- each run that resolves runs its continuation (a Close part's close, an item's menu close).
-  That was already safe before #81: the close is idempotent (2.3 item 8) and guarded by the
-  open generation (3.4), so the first resolved run closes and the others find nothing to do.
-  **Found in implementation (2026-11-24):** where the continuation is a transition of the
-  overlay's Root (a Close part in library mode, a closing `Menu.Item`), React entangles it with
-  the part's still-pending runs (2.3 item 5), so the close **commits only when every run has
-  settled**: the overlay stays open, and the part pending, until the last run is done. A
-  JS-free Close closes natively at the first resolved run (its content stays mounted), and a
-  `Toast.Action`'s close is not a transition, so the toast and its Action leave at the first
-  resolved run;
+- **the continuation (a Close part's close, an item's menu close, a toast's close on settle)
+  runs once, when the last run in flight settles, and only if the latest run resolved**
+  (product-owner decision on review F1, 2026-11-24): it is the latest run's continuation, still
+  under that run's open-generation guard (3.4). So "a rejection leaves the overlay / menu /
+  toast open" holds in both modes, and the part stays (pending) until its last run is done:
+  library-mode and JS-free Close parts, a closing `Menu.Item` and a `Toast.Action` with
+  `closeOnSettle` alike. An older run that resolves runs nothing; an older run that rejects
+  after the latest resolved is reported and the close still runs when it settles. (Before the
+  review fix each resolved run requested the close: a library-mode close was then held by
+  entanglement, 2.3 item 5, and committed together with a failed latest run; a JS-free Close
+  and a `Toast.Action` closed at the first resolved run while a later run could still fail.)
+  Implemented in `useActionTrigger` (3.4), so it applies to every part that passes `then`; the
+  steps of the continuous controls pass none;
 - errors follow 2.4 as for any owner (**the interaction with #145**): the **latest** run's
   rejection reaches the Error Boundary above the part, after every older run has settled; an
-  **older** run's rejection is passed to `reportError`, each once; a run that rejects after the
-  part left is reported as well (#152). Reachable for a `Toast.Action` (the first resolved run
-  closes the toast and the Action leaves with it); **not** for a JS-free Close (its content
-  stays mounted), nor for a
-  library-mode Close or a closing `Menu.Item` with `"run"`, whose close waits for every run (the
-  bullet above): there the latest run's rejection reaches the boundary above the part, and the
-  first run's close commits in the same commit (pinned in the shared overlay Close suite and in
-  `menu.test.tsx`). An ignored activation, by contrast, is not a run and reports nothing;
+  **older** run's rejection is passed to `reportError`, each once. Since the part does not
+  leave before its last run (the bullet above), the #152 route (a rejection after the part left)
+  is reached in `"run"` mode only when something else removes the part meanwhile (a dismissal,
+  `toast.dismiss`), as in `"ignore"` mode. An ignored activation, by contrast, is not a run and
+  reports nothing;
 - a `Button` with a function `formAction` is React's form channel, not the library's
   transition: overlapping submissions behave as React's own submitter does, which includes
   React **dropping** the rejection of an older overlapping submission (verified on 19.3.1,
@@ -1290,6 +1290,9 @@ if (!started) event.preventDefault();                        // ignored while pe
   `false`. The options object is the only form (`{ openGeneration?, ignoreWhilePending? }`).
   Runs that overlap (any part in `"run"` mode, and the steps) take the superseded-rejection
   path described in the next item.
+- `then` runs once per burst of overlapping runs: when the last run in flight settles, and only
+  if the latest run resolved (it is the latest run's `then`; review F1 of #146). With one run at
+  a time (`ignoreWhilePending`) this is the run's own `then` when it resolves, as before.
 - A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
   the part; a superseded run's rejection (reachable only with `ignoreWhilePending: false`: the
   steps of a continuous control and a pure trigger in `"run"` mode) is passed to `reportError`
@@ -3298,8 +3301,8 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     function `formAction` defaults to `"run"` as well, and the dropped rejection of an older
     overlapping submission is documented; (5) the opt-out value is `"run"`. The sub-question of
     3 was left to the implementation: `ToastActionOptions` gets no field (2.5.1). Found in
-    implementation: a library-mode close waits for every `"run"` run (2.5.1, the continuation
-    bullet). Applied: 2.3, 2.4, 2.5, 2.5.1, 3.4, 3.6, 9.4, 10.1; `button.md` 18, `dialog.md`
+    review (F1, product-owner decision 2026-11-24): a closing part's continuation runs once, when
+    the last run settles, and only if the latest run resolved (2.5.1, the continuation bullet). Applied: 2.3, 2.4, 2.5, 2.5.1, 3.4, 3.6, 9.4, 10.1; `button.md` 18, `dialog.md`
     3.4, `popover.md` 3.4, `menu.md` 2.3 / 3.4, `toast.md` 3.2 / 11.
 
 ## Open questions

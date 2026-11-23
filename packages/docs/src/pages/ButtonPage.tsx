@@ -46,7 +46,8 @@ export function ButtonPage() {
         Without the prop every click runs: click +1 several times quickly and each click counts. The
         button shows <code>data-pending</code> until the last run has settled and is never{" "}
         <code>aria-disabled</code> meanwhile, since it still acts. React commits the runs' updates
-        together once they have all finished.
+        together once they have all finished. Holding Enter on a focused button repeats the click,
+        as it does on any native button, and each repeat is a run.
       </p>
 
       <BehaviourIndex />

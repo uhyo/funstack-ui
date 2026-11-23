@@ -408,7 +408,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
             type: '"run" | "ignore"',
             default: '"ignore", or "run" with closeOnSettle={false}',
             description:
-              'What a click does while this part\'s action is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the Action and the Root stay `data-pending` and the timer paused until every run has settled, and the toast closes once. Set it on the part: `toast({ action })` has no such option. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+              'What a click does while this part\'s action is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the Action and the Root stay `data-pending` and the timer paused until every run has settled; with `closeOnSettle` the toast then closes once, if the latest run resolved (a rejection keeps it, in both modes). Set it on the part: `toast({ action })` has no such option. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
           ...functionProps("ToastActionState", "Default: `toast.action.label`."),
           renderProp("button", "ToastActionState"),

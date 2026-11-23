@@ -792,15 +792,12 @@ closes the dialog with no user code), so it keeps ignoring by default: the #81 t
 that is given an `action` (mixed ownership: the consumer's function, then the library's close)
 it is a **user decision** as well (conventions resolved question 44, question 1). With
 `whilePending="run"` every click runs the action again in the part's transition: `data-pending`
-until every run has settled, **no** `aria-disabled` from pending, and each run that resolves
-requests the close, which happens once (idempotent, and dropped for a stale open as below). An
+until every run has settled, **no** `aria-disabled` from pending. The close is requested once,
+when the last run in flight settles, and only if the latest run resolved (product-owner
+decision on review F1, 2026-11-24; conventions 2.5.1), in library and JS-free mode alike, and
+still dropped for a stale open as below. So a rejection leaves the dialog open in both modes. An
 older run's rejection goes to `reportError`, the latest one's to the boundary above the Close
-(conventions 2.4, #145). **Found in implementation:** in library mode the first resolved run's
-close is entangled with the Close's still-pending runs and commits only when every run has
-settled, so the part never leaves before its last run: a latest rejection then reaches the
-boundary and the close commits with it. In JS-free mode the native close happens at the first
-resolved run; the content stays mounted (JS-free mode always is), so a later run's rejection
-takes the usual route. Conventions 2.5.1. Without `action` the prop has no effect: nothing of
+(conventions 2.4, #145). Without `action` the prop has no effect: nothing of
 the part's own is pending, and a repeated click finds the close already intended.
 
 **Rejection and veto.** The action rejects: nothing was dispatched, the dialog stays open, the

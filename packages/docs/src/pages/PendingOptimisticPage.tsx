@@ -183,7 +183,9 @@ export function PendingOptimisticPage() {
         Switch the library's close off (<code>{"closeOnActivate={false}"}</code>,{" "}
         <code>{"closeOnSettle={false}"}</code>) and the item or action becomes yours, so it runs
         every activation again. Either way the prop overrides the default, and no part is ever
-        natively disabled, so focus stays where it is.
+        natively disabled, so focus stays where it is. A closing part in <code>"run"</code> mode
+        closes once, when its last run has settled, and only if the latest run resolved: a rejection
+        leaves the overlay, menu or toast open, as it does in <code>"ignore"</code> mode.
       </p>
       <ConceptExample component="Button" href="/components/button">
         <p>

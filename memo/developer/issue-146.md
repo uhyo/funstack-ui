@@ -50,3 +50,17 @@ Pending & optimistic (second-click section rewritten), Action props, Button (whi
 ButtonCounter example, Save / FormActions with "ignore", Overlapping submissions callout),
 Dialog / Popover / Menu / Toast props tables, Roadmap breaking entry, SKILL.md, playground
 (button, menu demos), CSS: menu `[aria-disabled]` rules now `:not([data-pending])`.
+
+## Review fix (memo/reviewer/review-146.md)
+
+- F1 (PO decision): `useActionTrigger` keeps the latest resolved run's `then` in a ref
+  (`resolvedThen`, cleared by every new run) and runs it in `settled()` only when `inFlight`
+  drops to 0. So the close of a closing part in "run" mode happens once, after the last run,
+  only if the latest resolved. Covers library + JS-free Close, closing Menu.Item, Toast.Action
+  with closeOnSettle. Deferring the JS-free native close was no problem (it is just
+  `dialog.close()` / `hidePopover()` called later). The "Found in implementation" entanglement
+  note above is superseded.
+- F2: Toast.Action JSDoc / page row say the toast closes after the last run if the latest
+  resolved.
+- F3: button.test formAction "run" row asserts data-pending between the two resolves.
+- F4: Button page sentence on held Enter repeating the click.

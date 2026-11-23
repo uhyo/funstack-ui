@@ -368,7 +368,7 @@ export function MenuPage() {
             type: '"run" | "ignore"',
             default: '"ignore", or "run" with closeOnActivate={false}',
             description:
-              'What a click, Enter or Space does while this item\'s `action` is pending. `"ignore"`: nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); a closing item still closes the menu once, when every run has settled. No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+              'What a click, Enter or Space does while this item\'s `action` is pending. `"ignore"`: nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); a closing item closes the menu once the last run has settled, and only if the latest run resolved: a rejection keeps the menu open in both modes. No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
         ]}
       />

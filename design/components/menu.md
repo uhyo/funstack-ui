@@ -347,13 +347,12 @@ question 2): it follows `closeOnActivate`.
   function, so the item is a `Button` that lives in a menu, and takes `Button`'s default. This
   is the counter case #146 was raised for.
 - In `"run"` mode the item renders `data-pending` until every run has settled and **no**
-  `aria-disabled` from pending (`aria-disabled` is then the `disabled` prop alone); each resolved
-  run requests the close and the first one wins (the open-generation guard as before); an older
+  `aria-disabled` from pending (`aria-disabled` is then the `disabled` prop alone); a closing
+  item requests the close once, when the last run in flight settles, and only if the latest run
+  resolved (product-owner decision on review F1, 2026-11-24; conventions 2.5.1; the
+  open-generation guard as before), so a rejection keeps the menu open in both modes; an older
   run's rejection goes to `reportError`, the latest one's to the boundary above the item
-  (conventions 2.4, #145). **Found in implementation:** the close is a transition of the Root,
-  entangled with the item's still-pending runs, so it commits only when every run has settled:
-  the item never leaves before its last run, and a latest rejection reaches the boundary while
-  the close commits with it (`menu.test.tsx` "whilePending (#146)"; conventions 2.5.1).
+  (conventions 2.4, #145; `menu.test.tsx` "whilePending (#146)").
 - An Item without `action` only closes, synchronously: nothing pends, the prop has no effect.
 - `CheckboxItem` and `RadioItem` get **no** `whilePending`: state owners, latest intent wins.
 

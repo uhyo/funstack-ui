@@ -242,10 +242,11 @@ older run's rejection goes to `reportError` and the latest one's to the boundary
 Viewport, or to `reportError` once the toast has left (conventions 2.4, #145, #152). The prop is
 on the part only: `ToastActionOptions` (`toast({ action: { label, action } })`) gets no
 `whilePending` field, since the part is where the consumer renders the button and the options
-carry no `closeOnSettle` either (sub-question of 3, settled in implementation). Pinned: the
-toast's close is not a transition, so with `"run"` the first resolved run closes the toast at
-once and a later run's rejection, arriving after the Action left, is reported (#152;
-`toast.test.tsx` "whilePending (#146)").
+carry no `closeOnSettle` either (sub-question of 3, settled in implementation). With
+`closeOnSettle` and `"run"` the toast closes once, when the last run in flight settles, and only
+if the latest run resolved (product-owner decision on review F1, 2026-11-24; conventions
+2.5.1): a rejection keeps the toast in both modes, and the latest run's rejection reaches the
+boundary above the Viewport (`toast.test.tsx` "whilePending (#146)").
 
 When the action resolves, the toast closes with `details.reason: "activate"` (`closeOnSettle`,
 default `true`; `false` keeps it, for an action that only navigates). When it rejects, the toast

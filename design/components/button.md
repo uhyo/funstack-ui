@@ -1523,13 +1523,13 @@ About sixty guard assertions exist today (most in `button.test.tsx` and
   `Menu.CheckboxItem` props type now also omits `whilePending` (it extends `MenuItemProps`; the
   type test caught the leak), so `Menu.RadioItem` does too.
 - `ToastActionOptions` gets no `whilePending` (conventions 2.5.1, the sub-question of 3).
-- **Deviation from the walkthrough (not from the rules):** with `"run"` on a library-mode Close
-  or a closing `Menu.Item`, the first resolved run's close is entangled with the part's
-  still-pending runs and commits only when every run has settled, so "a run that rejects after
-  the part left" is not reachable there: the latest run's rejection reaches the boundary above
-  the part and the close commits with it. A `Toast.Action` (its close is not a transition) does
-  leave at the first resolved run, and the later rejection is reported (#152); a JS-free Close
-  closes natively at the first resolved run but its content stays mounted. Conventions 2.5.1 amended; tests pin both.
+- **Closing parts in `"run"` mode (review F1, product-owner decision 2026-11-24):** the first
+  implementation ran each resolved run's close. A library-mode close was then held by
+  entanglement and committed together with a failed latest run (boundary fallback inside a
+  closed overlay); a JS-free Close and a `Toast.Action` closed at the first resolved run while a
+  later run could still fail. Now `useActionTrigger` runs the continuation once, when the last
+  run in flight settles, and only if the latest run resolved, for every closing part; a
+  rejection leaves the overlay, menu or toast open in both modes. Conventions 2.5.1 and 3.4.
 - Tests: 18.5 rows in `button.test.tsx` (5b, 5c, 5d added; 3, 5, 6, 9, 10, 11, 15, 18 split by
   mode), `button.browser.test.tsx` (21, 22, 24, 26 split by mode); D7 / P5 as shared rows of
   `src/__tests__/overlay-close-part-suite.tsx` (library and JS-free mode);

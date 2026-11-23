@@ -365,7 +365,7 @@ export function PopoverPage() {
             type: '"run" | "ignore"',
             default: '"ignore"',
             description:
-              'What a click, Enter or Space does while this part\'s `action` is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); the popover still closes once (in library mode, when every run has settled). No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+              'What a click, Enter or Space does while this part\'s `action` is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); the popover closes once the last run has settled, and only if the latest run resolved: a rejection leaves it open in both modes. No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
           {
             name: "disabled",
