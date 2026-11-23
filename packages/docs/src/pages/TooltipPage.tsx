@@ -442,12 +442,13 @@ export function TooltipPage() {
         }
       >
         <p>
-          There is no <code>open</code> prop, no <code>openChangeAction</code> and no{" "}
-          <code>data-open</code>. The popup is a popover in the top layer, opened and closed by the
-          browser (or by the library's listeners calling <code>showPopover</code> /{" "}
-          <code>hidePopover</code>), never through React state. Style it with{" "}
-          <code>:popover-open</code>, and the trigger of an open tooltip with{" "}
-          <code>:has(+ :popover-open)</code>. Tooltip is therefore the one component with no
+          There is no <code>open</code> prop, no callback and no <code>data-open</code>: every open
+          and close is the browser's or a timer the user drives, so none of it is a request (an
+          action); if a callback is ever added it will be an <code>onOpenChange</code> handler. The
+          popup is a popover in the top layer, opened and closed by the browser (or by the library's
+          listeners calling <code>showPopover</code> / <code>hidePopover</code>), never through
+          React state. Style it with <code>:popover-open</code>, and the trigger of an open tooltip
+          with <code>:has(+ :popover-open)</code>. Tooltip is therefore the one component with no
           transitions, no <code>data-pending</code> and no <code>transition</code> prop; animate it
           in CSS:
         </p>

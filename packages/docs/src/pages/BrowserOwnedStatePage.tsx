@@ -55,22 +55,28 @@ export function BrowserOwnedStatePage() {
               'A change the browser makes to library-owned state on its own, without a click the library sees: a form reset, find-in-page opening an item, a click before hydration. The component dispatches it like a user change, with `details.reason: "platform"`, and re-applies the committed state afterwards.',
           },
           {
-            id: "notification",
-            term: "Notification",
+            id: "request",
+            term: "Request",
             definition:
-              "A change action called after the browser has already made the change (a dismissal, a platform path). It is still awaited, but the UI did not wait for it: nothing can be vetoed, only re-applied.",
+              "A change the library can still roll back, reported to an action prop (`openChangeAction`) before it is committed: dispatched in a transition, awaited, with pending and optimistic state, and refused by a controlled parent that does not adopt it. A form reset or a click before hydration on a form control is a request too: the DOM is the optimistic state there, restored on a refusal.",
+          },
+          {
+            id: "fact",
+            term: "Fact",
+            definition:
+              "A change the browser already made in front of the user and the library could not hold, such as a [dismissal](#dismissal). It is reported to an `on*` handler (`onOpenChange`), synchronously, outside any transition, and not awaited: nothing is pending and no view transition runs. See [Requests and facts](#requests-and-facts).",
           },
           {
             id: "parts-close",
             term: "A part's close",
             definition:
-              "A close the user asks one of the component's parts for (a Close button, the Trigger, a form submit). It is library-owned: dispatched in a transition, awaited, vetoable and animatable. The opposite of a dismissal.",
+              "A close the user asks one of the component's parts for (a Close button, the Trigger, a form submit). It is a request: dispatched in a transition, awaited, vetoable and animatable. The opposite of a dismissal.",
           },
           {
             id: "js-free-mode",
             term: "JS-free mode and library mode",
             definition:
-              "Some components can run either way. In **JS-free mode** (no controlled or default state and no change action), the browser owns the state and the library adds no behaviour on the native path. In **library mode** (any of those props), the state is library-owned. See [Two modes](#two-modes).",
+              "Some components can run either way. In **JS-free mode** (no controlled or default state, no change action and no `onOpenChange`), the browser owns the state and the library adds no behaviour on the native path. In **library mode** (any of those props), the state is library-owned. See [Two modes](#two-modes).",
           },
         ]}
       />
@@ -89,7 +95,11 @@ export function BrowserOwnedStatePage() {
             "React state ([optimistic](/concepts/pending-and-optimistic#optimistic), `useOptimistic`)",
             "the DOM itself",
           ],
-          ["Action prop", "awaited; the UI waits for it", "a notification after the fact, or none"],
+          [
+            "Callback",
+            "an action prop, awaited; the UI waits for it",
+            "an `on*` handler after the fact (`onOpenChange`), not awaited; or none",
+          ],
           ["Styling", "`data-*` attributes", "pseudo-classes: `:popover-open`, `:open`"],
           [
             "Animation",
@@ -157,31 +167,54 @@ export function BrowserOwnedStatePage() {
 <Accordion.Root exclusive defaultValue={null} valueChangeAction={save}>...</Accordion.Root>`}</CodeBlock>
       </ConceptExample>
 
-      <h3 id="parts-vs-dismissals">Parts vs dismissals</h3>
+      <h3 id="requests-and-facts">Requests and facts</h3>
       <p>
-        For something that opens and closes in library mode, ownership is split by{" "}
-        <strong>who asked</strong>. Opening, and a close the user asks one of the component's parts
-        for, belong to the library: the click, submit or command is cancelled and dispatched in a
-        transition, the action is awaited, a controlled parent can refuse it, and it can animate
-        with a view transition. A <a href="#dismissal">dismissal</a> belongs to the browser: the
-        element closes natively and at once, the change action is called afterwards as a
-        notification with <code>reason: "dismiss"</code>, and a controlled parent that refuses
-        cannot keep it open (it can only open it again).
+        For something that opens and closes in library mode, a change is either a{" "}
+        <a href="#request">request</a> or a <a href="#fact">fact</a>, and each has its own prop.
+        Opening, and a close the user asks one of the component's parts for, are requests: the
+        click, submit or command is cancelled and dispatched in a transition,{" "}
+        <code>openChangeAction</code> is awaited, a controlled parent can refuse it, and it can
+        animate with a view transition. A <a href="#dismissal">dismissal</a> is a fact: the element
+        closes natively and at once, and <code>onOpenChange(false, details)</code> is called
+        synchronously from the browser's own event. Nothing is pending, no view transition runs (the
+        CSS exit animates it), and the committed state is <code>false</code> in the same event.
       </p>
       <p>
         The line sits where the platform lets the library cancel a step freely: a part's click
         (which cancels its command), a <code>command</code> event, a form's <code>submit</code>. A
         dismissal goes through a close request instead, whose <code>cancel</code> the browser
         honours only once per user activation, and a user who pressed Escape expects the element to
-        go away now. So the library never promises to hold a dismissal.
+        go away now. So the library never holds a dismissal. The test for any callback: if it
+        rejects, or the parent ignores it, can the library put the UI back without the user
+        noticing? If yes, it is a request; if the browser already did it in front of the user, it is
+        a fact.
+      </p>
+      <p>
+        <strong>Controlled mode needs both props.</strong> Pass the same setter to both:{" "}
+        <code>openChangeAction</code> adopts a request (in a transition), <code>onOpenChange</code>{" "}
+        adopts a fact (urgently). Set state directly in <code>onOpenChange</code>, never in{" "}
+        <code>startTransition</code> and never after an <code>await</code>: a parent that still says{" "}
+        <code>open={"{true}"}</code> when the browser's event has been handled gets the element
+        shown again at once, and a late <code>false</code> then closes it a second time. That
+        re-open is also how a parent refuses a dismissal on purpose (the user sees it go and come
+        back); a popup that must not be dismissed is configured on the platform side instead. A
+        controlled Root without <code>onOpenChange</code> warns in development.
+      </p>
+      <CodeBlock>{`const [open, setOpen] = useState(false);
+<Dialog.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>`}</CodeBlock>
+      <p>
+        A popup the browser opened before hydration is still a request (
+        <code>openChangeAction(true, {'{ reason: "platform" }'})</code>): the library can roll it
+        back by hiding the empty popup, and its load-on-open code runs. So <code>onOpenChange</code>{" "}
+        is only ever called with <code>false</code>.
       </p>
       <ConceptExample component="Dialog" href="/components/dialog">
         <p>
           A library-mode Dialog opens through its Trigger and closes through its Close parts and{" "}
           <code>Dialog.Form</code> after <code>openChangeAction</code> resolves. Escape or a click
-          outside closes it at once, and <code>openChangeAction(false, details)</code> follows with{" "}
+          outside closes it at once and calls <code>onOpenChange(false, details)</code> with{" "}
           <code>reason: "dismiss"</code>; a controlled parent that keeps <code>open</code> gets the
-          dialog re-opened once the action settles.
+          dialog re-opened in the same event.
         </p>
       </ConceptExample>
 
@@ -212,10 +245,12 @@ export function BrowserOwnedStatePage() {
         link or another element works through the library's click handler instead, and has none of
         the above: it renders <code>aria-expanded</code> itself, from whether the popup is shown;
         and a press on it while the popup is open counts as a click outside, so light dismiss closes
-        the popup before the click arrives. That close is not awaited, a controlled parent cannot
-        refuse it, and there is no exit transition. A development warning says so. A disabled
-        Trigger that stays focusable (it renders <code>aria-disabled</code>) is no invoker either,
-        so that nothing native can open the popup.
+        the popup before the click arrives. That close is a <a href="#fact">fact</a>, reported to{" "}
+        <code>onOpenChange</code> (with <code>reason: "activate"</code> and the click), not a
+        request: it is not awaited, a controlled parent cannot refuse it, and there is no view
+        transition. A development warning says so. A disabled Trigger that stays focusable (it
+        renders <code>aria-disabled</code>) is no invoker either, so that nothing native can open
+        the popup.
       </p>
       <p>
         <strong>Two kinds of open state on a Trigger.</strong> What assistive technology hears is
@@ -235,11 +270,12 @@ export function BrowserOwnedStatePage() {
       <p>
         <strong>Foreign invokers.</strong> A <a href="#foreign-invoker">foreign invoker</a> still
         works in library mode. An open through it is routed through the library like the Trigger's,
-        so the action runs and the content loads first. A close through it is reported with{" "}
-        <code>reason: "activate"</code>, because the user asked for it; each component page says
-        whether that close is awaited or a notification. A component that keeps focus in its popup
-        or its input does not lose it when you press a foreign invoker: the invoker's own close is
-        the only one.
+        so the action runs and the content loads first. A close through it is performed by the
+        browser, so it is a <a href="#fact">fact</a> reported to <code>onOpenChange</code>, with{" "}
+        <code>reason: "activate"</code> because the user asked for it (Dialog's foreign close
+        commands are the exception: the library cancels and routes them, so they are requests). A
+        component that keeps focus in its popup or its input does not lose it when you press a
+        foreign invoker: the invoker's own close is the only one.
       </p>
       <ConceptExample component="Popover" href="/components/popover">
         <p>

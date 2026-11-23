@@ -4,12 +4,13 @@ import { Popover } from "@funstack/ui/popover";
 import type { PopoverOpenChangeDetails } from "@funstack/ui/popover";
 import { sleep } from "./fake-api.js";
 
-// A slow `openChangeAction`: a pretend server call of 2 seconds for every open and close.
-// Opening: the Trigger gets data-open and data-pending at once, the popup is shown when the
-// action settles. Closing with the Trigger or the Close: the popup stays shown until the action
-// settles. Escape and a click outside are the browser's: the popup hides at once and the action
-// only hears about it (the Trigger is pending meanwhile). The browser exposes the Trigger as
-// expanded exactly while the popup is shown. The readout is plain text, not a live region.
+// A slow `openChangeAction`: a pretend server call of 2 seconds for every request (an open, or a
+// close with the Trigger or the Close). Opening: the Trigger gets data-open and data-pending at
+// once, the popup is shown when the action settles. Closing with the Trigger or the Close: the
+// popup stays shown until the action settles. Escape and a click outside are the browser's, a
+// fact: the popup hides at once, nothing is pending and the action is not called; `onOpenChange`
+// reports it, synchronously. The browser exposes the Trigger as expanded exactly while the popup
+// is shown. The readout is plain text, not a live region.
 export function PopoverSlowOpen() {
   const [log, setLog] = useState("(none yet)");
   const slow = async (open: boolean, { reason }: PopoverOpenChangeDetails) => {
@@ -19,9 +20,13 @@ export function PopoverSlowOpen() {
     // After an await: wrap the update in startTransition (React limitation).
     startTransition(() => setLog(`${call}: settled`));
   };
+  // A fact: called in the browser's event, not awaited. A plain setState here is urgent.
+  const dismissed = (open: boolean, { reason }: PopoverOpenChangeDetails) => {
+    setLog(`onOpenChange(${open}, "${reason}")`);
+  };
   return (
     <div className="demo-stack">
-      <Popover.Root openChangeAction={slow}>
+      <Popover.Root openChangeAction={slow} onOpenChange={dismissed}>
         <Popover.Trigger className="demo-button">
           {({ open, pending }) => (
             <>

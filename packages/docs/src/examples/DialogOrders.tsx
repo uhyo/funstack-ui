@@ -41,13 +41,17 @@ function OrderDetails({ id }: { id: string }) {
 // data is ready, then the dialog opens once, complete. The Close button's close is library-owned
 // too: openChangeAction(false) runs first, then the dialog closes in a view transition
 // (`transition`), so the exit animates in every engine, Firefox included. Escape and a click on
-// the backdrop are dismissals: the browser closes the dialog (with the CSS exit) and the Root is
-// told afterwards. The readout shows what the Root received.
+// the backdrop are dismissals: the browser closes the dialog (with the CSS exit), a fact reported
+// to `onOpenChange` synchronously. The readout shows what the Root received.
 export function DialogOrders() {
   const [last, setLast] = useState("(none yet)");
   const record = (open: boolean, { reason, returnValue }: DialogOpenChangeDetails) => {
     // The synchronous part of an action: this setState is a transition update.
-    setLast(`open=${open} reason="${reason}" returnValue=${JSON.stringify(returnValue)}`);
+    setLast(`openChangeAction(${open}, "${reason}") returnValue=${JSON.stringify(returnValue)}`);
+  };
+  const recordFact = (open: boolean, { reason, returnValue }: DialogOpenChangeDetails) => {
+    // A fact handler: this setState is urgent.
+    setLast(`onOpenChange(${open}, "${reason}") returnValue=${JSON.stringify(returnValue)}`);
   };
   return (
     <>
@@ -55,7 +59,7 @@ export function DialogOrders() {
         {["1042", "1043"].map((id) => (
           <li key={id} className="demo-row">
             Order #{id}
-            <Dialog.Root defaultOpen={false} openChangeAction={record}>
+            <Dialog.Root defaultOpen={false} openChangeAction={record} onOpenChange={recordFact}>
               <Dialog.Trigger className="demo-button">
                 {({ pending }) => (
                   <>
@@ -92,7 +96,7 @@ export function DialogOrders() {
         </button>
       </div>
       <output className="demo-readout">
-        last openChangeAction: <code>{last}</code>
+        last call: <code>{last}</code>
       </output>
     </>
   );

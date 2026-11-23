@@ -201,7 +201,8 @@ export function MenuPage() {
           {
             name: "open",
             type: "boolean",
-            description: "Controlled open state. undefined means uncontrolled.",
+            description:
+              "Controlled open state. undefined means uncontrolled. Pass `onOpenChange` too: the browser closes the menu without asking (development warns).",
           },
           {
             name: "defaultOpen",
@@ -213,18 +214,34 @@ export function MenuPage() {
             type: "ChangeAction<boolean, MenuOpenChangeDetails>",
             description: (
               <>
-                Awaited for <code>true</code> (the menu opens when it resolves and the items have
-                rendered) and for the closes a part asks for (the Trigger, an item's activation,
-                ArrowLeft in a submenu); the menu stays shown until the action settles, with{" "}
-                <code>data-pending</code> on the Trigger meanwhile. A notification for dismissals
-                (Escape, a click outside, Tab, the pointer leaving a hover-opened submenu, the
-                parent menu closing). Runs in the Root's transition; may be a Server Function.{" "}
-                <code>details.reason</code>: <code>"activate"</code>, <code>"dismiss"</code> or{" "}
+                Requests only. Awaited for <code>true</code> (the menu opens when it resolves and
+                the items have rendered) and for the closes a part asks for (the Trigger, an item's
+                activation, ArrowLeft in a submenu, the pointer leaving a hover-opened submenu); the
+                menu stays shown until the action settles, with <code>data-pending</code> on the
+                Trigger meanwhile. Never called for a dismissal (<code>onOpenChange</code>). Runs in
+                the Root's transition; may be a Server Function. <code>details.reason</code>:{" "}
+                <code>"activate"</code>, <code>"dismiss"</code> (the hover close of a submenu) or{" "}
                 <code>"platform"</code> (found open on hydration; <code>event</code> is{" "}
-                <code>undefined</code>). A{" "}
-                <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a> closes
-                it as <code>"activate"</code>, a notification; pressing one does not move focus out
-                of the menu.
+                <code>undefined</code>).
+              </>
+            ),
+          },
+          {
+            name: "onOpenChange",
+            type: "UrgentChangeHandler<boolean, MenuOpenChangeDetails>",
+            description: (
+              <>
+                Facts only: the menu was closed without the library closing it on request. Always{" "}
+                <code>false</code>. <code>details.reason</code>: <code>"dismiss"</code> (Escape, a
+                click outside, Tab or focus leaving the menu, a right- or middle-click outside, the
+                parent menu closing a submenu, script) or <code>"activate"</code> (a{" "}
+                <a href="/concepts/browser-owned-state#foreign-invoker">foreign invoker</a>;
+                pressing one does not move focus out of the menu). Called synchronously in the
+                browser's <code>toggle</code> event and not awaited: nothing is pending and no view
+                transition runs. In controlled mode set state directly here (
+                <code>onOpenChange={"{setOpen}"}</code>); a parent that keeps <code>open</code> gets
+                the menu shown again at once. Each submenu's Root has its own. May return a promise;
+                a rejection or a throw goes to <code>reportError</code>.
               </>
             ),
           },
@@ -651,8 +668,9 @@ export function MenuPage() {
           pointer leaves both, unless keyboard focus is inside it. Touch never opens on hover.
         </li>
         <li>
-          <strong>Tab closes immediately</strong>, without awaiting <code>openChangeAction</code>: a
-          menu must not linger once focus has moved on. It is notified as <code>"dismiss"</code>.
+          <strong>Tab closes immediately</strong>, without asking <code>openChangeAction</code>: a
+          menu must not linger once focus has moved on. It is a fact, reported to{" "}
+          <code>onOpenChange</code> as <code>"dismiss"</code>.
         </li>
         <li>
           <strong>ARIA:</strong> the Trigger and SubmenuTrigger have{" "}
@@ -707,9 +725,10 @@ export function MenuPage() {
           A slow <code>openChangeAction</code>
         </h4>
         <p>
-          A submenu's <code>Menu.Root</code> has its own <code>openChangeAction</code>. Here both
-          take 2 seconds, like a server call. Each trigger is exposed as expanded exactly while its
-          menu is shown:
+          A submenu's <code>Menu.Root</code> has its own <code>openChangeAction</code> and{" "}
+          <code>onOpenChange</code>. Here both actions take 2 seconds, like a server call, and the
+          handlers log the dismissals. Each trigger is exposed as expanded exactly while its menu is
+          shown:
         </p>
         <Example file="MenuSlowOpen.tsx" css="menu.css">
           <MenuSlowOpen />
@@ -726,8 +745,9 @@ export function MenuPage() {
             expanded until the close's action settles.
           </li>
           <li>
-            Escape or a click outside: the menu hides and the Trigger is collapsed at once; the
-            Trigger is pending while the <code>reason: "dismiss"</code> notification runs.
+            Escape or a click outside: a fact. The menu hides and the Trigger is collapsed at once;
+            nothing is pending and the slow action is not called; <code>onOpenChange</code> is (each
+            open submenu's too, when the whole stack closes).
           </li>
         </ul>
         <p>
@@ -756,7 +776,7 @@ export function MenuPage() {
       <BehaviourSection
         id="browser-owned-state"
         summary={
-          'The popup is a `popover="auto"`: the top layer, light dismiss and Escape are the browser\'s. A dismissal closes the menu at once; `openChangeAction(false)` is a notification with `reason: "dismiss"`, and it animates with CSS only.'
+          'The popup is a `popover="auto"`: the top layer, light dismiss and Escape are the browser\'s. A dismissal closes the menu at once, a fact: `onOpenChange(false)` is called with `reason: "dismiss"`, nothing is pending, and it animates with CSS only.'
         }
       />
 

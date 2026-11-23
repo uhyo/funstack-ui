@@ -14,7 +14,11 @@ export function MenuRowActions() {
   const [last, setLast] = useState("(none yet)");
   const [fail, setFail] = useState(false);
   const record = (open: boolean, { reason }: MenuOpenChangeDetails) => {
-    setLast(`open=${open} reason="${reason}"`);
+    setLast(`openChangeAction(${open}, "${reason}")`);
+  };
+  // Escape, a click outside, Tab: facts, reported synchronously and not awaited.
+  const recordFact = (open: boolean, { reason }: MenuOpenChangeDetails) => {
+    setLast(`onOpenChange(${open}, "${reason}")`);
   };
   const done = (text: string) => () => startTransition(() => setStatus(text));
 
@@ -22,7 +26,7 @@ export function MenuRowActions() {
     <div className="demo-stack">
       <div className="demo-row">
         <span>{status}</span>
-        <Menu.Root openChangeAction={record}>
+        <Menu.Root openChangeAction={record} onOpenChange={recordFact}>
           <Menu.Trigger className="demo-button" aria-label="Actions for Report.pdf">
             {({ pending }) => (pending ? <span className="demo-spinner" aria-hidden /> : "⋯")}
           </Menu.Trigger>
@@ -65,7 +69,7 @@ export function MenuRowActions() {
         <input type="checkbox" checked={fail} onChange={(e) => setFail(e.target.checked)} />
         Make Archive fail
       </label>
-      <p className="demo-readout">Last openChangeAction: {last}</p>
+      <p className="demo-readout">Last call: {last}</p>
     </div>
   );
 }

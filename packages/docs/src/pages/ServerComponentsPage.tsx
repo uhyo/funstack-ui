@@ -101,6 +101,18 @@ import { saveOpenSections } from "./actions"; // "use server"
 <Accordion.Root defaultValue={user.openSections} valueChangeAction={saveOpenSections}>
   ...
 </Accordion.Root>`}</CodeBlock>
+      <p>
+        A Server Function can be passed to an <code>on*</code> handler too (an overlay's{" "}
+        <code>onOpenChange</code>, a toast's <code>onClose</code>): it is called and not awaited,
+        nothing shows pending, and a rejection goes to <code>reportError</code>. An overlay closed
+        by a Close button is a request and by Escape a fact, so to hear both, pass the function to
+        both props:
+      </p>
+      <CodeBlock>{`<Dialog.Root
+  defaultOpen={!user.sawWelcome}
+  openChangeAction={rememberDismissed}
+  onOpenChange={rememberDismissed}
+>`}</CodeBlock>
 
       <h3 id="before-hydration">Before hydration</h3>
       <p>

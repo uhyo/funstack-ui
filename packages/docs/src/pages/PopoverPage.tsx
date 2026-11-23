@@ -90,7 +90,7 @@ export function PopoverPage() {
         rows={[
           [
             "Selected when",
-            "Root has none of `open`, `defaultOpen`, `openChangeAction`",
+            "Root has none of `open`, `defaultOpen`, `openChangeAction`, `onOpenChange`",
             "Root has any of them",
           ],
           [
@@ -106,7 +106,7 @@ export function PopoverPage() {
           [
             "Close by a dismissal (Escape, click outside, another popover)",
             "the browser",
-            "the browser; `openChangeAction(false)` is a notification",
+            "the browser; a fact: `onOpenChange(false)` is called synchronously, nothing is pending, no view transition",
           ],
           [
             "Popup content",
@@ -135,9 +135,9 @@ export function PopoverPage() {
         In library mode, opening and{" "}
         <a href="/concepts/browser-owned-state#parts-close">a part's close</a> are the library's; a{" "}
         <a href="/concepts/browser-owned-state#dismissal">dismissal</a> (Escape, a click outside,
-        another popover opening) is the browser's, and the Root is notified afterwards (
-        <a href="/concepts/browser-owned-state#parts-vs-dismissals">Parts vs dismissals</a>). The
-        mode is decided on the first render; switching later is not supported (development warning).
+        another popover opening) is the browser's: a fact, reported to <code>onOpenChange</code> (
+        <a href="/concepts/browser-owned-state#requests-and-facts">Requests and facts</a>). The mode
+        is decided on the first render; switching later is not supported (development warning).
       </p>
 
       <h4 id="other-openers">Other ways to open and close</h4>
@@ -151,26 +151,28 @@ export function PopoverPage() {
           <code>&lt;button commandfor command="show-popover"&gt;</code>, a{" "}
           <code>&lt;button popovertarget&gt;</code>, a script <code>showPopover()</code>) is
           cancelled at <code>beforetoggle</code> and dispatched with that <code>ToggleEvent</code>.
-          A foreign close happens natively and is reported as <code>"activate"</code>: a{" "}
-          <code>hide-popover</code> or <code>toggle-popover</code> command with its{" "}
-          <code>CommandEvent</code>, a <code>&lt;button popovertarget&gt;</code> with the{" "}
+          A foreign close happens natively, so it is a fact: <code>onOpenChange(false)</code> with{" "}
+          <code>"activate"</code> and a <code>hide-popover</code> or <code>toggle-popover</code>{" "}
+          command's <code>CommandEvent</code>, or a <code>&lt;button popovertarget&gt;</code>'s{" "}
           <code>beforetoggle</code> <code>ToggleEvent</code>, whose <code>source</code> is the
-          button. Escape, a click outside and a script <code>hidePopover()</code> stay{" "}
-          <code>"dismiss"</code>.
+          button. Escape, a click outside and a script <code>hidePopover()</code> are{" "}
+          <code>"dismiss"</code> facts.
         </li>
         <li>
           <strong>Hover card (Chromium):</strong> a <code>&lt;button interestfor&gt;</code> naming
           the Popup (your own button, or the Trigger with <code>interestfor</code> added) opens it
           on interest (hover or keyboard focus) through the library, and in library mode the Popup
-          hides again on lost interest: <code>openChangeAction(false)</code> is a{" "}
-          <code>"dismiss"</code> notification whose <code>details.event</code> is the{" "}
+          hides again on lost interest: a <code>"dismiss"</code> fact,{" "}
+          <code>onOpenChange(false)</code>, whose <code>details.event</code> is the{" "}
           <code>loseinterest</code> event (its <code>source</code> is the button). Lost interest
-          while the open is still pending cancels it, so the card never appears under a pointer that
-          has left. A Trigger-click open stays open on lost interest, as in the platform. As with
-          the platform's own lost-interest hide, focus is not returned to the Trigger. Firefox and
-          Safari ignore <code>interestfor</code>, so give the button a click path (make it the
-          Trigger) when the card must open everywhere. For a name or description (
-          <code>role="tooltip"</code> content), use <a href="/components/tooltip">Tooltip</a>.
+          while the open is still pending cancels it (a request,{" "}
+          <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>, superseding the open), so
+          the card never appears under a pointer that has left. A Trigger-click open stays open on
+          lost interest, as in the platform. As with the platform's own lost-interest hide, focus is
+          not returned to the Trigger. Firefox and Safari ignore <code>interestfor</code>, so give
+          the button a click path (make it the Trigger) when the card must open everywhere. For a
+          name or description (<code>role="tooltip"</code> content), use{" "}
+          <a href="/components/tooltip">Tooltip</a>.
         </li>
       </ul>
 
@@ -184,7 +186,7 @@ export function PopoverPage() {
             name: "open",
             type: "boolean",
             description:
-              "Controlled open state. undefined means uncontrolled. Selects library mode.",
+              "Controlled open state. undefined means uncontrolled. Selects library mode. Pass `onOpenChange` too: the browser closes the popover without asking (development warns).",
           },
           {
             name: "defaultOpen",
@@ -197,16 +199,35 @@ export function PopoverPage() {
             type: "ChangeAction<boolean, PopoverOpenChangeDetails>",
             description: (
               <>
-                Awaited for <code>true</code> (the popover opens when it resolves and the content
-                has rendered) and for a <code>false</code> the user asked a part for (Trigger,
-                Close: the popover hides when it resolves). A notification for a dismissal: the
-                popover is already hidden when it runs. Runs in the Root's transition; may be a
-                Server Function; rejections reach the nearest Error Boundary above the Root.{" "}
+                Requests only. Awaited for <code>true</code> (the popover opens when it resolves and
+                the content has rendered) and for a <code>false</code> the user asked a part for
+                (Trigger, Close: the popover hides when it resolves). Never called for a dismissal (
+                <code>onOpenChange</code>). Runs in the Root's transition; may be a Server Function;
+                rejections reach the nearest Error Boundary above the Root.{" "}
                 <code>details.reason</code>: <code>"activate"</code> (Trigger, Close, a foreign
-                invoker), <code>"dismiss"</code> (Escape, a click outside, script, another popover
-                or modal dialog, lost interest on an <code>interestfor</code> button) or{" "}
-                <code>"platform"</code> (found open on hydration; <code>event</code> is{" "}
-                <code>undefined</code>). Selects library mode.
+                open), <code>"dismiss"</code> (lost interest while an <code>interestfor</code> open
+                is still pending) or <code>"platform"</code> (found open on hydration;{" "}
+                <code>event</code> is <code>undefined</code>). Selects library mode.
+              </>
+            ),
+          },
+          {
+            name: "onOpenChange",
+            type: "UrgentChangeHandler<boolean, PopoverOpenChangeDetails>",
+            description: (
+              <>
+                Facts only: the popover was closed without the library closing it. Always{" "}
+                <code>false</code>. <code>details.reason</code>: <code>"dismiss"</code> (Escape, a
+                click outside, another popover or modal dialog, a parent popover closing, script{" "}
+                <code>hidePopover()</code>, lost interest on an <code>interestfor</code> button) or{" "}
+                <code>"activate"</code> (a foreign invoker; a non-button Trigger pressed while
+                open). Called synchronously in the browser's <code>toggle</code> event, outside any
+                transition, and not awaited: nothing is pending and no view transition runs. In
+                controlled mode set state directly here (<code>onOpenChange={"{setOpen}"}</code>),
+                never in <code>startTransition</code> or after an <code>await</code>; a parent that
+                keeps <code>open</code> gets the popover shown again at once. May return a promise
+                (a Server Function); a rejection or a throw goes to <code>reportError</code>.
+                Selects library mode.
               </>
             ),
           },
@@ -255,13 +276,13 @@ export function PopoverPage() {
       />
       <PartFacts
         state={
-          "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open, a part's close or a dismissal notification."
+          "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open or a part's close (never a dismissal)."
         }
         owned={
           "`type` (only on a `<button>`), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
         }
         note={
-          'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode only) is light-dismissed before its click; that close is reported as `"activate"`. `aria-haspopup` and `aria-controls` pass through.'
+          'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode only) is light-dismissed before its click; that close is a fact, `onOpenChange(false)` with `"activate"` and the click. `aria-haspopup` and `aria-controls` pass through.'
         }
       />
 
@@ -435,7 +456,7 @@ export function PopoverPage() {
           [
             "`data-pending`",
             "Trigger",
-            "An open, a part-initiated close or a dismissal notification is in flight (library mode only).",
+            "An open or a part-initiated close is in flight (library mode only). A dismissal never pends.",
           ],
           ["`data-pending`", "Close", "Its `action` is in flight."],
           [
@@ -458,7 +479,7 @@ export function PopoverPage() {
           ],
           [
             "Escape",
-            'Closes the innermost open popover; focus returns to its Trigger; `openChangeAction(false, { reason: "dismiss" })`',
+            'Closes the innermost open popover; focus returns to its Trigger; `onOpenChange(false, { reason: "dismiss" })`',
             "the browser (and the library for a nested popover)",
           ],
           [
@@ -503,7 +524,7 @@ export function PopoverPage() {
       <BehaviourSection
         id="transition-types"
         summary={
-          "Library mode: `fsui-popover` plus `fsui-popover-open` or `fsui-popover-close`; a controlled close carries none. JS-free mode starts no transitions."
+          "Library mode: `fsui-popover` plus `fsui-popover-open` or `fsui-popover-close`; a controlled close carries none, and a dismissal starts no transition at all. JS-free mode starts no transitions."
         }
       >
         <h4>ViewTransition: an exit in every engine</h4>
@@ -529,8 +550,9 @@ html:active-view-transition .popover { transition: none; }
             <code>fsui-popover-close</code>. A controlled close carries none.
           </li>
           <li>
-            Dismissals (Escape, a click outside) animate with the CSS exit only: keep it, and cut it
-            while a view transition runs, as above (
+            Dismissals (Escape, a click outside) are facts: their commit is urgent, so they start no
+            view transition and animate with the CSS exit only. Keep it, and cut it while a view
+            transition runs, as above (
             <a href="/concepts/transitions#css-exit">
               A popup with a CSS exit and a view transition
             </a>
@@ -551,7 +573,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a dismissal notification is in flight. The expanded state assistive technology hears follows the shown popup, so after Escape or a click outside it is collapsed at once, even while the dismissal notification runs. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open or a part's close is in flight. A dismissal is a fact: the popup, `data-open`, the committed `open` and the expanded state assistive technology hears all change at once, and nothing is pending. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
         }
       >
         <h4>Walkthrough (library mode)</h4>
@@ -584,7 +606,8 @@ html:active-view-transition .popover { transition: none; }
           </li>
           <li>
             Press Escape or click outside instead: the browser hides the popover at once (CSS fade),
-            and the Root receives <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>.
+            and the Root calls <code>onOpenChange(false, {'{ reason: "dismiss" }'})</code> in the
+            same event. Nothing is pending, and <code>openChangeAction</code> is not called.
           </li>
         </ol>
         <Callout kind="warning" title="Refusing a close">
@@ -592,16 +615,19 @@ html:active-view-transition .popover { transition: none; }
             A controlled parent that keeps <code>open</code> after a <strong>part-initiated</strong>{" "}
             close vetoes it: nothing was hidden, the Trigger's <code>data-open</code> snaps back.
             After a <strong>dismissal</strong> the popover is already hidden; a parent that keeps{" "}
-            <code>open</code> gets it re-opened once the action settles, which the user sees as a
-            blink. Adopt <code>false</code> for dismissals.
+            <code>open</code> gets it re-opened at once, which the user sees as a blink. Adopt{" "}
+            <code>false</code> in <code>onOpenChange</code>, directly (
+            <code>onOpenChange={"{setOpen}"}</code>), not in <code>startTransition</code> and not
+            after an <code>await</code>.
           </p>
         </Callout>
         <h4 id="slow-open-change-action">
           A slow <code>openChangeAction</code>
         </h4>
         <p>
-          Here every <code>openChangeAction</code> call takes 2 seconds, like a server call. The
-          Trigger is exposed as expanded exactly while the popup is shown:
+          Here every <code>openChangeAction</code> call takes 2 seconds, like a server call, and{" "}
+          <code>onOpenChange</code> logs the dismissals. The Trigger is exposed as expanded exactly
+          while the popup is shown:
         </p>
         <Example file="PopoverSlowOpen.tsx" css="popover.css">
           <PopoverSlowOpen />
@@ -617,8 +643,9 @@ html:active-view-transition .popover { transition: none; }
             shown and the Trigger expanded until the action settles.
           </li>
           <li>
-            Escape or a click outside: the popup hides and the Trigger is collapsed at once; the
-            Trigger is pending while the <code>reason: "dismiss"</code> notification runs.
+            Escape or a click outside: a fact. The popup hides, <code>data-open</code> goes and the
+            Trigger is collapsed at once; nothing is pending and the slow action is not called;{" "}
+            <code>onOpenChange</code> is.
           </li>
         </ul>
         <p>
@@ -637,7 +664,7 @@ html:active-view-transition .popover { transition: none; }
       <BehaviourSection
         id="browser-owned-state"
         summary={
-          "JS-free mode: the browser owns everything through the Trigger's `popovertarget` and the Close's Invoker Command. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, a click outside, another popover opening) is the browser's: the popover closes at once and `openChangeAction(false)` is a notification with `reason: \"dismiss\"`. Dismissals animate with CSS only."
+          "JS-free mode: the browser owns everything through the Trigger's `popovertarget` and the Close's Invoker Command. Library mode: opening and a close asked for by a part are requests (`openChangeAction`); a dismissal (Escape, a click outside, another popover opening) is the browser's, a fact: the popover closes at once and `onOpenChange(false)` is called with `reason: \"dismiss\"`. Dismissals animate with CSS only."
         }
       />
 
@@ -716,7 +743,7 @@ html:active-view-transition .popover { transition: none; }
       <h4>Submit, then close (controlled)</h4>
       <CodeBlock>{`const [open, setOpen] = useState(false);
 
-<Popover.Root open={open} openChangeAction={(next) => { setOpen(next); }}>
+<Popover.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>
   <Popover.Trigger>Rename</Popover.Trigger>
   <Popover.Popup initialFocus="[name=title]">
     <Popover.Title>Rename</Popover.Title>
@@ -733,7 +760,7 @@ html:active-view-transition .popover { transition: none; }
   </Popover.Popup>
 </Popover.Root>`}</CodeBlock>
       <h4>Controlled, opened without a Trigger</h4>
-      <CodeBlock>{`<Popover.Root open={open} openChangeAction={(next) => { setOpen(next); }}>
+      <CodeBlock>{`<Popover.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>
   <Popover.Popup side={null} className="popover centered">…</Popover.Popup>
 </Popover.Root>`}</CodeBlock>
       <p>

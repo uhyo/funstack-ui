@@ -14,8 +14,13 @@ export function ActionPropsPage() {
     >
       <p className="page-intro">
         FUNSTACK UI has no <code>onClick</code>, <code>onChange</code> or <code>onValueChange</code>
-        , with <a href="#urgent-lane">one exception, below</a>. Interactive props are{" "}
-        <em>actions</em>: callbacks that the component runs inside its own transition and awaits.
+        . Interactive props are <em>actions</em>: callbacks that the component runs inside its own
+        transition and awaits. A change the library cannot hold, because the browser already made
+        it, is reported to an{" "}
+        <a href="#handlers">
+          <code>on*</code> handler
+        </a>{" "}
+        instead.
       </p>
       <p>
         An <Term id="action">action</Term> is a function prop that the component calls when the user
@@ -46,7 +51,7 @@ export function ActionPropsPage() {
             id: "veto",
             term: "Veto",
             definition:
-              "A controlled parent refuses a change by not adopting the value: when the action settles, the optimistic value snaps back to the committed one. Only library-owned changes can be vetoed; a [dismissal](/concepts/browser-owned-state#dismissal) cannot.",
+              "A controlled parent refuses a change by not adopting the value: when the action settles, the optimistic value snaps back to the committed one. Only requests can be vetoed; a [dismissal](/concepts/browser-owned-state#dismissal) is a fact and cannot.",
           },
           {
             id: "form-channel",
@@ -131,8 +136,8 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
           ],
           [
             '`"dismiss"`',
-            'The user closed the component without one of its parts: Escape, Android back, an assistive-technology dismiss, a click outside. Also a [Toast](/components/toast)\'s Close part, which only means "go away".',
-            "The platform's `close` event; for Toast the click or keydown.",
+            'The user closed the component without one of its parts: Escape, Android back, an assistive-technology dismiss, a click outside; also a close nobody caused through the component (script, another top-layer element, focus leaving). On an overlay these are facts, reported to `onOpenChange`. Also a [Toast](/components/toast)\'s Close part, which only means "go away".',
+            "The platform's `close` or `toggle` event; for Toast the click or keydown.",
           ],
           [
             '`"timeout"`',
@@ -383,25 +388,80 @@ import { setFavorite } from "./actions"; // "use server"
         </li>
       </ul>
 
+      <h3 id="handlers">
+        Requests and facts: <code>on*</code> handlers
+      </h3>
+      <p>
+        The name is a contract. A prop named <code>action</code> or <code>fooAction</code> is a{" "}
+        <strong>request</strong>: the component calls it before the change is committed, inside a
+        transition, and awaits it; a rejection, or a controlled parent that does not adopt, rolls
+        the UI back. A prop named <code>onFoo</code> reports a <strong>fact</strong>: a change that
+        had already happened when the library heard of it, and that the library could not have held.
+        The test: if the callback rejects, or the parent ignores it, can the library put the UI back
+        without the user noticing? If yes, it is an action. That is why a form reset or a click
+        before hydration on a checkbox is still an action (the DOM is the optimistic state, restored
+        on a refusal), while a popup the user dismissed with Escape is a fact.
+      </p>
+      <p>Every handler the library defines:</p>
+      <Table
+        head={["Handler", "On", "Reports"]}
+        rows={[
+          [
+            "`onInputValueChange`",
+            "[Combobox](/components/combobox) `Root`",
+            "the text of the input changed (the [urgent lane](#urgent-lane))",
+          ],
+          [
+            "`onOpenChange`",
+            "[Popover](/components/popover), [Menu](/components/menu), [Combobox](/components/combobox), [Dialog](/components/dialog) `Root`",
+            "the popup was closed without the library closing it: Escape, a click outside, focus leaving, script… Always `false`. The same Roots take `openChangeAction` for the opens and the closes a part asks for ([Requests and facts](/concepts/browser-owned-state#requests-and-facts)).",
+          ],
+          ["`onClose`", "a toast (`toast({ onClose })`)", "the toast left, with `details.reason`"],
+        ]}
+      />
+      <p>All of them follow one rule:</p>
+      <ul>
+        <li>
+          Called <strong>synchronously</strong>, in the event that reports the fact, outside any
+          transition: a <code>setState</code> in the body is an urgent update.
+        </li>
+        <li>
+          <strong>Not awaited</strong>, with no pending or optimistic state: the DOM already holds
+          the new value.
+        </li>
+        <li>
+          It <strong>may return a promise</strong> (an <code>async</code> function, a Server
+          Function). A rejection, like a synchronous throw, goes to <code>reportError</code>, never
+          to an Error Boundary, and the library's own work around the call still happens. Nothing
+          warns about a returned promise.
+        </li>
+      </ul>
+      <CodeBlock language="typescript">{`/** Called synchronously, outside any Transition, and not awaited. */
+type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> =
+  (next: T, details: Details) => void;
+/** The same for a fact that carries no state (a toast's onClose). */
+type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: Details) => void;`}</CodeBlock>
+      <p>
+        In a controlled overlay, set state directly in the handler:{" "}
+        <code>onOpenChange={"{setOpen}"}</code>, not inside <code>startTransition</code> and not
+        after an <code>await</code>. Here the "wrap it in{" "}
+        <code>startTransition</code>" advice above inverts.
+      </p>
+
       <h3 id="urgent-lane">The urgent lane</h3>
       <p>
         One kind of state cannot be a transition: the text of a controlled text input, which React
         must update in the same event as the keystroke. Such a state keeps the <code>x</code> /{" "}
         <code>defaultX</code> pair (<code>inputValue</code> / <code>defaultInputValue</code> on{" "}
         <a href="/components/combobox">Combobox</a>), but its callback is a handler, not an action:{" "}
-        <code>onInputValueChange</code>, typed:
+        <code>onInputValueChange</code>, an <code>UrgentChangeHandler</code>.
       </p>
-      <CodeBlock language="typescript">{`/** Called synchronously, outside any Transition, and not awaited. */
-type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> =
-  (next: T, details: Details) => void;`}</CodeBlock>
       <p>
         Nothing is pending or optimistic for it: the DOM already holds the value when it runs, so{" "}
         <code>{"(next) => setText(next)"}</code> is the whole controlled pattern. Everything the
         urgent value drives leaves the urgent lane at once (a deferred query, an open, a selection).
-        A returned promise is ignored and warned about in development. The callback is named{" "}
-        <code>on*</code> on purpose: <code>fooAction</code> always means a handler the component
-        runs in a transition, so a callback that must not run in one is named like the plain React
-        handler it is.
+        A returned promise is allowed (the handler rule above); a fetch whose results should render
+        belongs in a transition, through <code>useDeferredValue</code> of the text.
       </p>
 
       <h3>What about native handlers?</h3>

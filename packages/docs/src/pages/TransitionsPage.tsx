@@ -172,8 +172,9 @@ export function TransitionsPage() {
         <code>transition</code> prop can animate it with a view transition in every engine. A{" "}
         <a href="/concepts/browser-owned-state#dismissal">dismissal</a> happens in the browser
         before React hears about it, so only a CSS exit (<code>@starting-style</code>,{" "}
-        <code>transition-behavior: allow-discrete</code>) can animate it. Keep both, and turn the
-        CSS exit off while a view transition runs:
+        <code>transition-behavior: allow-discrete</code>) can animate it; it is a fact, reported to{" "}
+        <code>onOpenChange</code> in an urgent commit, which starts no view transition at all. Keep
+        both, and turn the CSS exit off while a view transition runs:
       </p>
       <CodeBlock language="css">{`html:active-view-transition .my-popup { transition: none; }`}</CodeBlock>
       <p>

@@ -92,11 +92,11 @@ export function ComboboxPage() {
       <h3 id="how-it-works">How it works</h3>
       <h4>Typing is urgent; everything it causes is not</h4>
       <p>
-        "Everything is a transition" has one exception, and this is it: React requires a controlled
-        text input to update urgently, in the same event as the keystroke. So the text is{" "}
-        <strong>urgent state</strong>. It keeps the usual pair, <code>inputValue</code> /{" "}
-        <code>defaultInputValue</code>, but its callback is a handler, not an action:{" "}
-        <code>onInputValueChange</code> (
+        React requires a controlled text input to update urgently, in the same event as the
+        keystroke: by the time the library hears of it, the text is already in the DOM. So the text
+        is <strong>urgent state</strong>, a fact rather than a request. It keeps the usual pair,{" "}
+        <code>inputValue</code> / <code>defaultInputValue</code>, but its callback is a handler, not
+        an action: <code>onInputValueChange</code> (
         <a href="/concepts/action-props#urgent-lane">the urgent lane</a>) is called synchronously,
         outside any transition, and never awaited. A controlled parent simply sets its state in the
         body:
@@ -113,7 +113,8 @@ export function ComboboxPage() {
           ever rendered, so a slow response for "ja" cannot overwrite the results for "jap".
         </li>
         <li>
-          <strong>Opening</strong> is a transition (<code>openChangeAction</code>).
+          <strong>Opening</strong> is a transition (<code>openChangeAction</code>). A dismissal
+          (Escape, a click outside, focus leaving) is a fact, reported to <code>onOpenChange</code>.
         </li>
         <li>
           <strong>Choosing</strong> an option is a transition (<code>valueChangeAction</code>) with
@@ -124,9 +125,10 @@ export function ComboboxPage() {
         <p>
           <code>{"onInputValueChange={async (q) => setResults(await search(q))}"}</code> brings back
           every problem the deferred query solves: responses land in completion order, nothing marks
-          the results stale, and the urgent handler is not awaited anyway (development warns when it
-          returns a promise). Read a query-keyed cache with <code>use()</code> inside the List
-          instead.
+          the results stale, and the urgent handler is not awaited anyway. Read a query-keyed cache
+          with <code>use()</code> inside the List instead. (Returning a promise is allowed, for work
+          the UI does not wait for such as logging: like every <code>on*</code> handler, its
+          rejection goes to <code>reportError</code>.)
         </p>
       </Callout>
       <p>
@@ -208,12 +210,13 @@ export function ComboboxPage() {
             name: "onInputValueChange",
             type: "UrgentChangeHandler<string, ComboboxInputValueChangeDetails>",
             description:
-              "A handler, not an action: [the urgent lane](/concepts/action-props#urgent-lane), called synchronously, outside any transition, on every change of the text (typing, and the library's own writes). Not awaited, never pending. Set your state in the body.",
+              "A handler, not an action: [the urgent lane](/concepts/action-props#urgent-lane), called synchronously, outside any transition, on every change of the text (typing, and the library's own writes). Not awaited, never pending. Set your state in the body. May return a promise; a rejection or a throw goes to `reportError` ([the rule of every on* handler](/concepts/action-props#handlers)).",
           },
           {
             name: "open",
             type: "boolean",
-            description: "Controlled open state. `undefined` means uncontrolled.",
+            description:
+              "Controlled open state. `undefined` means uncontrolled. Pass `onOpenChange` too (development warns).",
           },
           {
             name: "defaultOpen",
@@ -225,7 +228,13 @@ export function ComboboxPage() {
             name: "openChangeAction",
             type: "ChangeAction<boolean, ComboboxOpenChangeDetails>",
             description:
-              'Awaited for opens and for the closes the library performs (an accepted option, the Trigger); a notification for dismissals (Escape, a click outside, focus leaving). A [foreign invoker](/concepts/browser-owned-state#foreign-invoker) closes it as `"activate"`, a notification; pressing one does not move focus out of the input, so the text is left as typed.',
+              "Requests only: awaited for opens and for the closes a part asks for (an accepted option, the Trigger, Alt+ArrowUp). Never called for a dismissal (`onOpenChange`).",
+          },
+          {
+            name: "onOpenChange",
+            type: "UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>",
+            description:
+              'Facts only: the listbox was closed without the library closing it on request. Always `false`. `"dismiss"`: Escape, focus leaving the input, a click outside, a Clear click while open, another popover opening, script. `"activate"`: a [foreign invoker](/concepts/browser-owned-state#foreign-invoker) (pressing one does not move focus out of the input, so the text is left as typed). Called synchronously and not awaited: nothing is pending. In controlled mode set state directly here (`onOpenChange={setOpen}`); a parent that keeps `open` gets the listbox shown again at once. May return a promise; a rejection or a throw goes to `reportError`.',
           },
           {
             name: "allowCustomValue",
@@ -614,9 +623,9 @@ export function ComboboxPage() {
           A slow <code>openChangeAction</code>
         </h4>
         <p>
-          Here every <code>openChangeAction</code> call takes 2 seconds, like a server call. The
-          Input's <code>aria-expanded</code>, and the state the browser exposes on the Trigger,
-          follow the shown listbox:
+          Here every <code>openChangeAction</code> call takes 2 seconds, like a server call, and{" "}
+          <code>onOpenChange</code> logs the dismissals. The Input's <code>aria-expanded</code>, and
+          the state the browser exposes on the Trigger, follow the shown listbox:
         </p>
         <Example file="ComboboxSlowOpen.tsx" css="combobox.css">
           <ComboboxSlowOpen />
@@ -632,8 +641,8 @@ export function ComboboxPage() {
             expanded until the close's action settles.
           </li>
           <li>
-            Escape or a click outside: the listbox hides and both are collapsed at once; both are
-            pending while the <code>reason: "dismiss"</code> notification runs.
+            Escape or a click outside: a fact. The listbox hides and both are collapsed at once;
+            nothing is pending and the slow action is not called; <code>onOpenChange</code> is.
           </li>
         </ul>
         <p>
@@ -652,7 +661,7 @@ export function ComboboxPage() {
       <BehaviourSection
         id="browser-owned-state"
         summary={
-          'The listbox is a popover: a dismissal (Escape, a click outside, another popover opening) is the browser\'s. Focus leaving the input is closed by the library but reported the same way. Either way `openChangeAction(false)` is a notification with `reason: "dismiss"`.'
+          'The listbox is a popover: a dismissal (Escape, a click outside, another popover opening) is the browser\'s. Focus leaving the input is closed by the library at once, which it cannot hold either. Either way it is a fact: `onOpenChange(false)` with `reason: "dismiss"`, nothing pending.'
         }
       />
 
