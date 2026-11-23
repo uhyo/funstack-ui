@@ -389,3 +389,5 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Still waiting on user: #146 guard discussion; #148 sub-decisions.
 - 2026-11-24: #151/#152 merged. #146 fully decided (Button incl. function formAction "run"; Close parts "ignore"; Menu.Item/Toast.Action follow close option; WhilePending = "run" | "ignore") → developer on feat/146-while-pending. Hidden-owner rejection report-only confirmed.
 - #148 decided: onOpenChange name; controlled keep-open RE-OPENS (prop/DOM consistency); platform dispatches stay actions; dev warning when onOpenChange seems ignored. Open: Toast closeAction (decide from concrete design). Architect writes #148 design after #146 merges. #147 after #148.
+- 2026-11-24: #146 MERGED (whilePending). Review F1 PO decision: run-mode closing parts close only when last run settles and latest resolved. #154 filed (two-submitter formAction pending, predates).
+- Next: architect writes #148 design (prop tables per overlay, Toast options, dev warning for ignored onOpenChange). Then #147. Consider releasing alpha.17 (breaking: Button whilePending default; #145 reportError) — ask user.
