@@ -21,12 +21,12 @@ export function ProgressPage() {
       description="A progress bar on div[role=progressbar]: the display of someone else's action, correct in every lane, localised aria-valuetext, and a Root that is itself a Server Component."
     >
       <p className="page-intro">
-        A progress bar (WAI-ARIA <code>progressbar</code>) and the library's first{" "}
-        <strong>output-only</strong> component: nothing is pressed or typed, so there is no action,
-        no pending state and no optimistic state. A Progress is the display of{" "}
-        <em>someone else's</em> action. It has no behaviour JavaScript: <code>Progress.Root</code>{" "}
-        has no <code>"use client"</code>, so a Server Component renders it on the server (the small
-        client parts still ship; see <a href="#server-components">Server Components</a>).
+        A progress bar (WAI-ARIA <code>progressbar</code>). It is an <strong>output-only</strong>{" "}
+        component: nothing is pressed or typed, so there is no action, no pending state and no
+        optimistic state. A Progress is the display of <em>someone else's</em> action. It has no
+        behaviour JavaScript: <code>Progress.Root</code> has no <code>"use client"</code>, so a
+        Server Component renders it on the server (the small client parts still ship; see{" "}
+        <a href="#server-components">Server Components</a>).
       </p>
 
       <Example file="ProgressUpload.tsx" css="progress.css">

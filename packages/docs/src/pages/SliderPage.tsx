@@ -16,8 +16,8 @@ export function SliderPage() {
       description="A slider on a visually hidden native <input type=range> per thumb: every step a transition, each gesture saved once with rollback, multi-thumb, vertical and RTL."
     >
       <p className="page-intro">
-        A slider (WAI-ARIA Slider and Slider (Multi-Thumb) patterns) and the library's first
-        continuous control. Each thumb is a styleable element containing a visually hidden native{" "}
+        A slider (WAI-ARIA Slider and Slider (Multi-Thumb) patterns): a control for a continuous
+        value. Each thumb is a styleable element containing a visually hidden native{" "}
         <code>&lt;input type="range"&gt;</code>, so the role, the value and bounds, every key (RTL
         mirroring included), labels, forms and <code>disabled</code> are the platform's. The library
         adds the styleable thumb and track, pointer dragging, several thumbs that cannot cross, and
