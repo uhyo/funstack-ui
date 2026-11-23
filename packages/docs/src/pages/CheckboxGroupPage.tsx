@@ -109,8 +109,9 @@ export function CheckboxGroupPage() {
   );
 }}`}</CodeBlock>
         <p>
-          Uncontrolled groups need none of this: the latest dispatch already contains the earlier
-          clicks.
+          Uncontrolled groups need none of this: once every overlapping save has settled, the group
+          commits each change whose save resolved, in click order, and leaves out one whose save
+          rejected.
         </p>
       </Callout>
 
@@ -423,8 +424,11 @@ export function CheckboxGroupPage() {
             returns to mixed, and the error reaches the nearest Error Boundary.
           </li>
           <li>
-            Clicks while a save is pending stack: each dispatch is computed from what the user sees,
-            and only the latest commits.
+            Clicks while a save is pending stack: each dispatch is computed from what the user sees.
+            Uncontrolled, once every save has settled, the changes whose saves resolved are
+            committed in click order. An earlier click whose save rejected is left out, and its
+            error goes to <code>reportError</code> rather than the Error Boundary (see{" "}
+            <a href="/concepts/action-props#overlapping-actions">Overlapping actions</a>).
           </li>
         </ol>
       </BehaviourSection>
