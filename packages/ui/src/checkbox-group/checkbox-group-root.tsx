@@ -278,9 +278,9 @@ export function CheckboxGroupRoot({
 
   const base = (): ValueSet => intendedValue(latestInFlight, optimistic);
 
-  /** Dispatches `patch` on top of `from`, with the details of design 3.1. */
   /** The latest dispatch was a form reset (the absolute one, see `reducer`); for #151 below. */
   const latestIsReset = useRef(false);
+  /** Dispatches `patch` on top of `from`, with the details of design 3.1. */
   const dispatchPatch = (
     from: ValueSet,
     patch: CheckboxGroupPatch,

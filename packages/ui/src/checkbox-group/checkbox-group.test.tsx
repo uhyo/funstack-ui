@@ -1901,6 +1901,27 @@ describe("CheckboxGroup", () => {
       expect(dataPending()).toEqual([]);
     });
 
+    // #151 is uncontrolled only: controlled has no replay, so an empty diff is not dispatched.
+    it("controlled: a reset to the intended value while a change is in flight dispatches nothing", async () => {
+      const ds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => ds.next());
+      render(<Harness mode="controlled" initial={["a"]} inForm action={action} />);
+      const user = setupUser();
+      await user.click(box("b")); // check b: in flight
+      await user.click(box("b")); // uncheck b: the intended value is ["a"] again
+      await act(async () => {
+        form().reset(); // the mount-time target, ["a"]
+      });
+      await flushMicrotasks();
+      expect(calls(action).map(([, reason]) => reason)).toEqual(["activate", "activate"]);
+      await act(async () => {
+        ds[0]!.resolve();
+        ds[1]!.resolve();
+      });
+      expect(checkedValues()).toEqual(["a"]);
+      expect(action).toHaveBeenCalledTimes(2);
+    });
+
     it("uncontrolled: a reset to the shown value with nothing in flight dispatches nothing", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode="uncontrolled" initial={[]} inForm action={action} />);
