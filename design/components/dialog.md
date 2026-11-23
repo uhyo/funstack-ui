@@ -2687,3 +2687,37 @@ on the JS path and natively with the flag. The JS-free Trigger now records `dial
 keyboard click (no press) is unaffected, and a stale press cannot swallow a later keyboard
 open. Owned key `onPointerDown` (non-modal JS-free mode). F2, the pending-close edge ends
 closed (corrected above). F5, section 2.6 edited to match.
+## Amendment: requests and facts, `onOpenChange` (#148, 2026-11-24, user decision; implemented 2026-11-24)
+
+Design: `design/components/overlay-open-change.md` (sections 2 and 6 are Dialog's; conventions
+resolved question 45). It overrides every place above that calls a dismissal's
+`openChangeAction(false)` a "notification" (2, 2.3, 2.5, 3.1, 4.1 to 4.4, 10.3, 11, 12, 13):
+
+- `Dialog.Root` gains **`onOpenChange?: UrgentChangeHandler<boolean,
+  DialogOpenChangeDetails>`**. `openChangeAction` hears **requests only**: the Trigger and a
+  foreign `show-modal` command, a dialog found open at hydration (`"platform"`), `Dialog.Close`,
+  `Dialog.Form` (a `method="dialog"` submit, or the settle of a function action), a foreign
+  `request-close` / `close` command.
+- A **fact** is the `close` event of a close the library did not perform in its apply effect
+  (`libraryClose`, unchanged): Escape, Android back, AT dismiss, light dismiss (the JS baseline or
+  native `closedby="any"`, the Trigger click of an open non-modal `lightDismiss` dialog
+  included, #116), script `close(v)` / `requestClose(v)`, `form.submit()` on a
+  `method="dialog"` form, a `submit` whose propagation the consumer stopped. In that listener the
+  Root supersedes every request in flight, writes committed `false` urgently (uncontrolled) and
+  calls `onOpenChange(false, { reason: "dismiss", returnValue })` synchronously, with
+  `returnValue` as the browser left it. No `data-pending`, no view transition, no
+  `fsui-dialog-close` type.
+- **Deleted: the stored dismissal** (`dismissedWhilePending`, 2.3 and walkthrough 11.13). A
+  dismissal while a part's close is in flight is reported at once and supersedes that close; a
+  later veto of it changes nothing (the controlled parent already adopted the fact). The pending
+  part's `returnValue` is still dropped when the browser closes first.
+- **Controlled**: a parent that keeps `open={true}` after a fact gets the dialog re-opened in the
+  fact's own commit (`showModal()` / `show()`, focus moves back in by the dialog focusing steps),
+  or once the requests the fact superseded settled. `open` without `onOpenChange` warns once.
+  Call-site examples gain `onOpenChange={setOpen}`; 12.4's welcome dialog passes the Server
+  Function to both props (`openChangeAction={rememberDismissed} onOpenChange={rememberDismissed}`).
+- **JS-free mode** is selected only when the Root has none of `open`, `defaultOpen`,
+  `openChangeAction`, `onOpenChange`.
+- Errors: 4.3's "dismissal notification rejects" row is now: a promise `onOpenChange` returns,
+  and a throw, go to `reportError`. 4.2's "close notification pending" rows are gone with the
+  notification.

@@ -1752,3 +1752,11 @@ pin the timing, the order and the cleanup order). Developer deviations, both acc
 Should-fix 1 (the developer's): the docs' and playground's "the library attaches no listeners"
 for the flagged path becomes "no interaction listeners (only a passive `beforetoggle` that
 writes `data-instant`)", matching 2.1.
+## Amendment: the argument of 4.1 under the request / fact rule (#148, 2026-11-24)
+
+`design/components/overlay-open-change.md` section 8. Nothing changes in Tooltip: no `open`
+prop, no callback, no `data-open`. Only the reason in 4.1 is restated: every tooltip open and
+close is performed by the browser or by timers the user drives, so nothing about it is a
+request, and **if a callback is ever wanted it is `onOpenChange` only** (both `true` and
+`false`, synchronous, not awaited; conventions 2.1), never an `openChangeAction`. It would still
+cost the native path its only remaining listener, so it is not proposed.

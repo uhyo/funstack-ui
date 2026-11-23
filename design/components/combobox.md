@@ -10,10 +10,10 @@ typing, the rollback outside the transition, and the accepted implementation dev
 UrgentChangeHandler`, no longer `inputValueChangeAction: UrgentChangeAction`; edited in place
 (decision 3, 2.2, 3, 3.1, 3.6, 4, 6.2, 9, 10, 11.2, 12.1, 14), migration and implementation
 checklist in the amendment at the end; the historical sections keep the old names.
-**Amended 2026-11-24 (#148, user decision; not implemented yet)**: `onInputValueChange` follows
+**Amended 2026-11-24 (#148, user decision; implemented 2026-11-24)**: `onInputValueChange` follows
 the library-wide handler rule (a returned promise is allowed, no warning, rejection or throw to
 `reportError`; edited in place in 4, 9 and 12.1), and `open` gains `onOpenChange` for
-dismissals (amendment at the end; 3.1, 5.4 and 5.5 still describe the shipped behaviour).
+dismissals (amendment at the end, which overrides what 3.1, 5.4 and 5.5 say about dismissals).
 Follows `design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` and `design/components/menu.md` first**: Combobox is built on
@@ -2350,7 +2350,7 @@ listbox light-dismisses it (`(false, "dismiss")`, input keeps focus), on all thr
 becomes true as written; ComboboxPage's Trigger owned-keys note gains "(while enabled, or
 natively disabled; not while `aria-disabled`)" next to `popoverTarget`.
 
-## Amendment: requests and facts (#148, 2026-11-24, user decision; not implemented yet)
+## Amendment: requests and facts (#148, 2026-11-24, user decision; implemented 2026-11-24)
 
 Design: `design/components/overlay-open-change.md` (section 5 is Combobox's; conventions
 resolved question 45). What it changes here:
