@@ -1,0 +1,401 @@
+// THROWAWAY probe for issue #147 (memo/architect/147-reevaluation.md), option B: the library cuts
+// the popup's CSS transition around its own show / hide instead of the documented recipe
+// `html:active-view-transition .popup { transition: none; }`.
+//
+// Not part of the suite. To run, copy to packages/ui/src/__probes__/issue147.browser.test.tsx and:
+//   FUNSTACK_BROWSERS=chromium,firefox,webkit pnpm --filter @funstack/ui exec vitest run --project browser src/__probes__
+// Add `--silent=false --reporter=verbose` to see the rows: each prints lines `[147 <engine>] {json}`.
+// The `cut-gated` rows (option B as recommended) also assert its engine-independent claims, so a
+// CI run without console output (the WebKit job) still answers the question: green = B holds.
+//
+// Option B is emulated WITHOUT touching library code: the probe wraps the DOM methods the library
+// calls for its own show / hide (`showPopover`, `hidePopover`, `showModal`, `close`). A dismissal
+// (Escape) never goes through these methods, exactly as in option B.
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { server, userEvent } from "vitest/browser";
+import {
+  addStyle,
+  animationsFinished,
+  leaveActEnvironment,
+  onCleanup,
+  sleep,
+  spyViewTransitions,
+} from "../__tests__/browser-helpers.js";
+import { Dialog } from "../dialog/index.js";
+import { Popover } from "../popover/index.js";
+
+const engine = server.browser;
+const out = (row: string, data: unknown) =>
+  console.log(`[147 ${engine}] ${JSON.stringify({ row, ...(data as object) })}`);
+
+type Variant = "none" | "recipe" | "cut" | "cut-noflush" | "cut-gated";
+type Kind = "popover" | "dialog";
+
+const DURATION = 400;
+
+function exitStyle(kind: Kind, recipe: boolean): void {
+  const open = kind === "dialog" ? ":open" : ":popover-open";
+  const boxes = (state = "") =>
+    kind === "dialog" ? `.fade${state}, .fade${state}::backdrop` : `.fade${state}`;
+  addStyle(`
+    ${boxes()} {
+      opacity: 0;
+      transition: opacity ${DURATION}ms linear, display ${DURATION}ms allow-discrete, overlay ${DURATION}ms allow-discrete;
+    }
+    ${boxes(open)} { opacity: 1; }
+    @starting-style { ${boxes(open)} { opacity: 0; } }
+    ${recipe ? "html:active-view-transition .fade { transition: none; }" : ""}
+    ::view-transition-old(.pop), ::view-transition-new(.pop) { animation-duration: 300ms; }
+  `);
+}
+
+const activePseudo = (): boolean | string => {
+  try {
+    return document.documentElement.matches(":active-view-transition");
+  } catch {
+    return "unsupported";
+  }
+};
+const activeApi = (): boolean | string =>
+  "activeViewTransition" in document
+    ? (document as Document & { activeViewTransition: unknown }).activeViewTransition != null
+    : "unsupported";
+
+interface CallRecord {
+  method: string;
+  activePseudo: boolean | string;
+  activeApi: boolean | string;
+  cut: boolean;
+  styleBefore: string | null;
+  styleAfter: string | null;
+}
+
+/**
+ * Option B, emulated: around the library's own show / hide of a `.fade` element, write an inline
+ * `transition: none !important`, call the method, flush style (unless `noflush`), restore the
+ * inline value. `gated`: only while `html:active-view-transition` matches.
+ */
+function installCut(variant: Variant): CallRecord[] {
+  const records: CallRecord[] = [];
+  const targets: [object, string][] = [
+    [HTMLElement.prototype, "showPopover"],
+    [HTMLElement.prototype, "hidePopover"],
+    [HTMLDialogElement.prototype, "showModal"],
+    [HTMLDialogElement.prototype, "close"],
+  ];
+  for (const [proto, name] of targets) {
+    const original = (proto as Record<string, (...args: unknown[]) => unknown>)[name]!;
+    (proto as Record<string, unknown>)[name] = function (this: HTMLElement, ...args: unknown[]) {
+      if (!this.classList.contains("fade")) return original.apply(this, args);
+      const pseudo = activePseudo();
+      const record: CallRecord = {
+        method: name,
+        activePseudo: pseudo,
+        activeApi: activeApi(),
+        cut: false,
+        styleBefore: this.getAttribute("style"),
+        styleAfter: null,
+      };
+      records.push(record);
+      const cut =
+        variant === "cut" || variant === "cut-noflush" || (variant === "cut-gated" && pseudo === true);
+      if (!cut) {
+        try {
+          return original.apply(this, args);
+        } finally {
+          record.styleAfter = this.getAttribute("style");
+        }
+      }
+      record.cut = true;
+      const previous = this.style.getPropertyValue("transition");
+      const priority = this.style.getPropertyPriority("transition");
+      this.style.setProperty("transition", "none", "important");
+      try {
+        return original.apply(this, args);
+      } finally {
+        // The style change of the show / hide must be processed while the cut is in place:
+        // without this flush the restored `transition` is what the engine sees and the fade runs.
+        if (variant !== "cut-noflush") void getComputedStyle(this).opacity;
+        if (previous === "") this.style.removeProperty("transition");
+        else this.style.setProperty("transition", previous, priority);
+        record.styleAfter = this.getAttribute("style");
+      }
+    };
+    onCleanup(() => {
+      (proto as Record<string, unknown>)[name] = original;
+    });
+  }
+  return records;
+}
+
+const trigger = () => screen.getByTestId("trigger");
+const popup = () => screen.getByTestId("popup");
+const isOpen = (kind: Kind) =>
+  kind === "dialog" ? (popup() as HTMLDialogElement).open : popup().matches(":popover-open");
+
+/** What is running now: the popup's own CSS transitions, its backdrop's, and the VT pseudos. */
+interface Snapshot {
+  display: string;
+  opacity: string;
+  cssTransitions: string[];
+  vtPseudos: string[];
+}
+
+function snapshot(): Snapshot {
+  const element = popup();
+  const style = getComputedStyle(element);
+  const own = element.getAnimations({ subtree: true }).map((animation) => {
+    const effect = animation.effect as KeyframeEffect | null;
+    const pseudo = effect?.pseudoElement ?? "";
+    const property = (animation as CSSTransition).transitionProperty ?? "(animation)";
+    return `${effect?.target === element ? "" : "child:"}${pseudo}${pseudo ? ":" : ""}${property}`;
+  });
+  const pseudos = [
+    ...new Set(
+      document
+        .getAnimations()
+        .map((animation) => (animation.effect as KeyframeEffect | null)?.pseudoElement ?? "")
+        .filter((name) => name.startsWith("::view-transition-") && !name.endsWith("(root)")),
+    ),
+  ]
+    // React's generated names differ per run; keep the kind only.
+    .map((name) => name.replace(/\(.*\)/, "(popup)"))
+    .sort();
+  return {
+    display: style.display,
+    opacity: Number(style.opacity).toFixed(2),
+    cssTransitions: own.sort(),
+    vtPseudos: pseudos,
+  };
+}
+
+function Harness({ kind, inlineTransition }: { kind: Kind; inlineTransition?: boolean }) {
+  const style = inlineTransition
+    ? {
+        transition: `opacity ${DURATION}ms linear, display ${DURATION}ms allow-discrete, overlay ${DURATION}ms allow-discrete`,
+      }
+    : undefined;
+  if (kind === "dialog") {
+    return (
+      <Dialog.Root defaultOpen={false}>
+        <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
+        <Dialog.Popup data-testid="popup" className="fade" transition="pop" style={style}>
+          <Dialog.Title>Title</Dialog.Title>
+          <Dialog.Close data-testid="close">Close</Dialog.Close>
+        </Dialog.Popup>
+      </Dialog.Root>
+    );
+  }
+  return (
+    <Popover.Root defaultOpen={false}>
+      <Popover.Trigger data-testid="trigger">Open</Popover.Trigger>
+      <Popover.Popup data-testid="popup" className="fade" transition="pop" style={style}>
+        <Popover.Title>Title</Popover.Title>
+        <Popover.Close data-testid="close">Close</Popover.Close>
+      </Popover.Popup>
+    </Popover.Root>
+  );
+}
+
+describe("probe A: the real Popover / Dialog with transition and a CSS exit", () => {
+  for (const kind of ["popover", "dialog"] as const) {
+    for (const variant of ["none", "recipe", "cut", "cut-noflush", "cut-gated"] as const) {
+      it(`${kind} ${variant}`, async () => {
+        leaveActEnvironment();
+        exitStyle(kind, variant === "recipe");
+        const calls = installCut(variant);
+        const vt = spyViewTransitions();
+        render(<Harness kind={kind} />);
+        const row = `A ${kind} ${variant}`;
+
+        // 1. Library open (view transition 1).
+        trigger().click();
+        await expect.poll(() => vt.calls()).toBe(1);
+        await vt.transitions[0]!.ready;
+        const atOpen = snapshot();
+        out(row, { step: "open@ready", ...atOpen });
+        if (variant === "cut-gated") {
+          // The CSS enter does not run next to the view transition's enter.
+          expect(atOpen.opacity, JSON.stringify(atOpen)).toBe("1.00");
+          expect(atOpen.cssTransitions.filter((name) => !name.startsWith("::backdrop"))).toEqual([]);
+        }
+        await vt.transitions[0]!.finished;
+        await animationsFinished(popup());
+        expect(isOpen(kind)).toBe(true);
+
+        // 2. Library close through the Close part (view transition 2).
+        screen.getByTestId("close").click();
+        await expect.poll(() => vt.calls()).toBe(2);
+        await vt.transitions[1]!.ready;
+        const atClose = snapshot();
+        out(row, { step: "close@ready", ...atClose });
+        if (variant === "cut-gated") {
+          // The hidden box is gone from the new snapshot: no double image.
+          expect(atClose.display, JSON.stringify(atClose)).toBe("none");
+          expect(atClose.cssTransitions).toEqual([]);
+        }
+        await vt.transitions[1]!.finished;
+        await animationsFinished(popup());
+        out(row, { step: "close@finished", open: isOpen(kind), style: popup().getAttribute("style") });
+
+        // 3. Re-open (view transition 3), then a dismissal: Escape.
+        trigger().click();
+        await expect.poll(() => vt.calls()).toBe(3);
+        await vt.transitions[2]!.finished;
+        await animationsFinished(popup());
+        expect(isOpen(kind)).toBe(true);
+        await userEvent.keyboard("{Escape}");
+        await expect.poll(() => isOpen(kind)).toBe(false);
+        await sleep(100);
+        out(row, { step: "escape+100ms", vtCalls: vt.calls(), ...snapshot() });
+        await sleep(DURATION + 100);
+        out(row, { step: "escape+settled", vtCalls: vt.calls(), ...snapshot() });
+
+        out(row, { step: "calls", calls });
+        if (variant === "cut-gated") {
+          // The gate matched inside every library show / hide, the inline style came back as it
+          // was, and the dismissal started no view transition.
+          expect(calls.map((call) => call.method)).toEqual(
+            kind === "dialog"
+              ? ["showModal", "close", "showModal"]
+              : ["showPopover", "hidePopover", "showPopover"],
+          );
+          for (const call of calls) {
+            expect(call.activePseudo, JSON.stringify(call)).toBe(true);
+            expect(call.styleAfter).toBe(call.styleBefore);
+          }
+          expect(vt.calls()).toBe(3);
+        }
+      });
+    }
+  }
+
+  // A consumer `style={{ transition }}`: the inline value must come back byte for byte, and React
+  // must not be confused by the write.
+  for (const kind of ["popover", "dialog"] as const) {
+    it(`${kind} cut-gated with an inline transition from the consumer`, async () => {
+      leaveActEnvironment();
+      addStyle(`
+        .fade { opacity: 0; }
+        .fade${kind === "dialog" ? ":open" : ":popover-open"} { opacity: 1; }
+        ::view-transition-old(.pop), ::view-transition-new(.pop) { animation-duration: 300ms; }
+      `);
+      const calls = installCut("cut-gated");
+      const vt = spyViewTransitions();
+      render(<Harness kind={kind} inlineTransition />);
+      const row = `A ${kind} inline-style`;
+      const before = popup().getAttribute("style");
+      trigger().click();
+      await expect.poll(() => vt.calls()).toBe(1);
+      await vt.transitions[0]!.finished;
+      await animationsFinished(popup());
+      screen.getByTestId("close").click();
+      await expect.poll(() => vt.calls()).toBe(2);
+      await vt.transitions[1]!.ready;
+      out(row, { step: "close@ready", ...snapshot() });
+      await vt.transitions[1]!.finished;
+      expect(popup().getAttribute("style")).toBe(before);
+      out(row, {
+        step: "close@finished",
+        sameStyle: popup().getAttribute("style") === before,
+        style: popup().getAttribute("style"),
+        cuts: calls.map((call) => `${call.method}:${call.cut}`),
+      });
+    });
+  }
+});
+
+// Platform only (no React): nested popovers the browser closes with the parent, and an unrelated
+// view transition during a dismissal's fade.
+describe("probe B: platform", () => {
+  const css = `
+    .p { opacity: 0; transition: opacity ${DURATION}ms linear, display ${DURATION}ms allow-discrete, overlay ${DURATION}ms allow-discrete; }
+    .p:popover-open { opacity: 1; }
+    #parent { view-transition-name: parent; }
+    ::view-transition-group(*) { animation-duration: 300ms; }
+  `;
+
+  function build(nesting: "descendant" | "invoker"): { parent: HTMLElement; child: HTMLElement } {
+    const host = document.createElement("div");
+    host.innerHTML =
+      nesting === "descendant"
+        ? `<div id="parent" class="p" popover>parent <div id="child" class="p" popover>child</div></div>`
+        : `<div id="parent" class="p" popover>parent <button id="inv" popovertarget="child">x</button></div>
+           <div id="child" class="p" popover>child</div>`;
+    document.body.append(host);
+    onCleanup(() => host.remove());
+    const parent = host.querySelector<HTMLElement>("#parent")!;
+    const child = host.querySelector<HTMLElement>("#child")!;
+    parent.showPopover();
+    if (nesting === "descendant") child.showPopover();
+    else child.showPopover({ source: host.querySelector<HTMLElement>("#inv")! });
+    return { parent, child };
+  }
+
+  const cutAround = (elements: HTMLElement[], run: () => void): void => {
+    for (const element of elements) element.style.setProperty("transition", "none", "important");
+    run();
+    for (const element of elements) void getComputedStyle(element).opacity;
+    for (const element of elements) element.style.removeProperty("transition");
+  };
+
+  for (const nesting of ["descendant", "invoker"] as const) {
+    for (const cut of ["none", "parent", "parent+child"] as const) {
+      it(`nested (${nesting}), cut=${cut}`, async () => {
+        addStyle(css);
+        const { parent, child } = build(nesting);
+        await animationsFinished(parent);
+        await animationsFinished(child);
+        const bothOpen = parent.matches(":popover-open") && child.matches(":popover-open");
+        const transition = document.startViewTransition(() => {
+          const targets = cut === "none" ? [] : cut === "parent" ? [parent] : [parent, child];
+          cutAround(targets, () => parent.hidePopover());
+        });
+        await transition.ready;
+        const read = (element: HTMLElement) => ({
+          open: element.matches(":popover-open"),
+          display: getComputedStyle(element).display,
+          cssTransitions: element.getAnimations().length,
+        });
+        out(`B nested ${nesting} cut=${cut}`, {
+          bothOpen,
+          parent: read(parent),
+          child: read(child),
+          childHasBox: child.getClientRects().length > 0,
+        });
+        await transition.finished;
+      });
+    }
+  }
+
+  for (const recipe of [false, true]) {
+    it(`an unrelated view transition during a dismissal's fade (recipe=${recipe})`, async () => {
+      addStyle(css + (recipe ? "html:active-view-transition .p { transition: none; }" : ""));
+      const host = document.createElement("div");
+      host.innerHTML = `<div id="solo" class="p" popover>solo</div><p id="other">a</p>`;
+      document.body.append(host);
+      onCleanup(() => host.remove());
+      const solo = host.querySelector<HTMLElement>("#solo")!;
+      solo.showPopover();
+      await animationsFinished(solo);
+      solo.focus();
+      await userEvent.keyboard("{Escape}");
+      await sleep(80);
+      const before = { open: solo.matches(":popover-open"), display: getComputedStyle(solo).display };
+      const transition = document.startViewTransition(() => {
+        host.querySelector("#other")!.textContent = "b";
+      });
+      await transition.ready;
+      out(`B unrelated-vt recipe=${recipe}`, {
+        before,
+        atReady: {
+          display: getComputedStyle(solo).display,
+          opacity: Number(getComputedStyle(solo).opacity).toFixed(2),
+          cssTransitions: solo.getAnimations().length,
+        },
+      });
+      await transition.finished;
+    });
+  }
+});
