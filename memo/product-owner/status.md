@@ -374,3 +374,9 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - MERGED #137 (JSDoc 100%; reviewer's pull --rebase linearised it onto master — fine), #134+#135+#136 together (e2175bf; SKILL.md conflict resolved to writer's version).
 - RELEASED 0.1.0-alpha.16 (Publish + Deploy Docs green). Verified: `npx -p @funstack/ui@0.1.0-alpha.16 funstack-ui-skill-installer` installs the skill; https://ui.funstack.work/llms.txt live; .md served as text/markdown. WAVE 19 DONE.
 - Lesson: merge in a private worktree and push from there — agents share the main checkout and its master.
+
+## Wave 20: #143 human feedback (2026-11-23)
+- #122 got slow openChangeAction examples (241440e); all human-task issues have "Where to test" links. #121 likely closed the Firefox stale-expanded gap; Firefox NVDA check still asked.
+- #143 split into: #144 docs wording (technical-writer, worktree branch docs/144-wording), #145 superseded rejections (align with React), #146 pure-trigger guard opt-in, #147 popup CSS exit vs VT, #148 dismissal-notification abstraction (user wants discussion), #149 Server Components accordion close not animating (developer, worktree branch fix/149-accordion-close).
+- Architect evaluating #145-#148 → memo/architect/143-design-questions.md. No design changes until the user decides; then docs for those sections follow.
+- Merge #144 and #149 myself in a private worktree after review.
