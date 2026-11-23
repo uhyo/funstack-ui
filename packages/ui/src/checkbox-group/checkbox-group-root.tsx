@@ -278,6 +278,8 @@ export function CheckboxGroupRoot({
 
   const base = (): ValueSet => intendedValue(latestInFlight, optimistic);
 
+  /** The latest dispatch was a form reset (the absolute one, see `reducer`); for #151 below. */
+  const latestIsReset = useRef(false);
   /** Dispatches `patch` on top of `from`, with the details of design 3.1. */
   const dispatchPatch = (
     from: ValueSet,
@@ -290,6 +292,7 @@ export function CheckboxGroupRoot({
       added: sortByDocument(patch.added),
       removed: sortByDocument(patch.removed),
     });
+    latestIsReset.current = reason === "platform" && event !== undefined;
     dispatch(applyPatch(from, details), details);
   };
 
@@ -352,6 +355,13 @@ export function CheckboxGroupRoot({
       readGroup("defaultChecked", value === undefined ? (defaultSet ?? EMPTY_SET) : base()),
     base,
     equals: setsEqual,
+    // #151: a reset is absolute in the uncontrolled replay (the `reducer` above), so while a
+    // change is in flight it is dispatched even when its target equals the intended value;
+    // otherwise an earlier change that rejects later would roll the group back past the reset.
+    // Not when the latest dispatch is itself a reset: nothing after it could be rolled back, and
+    // repeated resets stay one dispatch. Controlled: no replay, the parent decides.
+    dispatchEqualReset: () =>
+      value === undefined && latestInFlight() !== null && !latestIsReset.current,
     onPlatformChange: (next, event) => {
       const from = base();
       const added = [...next].filter((v) => !from.has(v));

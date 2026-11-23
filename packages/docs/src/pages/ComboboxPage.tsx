@@ -389,7 +389,7 @@ export function ComboboxPage() {
             type: "boolean",
             default: "false",
             description:
-              "`false`: the children render only while open. `true`: they stay mounted in a hidden `<Activity>`.",
+              "`false`: the children render only while open. `true`: they stay mounted in a hidden `<Activity>`; an action inside that rejects while it is hidden goes to `reportError`, not to an Error Boundary.",
           },
           {
             name: "transition",

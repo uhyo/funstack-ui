@@ -113,6 +113,21 @@ export function CheckboxGroupPage() {
           commits each change whose save resolved, in click order, and leaves out one whose save
           rejected.
         </p>
+        <p>
+          One exception, in both modes: a form reset (<code>reason: "platform"</code> with{" "}
+          <code>details.event?.type === "reset"</code>) replaces the whole value, so save its{" "}
+          <code>next</code> whole. Its <code>added</code> / <code>removed</code> are only the diff
+          from what was intended and can be empty, for example when a pending uncheck is reset away.
+          If your saves must not overlap at all, queue them with React's{" "}
+          <a href="https://react.dev/reference/react/useActionState">
+            <code>useActionState</code>
+          </a>{" "}
+          and call its dispatch from the action.
+        </p>
+        <CodeBlock>{`valueChangeAction={async (next, details) => {
+  if (details.reason === "platform" && details.event?.type === "reset") await saveAll(next);
+  else await save(details.added, details.removed);
+}}`}</CodeBlock>
       </Callout>
 
       <h3 id="props">Props</h3>
@@ -486,7 +501,10 @@ export function CheckboxGroupPage() {
           automatic reset after the action succeeds) is one dispatch for the whole group, with{" "}
           <code>reason: "platform"</code>, the <code>reset</code> event, and the diff in{" "}
           <code>added</code> / <code>removed</code>. Uncontrolled, the target is the latest{" "}
-          <code>defaultValue</code>; controlled, the mount-time values are offered to the parent.
+          <code>defaultValue</code>, and the reset replaces the value whole: it is dispatched even
+          with an empty diff while a change is still pending, so a pending change that fails later
+          cannot bring its box back after the reset. Controlled, the mount-time values are offered
+          to the parent.
         </li>
         <li>
           <strong>Clicks before hydration</strong> work natively, on Items and on Parents. On

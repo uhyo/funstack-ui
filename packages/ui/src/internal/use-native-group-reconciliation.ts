@@ -24,12 +24,21 @@ export interface UseNativeGroupReconciliationOptions<T> {
    */
   readonly base: () => T;
   /**
-   * The browser changed the group's value on a residual path and it differs from `base()`.
-   * `event` is the `reset` event, or `undefined` for mount reconciliation (the Root's mount, or a
-   * member mounting later). The Root dispatches once for the whole group with
-   * `reason: "platform"`.
+   * The browser changed the group's value on a residual path and it differs from `base()` (for a
+   * form reset, also when equal while `dispatchEqualReset()` holds). `event` is the `reset` event,
+   * or `undefined` for mount reconciliation (the Root's mount, or a member mounting later): an
+   * event is set exactly for a form reset, which CheckboxGroup's reducer relies on to treat the
+   * dispatch as absolute. The Root dispatches once for the whole group with `reason: "platform"`.
    */
   readonly onPlatformChange: (next: T, event: Event | undefined) => void;
+  /**
+   * Form reset only: dispatch the reset target even when it equals `base()`, while this returns
+   * `true`. A set-valued group (CheckboxGroup) passes "a dispatch is in flight"
+   * (`latestInFlight() !== null`): its reset is absolute in the uncontrolled replay (conventions
+   * 3.3), so it must enter the burst even with an empty diff, or an earlier in-flight change that
+   * rejects later would roll the group back past the reset (#151). Default: never.
+   */
+  readonly dispatchEqualReset?: (() => boolean) | undefined;
   /**
    * Equality between a read value and `base()`. Default `Object.is`, right for a primitive value
    * (RadioGroup's `string | null`); a group with a collection value (CheckboxGroup's
@@ -70,7 +79,7 @@ export interface UseNativeGroupReconciliationResult {
  *   Root, where a click before hydration changed the DOM) reports through `onItemMounted`, and the
  *   group is reconciled again the same way (see `UseNativeGroupReconciliationResult`).
  * - Form reset through `useFormReset` on the container: in a microtask after the reset,
- *   `readDefault()` vs `base()`.
+ *   `readDefault()` vs `base()` (or dispatched regardless while `dispatchEqualReset()` holds).
  *
  * Values are compared with `equals` (default `Object.is`).
  */
@@ -116,7 +125,9 @@ export function useNativeGroupReconciliation<T>(
     element,
     (event) => {
       if (element.current === null) return;
-      reconcile(options, options.readDefault(), event);
+      const next = options.readDefault();
+      if (options.dispatchEqualReset?.()) options.onPlatformChange(next, event);
+      else reconcile(options, next, event);
     },
     (event) => {
       if (element.current === null) return;

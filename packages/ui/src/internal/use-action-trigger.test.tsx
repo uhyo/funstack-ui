@@ -2,6 +2,7 @@
 // (Button, Dialog.Close, Popover.Close, Menu.Item, Toast.Action, the Slider and NumberField steps)
 // cover it through their own suites; these rows pin the default and the opt-out.
 import { act, render } from "@testing-library/react";
+import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { deferred, ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
 import { useActionTrigger } from "./use-action-trigger.js";
@@ -188,5 +189,82 @@ describe("useActionTrigger: superseded rejections, burst and unmount", () => {
     expect(caught).not.toHaveBeenCalled();
     expect(reportError.mock.calls).toEqual([[first], [second]]);
     expect(consoleError).not.toHaveBeenCalled();
+  });
+});
+
+// #152: the latest run's rejection after its part left. React routes a transition's rejection only
+// through a render of the component that owns it, so the hook reports it instead.
+describe("useActionTrigger: the latest rejection once the part left", () => {
+  function setupOwner(options?: ActionTriggerOptions) {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const caught = vi.fn();
+    let hook!: ActionTrigger;
+    type Mode = "shown" | "hidden" | "gone";
+    function App({ mode }: { mode: Mode }) {
+      return (
+        // The boundary stays mounted: only the part leaves, as a toast's Action does.
+        <ErrorCatcher onError={caught}>
+          {mode === "gone" ? null : (
+            <Activity mode={mode === "hidden" ? "hidden" : "visible"}>
+              <Probe options={options} onHook={(h) => (hook = h)} />
+            </Activity>
+          )}
+        </ErrorCatcher>
+      );
+    }
+    const view = render(<App mode="shown" />);
+    const setMode = (mode: Mode) => view.rerender(<App mode={mode} />);
+    return { reportError, caught, hook: () => hook, setMode };
+  }
+
+  it.each([
+    ["the default", undefined],
+    ["ignoreWhilePending: false", { ignoreWhilePending: false }],
+  ] as const)("unmounted (%s): reported once, `then` skipped", async (_label, options) => {
+    const consoleError = silenceErrors();
+    const { reportError, caught, hook, setMode } = setupOwner(options);
+    const run = deferred();
+    const then = vi.fn();
+    act(() => {
+      hook().run(() => run.promise, then);
+    });
+    act(() => setMode("gone"));
+    const failure = new Error("latest");
+    await act(async () => run.reject(failure));
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(caught).not.toHaveBeenCalled();
+    expect(then).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("hidden by <Activity>: reported once; the boundary is not reached on re-show", async () => {
+    silenceErrors();
+    const { reportError, caught, hook, setMode } = setupOwner();
+    const run = deferred();
+    act(() => {
+      hook().run(() => run.promise);
+    });
+    act(() => setMode("hidden"));
+    const failure = new Error("latest");
+    await act(async () => run.reject(failure));
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(failure);
+    act(() => setMode("shown"));
+    await act(async () => {});
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledTimes(1);
+  });
+
+  it("still mounted: the boundary, not reportError", async () => {
+    silenceErrors();
+    const { reportError, caught, hook } = setupOwner();
+    const run = deferred();
+    act(() => {
+      hook().run(() => run.promise);
+    });
+    const failure = new Error("latest");
+    await act(async () => run.reject(failure));
+    expect(caught).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(reportError).not.toHaveBeenCalled();
   });
 });

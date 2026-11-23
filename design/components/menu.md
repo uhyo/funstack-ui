@@ -962,7 +962,9 @@ Notation: `C` / `O` / `P` as in Popover. Uncontrolled root menu, `keepMounted={f
    (the transition belongs to an unmounted component: its post-await commit is dropped, the
    uncontrolled value is lost with the item; a controlled parent's `setChecked` after the await
    still runs). Documented: checkable items in a menu that unmounts should be controlled, or use
-   `keepMounted`.
+   `keepMounted`. Either way, if the action then rejects, the item is gone (unmounted) or hidden
+   (`keepMounted`: effects disconnected), so the rejection is passed to `reportError` and no
+   boundary shows, not even when the menu reopens (conventions 2.4, #152).
 5. **RadioItem switch, overlap.** "By date" then "By name" before the first settles: optimistic
    follows the latest; `data-pending` moves to "By name" and stays on the group; the first
    resolution is superseded; the final committed value is "name". If the first action rejects

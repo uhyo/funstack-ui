@@ -3,6 +3,7 @@
 // rules (reportError, not the boundary; every one of a burst; unmount; the console fallback) and
 // the uncontrolled reducer commit (#150) also have direct rows here.
 import { act, render } from "@testing-library/react";
+import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { deferred, ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
 import type { ActionDetails } from "./types.js";
@@ -238,6 +239,49 @@ describe("useControllableAction: superseded rejections", () => {
     expect(reportError).toHaveBeenCalledExactlyOnceWith(first);
     expect(consoleError).not.toHaveBeenCalled();
   });
+
+  // #152: React routes the latest dispatch's rejection only through a render of the component
+  // that owns it; once that component left, the hook reports it.
+  it.each([
+    ["unmounted", "gone"],
+    ["hidden by <Activity>", "hidden"],
+  ] as const)(
+    "%s: the latest rejection is reported once, the boundary never reached",
+    async (_label, away) => {
+      const consoleError = silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const caught = vi.fn();
+      const run = deferred();
+      let hook!: Hook;
+      type Mode = "shown" | "hidden" | "gone";
+      function App({ mode }: { mode: Mode }) {
+        return (
+          <ErrorCatcher onError={caught}>
+            {mode === "gone" ? null : (
+              <Activity mode={mode === "hidden" ? "hidden" : "visible"}>
+                <Probe action={() => run.promise} onHook={(h) => (hook = h)} />
+              </Activity>
+            )}
+          </ErrorCatcher>
+        );
+      }
+      const view = render(<App mode="shown" />);
+      const setMode = (mode: Mode) => view.rerender(<App mode={mode} />);
+      act(() => {
+        hook.dispatch("a", {} as ActionDetails);
+      });
+      act(() => setMode(away));
+      const failure = new Error("latest");
+      await act(async () => run.reject(failure));
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(failure);
+      act(() => setMode("shown"));
+      await act(async () => {});
+      expect(caught).not.toHaveBeenCalled();
+      expect(reportError).toHaveBeenCalledTimes(1);
+      expect(consoleError).not.toHaveBeenCalled();
+    },
+  );
 
   it("logs with console.error where there is no reportError", async () => {
     const consoleError = silenceErrors();

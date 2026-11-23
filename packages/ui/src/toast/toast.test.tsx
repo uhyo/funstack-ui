@@ -770,6 +770,40 @@ describe("Toast", () => {
       expect(last?.toasts.map((t) => [t.id, t.ending, t.pending])).toEqual([[id, false, false]]);
     });
 
+    // #152, walkthrough 6: the Action left with its toast, so React has no render to route the
+    // rejection through; the hook reports it.
+    it("closed while Undo is pending: its rejection is reported, the boundary untouched", async () => {
+      const consoleError = silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const errors: unknown[] = [];
+      const d = deferred();
+      const closeAction = vi.fn();
+      render(<Harness manager={manager} boundary={(e) => errors.push(e)} />);
+      const id = await call(() =>
+        manager({
+          title: "Archived",
+          action: { label: "Undo", action: () => d.promise },
+          closeAction,
+        }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`action-${id}`));
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`close-${id}`));
+      });
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).toBeNull();
+      const failure = new Error("undo failed");
+      await act(async () => d.reject(failure));
+      await flushMicrotasks(2);
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(failure);
+      expect(errors).toEqual([]);
+      expect(closeAction.mock.calls.map(([details]) => details.reason)).toEqual(["dismiss"]);
+      expect(consoleError).not.toHaveBeenCalled();
+    });
+
     it("caught inside: the action resolves and the toast closes (the documented trap)", async () => {
       render(<Harness manager={manager} />);
       const id = await call(() =>

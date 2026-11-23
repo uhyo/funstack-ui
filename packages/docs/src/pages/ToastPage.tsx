@@ -144,7 +144,10 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <code>data-pending</code> and the toast's timer is paused; when it resolves the toast closes
         with <code>reason: "activate"</code> (unless <code>closeOnSettle={"{false}"}</code>). A
         rejection keeps the toast and reaches the nearest Error Boundary{" "}
-        <strong>above the Viewport</strong>: put one around the list.
+        <strong>above the Viewport</strong>: put one around the list. Not when the Action is gone or
+        hidden by the time it rejects: the toast was closed while the action ran, or a{" "}
+        <code>toast.update</code> gave it content that is still suspending. The error then goes to
+        the global <code>reportError</code> (a window <code>error</code> event) instead.
       </p>
       <Callout kind="warning" title="A caught error closes the toast">
         <p>

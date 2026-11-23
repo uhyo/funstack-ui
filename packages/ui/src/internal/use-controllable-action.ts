@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { ActionDetails, ChangeAction } from "./types.js";
 import { useLatest } from "./use-latest.js";
-import { reportSuperseded } from "./report-superseded.js";
+import { reportDropped, useConnected } from "./report-dropped.js";
 
 export interface UseControllableActionOptions<T, Details extends ActionDetails> {
   /** The controlled prop (`x`). `undefined` means uncontrolled. */
@@ -98,8 +98,9 @@ function capitalize(s: string): string {
 /**
  * The one place the state model of conventions section 3 is implemented: committed state,
  * optimistic state (`useOptimistic`, reducer form), the component's own transition, the
- * post-`await` write of uncontrolled state, the latest-dispatch guard, and the reporting of
- * superseded rejections (conventions 2.4).
+ * post-`await` write of uncontrolled state, the latest-dispatch guard, and the reporting of the
+ * rejections React would drop: superseded ones, and the latest one once the owner left
+ * (conventions 2.4).
  */
 export function useControllableAction<T, Details extends ActionDetails = ActionDetails>(
   options: UseControllableActionOptions<T, Details>,
@@ -122,6 +123,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const inFlight = useRef<{ count: number; next: T | undefined }>({ count: 0, next: undefined });
   /** The uncontrolled reducer-mode dispatches of the current burst (overlapping), in order. */
   const burst = useRef<BurstEntry<T, Details>[]>([]);
+  const connected = useConnected();
 
   useDevWarnings(isControlled, defaultValue !== undefined, warn);
 
@@ -168,10 +170,11 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
           await action?.(next, details);
         } catch (error) {
           settle();
-          // The latest dispatch's rejection takes React's own route to the boundary. React drops
-          // a superseded one (it keeps only the newest thenable): it is reported instead (2.4).
-          if (id === latest.current) throw error;
-          reportSuperseded(error);
+          // The latest dispatch's rejection takes React's own route to the boundary while the
+          // owner is there to render it. React drops a superseded one (it keeps only the newest
+          // thenable) and one whose owner unmounted or is hidden: reported instead (2.4, #152).
+          if (id === latest.current && connected.current) throw error;
+          reportDropped(error);
           return;
         }
         if (entry) entry.resolved = true;
@@ -181,7 +184,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
         }
       });
     },
-    [props, settle, setOptimistic],
+    [props, settle, setOptimistic, connected],
   );
 
   const latestInFlight = useCallback((): { readonly next: T } | null => {

@@ -925,12 +925,13 @@ It is not set while content is merely suspended (that is the guard's job, and no
    resolve closed, the second's `then` found it gone.)
 6. **Close pressed while Undo is pending.** The toast closes (`"dismiss"`), the Action's
    transition keeps running to completion in the unmounted part; its `then` is a no-op. Its
-   rejection is **not reported anywhere**: it is the part's latest run, the hook rethrows it
-   inside the transition, and React drops the rejection of a transition whose component has
-   unmounted (probed 2026-11-23 on 19.3.1: no boundary, no `reportError`, no
-   `unhandledrejection`). The earlier text here said `reportError`; that was never the
-   behaviour for a latest run. Open gap against "the library never swallows an error",
-   conventions 2.4.
+   rejection is passed to `reportError` (#152, conventions 2.4): React drops the rejection of a
+   transition whose component has unmounted (probed 2026-11-23 on 19.3.1: no boundary, no
+   `reportError`, no `unhandledrejection`), so `useActionTrigger` reports a latest rejection
+   itself once the part's effects are disconnected. The boundary above the Viewport is not
+   involved. Until #152 the rejection went nowhere. The same holds while the Action is hidden by
+   the Root's Suspense guard (an urgent `toast.update` whose new content suspends): an Undo that
+   rejects then is reported, not thrown.
 7. **Promise toast whose promise never settles.** Stays `pending`, persistent; `toast.dismiss(id)`
    removes it; the returned promise is as unsettled as the input.
 8. **`toast.update` on an ending or unknown id.** Ignored (dev warning for unknown).
@@ -1150,7 +1151,7 @@ tested under "Lanes").
 | Promise | `toast.promise`: pending options rendered with `data-pending` at once; `success` on resolve (object and function forms), `error` on reject; omitted `success` / `error` dismiss; the returned promise resolves with the value, resolves `undefined` on rejection with `error` given, rejects with the reason without it; `ariaNotify` called on settle with the new text and priority; a throwing `success` / `error` function dismisses the toast and the returned promise rejects with what it threw (review M4). |
 | Sync action | `Toast.Action` calls `action(details)` with `details.id` and `details.event` the native click / keydown; `closeAction` receives `{ id, reason }`; Close dispatches `"dismiss"`; a disabled Action never dispatches; a default from `toast.action` and a prop `action` both work; no Action rendered without either. |
 | Async action | While the Undo promise is unresolved: `data-pending` on Action and Root, the toast's timer does not elapse (fake timers advanced past `duration`); after resolve: the toast closes with `reason: "activate"`; `closeOnSettle={false}` keeps it. |
-| Rejection | Undo rejects: the toast stays, `data-pending` gone, the error reaches an `<ErrorCatcher>` around the Viewport's list; caught-inside variant resolves and closes (the documented trap); caught-and-rethrown keeps the toast (15.3). |
+| Rejection | Undo rejects: the toast stays, `data-pending` gone, the error reaches an `<ErrorCatcher>` around the Viewport's list; caught-inside variant resolves and closes (the documented trap); caught-and-rethrown keeps the toast (15.3); the toast closed (Close) while Undo is pending, then Undo rejects: passed to `reportError` once (stubbed), the boundary untouched (walkthrough 6, #152). |
 | Overlap and superseded rejection | **N/A since #81** for `Toast.Action` (one run at a time); replaced by the Re-entry rows T1, T2 and T4 in `design/components/button.md` 16.4: the second Undo click is ignored and `defaultPrevented`, `aria-disabled` meanwhile, one close; a single rejecting run reaches the boundary above the Viewport and leaves the toast. |
 | `closeAction` | Called once per close with each reason (`"activate"`, `"dismiss"` for Close / Escape / `dismiss()`, `"timeout"`); runs in a transition (a `useTransition` probe inside it is not needed; assert it is not called synchronously inside the dismissal click, and that its rejection reaches the boundary above the Viewport); not called on Viewport unmount. |
 | Timers | Default 5000; Viewport `duration`; per-toast `duration`; `null` persistent; action toasts persistent by default and timed with `duration`; starts only when visible (queued beyond `limit`) and un-suspended; `update` with a new `duration` restarts. |

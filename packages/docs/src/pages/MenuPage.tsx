@@ -315,7 +315,7 @@ export function MenuPage() {
             type: "boolean",
             default: "false",
             description:
-              'false: the items render only while open (items that suspend hold the open, with `data-pending` on the Trigger). true: they stay mounted in `<Activity mode="hidden">`.',
+              'false: the items render only while open (items that suspend hold the open, with `data-pending` on the Trigger). true: they stay mounted in `<Activity mode="hidden">`; an item action that rejects while the menu is closed goes to `reportError`, not to an Error Boundary.',
           },
           {
             name: "experimental_focusgroup",

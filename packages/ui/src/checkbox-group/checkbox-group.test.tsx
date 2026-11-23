@@ -1810,6 +1810,128 @@ describe("CheckboxGroup", () => {
       expect(dataPending()).toEqual([]);
     });
 
+    // #151: the reset's target equals the intended value, so the diff is empty; it is dispatched
+    // anyway while a change is in flight, so the absolute reset joins the burst.
+    it.each([
+      ["before the reset settles", true],
+      ["after the reset settled", false],
+    ] as const)(
+      "uncontrolled: a reset to the intended value mid-burst wins over a rollback (rejects %s)",
+      async (_label, rejectFirst) => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const ds = sequencedDeferreds(5);
+        const action = vi.fn<ActionFn>(() => ds.next());
+        const caught = vi.fn();
+        render(
+          <Harness mode="uncontrolled" initial={[]} inForm action={action} boundary={caught} />,
+        );
+        const user = setupUser();
+        await user.click(box("a"));
+        await act(async () => ds[0]!.resolve());
+        expect(checkedValues()).toEqual(["a"]);
+
+        await user.click(box("a")); // uncheck a: rejects later
+        await user.click(box("b")); // check b
+        await user.click(box("b")); // uncheck b: the intended value is the default, []
+        await act(async () => {
+          form().reset();
+        });
+        await flushMicrotasks();
+        expect(calls(action).at(-1)).toEqual([[], "platform", [], []]);
+        const err = new Error("uncheck a failed");
+        if (rejectFirst) await act(async () => ds[1]!.reject(err));
+        await act(async () => {
+          ds[2]!.resolve();
+          ds[3]!.resolve();
+          ds[4]!.resolve();
+        });
+        if (!rejectFirst) await act(async () => ds[1]!.reject(err));
+
+        expect(caught).not.toHaveBeenCalled();
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(checkedValues()).toEqual([]);
+        expect(dataChecked()).toEqual([]);
+        expect(dataPending()).toEqual([]);
+      },
+    );
+
+    it("uncontrolled: a second reset after changes that followed the first is dispatched too", async () => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const ds = sequencedDeferreds(6);
+      const action = vi.fn<ActionFn>(() => ds.next());
+      render(<Harness mode="uncontrolled" initial={[]} inForm action={action} />);
+      const user = setupUser();
+      await user.click(box("a"));
+      await act(async () => ds[0]!.resolve());
+      await user.click(box("a")); // uncheck a
+      await act(async () => {
+        form().reset(); // equal to the intended [], dispatched (a change is in flight)
+      });
+      await flushMicrotasks();
+      await act(async () => {
+        form().reset(); // the latest dispatch is a reset: not again
+      });
+      await flushMicrotasks();
+      await user.click(box("b")); // check b: resolves
+      await user.click(box("b")); // uncheck b: rejects later
+      await act(async () => {
+        form().reset();
+      });
+      await flushMicrotasks();
+      expect(calls(action).map(([, reason]) => reason)).toEqual([
+        "activate",
+        "activate",
+        "platform",
+        "activate",
+        "activate",
+        "platform",
+      ]);
+      const err = new Error("uncheck b failed");
+      await act(async () => {
+        ds[1]!.resolve();
+        ds[2]!.resolve();
+        ds[3]!.resolve();
+        ds[4]!.reject(err);
+        ds[5]!.resolve();
+      });
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+      expect(checkedValues()).toEqual([]);
+      expect(dataPending()).toEqual([]);
+    });
+
+    // #151 is uncontrolled only: controlled has no replay, so an empty diff is not dispatched.
+    it("controlled: a reset to the intended value while a change is in flight dispatches nothing", async () => {
+      const ds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => ds.next());
+      render(<Harness mode="controlled" initial={["a"]} inForm action={action} />);
+      const user = setupUser();
+      await user.click(box("b")); // check b: in flight
+      await user.click(box("b")); // uncheck b: the intended value is ["a"] again
+      await act(async () => {
+        form().reset(); // the mount-time target, ["a"]
+      });
+      await flushMicrotasks();
+      expect(calls(action).map(([, reason]) => reason)).toEqual(["activate", "activate"]);
+      await act(async () => {
+        ds[0]!.resolve();
+        ds[1]!.resolve();
+      });
+      expect(checkedValues()).toEqual(["a"]);
+      expect(action).toHaveBeenCalledTimes(2);
+    });
+
+    it("uncontrolled: a reset to the shown value with nothing in flight dispatches nothing", async () => {
+      const action = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" initial={[]} inForm action={action} />);
+      await act(async () => {
+        form().reset();
+      });
+      await flushMicrotasks();
+      expect(action).not.toHaveBeenCalled();
+    });
+
     it("uncontrolled: a value with no Item returns to defaultValue too", async () => {
       const action = vi.fn<ActionFn>();
       render(
