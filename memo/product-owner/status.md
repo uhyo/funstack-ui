@@ -380,3 +380,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #143 split into: #144 docs wording (technical-writer, worktree branch docs/144-wording), #145 superseded rejections (align with React), #146 pure-trigger guard opt-in, #147 popup CSS exit vs VT, #148 dismissal-notification abstraction (user wants discussion), #149 Server Components accordion close not animating (developer, worktree branch fix/149-accordion-close).
 - Architect evaluating #145-#148 → memo/architect/143-design-questions.md. No design changes until the user decides; then docs for those sections follow.
 - Merge #144 and #149 myself in a private worktree after review.
+- #144 merged (a8a8292). #149 closed not-a-bug (user: leave it; memo/developer/issue-149.md).
+- Architect memo 5450f98. User decisions: #145 option B (reportError) + fix #150 together → developer on feat/145-superseded-report-error. #148 two channels (action = request deciding outcome; dismissals → sync urgent on* notification); sub-decisions pending (name onOpenChange vs onDismiss, controlled keep-open, Toast closeAction, platform dispatches). #147 waits on #148. #146 user wants discussion.
+- Order: #145/#150 → #146 → #148 → #147 (shared hooks). Architect folds conventions after each.
