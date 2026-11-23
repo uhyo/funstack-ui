@@ -758,8 +758,8 @@ commits nothing. No `fsui-button` types: `useActionTrigger` attaches none, as fo
     (the consumer's action may `preventDefault()` to hold it). Second click while pending:
     cancelled, no navigation.
 11. **Unmount while pending.** The action keeps running; its result is not awaited by anyone; a
-    rejection after unmount follows the hook's existing rule (latest run → React's route; nothing
-    new).
+    rejection after unmount is passed to `reportError`: React would route it only through a
+    render of the unmounted part (#152, conventions 2.4).
 12. **`disabled` flips to `true` during pending.** Native `disabled` lands (focus moves per the
     engine; the consumer chose it) next to `aria-disabled`; on settle only `aria-disabled` goes.
 
@@ -931,8 +931,9 @@ may be edited to the object form (three one-line changes); the developer's choic
 `finally` around `await work()`. The superseded-rejection handling stays (it is reachable for the
 unguarded parts and stays correct for guarded ones). **Since #145 (2026-11-23)** that handling is
 one call: a run that is no longer the latest passes its rejection to `reportError`
-(`internal/report-superseded.ts`, conventions 2.4) instead of throwing it from the part's
-render; the latest run's rejection is rethrown inside the transition as before. The hook's
+(`internal/report-dropped.ts`, conventions 2.4) instead of throwing it from the part's
+render; the latest run's rejection is rethrown inside the transition as before, unless the part
+unmounted or is hidden by `<Activity>` by then, when it is reported too (#152). The hook's
 options are `{ openGeneration?, ignoreWhilePending? }`; the `captureSuperseded` option that #100
 added is gone.
 

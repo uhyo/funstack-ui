@@ -240,9 +240,11 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         <code>Root</code>, or a single-element component such as a Toggle). The library never
         swallows an error: the rejection of an older action that a newer one superseded goes to{" "}
         <code>reportError</code> instead (see{" "}
-        <a href="/concepts/action-props#overlapping-actions">Overlapping actions</a>). The
-        optimistic state reverts automatically, and uncontrolled state is only written after
-        success, so a failed action leaves it untouched.
+        <a href="/concepts/action-props#overlapping-actions">Overlapping actions</a>), and so does a
+        rejection that arrives after the component unmounted (a toast or menu closed while its
+        action ran) or while an <code>&lt;Activity&gt;</code> hides it, since React has no render
+        left to deliver it through. The optimistic state reverts automatically, and uncontrolled
+        state is only written after success, so a failed action leaves it untouched.
       </p>
       <p>
         For inline error UI instead, catch inside the action. A caught error makes the action

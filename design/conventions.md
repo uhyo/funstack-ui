@@ -56,7 +56,9 @@ control hooks in 3.8, the `internal/` layout in 9.1, the cross-channel row in 10
 shipped-CSS modules in 12; amended 2026-11-23 with #145, **user decision**, and #150, see resolved
 question 42: superseded rejections go to `reportError` in 2.4, 3.4 and 10.1 (the two-channel
 capture of #100 is gone), the set-valued commit in 2.5, 3.3 and 3.4, `report-superseded.ts` in 9.1,
-the Overlap row in 10.1).
+the Overlap row in 10.1); amended 2026-11-23 with #151 and #152, see resolved question 43: the
+latest rejection after its owner left in 2.4 and 3.4, the reset with an empty diff in 3.3,
+`report-dropped.ts` in 9.1, the Superseded rejection row in 10.1).
 Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
@@ -555,10 +557,12 @@ What a consumer can rely on:
 ### 2.4 Errors
 
 An action that throws or rejects reaches the **nearest Error Boundary above the library
-component that owns the transition** (the `Root`, or the component itself), with one exception:
+component that owns the transition** (the `Root`, or the component itself), with two exceptions,
+both rejections React itself would drop, which are passed to the global `reportError` instead:
 the rejection of a **superseded** action (an older one, when a newer action of the same owner was
-dispatched before it settled) is passed to the global `reportError` instead. The library never
-swallows an error. There is no `errorAction` prop in v0.
+dispatched before it settled), and the rejection of the latest action when its **owner is gone**
+(unmounted, or hidden by `<Activity>`) by the time it arrives (#152). The library never swallows
+an error. There is no `errorAction` prop in v0.
 
 Why the exception (#145, user decision 2026-11-23, option B of
 `memo/architect/143-design-questions.md`). `useTransition` stores one thenable per
@@ -574,33 +578,35 @@ boundary for: it reports it. The UI stays up and shows the latest intent; the fa
 
 Contract:
 
-- The **latest** dispatch's rejection propagates through React's own path: the hook rethrows it
-  inside the transition. It reaches the boundary only **after every older overlapping dispatch
+- The **latest** dispatch's rejection propagates through React's own path while its owner is
+  mounted and visible: the hook rethrows it inside the transition. It reaches the boundary only **after every older overlapping dispatch
   has settled**: React holds the boundary's commit while the entangled action lane is still
   pending (section 2.3 item 5). React behaviour, documented so a test that rejects the newest of
   two dispatches does not expect the fallback before the older one resolves.
 - "Latest" is judged **when the rejection arrives**: a dispatch is superseded when another
   dispatch of the same hook instance was made after it, whether that one is still pending or has
   already settled.
-- A **superseded** dispatch's rejection is caught by the hook and passed to `reportSuperseded`
-  (`internal/report-superseded.ts`): the global `reportError` (a window `error` event), or
+- A **superseded** dispatch's rejection is caught by the hook and passed to `reportDropped`
+  (`internal/report-dropped.ts`): the global `reportError` (a window `error` event), or
   `console.error` in an environment without it. Nothing is thrown, no state is written, no
   boundary is involved, and the newer dispatch's outcome is unaffected.
 - **Every** superseded rejection of a burst is reported, each once, in the order they arrive.
   When the latest dispatch rejects as well, it still goes to the boundary; the two routes are
   independent.
-- Reports **continue after unmount**: the hook has no mounted check, so a superseded action that
-  rejects after its component left is still reported.
-- **Open gap: the latest action's rejection after unmount is dropped.** The hook rethrows it
-  inside the transition, and React routes a transition's rejection only through a render of the
-  component that owns it; with that component gone nothing reads it (probed 2026-11-23 on
-  19.3.1 with `useActionTrigger`: no boundary, no `reportError`, no `unhandledrejection`). So
-  after unmount a superseded failure is reported and a latest one is not. This predates #145
-  (the removed hook dropped both). The fix that matches the rule above is to pass the latest
-  rejection to `reportSuperseded` as well when the owner has unmounted; not decided, not
-  implemented. Reachable today: a `Toast.Action` whose toast is closed while its action runs
-  (toast.md walkthrough 6); by the same reasoning, not probed, a `Menu.Item` or Close part whose
-  overlay is dismissed and unmounts it meanwhile.
+- Reports **continue after unmount**: a superseded action that rejects after its component left
+  is still reported.
+- **The latest rejection once the owner is gone is reported too** (#152). The hook rethrows a
+  latest rejection only while its component's effects are connected (`useConnected` in
+  `report-dropped.ts`: set in a mount layout effect, cleared by its cleanup); otherwise it passes
+  it to `reportDropped` and returns. Why: React routes a transition's rejection only through a
+  render of the component that owns it; with that component unmounted nothing reads it (probed
+  2026-11-23 on 19.3.1 with `useActionTrigger`: no boundary, no `reportError`, no
+  `unhandledrejection`). Effect cleanup also runs when an `<Activity>` hides the component, so a
+  rejection that arrives while it is hidden is reported as well and does **not** reach the
+  boundary when the component is shown again (React would deliver it then); each rejection goes
+  one route, exactly once. Reachable: a `Toast.Action` whose toast is closed while its action runs
+  (toast.md walkthrough 6), a `Menu.Item` or Close part whose overlay is dismissed and unmounts it
+  meanwhile, any state owner removed while its action is pending.
 - A consumer who catches inside the action is unaffected, as before.
 - Both hooks (`useControllableAction`, `useActionTrigger`) do this themselves, per instance. A
   component with **two transition channels** (Slider and NumberField: steps through
@@ -989,9 +995,12 @@ Details of the replay:
   the rejection then reaches the boundary (section 2.4).
 - **Controlled mode writes nothing**, with or without a reducer; the reducer is then only the
   optimistic re-base.
-- Known leftover (#151): a CheckboxGroup form reset whose target equals the intended value
-  dispatches nothing, so it does not enter the burst; if an earlier in-flight uncheck then
-  rejects, its rollback shows after the reset.
+- **An absolute reset joins a burst even with an empty diff** (#151). A CheckboxGroup form reset
+  whose target equals the intended value is still dispatched (with empty `added` / `removed`)
+  while a dispatch is in flight, uncontrolled, unless the latest dispatch is itself a reset;
+  otherwise it would not enter the burst and an earlier in-flight change that rejects later would
+  roll the group back past the reset. With nothing in flight, or controlled, an equal reset
+  dispatches nothing (`useNativeGroupReconciliation`'s `dispatchEqualReset` option).
 
 For a continuous control (Slider) "the action" is the gesture's **commit** action: steps
 (`valueChangeAction`) write no uncontrolled state, the commit's resolution does, so a rejected
@@ -1080,9 +1089,11 @@ is React's root container by the time the action runs); Tabs derives `fsui-tabs-
 comparing their DOM order. `prev` is the committed value at dispatch time, not the optimistic
 one.
 
-In the implementation `reportError(error)` is `reportSuperseded(error)`
-(`internal/report-superseded.ts`: `console.error` where the global is missing), and each burst
-entry keeps the reducer of the render it was dispatched from. The hook holds no error state, so
+In the implementation `reportError(error)` is `reportDropped(error)`
+(`internal/report-dropped.ts`: `console.error` where the global is missing), the latest
+dispatch's rethrow is also routed there when the owner is gone (`if (id === latest.current &&
+connected.current) throw error`, section 2.4, #152), and each burst entry keeps the reducer of the
+render it was dispatched from. The hook holds no error state, so
 it has no ordering constraint against `useTransition` and takes no capture option (the
 `captureSuperseded` option of the pre-#145 design is gone, section 2.4).
 
@@ -1126,7 +1137,8 @@ if (!started) event.preventDefault();                        // ignored while pe
 - A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
   the part; a superseded run's rejection (reachable only with `ignoreWhilePending: false`: the
   steps of a continuous control) is passed to `reportError` (section 2.4), every one of a burst,
-  also after the part unmounted.
+  also after the part unmounted. So is the latest run's once the part unmounted or is hidden
+  (#152).
 - `then` still runs when the part unmounted meanwhile (an overlay's close must happen even though
   the part left with the content), so the only thing that cancels it is the **open-generation
   guard**: with `openGeneration` given, the hook reads the counter when `run` is called and skips
@@ -2121,7 +2133,7 @@ packages/ui/src/
     platform-attributes.ts  # the one `declare module "react"` (section 7.4)
     use-controllable-action.ts  # section 3.4; also intendedValue (3.8 rule 1)
     use-action-trigger.ts   # section 3.4: pure triggers
-    report-superseded.ts    # section 2.4: reportSuperseded(error) -> global reportError, console.error fallback; both hooks call it
+    report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; useConnected(); both hooks call them
     use-render.tsx          # resolves render / className / style / children against state
     render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton (1.2)
     merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
@@ -2272,7 +2284,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Async action (both) | While the promise is unresolved: `data-pending` on owner and trigger, optimistic state on the trigger, committed state unchanged on content. After resolve: `data-pending` gone, content updated. |
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
 | Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled); `data-pending` stays until both settled and nothing commits before that. Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`) also pins the **settled-changes** row (#150): the older action rejects before, and separately after, the newer resolves; the committed value holds the newer change only, on top of the starting value (section 3.3). Its `exclusive` modes pin the opposite: a rejected press followed by a resolved release ends with nothing selected, not with the old item. CheckboxGroup pins a form reset inside a burst (the value ends at the default). |
-| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error is passed to `reportError` exactly once and **not** to an Error Boundary around the component (section 2.4); the newer action's outcome is unaffected. The test stubs the global (`vi.stubGlobal("reportError", vi.fn())`; jsdom has none, and in browser mode an unstubbed report fails the run). The shared suites also pin: every superseded rejection of a burst of three is reported while the latest one still reaches the boundary, and a superseded rejection after unmount is still reported. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79; every pure trigger since #81) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. The rows stay required for state owners and for the step actions of continuous controls. A component with two channels (Slider, NumberField) also pins the **cross-channel** case: a superseded rejection on one channel while the other channel's action pends is reported at once, without waiting for it, in both directions. |
+| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error is passed to `reportError` exactly once and **not** to an Error Boundary around the component (section 2.4); the newer action's outcome is unaffected. The test stubs the global (`vi.stubGlobal("reportError", vi.fn())`; jsdom has none, and in browser mode an unstubbed report fails the run). The shared suites also pin: every superseded rejection of a burst of three is reported while the latest one still reaches the boundary, and a superseded rejection after unmount is still reported; the hooks' own suites pin that the latest rejection after unmount (and while hidden by `<Activity>`) is reported once and reaches no boundary (#152). Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79; every pure trigger since #81) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. The rows stay required for state owners and for the step actions of continuous controls. A component with two channels (Slider, NumberField) also pins the **cross-channel** case: a superseded rejection on one channel while the other channel's action pends is reported at once, without waiting for it, in both directions. |
 | Re-entry (pure trigger) | Required for every pure trigger with the guard on (section 2.5; `Button`, #79): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) **runs again** while the element still shows `data-pending` (the guard is the counter only; a non-awaiting action clicked three times under that hold is called three times); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. |
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
@@ -3089,8 +3101,16 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     the resolved dispatches, replayed in dispatch order when the last overlapping one settles.
     From the review (`memo/reviewer/review-145-150.md`): the `exclusive` modes pass no reducer
     (single-valued, latest wins, as Tabs), and CheckboxGroup's form reset replaces the value
-    whole. Leftover: #151 (a reset equal to the intended value dispatches nothing). Applied: 2.4,
-    2.5, 3.3, 3.4, 9.1, 10.1, decision 3; the component designs edited in place.
+    whole. Leftover: #151 (a reset equal to the intended value dispatches nothing; fixed, 43).
+    Applied: 2.4, 2.5, 3.3, 3.4, 9.1, 10.1, decision 3; the component designs edited in place.
+43. **The latest rejection after its owner left is reported (#152); an equal reset joins a burst
+    (#151)**, 2026-11-23, implementation fixes of the gaps recorded with 42. #152: a latest
+    rejection that arrives after the owning component unmounted or was hidden by `<Activity>`
+    went nowhere (React routes it only through a render of the owner); both hooks now pass it to
+    `reportError` (`reportSuperseded` renamed `reportDropped`, `report-dropped.ts`). #151:
+    uncontrolled CheckboxGroup dispatches a form reset with an empty diff while a dispatch is in
+    flight (unless the latest dispatch is a reset), so the absolute reset enters the replay.
+    Applied: 2.4, 3.3, 3.4, 9.1, 10.1; `checkbox-group.md` 5.4, `toast.md` walkthrough 6.
 
 ## Open questions
 

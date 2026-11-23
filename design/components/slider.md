@@ -1298,7 +1298,7 @@ packages/ui/src/slider/
   slider.test.tsx, slider.browser.test.tsx
 packages/ui/src/internal/
   use-native-group-reconciliation.ts   # widen `element` to FormAssociatedElement (an input) and add `onResetEvent` pass-through to useFormReset
-  report-superseded.ts                 # conventions 2.4: both hooks pass a superseded rejection to reportError (the Root does nothing itself)
+  report-dropped.ts                    # conventions 2.4: both hooks pass a superseded rejection (and a latest one after unmount) to reportError (the Root does nothing itself)
   use-register-count.ts                # the mounted-Label count
   decimal.ts                           # decimalsOf / gridDecimals / roundTo (shared with NumberField)
 ```

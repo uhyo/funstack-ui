@@ -1256,7 +1256,7 @@ packages/ui/src/number-field/
   number-field-format.test.ts, number-field.test.tsx, number-field.browser.test.tsx, number-field.types.test.tsx
 packages/ui/src/internal/
   decimal.ts                      # no directive: decimalsOf / gridDecimals / roundTo, shared with Slider
-  report-superseded.ts            # conventions 2.4: both hooks pass a superseded rejection to reportError (the Root does nothing itself)
+  report-dropped.ts               # conventions 2.4: both hooks pass a superseded rejection (and a latest one after unmount) to reportError (the Root does nothing itself)
   announce.ts                     # directive-free (#129): announce(target, message, priority?) and canAnnounce(target): ariaNotify only (the fallback live region was dropped, #113 A1); shared with Combobox, focus-first-invalid and Toast
   field-context.ts                # FieldControlRegistration gains `validityElement?: () => ValidatableElement | null`
   use-field-control.ts            # the option, passed through to registerControl

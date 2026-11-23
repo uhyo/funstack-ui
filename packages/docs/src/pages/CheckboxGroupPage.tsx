@@ -486,7 +486,10 @@ export function CheckboxGroupPage() {
           automatic reset after the action succeeds) is one dispatch for the whole group, with{" "}
           <code>reason: "platform"</code>, the <code>reset</code> event, and the diff in{" "}
           <code>added</code> / <code>removed</code>. Uncontrolled, the target is the latest{" "}
-          <code>defaultValue</code>; controlled, the mount-time values are offered to the parent.
+          <code>defaultValue</code>, and the reset replaces the value whole: it is dispatched even
+          with an empty diff while a change is still pending, so a pending change that fails later
+          cannot bring its box back after the reset. Controlled, the mount-time values are offered
+          to the parent.
         </li>
         <li>
           <strong>Clicks before hydration</strong> work natively, on Items and on Parents. On

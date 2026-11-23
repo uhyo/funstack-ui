@@ -29,6 +29,16 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          An action that rejects after its component unmounted (a <code>Toast.Action</code> whose
+          toast was closed meanwhile, a <code>Menu.Item</code> whose menu closed) or while an{" "}
+          <code>&lt;Activity&gt;</code> hides it is passed to the global <code>reportError</code>{" "}
+          instead of being lost (<a href={issue(152)}>#152</a>).
+        </li>
+        <li>
+          Resetting the form of an uncontrolled CheckboxGroup while a change is pending lands on the
+          default even when a pending change rejects later (<a href={issue(151)}>#151</a>).
+        </li>
+        <li>
           When an older action rejects after a newer one started, the rejection no longer replaces
           the component with the Error Boundary: it is passed to the global <code>reportError</code>{" "}
           (a window <code>error</code> event) and the UI keeps the newer intent. The latest action's

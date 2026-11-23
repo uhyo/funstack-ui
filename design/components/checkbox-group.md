@@ -588,10 +588,13 @@ renders committed state in the DOM, but Items and the Parent compare against it.
   wrong value.
 - The action's `next` therefore can be ahead of what the group commits. Persist the patch (2.6).
 - A **form reset** inside a burst replaces the value whole (5.2), then later resolved patches
-  apply on top of it. Known leftover (#151): a reset whose target already equals the intended
-  value dispatches nothing (8.2), so it does not enter the burst; if an earlier in-flight
-  uncheck then rejects, that box comes back checked after the reset. Proposed fix, not
-  implemented: on the reset path, dispatch whenever a dispatch is in flight.
+  apply on top of it. A reset whose target already equals the intended value is still
+  dispatched while a dispatch is in flight (#151), with `reason: "platform"`, the `reset` event
+  and empty `added` / `removed`, so it enters the burst; otherwise an earlier in-flight uncheck
+  that rejects later would bring its box back checked after the reset. Not when the latest
+  dispatch is itself a reset (repeated resets stay one dispatch), not with nothing in flight
+  (8.2: nothing to do), and not controlled (no replay; the parent decides). Implemented through
+  `useNativeGroupReconciliation`'s `dispatchEqualReset` option.
 - **Controlled, sync prefix** (`setToppings(next)`): writes land in dispatch order; correct.
 - **Controlled, update on success**: whole-value writes land in *completion* order and can lose a
   change; use the functional update of 2.6. Documented next to every such example.
