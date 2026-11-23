@@ -1,0 +1,258 @@
+// THROWAWAY probes for issue #148 (design/components/overlay-open-change.md section 11).
+// Not committed. Run: FUNSTACK_BROWSERS=chromium,firefox,webkit pnpm vitest run --project browser src/__probes__
+import { createRoot } from "react-dom/client";
+import { flushSync } from "react-dom";
+import {
+  startTransition,
+  useLayoutEffect,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import { describe, expect, it } from "vitest";
+import { userEvent } from "vitest/browser";
+import { server } from "vitest/browser";
+import { leaveActEnvironment, sleep } from "../__tests__/browser-helpers.js";
+
+const engine = server.browser;
+const log = (...args: unknown[]) => console.log(`[probe ${engine}]`, ...args);
+
+function mount(node: React.ReactNode) {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  flushSync(() => root.render(node));
+  return {
+    host,
+    unmount: () => {
+      root.unmount();
+      host.remove();
+    },
+  };
+}
+
+describe("probe 1: updates from a native toggle / close listener", () => {
+  for (const variant of ["plain", "unrelated async action pending"] as const) {
+    for (const kind of ["popover-escape", "popover-script", "dialog-escape"] as const) {
+      it(`${kind} (${variant})`, async () => {
+        leaveActEnvironment();
+        const commits: string[] = [];
+        const afterMicrotask: string[] = [];
+        let startUnrelated: (() => void) | null = null;
+        let unrelatedPending = false;
+
+        function Child({ setOpen }: { setOpen: (o: boolean) => void }) {
+          const [epoch, setEpoch] = useState(0);
+          const ref = useRef<HTMLElement | null>(null);
+          const [, startT] = useTransition();
+          startUnrelated = () =>
+            startT(async () => {
+              await new Promise(() => {});
+            });
+          useLayoutEffect(() => {
+            const el = ref.current!;
+            const type = kind.startsWith("dialog") ? "close" : "toggle";
+            const listener = (event: Event) => {
+              if (type === "toggle" && (event as ToggleEvent).newState !== "closed") return;
+              log("listener window.event?.type =", window.event?.type);
+              setEpoch((e) => e + 1);
+              setOpen(false);
+              queueMicrotask(() =>
+                afterMicrotask.push(document.getElementById("out")!.textContent!),
+              );
+            };
+            el.addEventListener(type, listener);
+            return () => el.removeEventListener(type, listener);
+          }, []);
+          useLayoutEffect(() => {
+            commits.push(`epoch=${epoch}`);
+          });
+          return kind.startsWith("dialog") ? (
+            <dialog ref={ref as React.Ref<HTMLDialogElement>} id="pop">
+              <button>in</button>
+            </dialog>
+          ) : (
+            <div ref={ref as React.Ref<HTMLDivElement>} id="pop" popover="auto">
+              <button>in</button>
+            </div>
+          );
+        }
+        function Parent() {
+          const [open, setOpen] = useState(true);
+          useLayoutEffect(() => {
+            commits.push(`open=${open}`);
+          });
+          return (
+            <>
+              <span id="out">{`open=${open}`}</span>
+              <Child setOpen={setOpen} />
+            </>
+          );
+        }
+        const { unmount } = mount(<Parent />);
+        try {
+          const el = document.getElementById("pop")!;
+          if (kind.startsWith("dialog")) (el as HTMLDialogElement).showModal();
+          else el.showPopover();
+          await sleep(50);
+          if (variant !== "plain") {
+            startTransition(() => {});
+            startUnrelated!();
+            unrelatedPending = true;
+            await sleep(50);
+          }
+          commits.length = 0;
+          if (kind === "popover-script") {
+            setTimeout(() => el.hidePopover(), 0);
+          } else {
+            (el.querySelector("button") as HTMLElement).focus();
+            await userEvent.keyboard("{Escape}");
+          }
+          await sleep(100);
+          log(
+            kind,
+            variant,
+            "commits:",
+            JSON.stringify(commits),
+            "after microtask:",
+            JSON.stringify(afterMicrotask),
+            "unrelatedPending",
+            unrelatedPending,
+          );
+          // Expected: one commit containing both updates, visible to a microtask queued after.
+          expect(afterMicrotask).toEqual(["open=false"]);
+          expect(commits).toEqual(["epoch=1", "open=false"]);
+        } finally {
+          unmount();
+        }
+      });
+    }
+  }
+});
+
+describe("probe 2: useOptimistic passthrough re-base drops a stale patch", () => {
+  for (const withEpoch of [true, false]) {
+    it(`epoch bump=${withEpoch}`, async () => {
+      leaveActEnvironment();
+      const renders: string[] = [];
+      let api: { request: () => void; fact: () => void; resolve: () => void } | null = null;
+      function Comp() {
+        const [committed, setCommitted] = useState(false);
+        const [epoch, setEpoch] = useState(0);
+        const epochRef = useRef(0);
+        const [opt, addOpt] = useOptimistic(
+          { value: committed, epoch },
+          (prev, patch: { next: boolean; epoch: number }) =>
+            patch.epoch < prev.epoch ? prev : { value: patch.next, epoch: prev.epoch },
+        );
+        const [pending, startT] = useTransition();
+        let resolveFn: () => void = () => {};
+        api = {
+          request: () =>
+            startT(async () => {
+              addOpt({ next: true, epoch: epochRef.current });
+              await new Promise<void>((r) => {
+                resolveFn = r;
+                api!.resolve = r;
+              });
+            }),
+          fact: () => {
+            if (withEpoch) {
+              epochRef.current += 1;
+              setEpoch(epochRef.current);
+            }
+            setCommitted(false);
+          },
+          resolve: () => resolveFn(),
+        };
+        useLayoutEffect(() => {
+          renders.push(`committed=${committed} opt=${opt.value} pending=${pending}`);
+        });
+        return null;
+      }
+      const { unmount, host } = mount(<Comp />);
+      try {
+        api!.request();
+        await sleep(50);
+        renders.length = 0;
+        // A fact from a discrete native event.
+        const target = document.createElement("div");
+        host.append(target);
+        target.addEventListener("toggle", () => api!.fact());
+        target.dispatchEvent(new Event("toggle"));
+        await sleep(50);
+        log("epoch", withEpoch, "after fact:", JSON.stringify(renders));
+        const afterFact = [...renders];
+        renders.length = 0;
+        api!.resolve();
+        await sleep(50);
+        log("epoch", withEpoch, "after old action resolves:", JSON.stringify(renders));
+        if (withEpoch) expect(afterFact).toEqual(["committed=false opt=false pending=true"]);
+        else expect(afterFact).toEqual(["committed=false opt=true pending=true"]);
+      } finally {
+        unmount();
+      }
+    });
+  }
+});
+
+describe("probe 3: re-open inside a running CSS exit", () => {
+  for (const delay of [0, 150])
+    it(`Escape then showPopover() ${delay}ms after the toggle task`, async () => {
+      const style = document.createElement("style");
+      style.textContent = `
+      #fade { transition: opacity 400ms linear, display 400ms allow-discrete, overlay 400ms allow-discrete; opacity: 1; }
+      #fade:not(:popover-open) { opacity: 0; }
+      @starting-style { #fade:popover-open { opacity: 0; } }
+    `;
+      document.head.append(style);
+      const el = document.createElement("div");
+      el.id = "fade";
+      el.popover = "auto";
+      el.innerHTML = "<button>x</button>";
+      document.body.append(el);
+      try {
+        el.showPopover();
+        await sleep(500);
+        expect(getComputedStyle(el).opacity).toBe("1");
+        const samples: string[] = [];
+        let reopenedAt = -1;
+        el.addEventListener("toggle", (e) => {
+          if ((e as ToggleEvent).newState === "closed") {
+            samples.push(
+              `toggle(closed): opacity=${getComputedStyle(el).opacity} display=${getComputedStyle(el).display}`,
+            );
+            const reopen = () => {
+              samples.push(
+                `before reopen: opacity=${Number(getComputedStyle(el).opacity).toFixed(2)} display=${getComputedStyle(el).display} anims=${el.getAnimations().length}`,
+              );
+              el.showPopover();
+              reopenedAt = performance.now();
+              samples.push(
+                `after showPopover: open=${el.matches(":popover-open")} opacity=${getComputedStyle(el).opacity} anims=${el.getAnimations().length}`,
+              );
+            };
+            if (delay === 0) reopen();
+            else setTimeout(reopen, delay);
+          }
+        });
+        el.querySelector("button")!.focus();
+        await userEvent.keyboard("{Escape}");
+        const start = performance.now();
+        while (performance.now() - start < 900) {
+          await new Promise((r) => requestAnimationFrame(r));
+          samples.push(
+            `t=${Math.round(performance.now() - start)} open=${el.matches(":popover-open")} opacity=${Number(getComputedStyle(el).opacity).toFixed(2)} display=${getComputedStyle(el).display} anims=${el.getAnimations().length}`,
+          );
+        }
+        log("reopenedAt", reopenedAt > 0, "\n" + samples.join("\n"));
+        expect(el.matches(":popover-open")).toBe(true);
+        expect(getComputedStyle(el).opacity).toBe("1");
+        expect(getComputedStyle(el).display).not.toBe("none");
+      } finally {
+        el.remove();
+        style.remove();
+      }
+    });
+});
