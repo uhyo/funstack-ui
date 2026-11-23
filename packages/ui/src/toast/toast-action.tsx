@@ -3,7 +3,7 @@ import { useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
-import type { Action, RenderProp, StateValue } from "../internal/types.js";
+import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -47,6 +47,16 @@ export interface ToastActionProps extends Omit<
    */
   closeOnSettle?: boolean;
   /**
+   * What a click does while this part's action is pending. `"ignore"`: nothing (the click is
+   * cancelled, `aria-disabled="true"` meanwhile): one Undo, one Retry. `"run"`: the action runs
+   * again; the Action and the Root stay `data-pending` and the timer paused until every run has
+   * settled. With `closeOnSettle` the toast then closes once, if the latest run resolved; a
+   * rejected latest run keeps it, as in `"ignore"` mode.
+   *
+   * @defaultValue `"ignore"`, or `"run"` with `closeOnSettle={false}`
+   */
+  whilePending?: WhilePending;
+  /**
    * The button's content, or a function of the part's state.
    *
    * @defaultValue the toast's `action.label`
@@ -63,7 +73,8 @@ export interface ToastActionProps extends Omit<
 /**
  * The toast's action button (Undo, Retry, View): a `button type="button"` whose `action` runs as
  * a transition. Renders nothing when neither the part nor the toast has an action. Never natively
- * disabled while pending: a second click meanwhile is ignored and the Action is `aria-disabled`.
+ * disabled while pending: a second click meanwhile is ignored and the Action is `aria-disabled`,
+ * unless `whilePending` is `"run"` (the default with `closeOnSettle={false}`).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `onClick`, `aria-disabled`,
  * `data-pending`.
@@ -73,6 +84,7 @@ export interface ToastActionProps extends Omit<
 export function ToastAction({
   action,
   closeOnSettle = true,
+  whilePending,
   children,
   className,
   style,
@@ -80,7 +92,10 @@ export function ToastAction({
   ...rest
 }: ToastActionProps) {
   const root = useToastRootContext("Toast.Action");
-  const { pending, run } = useActionTrigger();
+  // Mixed ownership (conventions 2.5.1): ignore while the library closes the toast after the
+  // action; a toast that stays makes the Action a user-owned trigger.
+  const ignoring = (whilePending ?? (closeOnSettle ? "ignore" : "run")) === "ignore";
+  const { pending, run } = useActionTrigger({ ignoreWhilePending: ignoring });
   const [token] = useState(() => ({}));
   const effective = action ?? root.toast.action?.action;
   const { setActionPending } = root;
@@ -98,8 +113,8 @@ export function ToastAction({
     if (effective === undefined || rest.disabled === true) return;
     const native = event.nativeEvent;
     const details = createActionDetails(native, { id: root.toast.id });
-    // A second click while this Action's own run is in flight starts nothing and is cancelled
-    // (the hook's guard): one Undo, one Retry.
+    // When ignoring, a second click while this Action's own run is in flight starts nothing and
+    // is cancelled (the hook's guard): one Undo, one Retry.
     const started = run(
       () => effective(details),
       () => {
@@ -113,8 +128,9 @@ export function ToastAction({
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
     onClick,
-    // Exactly while `data-pending`. Owned, so an idle Action removes a render element's own.
-    "aria-disabled": pending ? true : undefined,
+    // Exactly while `data-pending` when ignoring. Owned, so an idle Action removes a render
+    // element's own.
+    "aria-disabled": pending && ignoring ? true : undefined,
     "data-pending": dataAttr(pending),
   };
 

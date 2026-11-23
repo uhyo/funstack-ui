@@ -2,7 +2,13 @@
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
-import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  Action,
+  ActionDetails,
+  RenderProp,
+  StateValue,
+  WhilePending,
+} from "../internal/types.js";
 import { useOverlayClose } from "../internal/use-overlay-close.js";
 import { usePopoverContext } from "./popover-context.js";
 
@@ -36,6 +42,16 @@ export interface PopoverCloseProps extends Omit<
    */
   action?: Action<[details: ActionDetails]>;
   /**
+   * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
+   * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`
+   * until every run has settled); the popover closes once, when the last run settles and only
+   * if the latest run resolved (a rejection leaves it open, as in `"ignore"` mode). No effect
+   * without `action`.
+   *
+   * @defaultValue `"ignore"`
+   */
+  whilePending?: WhilePending;
+  /**
    * Never closes. Native `disabled` on a `<button>`; owned, so a `render` element cannot
    * re-enable it. With a link or component `render` whose click this part handles (library mode,
    * or with `action`), `aria-disabled="true"` instead: the element stays focusable.
@@ -58,7 +74,8 @@ export interface PopoverCloseProps extends Omit<
  * without `action` the browser hides the popover. In library mode the click is always cancelled
  * and the close goes through the Root (`openChangeAction(false)` awaited, `hidePopover()` in the
  * commit). With `action` the action runs first in this part's own transition (`data-pending` on
- * the button, with `aria-disabled`; a second click meanwhile is ignored); a rejection leaves the
+ * the button, with `aria-disabled`; a second click meanwhile is ignored unless
+ * `whilePending="run"`); a rejection leaves the
  * popover open. It keeps `commandfor` where the Trigger has `popovertarget`: an invoker
  * inside its own popover exposes no state either way, and the `command` event tells the Popup a
  * foreign hide's reason.
@@ -71,6 +88,7 @@ export interface PopoverCloseProps extends Omit<
  */
 export function PopoverClose({
   action,
+  whilePending,
   disabled = false,
   className,
   style,
@@ -89,6 +107,7 @@ export function PopoverClose({
     command: "hide-popover",
     openGeneration: ctx.openGeneration,
     action,
+    whilePending,
     details: (event) => createActionDetails(event, {}),
     close: (event) => {
       if (isLibrary) {

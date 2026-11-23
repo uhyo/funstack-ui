@@ -1,6 +1,7 @@
 // Unit rows for `useActionTrigger` (design/components/button.md 16.4 H1). The parts that use it
 // (Button, Dialog.Close, Popover.Close, Menu.Item, Toast.Action, the Slider and NumberField steps)
-// cover it through their own suites; these rows pin the default and the opt-out.
+// cover it through their own suites; these rows pin the default (runs overlap, #146) and the
+// guard (`ignoreWhilePending: true`, a part whose `whilePending` is "ignore").
 import { act, render } from "@testing-library/react";
 import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -31,9 +32,9 @@ function setup(options?: ActionTriggerOptions, onError?: (error: unknown) => voi
   };
 }
 
-describe("useActionTrigger: re-entry (default)", () => {
+describe('useActionTrigger: ignoreWhilePending: true (whilePending="ignore")', () => {
   it("a second run while the first is in flight is ignored; after settle it runs", async () => {
-    const { hook, pending } = setup();
+    const { hook, pending } = setup({ ignoreWhilePending: true });
     const first = deferred();
     const work = vi.fn(() => first.promise);
     const then = vi.fn();
@@ -66,7 +67,7 @@ describe("useActionTrigger: re-entry (default)", () => {
   it("the run's rejection reaches the boundary above the part", async () => {
     silenceErrors();
     const caught = vi.fn();
-    const { hook, caught: catcher } = setup(undefined, caught);
+    const { hook, caught: catcher } = setup({ ignoreWhilePending: true }, caught);
     const first = deferred();
     act(() => {
       hook().run(() => first.promise);
@@ -77,9 +78,9 @@ describe("useActionTrigger: re-entry (default)", () => {
   });
 });
 
-describe("useActionTrigger: ignoreWhilePending: false (the continuous controls)", () => {
-  it("runs both; pending stays until both settle", async () => {
-    const { hook, pending } = setup({ ignoreWhilePending: false });
+describe("useActionTrigger: runs overlap (the default since #146; the continuous controls)", () => {
+  it("the default runs both; pending stays until both settle", async () => {
+    const { hook, pending } = setup();
     const runs = [deferred(), deferred()];
     const work = vi.fn((i: number) => runs[i]!.promise);
     const then = vi.fn();
@@ -90,9 +91,35 @@ describe("useActionTrigger: ignoreWhilePending: false (the continuous controls)"
     expect(results).toEqual([true, true]);
     expect(work).toHaveBeenCalledTimes(2);
     await act(async () => runs[1]!.resolve());
+    // The latest resolved, but a run is still in flight: `then` waits (#146 review F1).
+    expect(then).not.toHaveBeenCalled();
     await act(async () => runs[0]!.resolve());
-    expect(then).toHaveBeenCalledTimes(2);
+    expect(then).toHaveBeenCalledTimes(1);
     expect(pending()).toBe("false");
+  });
+
+  it("`then` is the latest run's, once the last run settles; not at all if the latest rejected", async () => {
+    silenceErrors();
+    const { hook } = setup(undefined, () => {});
+    const runs = [deferred(), deferred(), deferred(), deferred()];
+    const thens = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
+    act(() => {
+      hook().run(() => runs[0]!.promise, thens[0]);
+      hook().run(() => runs[1]!.promise, thens[1]);
+    });
+    await act(async () => runs[0]!.resolve());
+    await act(async () => runs[1]!.resolve());
+    expect(thens[0]).not.toHaveBeenCalled();
+    expect(thens[1]).toHaveBeenCalledTimes(1);
+    // The latest rejects after an older run resolved: no `then` at all.
+    act(() => {
+      hook().run(() => runs[2]!.promise, thens[2]);
+      hook().run(() => runs[3]!.promise, thens[3]);
+    });
+    await act(async () => runs[2]!.resolve());
+    await act(async () => runs[3]!.reject(new Error("latest")));
+    expect(thens[2]).not.toHaveBeenCalled();
+    expect(thens[3]).not.toHaveBeenCalled();
   });
 
   // moved from the Close / Item rows, #81
@@ -221,6 +248,7 @@ describe("useActionTrigger: the latest rejection once the part left", () => {
   it.each([
     ["the default", undefined],
     ["ignoreWhilePending: false", { ignoreWhilePending: false }],
+    ["ignoreWhilePending: true", { ignoreWhilePending: true }],
   ] as const)("unmounted (%s): reported once, `then` skipped", async (_label, options) => {
     const consoleError = silenceErrors();
     const { reportError, caught, hook, setMode } = setupOwner(options);

@@ -63,15 +63,15 @@ Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
 
-Amended 2026-11-23 with #146, **user decision** for the prop and the ownership rule, **open
-questions** for the parts of mixed ownership (see "Open questions" at the end): the pure-trigger
-re-entry guard is no longer unconditional; it is the prop `whilePending` (`"run"` | `"ignore"`),
-whose default follows who owns the action. Applied: decision 2, the `Button` row in 1.1, item 9
-in 2.3, the last bullet of the contract in 2.4, the pure-trigger bullet in 2.5 and the new 2.5.1,
-the hook option in 3.4, `aria-disabled` while pending in 3.6, `WhilePending` in 9.4, the
-`whilePending` row in 10.1; `design/components/button.md` 18 and the Close / Item / Action
-sections of dialog.md, popover.md, menu.md and toast.md. **Design only: the library still has the
-unconditional guard until the developer lands #146.**
+Amended 2026-11-23 with #146, **user decision** (all of it, including the parts of mixed
+ownership; see resolved question 44): the pure-trigger re-entry guard is no longer
+unconditional; it is the prop `whilePending` (`"run"` | `"ignore"`), whose default follows who
+owns the action. Applied: decision 2, the `Button` row in 1.1, item 9 in 2.3, the last bullet of
+the contract in 2.4, the pure-trigger bullet in 2.5 and the new 2.5.1, the hook option in 3.4,
+`aria-disabled` while pending in 3.6, `WhilePending` in 9.4, the Re-entry and Superseded
+rejection rows in 10.1; `design/components/button.md` 18 and the Close / Item / Action sections
+of dialog.md, popover.md, menu.md and toast.md. **Implemented 2026-11-24** (branch
+`feat/146-while-pending`, `memo/developer/issue-146.md`).
 
 Inputs: `docs/vision.md`, `docs/research/react-async-apis.md`, `docs/research/popover-anchor-tooltip.md`,
 `docs/research/modern-platform-survey.md`, `docs/research/form-controls.md` (wave 2), prior art (Base UI, React Aria Components, Radix,
@@ -721,10 +721,10 @@ React neither cancels nor orders overlapping actions. The library's stance:
 
 #### 2.5.1 `whilePending` on pure triggers (#146)
 
-Status: the prop, its `"ignore"` value, the ownership rule and the two fixed points (`Button`
-runs, a Close part ignores) are a **user decision (2026-11-23), accepted**. The value `"run"`
-and the defaults of the parts of **mixed ownership** are the architect's recommendation and are
-listed under "Open questions" at the end of this document; the table marks which is which.
+Status: **user decision (2026-11-23), accepted in full, implemented 2026-11-24.** The prop, its
+`"ignore"` value, the ownership rule and the two fixed points (`Button` runs, a Close part
+ignores) were decided first; the value `"run"` and the defaults of the parts of mixed ownership
+followed (issue #146 comments of 2026-11-23; resolved question 44).
 
 ```ts
 /** What a pure trigger does with an activation that arrives while its own action is pending. */
@@ -755,7 +755,7 @@ Every pure trigger accepts both values, so the prop can be computed
 - **The library owns it**: activation does something of the library's own, with no user code
   needed (a Close part closes its dialog). Default **`"ignore"`**: the activation consumes the
   part, there is nothing to count, and a second run can only repeat a side effect.
-- **Mixed** (the consumer's `action`, then a library-owned step): recommended rule, **open**:
+- **Mixed** (the consumer's `action`, then a library-owned step), **accepted**:
   `"ignore"` exactly when a resolved run makes the library act on the part's container (close
   it), `"run"` when the library-owned step is switched off (`closeOnActivate={false}`,
   `closeOnSettle={false}`), because the part is then a user-owned trigger that happens to live
@@ -764,15 +764,15 @@ Every pure trigger accepts both values, so the prop can be computed
 | Part | What one activation does | Owner | Default | Status |
 | --- | --- | --- | --- | --- |
 | `Button` with `action` | runs the consumer's `action` | user | `"run"` | **accepted** |
-| `Button` with a function `formAction` | React submits the form with the consumer's function | user (React runs it) | `"run"` | accepted by the rule; consequence to confirm (question 4) |
+| `Button` with a function `formAction` | React submits the form with the consumer's function | user (React runs it) | `"run"` | **accepted** (question 4: the dropped rejection of an older submission is documented) |
 | `Button` with neither (plain, URL `formAction`, `command`, link) | the native default action | – | nothing is ever pending: the prop has no effect | accepted |
 | `Dialog.Close`, `Popover.Close` without `action` | the library closes the overlay | library | nothing pends in the part (the close is the Root's dispatch, and a repeat is a no-op, 2.3 item 8): the prop has no effect | **accepted** (the user's example) |
-| `Dialog.Close`, `Popover.Close` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` | recommended, **open** (question 1) |
-| `Menu.Item` with `action`, `closeOnActivate` (default `true`) | the consumer's `action`, then the library closes the menu | mixed | `"ignore"` | recommended, **open** (question 2) |
-| `Menu.Item` with `action`, `closeOnActivate={false}` | the consumer's `action`; the menu stays | user | `"run"` | recommended, **open** (question 2) |
+| `Dialog.Close`, `Popover.Close` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` | **accepted** (question 1) |
+| `Menu.Item` with `action`, `closeOnActivate` (default `true`) | the consumer's `action`, then the library closes the menu | mixed | `"ignore"` | **accepted** (question 2) |
+| `Menu.Item` with `action`, `closeOnActivate={false}` | the consumer's `action`; the menu stays | user | `"run"` | **accepted** (question 2) |
 | `Menu.Item` without `action` | the library closes the menu, synchronously | library | nothing pends: no effect | accepted |
-| `Toast.Action`, `closeOnSettle` (default `true`) | the consumer's `action` (the part's or the toast's), then the library closes the toast; the timer is paused meanwhile | mixed | `"ignore"` | recommended, **open** (question 3) |
-| `Toast.Action`, `closeOnSettle={false}` | the consumer's `action`; the toast stays | user | `"run"` | recommended, **open** (question 3) |
+| `Toast.Action`, `closeOnSettle` (default `true`) | the consumer's `action` (the part's or the toast's), then the library closes the toast; the timer is paused meanwhile | mixed | `"ignore"` | **accepted** (question 3) |
+| `Toast.Action`, `closeOnSettle={false}` | the consumer's `action`; the toast stays | user | `"run"` | **accepted** (question 3) |
 | `Menu.CheckboxItem`, `Menu.RadioItem` | a state change (`useControllableAction`) | state owner | no prop: latest intent wins | unchanged |
 | `Slider.Root`, `NumberField.Root` steps (`valueChangeAction`; `NumberField.Increment` / `Decrement` request them) | a state change, one step of a gesture | state owner's second channel | no prop: every step runs | unchanged |
 | `Form.Submit`, `Dialog.Form` | the form channel (2.7) | React's form | no prop, never guarded | unchanged |
@@ -782,7 +782,10 @@ A default that depends on another prop (`closeOnActivate`, `closeOnSettle`) is a
 page's props table has to spell it ("`"ignore"`, or `"run"` with `closeOnActivate={false}`").
 The alternative, a fixed `"ignore"` for every part of an overlay, keeps the tables simple and
 leaves the counter case the user raised (#146: a "Zoom in" item that stays open) needing the
-prop. That is the trade-off behind questions 2 and 3.
+prop. The user chose the dependent default (questions 2 and 3). `toast({ action: { label,
+action } })` (`ToastActionOptions`) carries no `whilePending`: it has no `closeOnSettle` either
+(the behaviour props live on the part), so the field would not fit its shape; the consumer sets
+it on `<Toast.Action>` (implementation decision, 2026-11-24).
 
 **The effective value** is `whilePending ?? <the part's default>`, read when the activation
 arrives (a change while a run is in flight applies to the next activation; the rendered
@@ -819,20 +822,32 @@ status, a render value (`button.md` 5.2).
 - **`data-pending` / `state.pending` only, no `aria-disabled`** from pending: the part still
   acts, and telling assistive technology it is unavailable would be false. `pending` stays true
   until every run has settled and the result has committed;
-- each run that resolves runs its continuation (a Close part's close, an item's menu close).
-  That was already safe before #81: the close is idempotent (2.3 item 8) and guarded by the
-  open generation (3.4), so the first resolved run closes and the others find nothing to do;
+- **the continuation (a Close part's close, an item's menu close, a toast's close on settle)
+  runs once, when the last run in flight settles, and only if the latest run resolved**
+  (product-owner decision on review F1, 2026-11-24): it is the latest run's continuation, still
+  under that run's open-generation guard (3.4). So "a rejection leaves the overlay / menu /
+  toast open" holds in both modes, and the part stays (pending) until its last run is done:
+  library-mode and JS-free Close parts, a closing `Menu.Item` and a `Toast.Action` with
+  `closeOnSettle` alike. An older run that resolves runs nothing; an older run that rejects
+  after the latest resolved is reported and the close still runs when it settles. (Before the
+  review fix each resolved run requested the close: a library-mode close was then held by
+  entanglement, 2.3 item 5, and committed together with a failed latest run; a JS-free Close
+  and a `Toast.Action` closed at the first resolved run while a later run could still fail.)
+  Implemented in `useActionTrigger` (3.4), so it applies to every part that passes `then`; the
+  steps of the continuous controls pass none;
 - errors follow 2.4 as for any owner (**the interaction with #145**): the **latest** run's
   rejection reaches the Error Boundary above the part, after every older run has settled; an
-  **older** run's rejection is passed to `reportError`, each once; a run that rejects after the
-  part left (the first run resolved and closed the overlay) is reported as well (#152). An
-  ignored activation, by contrast, is not a run and reports nothing;
+  **older** run's rejection is passed to `reportError`, each once. Since the part does not
+  leave before its last run (the bullet above), the #152 route (a rejection after the part left)
+  is reached in `"run"` mode only when something else removes the part meanwhile (a dismissal,
+  `toast.dismiss`), as in `"ignore"` mode. An ignored activation, by contrast, is not a run and
+  reports nothing;
 - a `Button` with a function `formAction` is React's form channel, not the library's
   transition: overlapping submissions behave as React's own submitter does, which includes
   React **dropping** the rejection of an older overlapping submission (verified on 19.3.1,
   `memo/architect/143-design-questions.md`). The library cannot observe that rejection and does
   not report it; the Button page says so and points to `whilePending="ignore"` and to
-  `useActionState` (question 4).
+  `useActionState` (question 4, accepted: the user chose `"run"` for `formAction` too).
 
 **Not offered**: `"queue"` (user decision). Ordered, result-threaded runs are `useActionState`,
 passed as `formAction` or called from the action. The related accepted point from the same
@@ -1268,17 +1283,20 @@ if (!started) event.preventDefault();                        // ignored while pe
   (section 2.5.1). The option stays an internal boolean; the public surface is the part's
   `whilePending` prop (#146), and every pure trigger passes
   `ignoreWhilePending: (whilePending ?? <its default>) === "ignore"`, read per render so the
-  value in force is the one of the render the activation's handler belongs to. **With #146 the
-  default becomes `false`** (it was `true` since #81, `design/components/button.md` 16.2): the
+  value in force is the one of the render the activation's handler belongs to. **Since #146 the
+  default is `false`** (it was `true` since #81, `design/components/button.md` 16.2): the
   hook's baseline is React's, and no part relies on the default any more. The continuous
   controls (Slider, NumberField) keep running every step, with or without their explicit
   `false`. The options object is the only form (`{ openGeneration?, ignoreWhilePending? }`).
   Runs that overlap (any part in `"run"` mode, and the steps) take the superseded-rejection
   path described in the next item.
+- `then` runs once per burst of overlapping runs: when the last run in flight settles, and only
+  if the latest run resolved (it is the latest run's `then`; review F1 of #146). With one run at
+  a time (`ignoreWhilePending`) this is the run's own `then` when it resolves, as before.
 - A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
   the part; a superseded run's rejection (reachable only with `ignoreWhilePending: false`: the
-  steps of a continuous control) is passed to `reportError` (section 2.4), every one of a burst,
-  also after the part unmounted. So is the latest run's once the part unmounted or is hidden
+  steps of a continuous control and a pure trigger in `"run"` mode) is passed to `reportError`
+  (section 2.4), every one of a burst, also after the part unmounted. So is the latest run's once the part unmounted or is hidden
   (#152).
 - `then` still runs when the part unmounted meanwhile (an overlay's close must happen even though
   the part left with the content), so the only thing that cancels it is the **open-generation
@@ -2433,10 +2451,9 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Async action (both) | While the promise is unresolved: `data-pending` on owner and trigger, optimistic state on the trigger, committed state unchanged on content. After resolve: `data-pending` gone, content updated. |
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
 | Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled); `data-pending` stays until both settled and nothing commits before that. Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`) also pins the **settled-changes** row (#150): the older action rejects before, and separately after, the newer resolves; the committed value holds the newer change only, on top of the starting value (section 3.3). Its `exclusive` modes pin the opposite: a rejected press followed by a resolved release ends with nothing selected, not with the old item. CheckboxGroup pins a form reset inside a burst (the value ends at the default). |
-| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error is passed to `reportError` exactly once and **not** to an Error Boundary around the component (section 2.4); the newer action's outcome is unaffected. The test stubs the global (`vi.stubGlobal("reportError", vi.fn())`; jsdom has none, and in browser mode an unstubbed report fails the run). The shared suites also pin: every superseded rejection of a burst of three is reported while the latest one still reaches the boundary, and a superseded rejection after unmount is still reported; the hooks' own suites pin that the latest rejection after unmount (and while hidden by `<Activity>`) is reported once and reaches no boundary (#152). Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79; every pure trigger since #81) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. The rows stay required for state owners and for the step actions of continuous controls. A component with two channels (Slider, NumberField) also pins the **cross-channel** case: a superseded rejection on one channel while the other channel's action pends is reported at once, without waiting for it, in both directions. |
-| Re-entry (pure trigger) | Required for every pure trigger with the guard on (section 2.5; `Button`, #79): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) **runs again** while the element still shows `data-pending` (the guard is the counter only; a non-awaiting action clicked three times under that hold is called three times); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. |
+| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error is passed to `reportError` exactly once and **not** to an Error Boundary around the component (section 2.4); the newer action's outcome is unaffected. The test stubs the global (`vi.stubGlobal("reportError", vi.fn())`; jsdom has none, and in browser mode an unstubbed report fails the run). The shared suites also pin: every superseded rejection of a burst of three is reported while the latest one still reaches the boundary, and a superseded rejection after unmount is still reported; the hooks' own suites pin that the latest rejection after unmount (and while hidden by `<Activity>`) is reported once and reaches no boundary (#152). Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger whose `whilePending` is `"ignore"` (2.5.1, #146) declares this row and the Overlap row N/A **for that mode** with that reason: it never has two of its own runs in flight. In `"run"` mode (the default of `Button`, of a `closeOnActivate={false}` `Menu.Item` and a `closeOnSettle={false}` `Toast.Action`; a Close part with the prop) both rows are **required**: an older run's rejection, after and separately while the newer pends, reaches the stubbed `reportError` once and not the boundary; the latest run's reaches the boundary. The rows stay required for state owners and for the step actions of continuous controls. A component with two channels (Slider, NumberField) also pins the **cross-channel** case: a superseded rejection on one channel while the other channel's action pends is reported at once, without waiting for it, in both directions. |
+| Re-entry (pure trigger) | Required for every pure trigger, **in both `whilePending` modes, its default first** (sections 2.5 and 2.5.1; #79, #146). **`"ignore"`** (default of the Close parts and of a closing `Menu.Item` / `Toast.Action`; `Button` with the prop): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) **runs again** while the element still shows `data-pending` (the guard is the counter only; a non-awaiting action clicked three times under that hold is called three times); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. **`"run"`** (default of `Button` and of a `closeOnActivate={false}` / `closeOnSettle={false}` part; a Close part with the prop): while a deferred action pends, a second click, an Enter and a Space each **call the action again** and are not `defaultPrevented` by the guard (a `render`ed link's second click is not cancelled; a Close part in library mode still cancels every click, its own mechanism); two synchronous clicks in one `act` call it twice; **no `aria-disabled`** at any point, `data-pending` from the first run until the last has settled, with the runs resolved out of order; a continuation (close) happens once however many runs resolve. A change of the prop while a run pends applies to the rendered `aria-disabled` at once and to the next activation. Types: `whilePending` accepts `"run"` and `"ignore"` (the shared `WhilePending`) and rejects a boolean and any other string; it is absent from the state owners (`Menu.CheckboxItem`, `Menu.RadioItem`), `Form.Submit`, `Toast.Close` and `ToastActionOptions`. 
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
-| `whilePending` (pure trigger, #146) | **Amends the Re-entry row and the pure-trigger sentence of the Superseded rejection row above; to be folded into them when #146 lands.** Every pure trigger pins **both** modes, its default first. `"ignore"` mode (default of the Close parts; `Button` with the prop): the whole Re-entry row. `"run"` mode (default of `Button`; a Close part with the prop): while a deferred action pends, a second click, an Enter and a Space each **call the action again** and are not `defaultPrevented` by the guard (a `render`ed link's second click is not cancelled); two synchronous clicks in one `act` call it twice; **no `aria-disabled`** at any point, `data-pending` from the first run until the last has settled, with the runs resolved out of order; a continuation (close) happens once however many runs resolve. In `"run"` mode the Overlap and Superseded rejection rows are **required** (no longer N/A): an older run's rejection reaches the stubbed `reportError` once and not the boundary, the latest run's reaches the boundary. In `"ignore"` mode they stay N/A with the reason "never two runs in flight". Types: `whilePending` accepts `"run"` and `"ignore"` and rejects a boolean and any other string. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
 | `render` element | Element form replaces the default element, merges `className`/`style`, keeps the library's handler working, forwards `ref`. |
 | Post-await rule | A controlled parent updating after its own `await` inside `startTransition` works end to end (guards the documented pattern). |
@@ -3273,19 +3290,27 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     (`checkbox-group.md` 2.6).
     Applied: 2.4, 3.3, 3.4, 9.1, 10.1; `checkbox-group.md` 5.4, `toast.md` walkthrough 6.
 
+44. **`whilePending` (#146)**, user decisions of 2026-11-23 (issue #146 comments), implemented
+    2026-11-24. The guard is a prop, `whilePending`, a string (`WhilePending = "run" |
+    "ignore"`) so that modes can be added; no `"queue"` now; the default follows who owns the
+    action: a part whose action the library owns ignores, a fully user-owned trigger runs. Also
+    accepted there: a set-valued action's `next` may include still-pending changes (2.5),
+    documented, with `useActionState` as the way out. The five questions below were answered as
+    recommended: (1) a Close part with a user `action` defaults to `"ignore"`; (2) `Menu.Item`
+    and (3) `Toast.Action` follow `closeOnActivate` / `closeOnSettle`; (4) a `Button` with a
+    function `formAction` defaults to `"run"` as well, and the dropped rejection of an older
+    overlapping submission is documented; (5) the opt-out value is `"run"`. The sub-question of
+    3 was left to the implementation: `ToastActionOptions` gets no field (2.5.1). Found in
+    review (F1, product-owner decision 2026-11-24): a closing part's continuation runs once, when
+    the last run settles, and only if the latest run resolved (2.5.1, the continuation bullet). Applied: 2.3, 2.4, 2.5, 2.5.1, 3.4, 3.6, 9.4, 10.1; `button.md` 18, `dialog.md`
+    3.4, `popover.md` 3.4, `menu.md` 2.3 / 3.4, `toast.md` 3.2 / 11.
+
 ## Open questions
 
-### #146: `whilePending`, the parts of mixed ownership (2026-11-23)
+None at the moment. The questions of #146 that stood here are resolved question 44; their
+text is kept below for the record.
 
-**Accepted (user decision, issue #146 comment of 2026-11-23), recorded in 2.5.1:** the guard is
-a prop, `whilePending="ignore"`, a string so that modes can be added; no `"queue"` now; the
-default follows who owns the action: a part whose action the library owns (`Dialog.Close`:
-clicking it closes the dialog without any user code) ignores by default, a fully user-owned
-trigger (`Button`) does not. Also accepted there: a set-valued action's `next` may include
-still-pending changes (2.5), documented, with `useActionState` as the way out.
-
-**For the user to decide.** Each has a recommendation, which 2.5.1 and the component designs
-already describe; none is implemented.
+### #146: `whilePending`, the parts of mixed ownership (2026-11-23, resolved: question 44)
 
 1. **A Close part that is given a user `action`** (`<Dialog.Close action={deleteItem}>`,
    `Popover.Close` alike). The user's example is the Close *without* an action, where nothing of

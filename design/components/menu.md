@@ -327,11 +327,11 @@ work later" writes `action={() => { void archive(id); }}` (not awaited; conventi
 `false` (section 4). A `false` Item is a "keep open" action (a "Refresh" item, a zoom control):
 the action runs with `data-pending` and the menu stays.
 
-**Amended 2026-11-23 (#146, conventions 2.5.1; design only, not implemented).** The guard of #81
+**Amended 2026-11-23 (#146, conventions 2.5.1; implemented 2026-11-24).** The guard of #81
 is now the prop `whilePending` on `Menu.Item`, and the #81 paragraph above describes
 `whilePending="ignore"`. An Item is of **mixed ownership**: the `action` is the consumer's, the
-close after it is the library's. Recommended default, **open** (conventions "Open questions"
-2): it follows `closeOnActivate`.
+close after it is the library's. Default (**user decision**, conventions resolved question 44,
+question 2): it follows `closeOnActivate`.
 
 ```tsx
 <Menu.Item action={archive}>Archive</Menu.Item>                                 // "ignore": one run, then the menu closes
@@ -347,10 +347,12 @@ close after it is the library's. Recommended default, **open** (conventions "Ope
   function, so the item is a `Button` that lives in a menu, and takes `Button`'s default. This
   is the counter case #146 was raised for.
 - In `"run"` mode the item renders `data-pending` until every run has settled and **no**
-  `aria-disabled` from pending (`aria-disabled` is then the `disabled` prop alone); each resolved
-  run requests the close and the first one wins (the open-generation guard as before); an older
-  run's rejection goes to `reportError`, the latest one's to the boundary above the item, one
-  arriving after the menu closed is reported (conventions 2.4, #145, #152).
+  `aria-disabled` from pending (`aria-disabled` is then the `disabled` prop alone); a closing
+  item requests the close once, when the last run in flight settles, and only if the latest run
+  resolved (product-owner decision on review F1, 2026-11-24; conventions 2.5.1; the
+  open-generation guard as before), so a rejection keeps the menu open in both modes; an older
+  run's rejection goes to `reportError`, the latest one's to the boundary above the item
+  (conventions 2.4, #145; `menu.test.tsx` "whilePending (#146)").
 - An Item without `action` only closes, synchronously: nothing pends, the prop has no effect.
 - `CheckboxItem` and `RadioItem` get **no** `whilePending`: state owners, latest intent wins.
 
@@ -494,7 +496,7 @@ export interface MenuItemProps
   /**
    * What an activation does while this item's `action` is pending. `"ignore"`: nothing (the
    * event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again.
-   * Conventions 2.5.1 (#146). Default (recommended; open question 2 in the conventions):
+   * Conventions 2.5.1 (#146). Default (user decision; conventions resolved question 44):
    * `"ignore"` when `closeOnActivate`, `"run"` with `closeOnActivate={false}`.
    */
   whilePending?: WhilePending;

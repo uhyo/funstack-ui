@@ -739,7 +739,7 @@ export interface DialogCloseProps
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the dialog
    * still closes once. No effect without `action`. Conventions 2.5.1 (#146).
-   * Default `"ignore"` (recommended; open question 1 in the conventions).
+   * Default `"ignore"` (user decision; conventions resolved question 44).
    */
   whilePending?: WhilePending;
   /** Becomes `dialog.returnValue` (and `details.returnValue` of the close notification). */
@@ -785,18 +785,19 @@ for as long as it shows `data-pending`, which here spans the action and the clos
 path is no longer reachable from a Close (conventions 2.5, 10.1). Without `action` nothing
 changed: a repeated click finds `false` already intended and does nothing.
 
-**Amended 2026-11-23 (#146, conventions 2.5.1; design only, not implemented).** The guard of #81
+**Amended 2026-11-23 (#146, conventions 2.5.1; implemented 2026-11-24).** The guard of #81
 is now the prop `whilePending`. `Dialog.Close` is a part whose activation the library owns (it
 closes the dialog with no user code), so it keeps ignoring by default: the #81 text above describes
 `whilePending="ignore"`. That default is a **user decision** for the Close as such; for a Close
 that is given an `action` (mixed ownership: the consumer's function, then the library's close)
-it is the architect's **recommendation, open** (conventions "Open questions" 1). With
+it is a **user decision** as well (conventions resolved question 44, question 1). With
 `whilePending="run"` every click runs the action again in the part's transition: `data-pending`
-until every run has settled, **no** `aria-disabled` from pending, and each run that resolves
-requests the close, which happens once (idempotent, and dropped for a stale open as below). An
-older run's rejection goes to `reportError`, the latest one's to the boundary above the Close,
-and a run that rejects after an earlier run closed the overlay and unmounted the part is
-reported too (conventions 2.4, #145, #152). Without `action` the prop has no effect: nothing of
+until every run has settled, **no** `aria-disabled` from pending. The close is requested once,
+when the last run in flight settles, and only if the latest run resolved (product-owner
+decision on review F1, 2026-11-24; conventions 2.5.1), in library and JS-free mode alike, and
+still dropped for a stale open as below. So a rejection leaves the dialog open in both modes. An
+older run's rejection goes to `reportError`, the latest one's to the boundary above the Close
+(conventions 2.4, #145). Without `action` the prop has no effect: nothing of
 the part's own is pending, and a repeated click finds the close already intended.
 
 **Rejection and veto.** The action rejects: nothing was dispatched, the dialog stays open, the

@@ -1,7 +1,7 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "./data-attr.js";
-import type { Action, ActionDetails, RenderProp, StateValue } from "./types.js";
+import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "./types.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import { useElementCheck } from "./use-element-check.js";
 import { disabledButton, rendersButton, useRender } from "./use-render.js";
@@ -27,6 +27,8 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
   readonly command: "hide-popover" | "request-close";
   readonly openGeneration: () => number;
   readonly action: Action<[details: Details]> | undefined;
+  /** The part's `whilePending` prop; `"ignore"` when omitted (conventions 2.5.1). */
+  readonly whilePending: WhilePending | undefined;
   /** The `action`'s details, built at the click. */
   readonly details: (event: Event) => Details;
   /** The close after the action (or at once without one): through the Root, or natively. */
@@ -46,14 +48,21 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
  * dialog.md 3.4): `<button type="button" commandfor command>`. In JS-free mode without `action`
  * the browser runs the command. Otherwise the click is cancelled, refused while disabled, and
  * `close` runs, after the `action` when there is one, inside this part's own transition; a
- * second click meanwhile starts nothing, and a close whose open was superseded by a newer one
- * (dismissed and re-opened meanwhile) is dropped (the open-generation guard).
+ * second click meanwhile starts nothing (`whilePending`, default `"ignore"`) or runs the action
+ * again (`"run"`; the close happens once, after the last run and only if the latest one
+ * resolved), and a close whose open was superseded by a
+ * newer one (dismissed and re-opened meanwhile) is dropped (the open-generation guard).
  */
 export function useOverlayClose<Details extends ActionDetails>(
   options: OverlayCloseOptions<Details>,
 ): ReactNode {
   const { part, noun, isLibrary, popupId, command, action, disabled, render } = options;
-  const { pending, run } = useActionTrigger({ openGeneration: options.openGeneration });
+  // The library owns the close, so a Close ignores clicks while pending by default (2.5.1).
+  const ignoring = (options.whilePending ?? "ignore") === "ignore";
+  const { pending, run } = useActionTrigger({
+    openGeneration: options.openGeneration,
+    ignoreWhilePending: ignoring,
+  });
   const installClick = isLibrary || action !== undefined;
   // JS-free mode without `action` is the browser's command, which only native `disabled` stops.
   const disabledProps = disabledButton(render, disabled, { handlesClick: installClick });
@@ -95,9 +104,9 @@ export function useOverlayClose<Details extends ActionDetails>(
     command: disabledProps.invoker && rendersButton(render) ? command : undefined,
     ...options.ownProps,
     ...(installClick && { onClick }),
-    // Exactly while `data-pending`: a Close that will not act is unavailable to AT. Owned,
-    // so an idle Close removes a render element's own `aria-disabled`.
-    "aria-disabled": pending || !disabledProps.invoker ? true : undefined,
+    // Exactly while `data-pending` when ignoring: a Close that will not act is unavailable to
+    // AT; one that runs again is not. Owned, so an idle Close removes a render element's own.
+    "aria-disabled": (pending && ignoring) || !disabledProps.invoker ? true : undefined,
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
   };

@@ -354,10 +354,18 @@ export function PopoverPage() {
                 awaited, view transition if set), in JS-free mode with <code>hidePopover()</code>. A
                 rejection reaches the nearest Error Boundary above the button and leaves the popover
                 open. A second click while it is pending is ignored, and the button is{" "}
-                <code>aria-disabled="true"</code> meanwhile. Without <code>action</code> in JS-free
-                mode the button is a native <code>command="hide-popover"</code> invoker.
+                <code>aria-disabled="true"</code> meanwhile, unless <code>whilePending</code> is{" "}
+                <code>"run"</code>. Without <code>action</code> in JS-free mode the button is a
+                native <code>command="hide-popover"</code> invoker.
               </>
             ),
+          },
+          {
+            name: "whilePending",
+            type: '"run" | "ignore"',
+            default: '"ignore"',
+            description:
+              'What a click, Enter or Space does while this part\'s `action` is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); the popover closes once the last run has settled, and only if the latest run resolved: a rejection leaves it open in both modes. No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
           {
             name: "disabled",
@@ -376,7 +384,7 @@ export function PopoverPage() {
           "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a link or other non-button host element), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
-          'In library mode the click is always intercepted, so every Close goes through the Root. A second click while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending` (the action and the hide); never natively disabled, so it keeps focus. To hide at once and finish the work in the background, do not return the promise: `action={() => { void apply(); }}`. If the user dismisses the popover and opens it again while the action runs, the action\'s close is dropped: it belonged to the earlier open. Popovers have no return value.'
+          'In library mode the click is always intercepted, so every Close goes through the Root. By default (`whilePending="ignore"`) a second click while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending` (the action and the hide); never natively disabled, so it keeps focus. To hide at once and finish the work in the background, do not return the promise: `action={() => { void apply(); }}`. If the user dismisses the popover and opens it again while the action runs, the action\'s close is dropped: it belonged to the earlier open. Popovers have no return value.'
         }
       />
 
@@ -433,7 +441,7 @@ export function PopoverPage() {
           [
             "`aria-disabled`",
             "Close",
-            '`"true"` while `data-pending`: a second click is ignored meanwhile.',
+            '`"true"` while `data-pending` with `whilePending="ignore"` (the default): a second click is ignored meanwhile.',
           ],
           ["`data-disabled`", "Trigger, Close", "The `disabled` prop (both modes)."],
         ]}

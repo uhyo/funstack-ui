@@ -157,17 +157,49 @@ export function PendingOptimisticPage() {
         A trigger that changes state takes every click: a second click on a pending trigger is a new
         intent, the optimistic value follows it, and the latest intent wins (see{" "}
         <a href="/concepts/action-props#overlapping-actions">Overlapping actions</a>). A{" "}
-        <a href="#pure-trigger">pure trigger</a> ignores a second click, Enter or Space while its
-        own action is pending, and renders <code>aria-disabled="true"</code> for as long as it shows{" "}
-        <code>data-pending</code>, so a double click never runs a save twice. Neither kind is ever
-        natively disabled, so focus stays where it is.
+        <a href="#pure-trigger">pure trigger</a> has no value to protect, so what a second click,
+        Enter or Space does while its own action is pending is its <code>whilePending</code> prop:
+      </p>
+      <ul>
+        <li>
+          <code>"run"</code>: the activation runs the action again, in the same transition. The part
+          shows <code>data-pending</code> until every run has settled, and is not{" "}
+          <code>aria-disabled</code>: it still acts.
+        </li>
+        <li>
+          <code>"ignore"</code>: the activation starts nothing and its default action (a link's
+          navigation, a form submission, a command) is cancelled. The part renders{" "}
+          <code>aria-disabled="true"</code> for as long as it shows <code>data-pending</code>, so a
+          screen-reader user who presses again hears that it is unavailable.
+        </li>
+      </ul>
+      <p>
+        The default follows <strong>who owns the action</strong>. Where the action is yours alone (a{" "}
+        <code>Button</code>), every click runs, as with React's own <code>useTransition</code>: only
+        you know whether two overlapping runs are a bug (Save) or the point (a counter). Where the
+        library acts after your action (a <code>Dialog.Close</code> or <code>Popover.Close</code>{" "}
+        closes its overlay, a <code>Menu.Item</code> closes its menu, a <code>Toast.Action</code>{" "}
+        closes its toast), a second activation is ignored: the first one already ends in that close.
+        Switch the library's close off (<code>{"closeOnActivate={false}"}</code>,{" "}
+        <code>{"closeOnSettle={false}"}</code>) and the item or action becomes yours, so it runs
+        every activation again. Either way the prop overrides the default, and no part is ever
+        natively disabled, so focus stays where it is. A closing part in <code>"run"</code> mode
+        closes once, when its last run has settled, and only if the latest run resolved: a rejection
+        leaves the overlay, menu or toast open, as it does in <code>"ignore"</code> mode.
       </p>
       <ConceptExample component="Button" href="/components/button">
         <p>
-          A <code>Button</code> is a pure trigger. While the promise its <code>action</code>{" "}
-          returned is pending, it ignores further clicks and carries <code>aria-disabled</code>. For
-          a button that should count every click (a "+1"), do not return the promise:{" "}
-          <code>{"action={() => { void increment(); }}"}</code>.
+          A counter wants every click; a Save must not run twice. Opt the Save in to{" "}
+          <code>"ignore"</code>:
+        </p>
+        <CodeBlock>{`<Button action={async () => { await incrementOnServer(); }}>+1</Button>  // every click runs
+<Button action={save} whilePending="ignore">Save</Button>                // one save at a time`}</CodeBlock>
+        <p>
+          In <code>"run"</code> mode the runs overlap, and their errors follow{" "}
+          <a href="/concepts/action-props#overlapping-actions">the usual rule</a>: the latest run's
+          rejection reaches the Error Boundary, an older run's goes to <code>reportError</code>. For
+          runs that must happen one after another, each seeing the previous result, use{" "}
+          <code>useActionState</code> and call its dispatch from the action.
         </p>
       </ConceptExample>
 

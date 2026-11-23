@@ -2,7 +2,13 @@
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
-import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  Action,
+  ActionDetails,
+  RenderProp,
+  StateValue,
+  WhilePending,
+} from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
@@ -45,6 +51,16 @@ export interface MenuItemProps extends Omit<
    */
   closeOnActivate?: boolean;
   /**
+   * What a click, Enter or Space does while this item's `action` is pending. `"ignore"`:
+   * nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs
+   * again (`data-pending` until every run has settled); a closing item closes the menu once,
+   * when the last run settles and only if the latest run resolved (a rejection keeps the menu
+   * open, as in `"ignore"` mode). No effect without `action`.
+   *
+   * @defaultValue `"ignore"`, or `"run"` with `closeOnActivate={false}`
+   */
+  whilePending?: WhilePending;
+  /**
    * Renders `aria-disabled` and `data-disabled`: the item stays focusable and never activates.
    * It is an ordinary item for navigation; only the open focus skips items with `disabled`.
    *
@@ -65,8 +81,9 @@ export interface MenuItemProps extends Omit<
 
 /**
  * A menu command: `<button type="button" role="menuitem" tabindex="-1">`. Click, Enter or Space
- * runs `action` in the item's own transition (`data-pending` and `aria-disabled` on the item; a
- * second activation meanwhile is ignored); once it resolves the whole menu stack closes
+ * runs `action` in the item's own transition (`data-pending` on the item; a second activation
+ * meanwhile is ignored and the item `aria-disabled`, unless `whilePending` is `"run"`, the
+ * default of a `closeOnActivate={false}` item); once it resolves the whole menu stack closes
  * through the top-level Root (`openChangeAction(false, { reason: "activate" })` awaited, view
  * transition if set). Hovering the item focuses it.
  *
@@ -79,6 +96,7 @@ export interface MenuItemProps extends Omit<
 export function MenuItem({
   action,
   closeOnActivate = true,
+  whilePending,
   disabled = false,
   label,
   className,
@@ -89,7 +107,13 @@ export function MenuItem({
 }: MenuItemProps) {
   const menu = useMenuContext("Menu.Item");
   // The close belongs to the top-level menu, so its open generation guards it.
-  const { pending, run } = useActionTrigger({ openGeneration: menu.root.popover.openGeneration });
+  // Mixed ownership (conventions 2.5.1): an item the library closes the menu after ignores by
+  // default; a keep-open item is a user-owned trigger and runs every activation.
+  const ignoring = (whilePending ?? (closeOnActivate ? "ignore" : "run")) === "ignore";
+  const { pending, run } = useActionTrigger({
+    openGeneration: menu.root.popover.openGeneration,
+    ignoreWhilePending: ignoring,
+  });
 
   const { libraryProps } = useMenuItem({
     part: "Menu.Item",
@@ -98,9 +122,9 @@ export function MenuItem({
     label,
     activate: (event) => {
       const details: MenuItemDetails = createActionDetails(event, {});
-      // A second activation while this item's own run is in flight starts nothing and is
-      // cancelled (the hook's guard): a link does not navigate, a composed command does not
-      // run. Enter / Space reach here through the element's click, their keydown is cancelled.
+      // When ignoring, a second activation while this item's own run is in flight starts
+      // nothing and is cancelled (the hook's guard): a link does not navigate, a composed
+      // command does not run. Enter / Space reach here through the element's click, their keydown is cancelled.
       const started = run(
         () => action?.(details),
         closeOnActivate ? () => menu.root.popover.requestClose(event, "activate") : undefined,
@@ -122,9 +146,10 @@ export function MenuItem({
     libraryProps: {
       ...(rendersButton(render) && { type: "button" as const }),
       ...libraryProps,
-      // Also while pending: an item that will not act is unavailable to AT. Navigation keys
-      // on `data-disabled` (the `disabled` prop), so a pending item is still an enabled item.
-      "aria-disabled": disabled || pending ? true : undefined,
+      // Also while pending when ignoring: an item that will not act is unavailable to AT.
+      // Navigation keys on `data-disabled` (the `disabled` prop), so a pending item is still an
+      // enabled item.
+      "aria-disabled": disabled || (pending && ignoring) ? true : undefined,
       "data-pending": dataAttr(pending),
     },
   });

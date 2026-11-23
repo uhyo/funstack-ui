@@ -44,7 +44,8 @@
   outline: none;
   background: #e0e7ff;
 }
-.menu [aria-disabled="true"] {
+/* Not while pending: an ignoring item (whilePending="ignore") is aria-disabled while it runs. */
+.menu [aria-disabled="true"]:not([data-pending]) {
   opacity: 0.4;
 }
 .menu [data-pending] {

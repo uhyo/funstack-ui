@@ -11,18 +11,43 @@ import "./button-demo.css";
 const fakeCall = (label: string, { ms = 1000, fail = false } = {}) =>
   fakeSave("button", label, { ms, fail });
 
+function CounterDemo() {
+  const [count, setCount] = useState(0);
+  return (
+    <section>
+      <h3>Every click runs (the default)</h3>
+      <p>
+        Click several times quickly: every click runs the action. The button shows{" "}
+        <code>data-pending</code> until the last run settles and is never <code>aria-disabled</code>{" "}
+        meanwhile.
+      </p>
+      <Button
+        className="btn"
+        action={async () => {
+          await fakeCall("+1");
+          startTransition(() => setCount((c) => c + 1));
+        }}
+      >
+        +1
+      </Button>{" "}
+      <output>count: {count}</output>
+    </section>
+  );
+}
+
 function SaveDemo() {
   const [calls, setCalls] = useState(0);
   const [saved, setSaved] = useState(0);
   return (
     <section>
-      <h3>Async action, re-entry ignored</h3>
+      <h3>whilePending="ignore": one save at a time</h3>
       <p>
         Click several times quickly: the action runs once. The button is <code>aria-disabled</code>{" "}
         and <code>data-pending</code> while it runs and keeps focus.
       </p>
       <Button
         className="btn"
+        whilePending="ignore"
         action={async () => {
           startTransition(() => setCalls((c) => c + 1));
           await fakeCall("save");
@@ -71,6 +96,7 @@ function FormDemo() {
         <Form.Submit className="btn">Publish</Form.Submit>{" "}
         <Button
           className="btn"
+          whilePending="ignore"
           formAction={async (data: FormData) => {
             await fakeCall(`save draft ${String(data.get("title"))}`);
             record("draft saved");
@@ -80,6 +106,7 @@ function FormDemo() {
         </Button>{" "}
         <Button
           className="btn"
+          whilePending="ignore"
           formAction={async () => {
             await fakeCall("discard", { ms: 1500 });
             record("discarded");
@@ -122,6 +149,7 @@ function ComposeDemo() {
 export function ButtonDemo() {
   return (
     <Demo title="Button">
+      <CounterDemo />
       <SaveDemo />
       <RejectDemo />
       <FormDemo />

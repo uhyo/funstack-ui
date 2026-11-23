@@ -17,7 +17,7 @@ import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, useState, useTransition } from "react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -32,7 +32,10 @@ import { Dialog } from "../dialog/index.js";
 import { createToastManager, Toast, toast } from "./index.js";
 import type {
   ToastActionDetails,
+  ToastActionOptions,
+  ToastActionProps,
   ToastCloseDetails,
+  ToastCloseProps,
   ToastItem,
   ToastManager,
   ToastViewportProps,
@@ -870,9 +873,10 @@ describe("Toast", () => {
     });
   });
 
-  // Overlap and Superseded rejection are N/A for `Toast.Action`: the re-entry guard means an
-  // Action never has two of its own runs in flight (#79, #81). These rows replace them
-  // (design/components/button.md 16.4 T1, T2, T4).
+  // Overlap and Superseded rejection are N/A for a `Toast.Action` whose `whilePending` is "ignore"
+  // (the default with `closeOnSettle`): it never has two of its own runs in flight (#79, #81).
+  // These rows pin it (design/components/button.md 16.4 T1, T2, T4); "whilePending (#146)" below
+  // has the rows for "run" mode, where they are required.
   describe("re-entry", () => {
     // T1
     it("a second Undo click while pending is ignored and cancelled; one dispatch, one close", async () => {
@@ -953,7 +957,7 @@ describe("Toast", () => {
     });
 
     // T2
-    it("closeOnSettle={false}, an ignored second click, then a rejection: one error", async () => {
+    it('closeOnSettle={false} whilePending="ignore", an ignored second click, then a rejection: one error', async () => {
       silenceErrors();
       const errors: unknown[] = [];
       const d = deferred();
@@ -965,7 +969,7 @@ describe("Toast", () => {
             <ErrorCatcher onError={(e) => errors.push(e)}>
               {toasts.map((t) => (
                 <Toast.Root key={t.id} toast={t}>
-                  <Toast.Action data-testid="act" closeOnSettle={false} />
+                  <Toast.Action data-testid="act" closeOnSettle={false} whilePending="ignore" />
                 </Toast.Root>
               ))}
             </ErrorCatcher>
@@ -980,6 +984,7 @@ describe("Toast", () => {
         fireEvent.click(screen.getByTestId("act"));
       });
       expect(undo).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("act")).toHaveAttribute("aria-disabled", "true");
       const failure = new Error("older");
       await act(async () => d.reject(failure));
       await flushMicrotasks(2);
@@ -1002,6 +1007,212 @@ describe("Toast", () => {
       );
       await call(() => manager({ title: "A", action: { label: "Undo", action: () => {} } }));
       expect(screen.getByTestId("act")).not.toHaveAttribute("aria-disabled");
+    });
+  });
+
+  // #146, conventions 2.5.1: the default follows closeOnSettle; "run" mode overlaps runs.
+  describe("whilePending (#146)", () => {
+    function KeepOpen({ errors }: { errors: unknown[] }) {
+      return (
+        <Harness
+          manager={manager}
+          list={({ toasts }) => (
+            <ErrorCatcher onError={(e) => errors.push(e)}>
+              {toasts.map((t) => (
+                <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`}>
+                  <Toast.Action data-testid="act" closeOnSettle={false} />
+                </Toast.Root>
+              ))}
+            </ErrorCatcher>
+          )}
+        />
+      );
+    }
+
+    // W6 flips
+    it("closeOnSettle={false} runs every click by default; timer paused and Root pending until both settle", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const runs = [deferred(), deferred()];
+      let call_ = 0;
+      const retry = vi.fn(() => runs[call_++]!.promise);
+      const errors: unknown[] = [];
+      render(<KeepOpen errors={errors} />);
+      const id = await call(() =>
+        manager({ title: "A", duration: 1000, action: { label: "Retry", action: retry } }),
+      );
+      let second = false;
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("act"));
+      });
+      await act(async () => {
+        second = fireEvent.click(screen.getByTestId("act"));
+      });
+      expect(retry).toHaveBeenCalledTimes(2);
+      expect(second).toBe(true); // not cancelled
+      const action = screen.getByTestId("act");
+      expect(action).not.toHaveAttribute("aria-disabled");
+      expectPending(action);
+      expectPending(root(id));
+      await act(async () => runs[1]!.resolve());
+      await flushMicrotasks(2);
+      expectPending(action);
+      expectPending(root(id));
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      await act(async () => runs[0]!.resolve());
+      await flushMicrotasks(2);
+      expectNotPending(action);
+      expectNotPending(root(id));
+      expect(queryRoot(id)).not.toBeNull();
+      expect(errors).toEqual([]);
+    });
+
+    it.each([
+      ["while the newer run is pending", false],
+      ["after the newer run resolved", true],
+    ] as const)(
+      '"run": an older run rejecting %s is reported, not caught',
+      async (_l, newerFirst) => {
+        silenceErrors();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const runs = [deferred(), deferred()];
+        let call_ = 0;
+        const errors: unknown[] = [];
+        render(<KeepOpen errors={errors} />);
+        await call(() =>
+          manager({ title: "A", action: { label: "Retry", action: () => runs[call_++]!.promise } }),
+        );
+        await act(async () => {
+          fireEvent.click(screen.getByTestId("act"));
+          fireEvent.click(screen.getByTestId("act"));
+        });
+        if (newerFirst) await act(async () => runs[1]!.resolve());
+        const older = new Error("older");
+        await act(async () => runs[0]!.reject(older));
+        if (!newerFirst) await act(async () => runs[1]!.resolve());
+        await flushMicrotasks(2);
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+        expect(errors).toEqual([]);
+      },
+    );
+
+    it('"run": the latest run rejecting reaches the boundary above the Viewport list', async () => {
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const runs = [deferred(), deferred()];
+      let call_ = 0;
+      const errors: unknown[] = [];
+      render(<KeepOpen errors={errors} />);
+      await call(() =>
+        manager({ title: "A", action: { label: "Retry", action: () => runs[call_++]!.promise } }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("act"));
+        fireEvent.click(screen.getByTestId("act"));
+      });
+      const latest = new Error("latest");
+      await act(async () => runs[1]!.reject(latest));
+      await act(async () => runs[0]!.resolve());
+      await flushMicrotasks(2);
+      expect(errors).toEqual([latest]);
+      expect(reportError).not.toHaveBeenCalled();
+    });
+
+    it('a closing Action with whilePending="run": two calls, the toast closes once', async () => {
+      const runs = [deferred(), deferred()];
+      let call_ = 0;
+      const undo = vi.fn(() => runs[call_++]!.promise);
+      const closeAction = vi.fn();
+      render(
+        <Harness
+          manager={manager}
+          list={({ toasts }) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`}>
+                <Toast.Action data-testid="act" whilePending="run" />
+              </Toast.Root>
+            ))
+          }
+        />,
+      );
+      const id = await call(() =>
+        manager({ title: "A", action: { label: "Undo", action: undo }, closeAction }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("act"));
+        fireEvent.click(screen.getByTestId("act"));
+      });
+      expect(undo).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId("act")).not.toHaveAttribute("aria-disabled");
+      await act(async () => runs[0]!.resolve());
+      await flushMicrotasks(2);
+      // Not at the first resolved run: the toast leaves when the last run settles.
+      expect(queryRoot(id)).not.toBeNull();
+      expectPending(root(id));
+      await act(async () => runs[1]!.resolve());
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).toBeNull();
+      expect(closeAction).toHaveBeenCalledTimes(1);
+    });
+
+    it('"run" on a closing Action: the first run resolves, the latest rejects: the boundary, the toast stays', async () => {
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const runs = [deferred(), deferred()];
+      let call_ = 0;
+      const errors: unknown[] = [];
+      let last: ToastViewportState | undefined;
+      render(
+        <Harness
+          manager={manager}
+          list={(state) => {
+            last = state;
+            return (
+              <ErrorCatcher onError={(e) => errors.push(e)}>
+                {state.toasts.map((t) => (
+                  <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`}>
+                    <Toast.Action data-testid="act" whilePending="run" />
+                  </Toast.Root>
+                ))}
+              </ErrorCatcher>
+            );
+          }}
+        />,
+      );
+      const id = await call(() =>
+        manager({ title: "A", action: { label: "Undo", action: () => runs[call_++]!.promise } }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("act"));
+        fireEvent.click(screen.getByTestId("act"));
+      });
+      await act(async () => runs[0]!.resolve());
+      await flushMicrotasks(2);
+      // The close waits for the last run in flight and needs the latest run to resolve (#146
+      // review F1): the toast stays, pending.
+      expect(queryRoot(id)).not.toBeNull();
+      expectPending(root(id));
+      const late = new Error("late");
+      await act(async () => runs[1]!.reject(late));
+      await flushMicrotasks(2);
+      // The latest run rejected while the Action was there: the boundary above the list, and
+      // the toast is not closed.
+      expect(errors).toEqual([late]);
+      expect(reportError).not.toHaveBeenCalled();
+      expect(last?.toasts.map((t) => [t.id, t.ending])).toEqual([[id, false]]);
+    });
+
+    it("types: whilePending on Toast.Action; not on Toast.Close or the toast() action options", () => {
+      expectTypeOf<NonNullable<ToastActionProps["whilePending"]>>().toEqualTypeOf<
+        "run" | "ignore"
+      >();
+      expectTypeOf<ToastCloseProps>().not.toHaveProperty("whilePending");
+      expectTypeOf<ToastActionOptions>().not.toHaveProperty("whilePending");
     });
   });
 

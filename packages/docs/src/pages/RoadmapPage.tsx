@@ -29,6 +29,19 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          <strong>Breaking:</strong> a pending <code>Button</code> no longer ignores clicks or
+          renders <code>aria-disabled="true"</code>: every click, Enter or Space runs its{" "}
+          <code>action</code> (or submits its function <code>formAction</code>) again. Add{" "}
+          <code>whilePending="ignore"</code> to keep the old behaviour, for a Save, Pay or Delete
+          that must not run twice. A <code>Menu.Item</code> with{" "}
+          <code>{"closeOnActivate={false}"}</code> and a <code>Toast.Action</code> with{" "}
+          <code>{"closeOnSettle={false}"}</code> now run every activation too. The Close parts, a
+          closing <code>Menu.Item</code> and a closing <code>Toast.Action</code> still ignore a
+          second activation by default; <code>whilePending="run"</code> opts out. In{" "}
+          <code>"run"</code> mode the runs overlap, so an older run's rejection goes to{" "}
+          <code>reportError</code> (<a href={issue(146)}>#146</a>).
+        </li>
+        <li>
           An action that rejects after its component unmounted (a <code>Toast.Action</code> whose
           toast was closed meanwhile, a <code>Menu.Item</code> whose menu closed) or while it is
           hidden (an <code>&lt;Activity&gt;</code>, a closed <code>keepMounted</code> overlay, a

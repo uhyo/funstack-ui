@@ -1,7 +1,13 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
-import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  Action,
+  ActionDetails,
+  RenderProp,
+  StateValue,
+  WhilePending,
+} from "../internal/types.js";
 import { useOverlayClose } from "../internal/use-overlay-close.js";
 import { useDialogContext } from "./dialog-context.js";
 
@@ -41,6 +47,16 @@ export interface DialogCloseProps extends Omit<
    * button is a native `command="request-close"` invoker.
    */
   action?: Action<[details: DialogCloseDetails]>;
+  /**
+   * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
+   * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`
+   * until every run has settled); the dialog closes once, when the last run settles and only if
+   * the latest run resolved (a rejection leaves it open, as in `"ignore"` mode). No effect
+   * without `action`.
+   *
+   * @defaultValue `"ignore"`
+   */
+  whilePending?: WhilePending;
   /** Becomes `dialog.returnValue` (and `details.returnValue` of `openChangeAction(false)`). */
   value?: string;
   /**
@@ -68,7 +84,7 @@ export interface DialogCloseProps extends Omit<
  * through the Root (`openChangeAction(false)` awaited, then `close(value)` in the commit, inside
  * the view transition if the Popup's `transition` is set). With `action` the action runs first in
  * this part's own transition (`data-pending` and `aria-disabled` on the button; a second click
- * meanwhile is ignored); a rejection leaves the dialog open.
+ * meanwhile is ignored unless `whilePending="run"`); a rejection leaves the dialog open.
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
  * `command`, `value`, `onClick` (library mode, or with `action`), `aria-disabled`, `data-pending`,
@@ -78,6 +94,7 @@ export interface DialogCloseProps extends Omit<
  */
 export function DialogClose({
   action,
+  whilePending,
   value,
   disabled = false,
   className,
@@ -97,6 +114,7 @@ export function DialogClose({
     command: "request-close",
     openGeneration: ctx.openGeneration,
     action,
+    whilePending,
     details: (event) => createActionDetails(event, { returnValue: value ?? "" }),
     close: (event) => {
       const returnValue = value ?? "";

@@ -28,33 +28,76 @@ const frames = (n: number) =>
   });
 
 describe("focus retention (row 21)", () => {
-  it("the pending Button keeps focus, two frames later and after resolve", async () => {
-    const d = deferred();
-    const action = vi.fn(() => d.promise);
-    render(<Button action={action}>Save</Button>);
-    button("Save").focus();
-    await user.keyboard("{Enter}");
-    expect(action).toHaveBeenCalledTimes(1);
-    expectPending(button("Save"));
-    expect(button("Save")).toHaveAttribute("aria-disabled", "true");
-    await frames(2);
-    expect(document.activeElement).toBe(button("Save"));
-    await act(async () => {
-      d.resolve();
-    });
-    expectNotPending(button("Save"));
-    await frames(2);
-    expect(document.activeElement).toBe(button("Save"));
-  });
+  it.each([
+    ["default", undefined],
+    ['"ignore"', "ignore"],
+  ] as const)(
+    "%s: the pending Button keeps focus, two frames later and after resolve",
+    async (_label, whilePending) => {
+      const d = deferred();
+      const action = vi.fn(() => d.promise);
+      render(
+        <Button action={action} whilePending={whilePending}>
+          Save
+        </Button>,
+      );
+      button("Save").focus();
+      await user.keyboard("{Enter}");
+      expect(action).toHaveBeenCalledTimes(1);
+      expectPending(button("Save"));
+      if (whilePending === "ignore") {
+        expect(button("Save")).toHaveAttribute("aria-disabled", "true");
+      } else {
+        expect(button("Save")).not.toHaveAttribute("aria-disabled");
+      }
+      await frames(2);
+      expect(document.activeElement).toBe(button("Save"));
+      await act(async () => {
+        d.resolve();
+      });
+      expectNotPending(button("Save"));
+      await frames(2);
+      expect(document.activeElement).toBe(button("Save"));
+    },
+  );
 });
 
 describe("Invoker Command + action (row 22)", () => {
-  it("the second click while pending runs neither the action nor the command", async () => {
+  it("default: the second click while pending runs the action and the command again", async () => {
+    const runs = [deferred(), deferred()];
+    let call = 0;
+    const action = vi.fn(() => runs[call++]!.promise);
+    render(
+      <>
+        <Button commandfor="p" command="toggle-popover" action={action}>
+          Toggle
+        </Button>
+        <div id="p" popover="manual" data-testid="p">
+          Panel
+        </div>
+      </>,
+    );
+    const isOpen = () => screen.getByTestId("p").matches(":popover-open");
+    await user.click(button("Toggle"));
+    await expect.poll(isOpen).toBe(true);
+    expectPending(button("Toggle"));
+    expect(button("Toggle")).not.toHaveAttribute("aria-disabled");
+    await user.click(button("Toggle"));
+    await expect.poll(isOpen).toBe(false);
+    expect(action).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      runs[0]!.resolve();
+      runs[1]!.resolve();
+    });
+    expectNotPending(button("Toggle"));
+  });
+
+  it('"ignore": the second click while pending runs neither the action nor the command', async () => {
     const d = deferred();
     const action = vi.fn(() => d.promise);
     render(
       <>
-        <Button commandfor="p" command="toggle-popover" action={action}>
+        <Button commandfor="p" command="toggle-popover" action={action} whilePending="ignore">
           Toggle
         </Button>
         <div id="p" popover="manual" data-testid="p">
@@ -137,13 +180,39 @@ describe("Tooltip on a pending Button (row 23)", () => {
 });
 
 describe("implicit submission (row 24)", () => {
-  it("Enter in a field submits once; again while pending submits nothing", async () => {
+  it("default: Enter in a field while the submission pends submits again", async () => {
+    const runs = [deferred(), deferred()];
+    let call = 0;
+    const draft = vi.fn<(formData: FormData) => Promise<void>>(() => runs[call++]!.promise);
+    render(
+      <form>
+        <input aria-label="Title" name="title" />
+        <Button formAction={draft}>Draft</Button>
+      </form>,
+    );
+    const field = screen.getByRole("textbox", { name: "Title" });
+    await user.type(field, "x{Enter}");
+    await expect.poll(() => draft.mock.calls.length).toBe(1);
+    expectPending(button("Draft"));
+    field.focus();
+    await user.keyboard("{Enter}");
+    await expect.poll(() => draft.mock.calls.length).toBe(2);
+    await act(async () => {
+      runs[0]!.resolve();
+      runs[1]!.resolve();
+    });
+    await expect.poll(() => button("Draft").hasAttribute("data-pending")).toBe(false);
+  });
+
+  it('"ignore": Enter in a field submits once; again while pending submits nothing', async () => {
     const d = deferred();
     const draft = vi.fn<(formData: FormData) => Promise<void>>(() => d.promise);
     render(
       <form>
         <input aria-label="Title" name="title" />
-        <Button formAction={draft}>Draft</Button>
+        <Button formAction={draft} whilePending="ignore">
+          Draft
+        </Button>
       </form>,
     );
     const field = screen.getByRole("textbox", { name: "Title" });
@@ -219,9 +288,30 @@ describe("ViewTransition (row 25)", () => {
 });
 
 describe.runIf(browserName === "chromium")("accessibility tree (row 26, Chromium CDP)", () => {
-  it("the pending Button keeps its name and is reported disabled; after settle it is not", async () => {
+  it("default: the pending Button is not reported disabled", async () => {
     const d = deferred();
     render(<Button action={() => d.promise}>Save changes</Button>);
+    const node = async () =>
+      (await getAXNodes()).find(
+        (n) => n.role?.value === "button" && n.name?.value === "Save changes",
+      );
+    await user.click(button("Save changes"));
+    expectPending(button("Save changes"));
+    const pendingNode = await node();
+    expect(pendingNode).toBeDefined();
+    expect(axProperty(pendingNode, "disabled")).toBeUndefined();
+    await act(async () => {
+      d.resolve();
+    });
+  });
+
+  it('"ignore": the pending Button keeps its name and is reported disabled; after settle it is not', async () => {
+    const d = deferred();
+    render(
+      <Button action={() => d.promise} whilePending="ignore">
+        Save changes
+      </Button>,
+    );
     const node = async () =>
       (await getAXNodes()).find(
         (n) => n.role?.value === "button" && n.name?.value === "Save changes",

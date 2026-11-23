@@ -1,6 +1,6 @@
 /* Button: [data-pending] is the in-flight state, [data-disabled] the consumer's `disabled`. A
-   pending Button is also aria-disabled="true", so style "unavailable" from [data-disabled] (or
-   aria-disabled without data-pending), not from aria-disabled alone. */
+   pending Button with whilePending="ignore" is also aria-disabled="true", so style "unavailable"
+   from [data-disabled] (or aria-disabled without data-pending), not from aria-disabled alone. */
 .demo-btn {
   display: inline-flex;
   align-items: center;

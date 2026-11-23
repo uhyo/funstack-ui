@@ -23,9 +23,10 @@
 // N/A rows: none of conventions 10.1 is N/A in library mode. JS-free mode has no action props, so
 // its sync/async/rejection/overlap/parity rows do not apply (it is covered by the ARIA, function
 // props, Close and Form rows). For the Close part's own `action`, Overlap and Superseded rejection
-// are N/A: the re-entry guard means a Close never has two of its own runs in flight (#79, #81);
-// the Close "re-entry" rows (D1-D6, design/components/button.md 16.4, in dialog-close.test.tsx)
-// replace them.
+// are N/A under its default `whilePending="ignore"`: a Close never has two of its own runs in
+// flight (#79, #81); the Close "re-entry" rows (D1-D6, design/components/button.md 16.4, in
+// dialog-close.test.tsx) pin it. With `whilePending="run"` they are required and are the shared
+// suite's "whilePending" rows (D7, #146).
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { startTransition, use, useRef, useState } from "react";
 import { renderToString } from "react-dom/server";
