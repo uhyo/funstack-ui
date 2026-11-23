@@ -7,7 +7,14 @@ import "./menu-demo.css";
 
 function logChange(label: string) {
   return (open: boolean, { reason }: MenuOpenChangeDetails) => {
-    console.log(`[${label}] open=${open} reason=${reason}`);
+    console.log(`[${label}] openChangeAction open=${open} reason=${reason}`);
+  };
+}
+
+/** A fact (a dismissal): `onOpenChange`, called synchronously and not awaited. */
+function logFact(label: string) {
+  return (open: boolean, { reason }: MenuOpenChangeDetails) => {
+    console.log(`[${label}] onOpenChange open=${open} reason=${reason}`);
   };
 }
 
@@ -28,7 +35,7 @@ function RowActions() {
         ), so it runs every activation, also while pending (<code>whilePending</code> defaults to{" "}
         <code>"run"</code> there); "Archive" ignores a second Enter while it runs.
       </p>
-      <Menu.Root openChangeAction={logChange("row menu")}>
+      <Menu.Root openChangeAction={logChange("row menu")} onOpenChange={logFact("row menu")}>
         <Menu.Trigger className="menu-btn">Actions ▾</Menu.Trigger>
         <Menu.Popup
           className="menu"
@@ -49,7 +56,7 @@ function RowActions() {
           </Menu.Item>
           <Menu.Item disabled>Share (disabled)</Menu.Item>
           <Menu.Separator />
-          <Menu.Root openChangeAction={logChange("move to")}>
+          <Menu.Root openChangeAction={logChange("move to")} onOpenChange={logFact("move to")}>
             <Menu.SubmenuTrigger>Move to ▸</Menu.SubmenuTrigger>
             <Menu.Popup className="menu">
               <Menu.Item action={() => note("Moved to Inbox")}>Inbox</Menu.Item>
@@ -188,7 +195,11 @@ function ContextMenuCards() {
       </p>
       <div className="cm-cards">
         {cards.map((name) => (
-          <Menu.Root key={name} openChangeAction={logChange(`context ${name}`)}>
+          <Menu.Root
+            key={name}
+            openChangeAction={logChange(`context ${name}`)}
+            onOpenChange={logFact(`context ${name}`)}
+          >
             <Menu.ContextTrigger className="cm-card">
               <strong>{name}</strong>
               <Menu.Trigger className="menu-btn" aria-label={`Actions for ${name}`}>
@@ -196,7 +207,10 @@ function ContextMenuCards() {
               </Menu.Trigger>
               <input aria-label={`Note for ${name}`} placeholder="Note (native menu)" />
               {name === "Archive" && (
-                <Menu.Root openChangeAction={logChange("nested region")}>
+                <Menu.Root
+                  openChangeAction={logChange("nested region")}
+                  onOpenChange={logFact("nested region")}
+                >
                   <Menu.ContextTrigger className="cm-nested">Nested region</Menu.ContextTrigger>
                   <Menu.Popup className="menu" aria-label="Nested actions">
                     <Menu.Item action={() => note("Nested action")}>Nested action</Menu.Item>
