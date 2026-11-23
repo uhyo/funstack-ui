@@ -37,13 +37,18 @@ function RowActions({ id, archive }: { id: string; archive: () => Promise<void> 
 // permissions are loaded, then it opens once, complete. A Close with an `action` runs it with its
 // own pending state, then closes through the Root: the commit hides the popup, and
 // `transition="pop"` animates that exit with a view transition, Firefox included. Escape and
-// clicks outside are the browser's (reason "dismiss") and use the CSS fade.
+// clicks outside are the browser's, facts reported to `onOpenChange` (reason "dismiss"), and use
+// the CSS fade.
 export function PopoverActions() {
   const [archived, setArchived] = useState<readonly string[]>([]);
   const [last, setLast] = useState("(none yet)");
   const record = (open: boolean, { reason }: PopoverOpenChangeDetails) => {
     // The synchronous part of an action: this setState is a transition update.
-    setLast(`open=${open} reason="${reason}"`);
+    setLast(`openChangeAction(${open}, "${reason}")`);
+  };
+  const recordFact = (open: boolean, { reason }: PopoverOpenChangeDetails) => {
+    // A fact handler: this setState is urgent.
+    setLast(`onOpenChange(${open}, "${reason}")`);
   };
   const rows = [
     { id: "report", name: "Quarterly report" },
@@ -55,7 +60,7 @@ export function PopoverActions() {
         {rows.map(({ id, name }) => (
           <li key={id} className="demo-row" data-archived={archived.includes(id) ? "" : undefined}>
             <span>{name}</span>
-            <Popover.Root defaultOpen={false} openChangeAction={record}>
+            <Popover.Root defaultOpen={false} openChangeAction={record} onOpenChange={recordFact}>
               <Popover.Trigger className="demo-button" aria-label={`Actions for ${name}`}>
                 {({ pending }) => (pending ? <span className="demo-spinner" aria-hidden /> : "⋯")}
               </Popover.Trigger>
@@ -80,7 +85,7 @@ export function PopoverActions() {
         </button>
       </div>
       <output className="demo-readout">
-        last openChangeAction: <code>{last}</code>
+        last call: <code>{last}</code>
       </output>
     </>
   );

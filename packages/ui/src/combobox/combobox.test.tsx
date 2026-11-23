@@ -538,15 +538,43 @@ describe("Combobox", () => {
       await flushTasks(2);
     });
 
-    it("warns once when onInputValueChange returns a promise", async () => {
+    // #148: the rule of every `on*` handler (conventions 2.1).
+    it("onInputValueChange may return a promise: no warning; a rejection goes to reportError", async () => {
       const error = silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
       const user = setupUser();
-      render(<Harness root={{ onInputValueChange: async () => {} }} />);
+      const err = new Error("save failed");
+      render(<Harness root={{ onInputValueChange: () => Promise.reject(err) }} />);
       await typeText(user, "ab");
-      const warnings = error.mock.calls.filter(([m]) =>
-        String(m).includes("`onInputValueChange` returned a promise"),
+      expect(
+        error.mock.calls.filter(([m]) => String(m).includes("onInputValueChange")),
+      ).toHaveLength(0);
+      expect(reportError).toHaveBeenCalledTimes(2);
+      expect(reportError).toHaveBeenCalledWith(err);
+      expect(input().value).toBe("ab");
+    });
+
+    it("onInputValueChange throws: reportError, and the text write stands", async () => {
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const user = setupUser();
+      const err = new Error("handler bug");
+      render(
+        <Harness
+          root={{
+            onInputValueChange: () => {
+              throw err;
+            },
+          }}
+        />,
       );
-      expect(warnings).toHaveLength(1);
+      await typeText(user, "a");
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+      expect(input().value).toBe("a");
+      // The keystroke still opened the listbox (the library's bookkeeping after the call ran).
+      expect(isOpen()).toBe(true);
     });
   });
 
@@ -1401,19 +1429,24 @@ describe("Combobox", () => {
       }
     });
 
-    it("closes at once when focus moves outside, notified as dismiss", async () => {
+    it("closes at once when focus moves outside: a 'dismiss' fact with the focusout", async () => {
       const openAction = vi.fn<OpenAction>();
+      const fact = vi.fn<OpenAction>();
       const hide = spyHide();
       const user = setupUser();
-      render(<Harness root={{ openChangeAction: openAction }} />);
+      render(<Harness root={{ openChangeAction: openAction, onOpenChange: fact }} />);
       await typeText(user, "j");
       await user.click(screen.getByTestId("elsewhere"));
       expect(hide).toHaveBeenCalledTimes(1);
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-      expect(openAction.mock.calls.at(-1)![0]).toBe(false);
-      expect(openAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
-      expect(openAction.mock.calls.at(-1)![1].event?.type).toBe("focusout");
+      // The library's immediate hide, which it cannot hold: a fact, not a request.
+      expect(openAction.mock.calls.map(([n]) => n)).toEqual([true]);
+      expect(fact).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![0]).toBe(false);
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].event?.type).toBe("focusout");
+      expectNotPending(input());
     });
 
     // Focusable content inside the Popup is not outside (design 5.4): focus
@@ -2291,11 +2324,11 @@ describe("Combobox", () => {
       expect(openAction.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[true, "activate"]]);
     });
 
-    // #118
-    it("a dismissal: not expanded once the listbox is hidden, while the notification runs", async () => {
-      const close = deferred();
-      const openAction = vi.fn<OpenAction>((next) => (next ? undefined : close.promise));
-      render(<Harness root={{ openChangeAction: openAction }} />);
+    // #118, #148
+    it("a dismissal: a fact, not expanded and not pending once the listbox is hidden", async () => {
+      const openAction = vi.fn<OpenAction>();
+      const fact = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: openAction, onOpenChange: fact }} />);
       act(() => trigger().click());
       await flushTasks(2);
       expect(isOpen()).toBe(true);
@@ -2306,37 +2339,49 @@ describe("Combobox", () => {
       act(() => popup().hidePopover());
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-      expectPending(input());
-      expect(input()).toHaveAttribute("aria-expanded", "false");
-      expect(trigger()).not.toHaveAttribute("aria-expanded");
-      await act(async () => close.resolve());
-      await flushTasks(2);
+      expect(fact.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([[false, "dismiss"]]);
+      expect(openAction.mock.calls.map(([n]) => n)).toEqual([true]);
       expectNotPending(input());
+      expect(input()).not.toHaveAttribute("data-open");
       expect(input()).toHaveAttribute("aria-expanded", "false");
       expect(trigger()).not.toHaveAttribute("aria-expanded");
     });
 
-    // #118
-    it("a dismissal entangled with an unrelated pending action: not expanded meanwhile", async () => {
+    // #118, #148: the fact's commit is urgent, so an unrelated pending action does not hold it.
+    it("a dismissal while an unrelated action is pending: committed closed at once, not expanded", async () => {
       const save = deferred();
-      const openAction = vi.fn<OpenAction>();
-      render(<Harness root={{ openChangeAction: openAction }} />);
+      const fact = vi.fn<OpenAction>();
+      render(<Harness root={{ onOpenChange: fact }} />);
       act(() => trigger().click());
       await flushTasks(2);
       expect(isOpen()).toBe(true);
-      // An unrelated async action holds every transition, the notification's included.
+      // An unrelated async action holds every transition, but not an urgent update.
       act(() => startTransition(() => save.promise));
       act(() => popup().hidePopover());
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-      expect(openAction.mock.calls.at(-1)![0]).toBe(false);
-      expectPending(input());
+      expect(fact).toHaveBeenCalledTimes(1);
+      expectNotPending(input());
+      expect(input()).not.toHaveAttribute("data-open");
       expect(input()).toHaveAttribute("aria-expanded", "false");
       expect(trigger()).not.toHaveAttribute("aria-expanded");
       await act(async () => save.resolve());
       await flushTasks(2);
       expectNotPending(input());
       expect(input()).toHaveAttribute("aria-expanded", "false");
+    });
+
+    // #148, overlay-open-change.md 5.3
+    it("a controlled parent that keeps open={true} re-opens the listbox at once after Escape", async () => {
+      const fact = vi.fn<OpenAction>();
+      render(<Harness root={{ open: true, onOpenChange: fact }} />);
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      act(() => popup().hidePopover());
+      await flushTasks(2);
+      expect(fact).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(true);
+      expectNotPending(input());
     });
 
     it("a controlled open={true} parent that refuses the close keeps the listbox shown", async () => {
@@ -2369,10 +2414,10 @@ describe("Combobox", () => {
 
   // #125
   describe("foreign popovertarget invoker", () => {
-    it("a close that moves no focus is 'activate' with the ToggleEvent", async () => {
+    it("a close that moves no focus is an 'activate' fact with the ToggleEvent", async () => {
       const openAction = vi.fn<OpenAction>();
       const user = setupUser();
-      render(<Harness root={{ openChangeAction: openAction }} />);
+      render(<Harness root={{ onOpenChange: openAction }} />);
       await typeText(user, "j");
       expect(isOpen()).toBe(true);
       openAction.mockClear();
@@ -2423,10 +2468,10 @@ describe("Combobox", () => {
 
     // HTML's invoker relationship: a submit button with a form owner invokes nothing, so its press
     // is an outside press (#126 review F1).
-    it("a submit button in a form naming the popup: focus leaves, 'dismiss', the text reverts", async () => {
+    it("a submit button in a form naming the popup: focus leaves, a 'dismiss' fact, the text reverts", async () => {
       const openAction = vi.fn<OpenAction>();
       const user = setupUser();
-      render(<Harness root={{ openChangeAction: openAction }} />);
+      render(<Harness root={{ onOpenChange: openAction }} />);
       const form = document.createElement("form");
       form.addEventListener("submit", (event) => event.preventDefault());
       const foreign = document.createElement("button");

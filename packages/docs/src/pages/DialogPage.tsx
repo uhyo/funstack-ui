@@ -81,7 +81,7 @@ export function DialogPage() {
         rows={[
           [
             "Selected when",
-            "Root has none of `open`, `defaultOpen`, `openChangeAction`",
+            "Root has none of `open`, `defaultOpen`, `openChangeAction`, `onOpenChange`",
             "Root has any of them",
           ],
           [
@@ -97,7 +97,7 @@ export function DialogPage() {
           [
             "Dismissal (Escape, Android back, a click outside)",
             "the browser",
-            "the browser, at once; `openChangeAction(false)` is a notification",
+            "the browser, at once; a fact: `onOpenChange(false)` is called synchronously, nothing is pending, no view transition",
           ],
           [
             "Popup content",
@@ -125,9 +125,9 @@ export function DialogPage() {
         In library mode, opening and{" "}
         <a href="/concepts/browser-owned-state#parts-close">a part's close</a> are the library's; a{" "}
         <a href="/concepts/browser-owned-state#dismissal">dismissal</a> (Escape, Android back, a
-        click outside) is the browser's, and the Root is notified afterwards (
-        <a href="/concepts/browser-owned-state#parts-vs-dismissals">Parts vs dismissals</a>). The
-        mode is decided on the first render; switching later is not supported (development warning).
+        click outside) is the browser's: a fact, reported to <code>onOpenChange</code> (
+        <a href="/concepts/browser-owned-state#requests-and-facts">Requests and facts</a>). The mode
+        is decided on the first render; switching later is not supported (development warning).
       </p>
 
       <h3 id="props">Props</h3>
@@ -140,7 +140,7 @@ export function DialogPage() {
             name: "open",
             type: "boolean",
             description:
-              "Controlled open state. undefined means uncontrolled. Selects library mode.",
+              "Controlled open state. undefined means uncontrolled. Selects library mode. Pass `onOpenChange` too: the browser closes the dialog without asking (development warns).",
           },
           {
             name: "defaultOpen",
@@ -153,19 +153,40 @@ export function DialogPage() {
             type: "ChangeAction<boolean, DialogOpenChangeDetails>",
             description: (
               <>
-                Awaited for <code>true</code>: the dialog opens when it resolves and the content has
-                rendered. Awaited for a <code>false</code> the user asked a part for (a{" "}
-                <code>Dialog.Close</code>, a <code>Dialog.Form</code> submit or settled action, a
+                Requests only. Awaited for <code>true</code>: the dialog opens when it resolves and
+                the content has rendered. Awaited for a <code>false</code> the user asked a part for
+                (a <code>Dialog.Close</code>, a <code>Dialog.Form</code> submit or settled action, a
                 foreign close command): the dialog closes with <code>details.returnValue</code> when
                 it resolves, with a view transition if the Popup has <code>transition</code>; a
-                controlled parent that keeps <code>open</code> vetoes it. A notification for a
-                dismissal (Escape, a click outside): the dialog is already closed when it runs. Runs
-                in the Root's transition; may be a Server Function; rejections reach the nearest
-                Error Boundary above the Root. <code>details</code>: <code>reason</code> (
-                <code>"activate"</code>, <code>"dismiss"</code> or <code>"platform"</code>) and{" "}
-                <code>returnValue</code> (the closing button's or submitter's <code>value</code>,{" "}
-                <code>""</code> for a dismiss, <code>undefined</code> on open). Selects library
+                controlled parent that keeps <code>open</code> vetoes it. Never called for a
+                dismissal (<code>onOpenChange</code>). Runs in the Root's transition; may be a
+                Server Function; rejections reach the nearest Error Boundary above the Root.{" "}
+                <code>details</code>: <code>reason</code> (<code>"activate"</code> or{" "}
+                <code>"platform"</code>) and <code>returnValue</code> (the closing button's or
+                submitter's <code>value</code>, <code>undefined</code> on open). Selects library
                 mode.
+              </>
+            ),
+          },
+          {
+            name: "onOpenChange",
+            type: "UrgentChangeHandler<boolean, DialogOpenChangeDetails>",
+            description: (
+              <>
+                Facts only: the dialog was closed without the library closing it (Escape, Android
+                back, an assistive-technology dismiss, a click outside with{" "}
+                <code>lightDismiss</code>, a script <code>close()</code> /{" "}
+                <code>requestClose()</code>). Always <code>false</code>, with{" "}
+                <code>reason: "dismiss"</code> and <code>returnValue</code> as the browser left it (
+                <code>""</code> for Escape). Called synchronously in the browser's{" "}
+                <code>close</code> event, outside any transition, and not awaited: nothing is
+                pending and no view transition runs. A dismissal while a part's close is still
+                running is reported at once and supersedes that close. In controlled mode set state
+                directly here (<code>onOpenChange={"{setOpen}"}</code>), never in{" "}
+                <code>startTransition</code> or after an <code>await</code>; a parent that keeps{" "}
+                <code>open</code> gets the dialog shown again at once. May return a promise (a
+                Server Function); a rejection or a throw goes to <code>reportError</code>. Selects
+                library mode.
               </>
             ),
           },
@@ -217,7 +238,7 @@ export function DialogPage() {
       />
       <PartFacts
         state={
-          "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, a part's close waiting for `openChangeAction(false)`, a close notification in flight, or a re-open requested while a close notification is still settling."
+          "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends, but a request still running when a dismissal superseded it keeps `pending` until that request settles."
         }
         owned={
           "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
@@ -465,7 +486,7 @@ export function DialogPage() {
           [
             "`data-pending`",
             "Trigger",
-            "An open, a part's close, or a close notification is in flight (library mode only).",
+            "An open or a part's close is in flight (library mode only). A dismissal never pends, but a request still running when a dismissal superseded it keeps it until that request settles.",
           ],
           ["`data-pending`", "Close", "Its `action` is in flight."],
           [
@@ -508,7 +529,7 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
           ],
           [
             "Escape (modal)",
-            'Closes and returns focus; `openChangeAction(false, { reason: "dismiss" })`',
+            'Closes and returns focus; `onOpenChange(false, { reason: "dismiss" })`',
             "the browser",
           ],
           [
@@ -620,7 +641,7 @@ html:active-view-transition .dialog { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a close notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger) (`data-pending`; `aria-disabled` while it ignores a second click, the default)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open or a part's close is in flight; a dismissal is a fact and pends nothing. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger) (`data-pending`; `aria-disabled` while it ignores a second click, the default)."
         }
       >
         <h4>Walkthrough (library mode)</h4>
@@ -650,8 +671,9 @@ html:active-view-transition .dialog { transition: none; }
             <code>openChangeAction(false, {'{ reason: "activate", returnValue: "done" }'})</code>{" "}
             runs, then the dialog closes in a view transition (the <code>transition</code> prop), in
             Firefox too. Escape or a click on the backdrop (<code>lightDismiss</code>) are
-            dismissals: the browser closes the dialog at once and the Root then receives{" "}
-            <code>reason: "dismiss"</code>. The second open is instant (the data is cached).
+            dismissals: the browser closes the dialog at once and the Root calls{" "}
+            <code>onOpenChange(false, {'{ reason: "dismiss" }'})</code> in the same event, with
+            nothing pending. The second open is instant (the data is cached).
           </li>
           <li>
             If the opening action rejects, the error reaches the Error Boundary above the Root and
@@ -667,14 +689,15 @@ html:active-view-transition .dialog { transition: none; }
             A close a part asks for waits for <code>openChangeAction(false)</code>: a controlled
             parent that keeps <code>open</code> gets a plain snap-back, and the dialog never blinks
             (for example "the save failed, keep editing", checked through{" "}
-            <code>details.returnValue</code>). A dismissal is already done when the action runs: a
-            parent that does not adopt <code>false</code> gets the dialog re-opened once the action
-            settles, and the user sees it close and come back. Adopt a dismissal's{" "}
-            <code>false</code> unconditionally. If the user dismisses the dialog while a part's
-            close is still running and you then veto that close, the dialog stays closed and you
-            receive the dismissal (<code>reason: "dismiss"</code>) right after. Neither is a way to
-            ask the user first: an action must never await input, so build confirmation inside the
-            dialog (see the callout above).
+            <code>details.returnValue</code>). A dismissal is already done when{" "}
+            <code>onOpenChange</code> runs: a parent that does not adopt <code>false</code> gets the
+            dialog re-opened at once, and the user sees it close and come back. Adopt a dismissal's{" "}
+            <code>false</code> directly in <code>onOpenChange</code> (not in{" "}
+            <code>startTransition</code>, not after an <code>await</code>). If the user dismisses
+            the dialog while a part's close is still running, <code>onOpenChange</code> hears it at
+            once and that close is superseded: a later veto of it changes nothing. Neither is a way
+            to ask the user first: an action must never await input, so build confirmation inside
+            the dialog (see the callout above).
           </p>
         </Callout>
       </BehaviourSection>
@@ -689,7 +712,7 @@ html:active-view-transition .dialog { transition: none; }
       <BehaviourSection
         id="browser-owned-state"
         summary={
-          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are library-owned; a dismissal (Escape, Android back, a click outside) is the browser\'s: the dialog closes at once, `openChangeAction(false)` is a notification with `reason: "dismiss"`, and a controlled parent that keeps `open` gets it re-opened once the action settles. Dismissals animate with CSS only.'
+          'JS-free mode: the browser owns everything through Invoker Commands. Library mode: opening and a close asked for by a part are requests (`openChangeAction`); a dismissal (Escape, Android back, a click outside) is the browser\'s, a fact: the dialog closes at once, `onOpenChange(false)` is called with `reason: "dismiss"`, and a controlled parent that keeps `open` gets it re-opened at once. Dismissals animate with CSS only.'
         }
       />
 
@@ -758,8 +781,8 @@ html:active-view-transition .dialog { transition: none; }
         In library mode a <code>method="dialog"</code> submit is a library-owned close too, with the
         submitter's <code>value</code>, after your own <code>onSubmit</code> ran. To leave such a
         form to the browser, call <code>event.stopPropagation()</code> in its <code>onSubmit</code>:
-        the dialog then closes natively and the Root is notified with <code>reason: "dismiss"</code>
-        .
+        the dialog then closes natively and <code>onOpenChange</code> hears it as a{" "}
+        <code>reason: "dismiss"</code> fact.
       </p>
 
       <h4>Server Functions</h4>
@@ -767,8 +790,14 @@ html:active-view-transition .dialog { transition: none; }
         The dialog's action and the <a href="/concepts/action-props#form-channel">form channel</a>{" "}
         are independent, and both usable from a Server Component:
       </p>
-      <CodeBlock>{`// Persist "seen" when the user dismisses an announcement.
-<Dialog.Root defaultOpen={!user.seenAnnouncement} openChangeAction={markAnnouncementSeen}>
+      <CodeBlock>{`// Persist "seen" when the user closes an announcement: a Close button is a request,
+// Escape a fact, so pass the Server Function to both. It receives (open, details): with a
+// Trigger inside, the action is also called with true when the dialog opens.
+<Dialog.Root
+  defaultOpen={!user.seenAnnouncement}
+  openChangeAction={markAnnouncementSeen}
+  onOpenChange={markAnnouncementSeen}
+>
   ...
 </Dialog.Root>
 
@@ -776,16 +805,18 @@ html:active-view-transition .dialog { transition: none; }
 <Dialog.Form action={saveProfile}>...</Dialog.Form>`}</CodeBlock>
       <p>
         <code>openChangeAction</code> is a per-dialog action with the Trigger's pending state;{" "}
-        <code>Dialog.Form action</code> is React's form action with React's{" "}
-        <code>useFormStatus</code>. The Form only observes the form channel to close the dialog
-        afterwards; it never wraps your function and never reports form pending as the dialog's.
+        <code>onOpenChange</code> is called and not awaited, nothing pends for it, and its rejection
+        goes to <code>reportError</code>; <code>Dialog.Form action</code> is React's form action
+        with React's <code>useFormStatus</code>. The Form only observes the form channel to close
+        the dialog afterwards; it never wraps your function and never reports form pending as the
+        dialog's.
       </p>
 
       <h3 id="recipes">Recipes</h3>
       <h4>Controlled, opened without a Trigger</h4>
       <CodeBlock>{`const [open, setOpen] = useState(false);
 
-<Dialog.Root open={open} openChangeAction={(next) => { setOpen(next); }}>
+<Dialog.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>
   <Dialog.Popup>...</Dialog.Popup>
 </Dialog.Root>`}</CodeBlock>
       <h4>Branch on how it closed</h4>

@@ -114,6 +114,11 @@ export function usePopoverPopup(
   // popup is hidden but its `toggle` has not arrived, so the apply effect must not re-open it
   // from a commit that lands in between (design 2.5).
   const awaitingClose = useRef(false);
+  // Set right before the library's own `hidePopover()` (the apply effect), consumed by the next
+  // `toggle`: that hide is the library's, every other is a fact (overlay-open-change.md 2.2). The
+  // echo is recognised by its source, as Dialog's `libraryClose`, not by what is intended: a
+  // dismissal during a pending part close is a fact and must be reported.
+  const libraryHide = useRef(false);
   // Whether focus was inside the popup when its last close began (design 6.2 rule 1).
   const focusWasInside = useRef(false);
   const initialFocusTarget = useInitialFocusTarget(part, "popup");
@@ -227,10 +232,12 @@ export function usePopoverPopup(
   // The apply effect (design 2.5): after every commit that re-renders the Popup, once nothing is
   // in flight, the DOM follows committed state. One effect covers the normal open, `defaultOpen`,
   // a controlled open or close, a library-driven close after `openChangeAction(false)` settled,
-  // the re-open of a refused dismissal, and the close after a refused or failed pre-hydration
-  // open. The Root's value is memoised, so an unrelated Root render does not re-render the Popup
-  // and does not run this; every path that makes the DOM diverge from state goes through a
-  // dispatch, whose `pending` flips do. Do not rely on an unrelated render to re-apply state.
+  // the re-open of a dismissal a controlled parent refused (in the fact's own commit, or once the
+  // requests it superseded settled: overlay-open-change.md 2.4), and the close after a refused or
+  // failed pre-hydration open. The Root's value is memoised, so an unrelated Root render does not
+  // re-render the Popup and does not run this; every path that makes the DOM diverge from state
+  // goes through a dispatch, whose `pending` flips do, or a fact, whose `epoch` does. Do not rely
+  // on an unrelated render to re-apply state.
   useLayoutEffect(() => {
     if (!isLibrary) return;
     const element = popupRef.current;
@@ -240,8 +247,10 @@ export function usePopoverPopup(
       if (ctx.committed && !shown) {
         if (!awaitingClose.current) showPopup(element);
       } else if (!ctx.committed && shown) {
-        // An echo: the `toggle` listener finds `false` intended and skips the dispatch.
+        // The library's own hide: the `toggle` listener recognises it by `libraryHide` and
+        // reports nothing.
         ctx.recordCloseIntent(undefined);
+        libraryHide.current = true;
         element.hidePopover();
         // The close commit may have unmounted the focused content before the hide: the
         // platform restores focus only from inside the popover, so do it now.
@@ -294,6 +303,10 @@ export function usePopoverPopup(
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
     awaitingClose.current = false;
+    // Consumed by every `toggle`, whatever it reports: a hide the engine coalesced with a show
+    // must not mark a later dismissal as the library's.
+    const echo = libraryHide.current;
+    libraryHide.current = false;
     const lostInterest = interest.takeLostInterest();
     // JS-free mode writes the Trigger's `data-open`; library mode mirrors into the Root, which
     // non-button Triggers and the Combobox Input render as `aria-expanded`.
@@ -312,10 +325,10 @@ export function usePopoverPopup(
 
       const intent = ctx.takeCloseIntent();
       if (isLibrary) {
-        // An echo: `false` already intended (the library's own hide, or a dismissal during a
-        // pending part-initiated close).
-        exit.afterClose(element, !ctx.intended());
-        ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
+        exit.afterClose(element, echo);
+        // Anything but the library's own hide is a fact: committed `false` now (urgent, this
+        // event's commit) and `onOpenChange(false)` (overlay-open-change.md 2.3).
+        if (!echo) ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
       }
     }
     const { newState } = event as ToggleEvent;

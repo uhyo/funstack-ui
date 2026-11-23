@@ -13,9 +13,9 @@ import { PopoverTrigger } from "./popover-trigger.js";
  * (`button[popovertarget]`) + `Popup` (`dialog[popover=auto][aria-modal=false]`) >
  * `Title`, `Description`, `Close`. The platform gives the top layer, light dismiss, Escape,
  * nesting, the implicit anchor and focus return. JS-free when the Root has none of `open` /
- * `defaultOpen` / `openChangeAction`; otherwise opening and the closes a part asks for are
- * transitions (pending Trigger, content from committed state), and dismissals are notified
- * through `openChangeAction(false)`.
+ * `defaultOpen` / `openChangeAction` / `onOpenChange`; otherwise opening and the closes a part
+ * asks for are requests, transitions (pending Trigger, content from committed state), and
+ * dismissals are facts, reported to `onOpenChange(false)`.
  *
  * @see https://ui.funstack.work/components/popover
  */

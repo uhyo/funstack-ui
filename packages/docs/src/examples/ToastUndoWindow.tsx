@@ -6,13 +6,16 @@ import { sleep } from "./fake-api.js";
 const initial = ["Groceries", "Dentist", "Call Ada"];
 
 // "Do later, unless undone": the item leaves the list at once (local state), and the toast is the
-// grace period. `closeAction` runs when the toast leaves, with the reason: "activate" when Undo
+// grace period. `onClose` is called when the toast leaves, with the reason: "activate" when Undo
 // was used, otherwise ("timeout", or "dismiss" through Close, Escape or toast.dismiss()) the
-// deletion is committed. Hover or focus the toast to pause its 6 second timer.
+// deletion is committed. It is a handler, not an action: not awaited, so the slow delete holds
+// no other transition, and a rejection would go to reportError. Hover or focus the toast to pause
+// its 6 second timer.
 export function ToastUndoWindow() {
   const [items, setItems] = useState(initial);
   const [log, setLog] = useState<readonly string[]>([]);
-  const note = (line: string) => startTransition(() => setLog((l) => [line, ...l].slice(0, 3)));
+  // Called from onClose, a handler: a plain setState there is an urgent update, even after an await.
+  const note = (line: string) => setLog((l) => [line, ...l].slice(0, 3));
 
   const remove = (name: string) => {
     setItems((list) => list.filter((item) => item !== name));
@@ -23,7 +26,7 @@ export function ToastUndoWindow() {
         label: "Undo",
         action: () => startTransition(() => setItems((list) => [...list, name])),
       },
-      closeAction: async ({ reason }) => {
+      onClose: async ({ reason }) => {
         if (reason === "activate") {
           note(`Restored ${name}`);
           return;

@@ -9,7 +9,14 @@ import "./popover-demo.css";
 
 function logChange(label: string) {
   return (open: boolean, { reason }: PopoverOpenChangeDetails) => {
-    console.log(`[${label}] open=${open} reason=${reason}`);
+    console.log(`[${label}] openChangeAction open=${open} reason=${reason}`);
+  };
+}
+
+/** A fact (a dismissal): `onOpenChange`, called synchronously and not awaited. */
+function logFact(label: string) {
+  return (open: boolean, { reason }: PopoverOpenChangeDetails) => {
+    console.log(`[${label}] onOpenChange open=${open} reason=${reason}`);
   };
 }
 
@@ -75,7 +82,11 @@ function Row({ id, name }: { id: string; name: string }) {
   return (
     <li className="pop-row" data-archived={archived ? "" : undefined}>
       <span>{name}</span>
-      <Popover.Root defaultOpen={false} openChangeAction={logChange(`row ${id}`)}>
+      <Popover.Root
+        defaultOpen={false}
+        openChangeAction={logChange(`row ${id}`)}
+        onOpenChange={logFact(`row ${id}`)}
+      >
         <Popover.Trigger className="pop-btn" aria-label={`Actions for ${name}`}>
           {({ pending }) => (pending ? <span className="pop-spinner" aria-hidden /> : "⋯")}
         </Popover.Trigger>
@@ -139,7 +150,7 @@ function Rename() {
       <p>
         Title: <strong>{title}</strong>
       </p>
-      <Popover.Root open={open} openChangeAction={(next) => setOpen(next)}>
+      <Popover.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>
         <Popover.Trigger className="pop-btn">Rename</Popover.Trigger>
         <Popover.Popup className="pop" initialFocus="[name=title]" align="start">
           <Popover.Title>Rename</Popover.Title>
@@ -203,12 +214,20 @@ function Nested() {
         platform does not for nested popovers). The Dialog is a DOM descendant, so it keeps the
         popover open and its Escape closes first.
       </p>
-      <Popover.Root defaultOpen={false} openChangeAction={logChange("share")}>
+      <Popover.Root
+        defaultOpen={false}
+        openChangeAction={logChange("share")}
+        onOpenChange={logFact("share")}
+      >
         <Popover.Trigger className="pop-btn">Share settings</Popover.Trigger>
         <Popover.Popup className="pop" align="start">
           <Popover.Title>Share</Popover.Title>
           <div className="pop-actions">
-            <Popover.Root defaultOpen={false} openChangeAction={logChange("permissions")}>
+            <Popover.Root
+              defaultOpen={false}
+              openChangeAction={logChange("permissions")}
+              onOpenChange={logFact("permissions")}
+            >
               <Popover.Trigger className="pop-btn">Permissions</Popover.Trigger>
               <Popover.Popup className="pop" side="right" align="start">
                 <Popover.Title>Permissions</Popover.Title>

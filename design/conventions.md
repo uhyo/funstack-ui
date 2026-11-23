@@ -74,14 +74,15 @@ of dialog.md, popover.md, menu.md and toast.md. **Implemented 2026-11-24** (bran
 `feat/146-while-pending`, `memo/developer/issue-146.md`).
 
 Amended 2026-11-24 with #148, **user decision** (resolved question 45;
-`design/components/overlay-open-change.md`, accepted, **not implemented yet**): an action is a
-change the library can still roll back, an `on*` handler reports one it cannot hold; overlay
-Roots get `onOpenChange` next to `openChangeAction`; Toast's `closeAction` becomes `onClose`;
-one rule for every `on*` handler (synchronous, not awaited, may return a promise, rejection or
-throw to `reportError`, no promise warning). Applied here: decisions 2 and 11, 2.1, 2.6, the
-Urgent handler row of 10.1. Sections 2.2, 2.4, 3.4, 3.5, 4, 5 and the rest of 10.1 still
-describe the shipped behaviour and are amended with the implementation (that document's 12.2).
-`docs/vision.md` principle 3 still words the old rule and needs the same rewording.
+`design/components/overlay-open-change.md`, accepted, **implemented 2026-11-24**, branch
+`feat/148-on-open-change`, `memo/developer/issue-148.md`): an action is a change the library
+can still roll back, an `on*` handler reports one it cannot hold; overlay Roots get
+`onOpenChange` next to `openChangeAction`; Toast's `closeAction` becomes `onClose`; one rule for
+every `on*` handler (synchronous, not awaited, may return a promise, rejection or throw to
+`reportError`, no promise warning). Applied here: decisions 2, 3 and 11, 2.1, 2.2 (the channel
+note), 2.4 (the fact's routes), 2.6, 3.2 (the mirror's reason), 3.4 (`adoptFact`), 3.5, 4.3,
+5.1, 5.3 and 10.1 (the Fact handler row, the allow-list). `docs/vision.md` principle 3 carries
+the rule.
 
 Inputs: `docs/vision.md`, `docs/research/react-async-apis.md`, `docs/research/popover-anchor-tooltip.md`,
 `docs/research/modern-platform-survey.md`, `docs/research/form-controls.md` (wave 2), prior art (Base UI, React Aria Components, Radix,
@@ -94,7 +95,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
 | 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. What a pure trigger does with an activation that arrives while its own action is pending is the prop `whilePending` (`"run"` | `"ignore"`); the default follows who owns the action: `"run"` for a user-owned trigger (`Button`), `"ignore"` for a part whose activation the library owns (a Close part); an ignoring part renders `aria-disabled="true"` while pending (2.5.1; #146, user decision 2026-11-23, replacing the unconditional guard of #79 / #81). **`fooAction` always means a handler the component runs in a transition**, and since #148 a **request**: a change the library can still roll back. A change the library cannot hold is reported to an `on*` handler instead (row 11, #96, #148): `on<State>Change` or `on<Event>`, never an action. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), not an event prop. |
-| 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins, and set-valued state without `exclusive` commits the changes whose actions resolved (3.3, #150). "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
+| 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins, and set-valued state without `exclusive` commits the changes whose actions resolved (3.3, #150). "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. An overlay's `open` has both: requests through `openChangeAction`, and facts (a dismissal) adopted urgently and reported to `onOpenChange`, which supersede every request in flight (3.4 `adoptFact`, #148). |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
@@ -445,8 +446,18 @@ exposes `reason` uses exactly these values and no synonyms:
 | --- | --- | --- |
 | `"activate"` | The user acted on a trigger part: click, Enter/Space, or focus in an automatic-activation mode. | The native `MouseEvent`, `KeyboardEvent` or `FocusEvent` (`type` is `"focusin"` for React's `onFocus`). For native checkbox and radio inputs it is always the `click` `PointerEvent`, including Space and radio arrow keys, because React's `onChange` for them is click-driven. |
 | `"platform"` | The browser changed the state: find-in-page or a text fragment (`beforematch`, `<details>` `toggle`), form reset, or interaction before hydration reconciled at mount. Never a user gesture. | The platform event, or `undefined` for mount reconciliation. |
-| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover, focus leaving the component (Tab out of a menu), a right- or middle-click outside a menu (the library's own immediate close, since click-based light dismiss ignores those buttons; Menu #45), the pointer leaving a hover-opened submenu, or a parent overlay closing (a submenu when its menu closes). A close through a part **that carries a decision** (`Dialog.Close`, a Form submit) is `"activate"`; `Toast.Close`, which only ever means "go away" (the same as Escape), is `"dismiss"`, so a toast's `closeAction` can tell "acted on the content" (its Action part, `"activate"`) from everything else. | The platform's `close` or `toggle` event; the click or keydown for Toast. |
+| `"dismiss"` | The user closed the component **without acting on one of its parts**: Escape, Android back, an assistive-technology dismiss gesture, light dismiss (outside click); also a close no user caused through this component: script calling `hidePopover()`, another top-layer element (an unrelated `auto` popover, a modal dialog) hiding the popover, focus leaving the component (Tab out of a menu), a right- or middle-click outside a menu (the library's own immediate close, since click-based light dismiss ignores those buttons; Menu #45), the pointer leaving a hover-opened submenu, or a parent overlay closing (a submenu when its menu closes). A close through a part **that carries a decision** (`Dialog.Close`, a Form submit) is `"activate"`; `Toast.Close`, which only ever means "go away" (the same as Escape), is `"dismiss"`, so a toast's `onClose` can tell "acted on the content" (its Action part, `"activate"`) from everything else. | The platform's `close` or `toggle` event; the click or keydown for Toast. |
 | `"timeout"` | The library's own timer closed the component: no user gesture and no platform event. Toast's auto-dismiss is the only user; the Undo-window pattern (`design/components/toast.md` 9.3) relies on it being distinct from `"dismiss"`. | `undefined` |
+
+**Channel and `reason` are independent** (#148, `design/components/overlay-open-change.md` 2.2).
+On an overlay Root the channel says whether the library held the change (`openChangeAction`, a
+request) or not (`onOpenChange`, a fact); `reason` says what the user did. Most facts are
+`"dismiss"` and most requests `"activate"`; `"platform"` is always a request. The crossovers:
+
+| Channel | `reason` | Where |
+| --- | --- | --- |
+| `onOpenChange` | `"activate"` | A consumer's own invoker button (`popovertarget`, `commandfor` with a popover command) closes a popover, menu or listbox; a non-button Trigger pressed while open (#115: light dismiss hid it at `pointerup`, the click names the cause). |
+| `openChangeAction` | `"dismiss"` | A close the library does hold although no part asked: the pointer leaving a hover-opened submenu; lost interest while an interest open is still pending (nothing is shown yet). |
 
 Components whose close carries a platform result add it as a serialisable field next to
 `reason`: Dialog's `details.returnValue` is `dialog.returnValue` (the `value` of the Close button
@@ -671,6 +682,15 @@ Contract:
   connected is rethrown, and if the owner unmounts in the same commit, before React renders it
   again, React still drops it (a tiny window; not handled).
 - A consumer who catches inside the action is unaffected, as before.
+- **A request superseded by a fact** (#148): a fact on an overlay Root (`adoptFact`, 3.4)
+  makes every dispatch in flight superseded at once, so a later rejection of one of them is
+  passed to `reportDropped`, as for any superseded dispatch, and its resolution commits
+  nothing.
+- **A fact handler's errors are not action errors**: an `on*` handler's synchronous throw and
+  its returned promise's rejection go to `reportError` (the handler rule of 2.1,
+  `internal/call-urgent-handler.ts`); nothing reaches an Error Boundary, and the library's own
+  bookkeeping around the call (the committed `false` of a fact, a toast's queue write, a
+  Combobox text write) stands.
 - Both hooks (`useControllableAction`, `useActionTrigger`) do this themselves, per instance. A
   component with **two transition channels** (Slider and NumberField: steps through
   `useActionTrigger`, commits through `useControllableAction`) needs nothing extra: each channel
@@ -1142,10 +1162,12 @@ only** (`data-open`, `state.open`) and assistive technology hears what is shown:
 for the Accordion, the popover's own state for a `<button>` overlay Trigger (a `popovertarget`
 invoker with no `aria-expanded`, ARIA in HTML #514, #121), and the Root's `shown` mirror of the
 popup's `toggle` (the urgent row above; #118, revised after its review M1) where an attribute is
-still rendered (a non-button Trigger render, the Combobox Input). The mirror, not `committed`, because a
-dismissal hides the popup before its notification settles and a transition entangled with an
-unrelated action can hold `committed` for that action's whole duration, while the attribute must
-equal `:popover-open` within a task in every phase. The component doc says so explicitly.
+still rendered (a non-button Trigger render, the Combobox Input). The mirror, not `committed`,
+because a transition entangled with an unrelated action can hold `committed` for that action's
+whole duration (an open, a part's close), while the attribute must equal `:popover-open` within a
+task in every phase. (Since #148 a dismissal is a fact and commits `false` urgently in its own
+event, so the two agree there; they still differ during a request and for a refused fact's
+re-show.) The component doc says so explicitly.
 
 ### 3.3 When uncontrolled state is committed
 
@@ -1311,6 +1333,23 @@ section 3.3. Rules for a reducer:
 - A mode that is single-valued passes `undefined`, not a "replace" reducer; with a reducer the
   dispatch would enter the replay.
 
+**`adoptFact(next)`** (#148, `design/components/overlay-open-change.md` 2.5 and 11): the one
+way a state owner takes a change it could not hold. Called from the platform event's listener
+(an overlay's `toggle` / `close`), never inside a transition; it never calls the action. It
+advances the latest-dispatch counter (no dispatch in flight commits uncontrolled state any more,
+and a later rejection of one is reported, 2.4), makes `next` the in-flight intent (so
+`intended()` and the next Trigger click see it), drops the optimistic patches of those
+dispatches, writes the committed value urgently in uncontrolled mode, and advances `epoch`. The
+patch drop: every patch carries the epoch of its dispatch, and the reducer of the render ignores
+a patch older than the render's epoch; React re-applies pending optimistic updates on every
+render with that render's reducer, so the urgent `setEpoch` drops them in the fact's own commit.
+(The design sketched an object passthrough `{ value, epoch }`; it defeats React's bailout of a
+render whose state did not change, which an inline ref re-run on every render turned into an
+update loop, so the epoch lives in the reducer's closure instead; issue-148 memo.) `epoch` is
+part of the returned value, so a memoised context built on it re-renders its parts in the
+fact's commit even when a controlled parent keeps its value, which is how a refused dismissal
+is re-shown at once. Only the overlay Roots call it.
+
 Library state never lives in `useSyncExternalStore`: a store mutation during a transition forces a
 blocking re-render and defeats both fallback avoidance and ViewTransition. Reading
 `matchMedia` for display only is fine.
@@ -1371,9 +1410,9 @@ can delay or roll it back. The boundary:
 | Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in Accordion's static (JS-free) mode, `<dialog open>`; the Toast region (`popover="manual"`), which the library shows and hides in both directions, driven by the urgent queue, and never notifies: it has no `openChangeAction` because nothing a consumer could do with "the region opened" exists |
 | Who changes it | The library, inside its transition | The browser (top layer, light dismiss, `interestfor`, find-in-page) |
 | Optimistic source | `useOptimistic` | The DOM itself. An ARIA attribute on another element that must report it to assistive technology (`aria-expanded` on a non-button overlay Trigger render or the Combobox Input, #118; a `<button>` Trigger renders none, its `popovertarget` exposes the state, #121) renders an urgent `useState` mirror written from the platform event (`toggle`, reading `:popover-open`), never transition state |
-| `xChangeAction` | Can be awaited; the UI waits for it | Notification: dispatched from the platform event (`toggle`) inside a transition, after the fact |
-| Controlled mode | React value is the source of truth | React value is re-applied to the DOM after the action resolves (`showPopover()` / `hidePopover()`, `open` attribute); it follows the browser, it does not gate it |
-| Pending | `data-pending` while the action runs | `data-pending` while the notification action runs; the open/close itself is already done |
+| `xChangeAction` | Can be awaited; the UI waits for it | Requests only (an overlay's opens and the closes its parts ask for). A change the browser performed is a **fact**, reported to the `on*` handler (`onOpenChange`) synchronously in the platform event (`toggle` / `close`), outside any transition, not awaited (#148) |
+| Controlled mode | React value is the source of truth | React value is re-applied to the DOM after every commit once nothing is in flight (`showPopover()` / `hidePopover()`, `showModal()` / `close()`); a parent that keeps `open={true}` after a fact gets the popup re-shown in the fact's own commit (#148). It follows the browser, it does not gate it |
+| Pending | `data-pending` while the action runs | `data-pending` while a request runs; a fact never pends (the open/close itself is already done) |
 | Server Components | Only through Server Functions as actions | Uncontrolled form needs no behaviour JS; the part may still be a client module (section 7.3) |
 | Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event; **late-mounting options** in a `<select>` (Select) are never selected by React (`updateOptions` runs only in the select's own commit), so the Root re-applies the intended option when an Option reports its mount: an option that **hydrated** is reconciled first (a user may have picked it before hydration) and one React **created** is only re-applied (the browser's automatic first-option selection on insertion is not an intent), told apart by `useSyncExternalStore`'s server snapshot; and a platform dispatch on a `<select>` requires the **intended option to exist in the DOM**, so a value whose option is still loading is never "reconciled" to the fallback; **text typed into a controlled text input before hydration** (Combobox) is adopted at mount through the urgent action with `reason: "platform"` (react-dom keeps a hydrated text input's DOM value and fires no `onChange`), and **a value stepped into a native range before hydration** (Slider) the same way through its step + commit dispatch; **a controlled value input** (`type=text`, `type=range`, …) has no reset target of its own, because react-dom keeps its `value` attribute equal to the current value after every update, so the component writes the reset target into `defaultValue` synchronously in the `reset` event (`useFormReset`'s `onResetEvent`) and dispatches the JS-computed target (uncontrolled: the latest `defaultX`; controlled: the mount-time value) from the microtask (Combobox's text, Slider's thumbs); and a component that owns a form value with no visible form element of its own **mirrors the optimistic value into a hidden input** and listens to `reset` on it; a hidden input has **no reset behaviour** (its `.value` is the `value` attribute, which React keeps equal to the optimistic value), so the reset target is computed in JS (uncontrolled: the latest `defaultX`; controlled: the mount-time value) and dispatched from the `reset` microtask, while the visible text input's `defaultValue` mirror is written synchronously in the `reset` event itself, because react-dom syncs a text input's `defaultValue` attribute to its value after every keystroke (Combobox, `useFormReset`'s `onResetEvent`); a form `reset` also **clears the user-validity flag (`:user-invalid`) but not custom validity**, so `Field.Root` re-reads its validity mirror and recomputes its custom-validity slot in the reset microtask (Field #54); and **the settle of a form submission** (the `useFormStatus` `true → false` edge) is a form-channel event the library observes without owning: `Dialog.Form` closes on it, `Form.Root` advances its settle generation, focuses the first errored field and applies `autoReset` on it; **text typed into a NumberField's visible input before hydration** (#67) is parsed and dispatched as a `"platform"` step + commit at mount, or adopted as the draft when the input is still focused; and **a library-owned native input that is not the user's surface may be uncontrolled** (NumberField's hidden number input): its `defaultValue` prop is the reset target (uncontrolled: the latest `defaultX`; controlled: the mount-time value), which react-dom keeps in the `value` attribute and updates when the prop changes, its `.value` is written through the ref at every change and re-applied after every commit, so the platform's own reset applies to it and it needs no `onResetEvent` mirror (a controlled `value` would make react-dom rewrite the attribute on every update) | n/a |
 
@@ -1433,9 +1472,10 @@ Rules:
 - A state may be **library-owned in one direction and browser-owned in the other**, or
   **library-owned for some causes of a change and browser-owned for others** (Dialog's `open`:
   opening and the closes a part asks for are transitions the library drives and awaits; a
-  dismissal is performed by the browser and reaches the library as a notification with
-  `reason: "dismiss"` and `details.returnValue`). The component doc says which, and the
-  `xChangeAction` doc comment says so per value.
+  dismissal is performed by the browser and is a fact, reported to `onOpenChange` with
+  `reason: "dismiss"` and `details.returnValue`; #148). Such a state has both props,
+  `xChangeAction` for requests and `onXChange` for facts (2.1), and the component doc lists
+  which cause goes where.
 - Where the platform step a part's close goes through is **cancelable without an anti-abuse
   rule**, a component may **own the closes its parts initiate and leave dismissals to the
   browser**. The cancelable steps are the invoker's `command` event (popovers and dialogs
@@ -1444,15 +1484,15 @@ Rules:
   user activation) and the `close()` a `method="dialog"` form performs once its `submit` was
   allowed, which is why a dialog's **Escape** is never library-owned while its **Close part**
   is. Popover: Trigger toggle, `Close` and a controlled `open={false}` are awaited and hidden
-  in the apply effect; Escape and light dismiss are notified. Dialog (#46): `Close`, `Form`
-  (a `method="dialog"` submit, or the settle after a function action), a foreign close command
-  and a controlled `open={false}` are awaited and closed in the apply effect; Escape, Android
-  back, AT dismiss and light dismiss are notified. The component doc lists which close is
-  which.
+  in the apply effect; Escape and light dismiss are facts (`onOpenChange`). Dialog (#46):
+  `Close`, `Form` (a `method="dialog"` submit, or the settle after a function action), a
+  foreign close command and a controlled `open={false}` are awaited and closed in the apply
+  effect; Escape, Android back, AT dismiss and light dismiss are facts. The component doc lists
+  which close is which.
 - **A part's library-owned close is the single source of that close** (Menu #110). Whatever the
   press does on the way to the `click` must not trip one of the component's immediate,
   browser-shaped closes first; otherwise the popup is gone before the action runs, the reason is
-  wrong (the notification's `"dismiss"` lands first and the click's dispatch is a no-op) and the
+  wrong (the fact's `"dismiss"` lands first and the click's dispatch is a no-op) and the
   outcome depends on the engine. The known trap is the focus move of a `mousedown`: Chromium and
   Firefox focus a button on press, WebKit does not. A component that closes on focus leaving
   (Menu's Tab-out, Combobox's focus loss) therefore has the parts outside its popup
@@ -1792,6 +1832,10 @@ alternative.
 - **Panels** do not get `data-pending`; a panel is either committed-visible or not. Consumers who
   want to dim the old panel while the next one loads select on the root:
   `.root[data-pending] .panel { opacity: .6 }`.
+- **A fact never produces `data-pending`** (#148): an overlay's dismissal is adopted urgently and
+  reported to `onOpenChange`, which is not awaited. The Trigger shows `data-pending` after a
+  dismissal only while a request the fact superseded is still running (it reports that request,
+  `design/components/overlay-open-change.md` 2.5).
 
 The state object given to function props on the owner includes `pending`; on triggers it includes
 `pending` with the trigger-local meaning above.
@@ -1871,7 +1915,10 @@ popup's own box on a library-driven open (`::view-transition-new`) and on a libr
 (`::view-transition-old`), in all three engines. `Dialog.Popup` already wraps the `<dialog>`;
 `Popover.Popup` and `Menu.Popup` wrap the `[popover]` element. The rule only matters for opens
 and closes the library performs in a layout effect of a transition commit; browser-initiated
-ones (Escape, light dismiss) happen outside React and animate with CSS, as above. A CSS exit
+ones (Escape, light dismiss) happen outside React and animate with CSS, as above. Since #148 such
+a dismissal is a fact whose commit is **urgent**, so it starts no view transition at all, with or
+without `transition`, and carries no `fsui-<component>-close` type
+(`design/components/overlay-open-change.md` 2.8). A CSS exit
 kept next to `transition` must be **cut while a view transition runs**
 (`html:active-view-transition .dialog { transition: none; }`), otherwise Chromium keeps the
 fading element rendered and the close's view transition captures it as a live
@@ -1974,7 +2021,8 @@ Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
 prefix are collected into the same transition.
 
-Types are attached only to the commit that ends a dispatched action. A controlled snap-back (the
+Types are attached only to the commit that ends a dispatched action; an overlay's dismissal is a
+fact, not a dispatch, and carries none (#148). A controlled snap-back (the
 parent did not adopt the value) and a boundary swap after a rejection carry **no** `fsui-*` types,
 so a type-map `transition` needs a `default` entry if rollbacks should animate; with
 `default: "none"` they do not. Overlapping dispatches contribute all of their types to the single
@@ -2514,8 +2562,9 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Inside a Field | Required for every form control (Switch, Checkbox, RadioGroup, CheckboxGroup, Select, Combobox, Slider, NumberField): rendered inside a `Field.Root`, the part's element (or group element) receives the Field's `id` (or `aria-labelledby`), `name`, `aria-describedby`, `aria-invalid`, and `disabled` / `required` from the Field; its own `data-pending` is unaffected by the form's. |
 | Validity display | Required for Field: a submission attempt with an invalid control shows the message, cancels the native bubble (the `invalid` event is `defaultPrevented`) and focuses the first invalid control in document order; a `form.reset()` clears it. The `:user-invalid` half (changed-then-blurred, live updates, `checkValidity()` showing nothing) runs in browser mode. |
 | Urgent handler (both) | Required for every component with an urgent state (section 2.6): the handler is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; **the handler rule (2.1, #148)**: a returned promise does not warn, its rejection is passed to `reportError` exactly once and not to an Error Boundary, a synchronous throw likewise, and the library's own write still happens; required for every `on*` handler of 2.1 (`onInputValueChange`, `onOpenChange` on the four overlay Roots, a toast's `onClose`); a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
+| Fact handler (both) | Required for every overlay Root with `onOpenChange` (#148, `design/components/overlay-open-change.md`): a dismissal calls `onOpenChange(false, details)` once, in the platform event, with `openChangeAction` not called; no `data-pending`, no view transition (browser rows); uncontrolled committed `false` in the fact's commit; a fact during a pending request supersedes it (its rejection is reported, its resolution commits nothing, the stale optimistic `data-open` is dropped); a controlled parent that keeps `open={true}` gets the popup re-shown at once (after the requests in flight settled when there are any); the library's own close is no fact; `open` without `onOpenChange` warns once. Shared rows in `__tests__/overlay-open-state-suite.tsx` (`fact`, `factAdoption`) and `__tests__/overlay-browser-suite.tsx`. |
 | Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
-| Action naming (type, library-wide) | One file, `src/__tests__/action-naming.test.ts` (#96): for **every public `*Props` type** exported from `src/index.ts`, every key named `action` or ending in `Action` is a transition action, and every library-defined `on*` key is on an allow-list that names its type (`ComboboxRootProps.onInputValueChange: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`). "Is a transition action" is checked on the **function members** of the prop's type (`Extract<NonNullable<P[K]>, (...args: never[]) => unknown>`): that part must exist and return `unknown` (an `Action` / `ChangeAction`; `UrgentChangeHandler` returns `void` and fails; a key with no function member, say a `string`, fails too). Checking the function part rather than the whole type is what lets `Form.Root`'s `action: string \| ((formData) => unknown)`, React's form channel, pass on its function member instead of failing on the URL string. **DOM pass-through keys are excluded from both checks**, by name, as the union `keyof DOMAttributes<Element> \| keyof DialogHTMLAttributes<HTMLDialogElement> \| keyof ButtonHTMLAttributes<HTMLButtonElement> \| keyof InputHTMLAttributes<HTMLInputElement>`: `DOMAttributes` alone is not enough, because `<dialog>`'s `onCancel` / `onClose` (passed through by `Dialog.Popup` and `Popover.Popup`) live in `DialogHTMLAttributes`, and `<button>` / `<input>`'s `formAction` (`string \| (formData) => void \| Promise<void>`) would otherwise be flagged as a non-transition action. These are React's names, not the library's, and cannot be told apart from library props by type, so the design doc is the guard for them. The helper types have a self-test (a planted `inputValueChangeAction?: UrgentChangeHandler<string>` and a `labelAction?: string` are caught, `action` and `formAction` are not; `onClick` / `onClose` are excluded, `onValueChange` is not). A new public Props type is added to the list in the same commit that exports it (a type-level and a runtime completeness check against `src/index.ts` fail until it is). |
+| Action naming (type, library-wide) | One file, `src/__tests__/action-naming.test.ts` (#96): for **every public `*Props` type** exported from `src/index.ts`, every key named `action` or ending in `Action` is a transition action, and every library-defined `on*` key is on an allow-list that names its type (`ComboboxRootProps.onInputValueChange: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`; since #148 `onOpenChange` on exactly `PopoverRootProps`, `MenuRootProps`, `ComboboxRootProps` and `DialogRootProps`, each `UrgentChangeHandler<boolean, <C>OpenChangeDetails>`, and, outside the Props types, `ToastOptions.onClose: UrgentHandler<ToastCloseDetails>` with no `closeAction`). "Is a transition action" is checked on the **function members** of the prop's type (`Extract<NonNullable<P[K]>, (...args: never[]) => unknown>`): that part must exist and return `unknown` (an `Action` / `ChangeAction`; `UrgentChangeHandler` returns `void` and fails; a key with no function member, say a `string`, fails too). Checking the function part rather than the whole type is what lets `Form.Root`'s `action: string \| ((formData) => unknown)`, React's form channel, pass on its function member instead of failing on the URL string. **DOM pass-through keys are excluded from both checks**, by name, as the union `keyof DOMAttributes<Element> \| keyof DialogHTMLAttributes<HTMLDialogElement> \| keyof ButtonHTMLAttributes<HTMLButtonElement> \| keyof InputHTMLAttributes<HTMLInputElement>`: `DOMAttributes` alone is not enough, because `<dialog>`'s `onCancel` / `onClose` (passed through by `Dialog.Popup` and `Popover.Popup`) live in `DialogHTMLAttributes`, and `<button>` / `<input>`'s `formAction` (`string \| (formData) => void \| Promise<void>`) would otherwise be flagged as a non-transition action. These are React's names, not the library's, and cannot be told apart from library props by type, so the design doc is the guard for them. The helper types have a self-test (a planted `inputValueChangeAction?: UrgentChangeHandler<string>` and a `labelAction?: string` are caught, `action` and `formAction` are not; `onClick` / `onClose` are excluded, `onValueChange` is not). A new public Props type is added to the list in the same commit that exports it (a type-level and a runtime completeness check against `src/index.ts` fail until it is). |
 | Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
 | Placement | Required for every part that renders an anchored `position-area` (Tooltip, Popover and Menu `Popup`; Combobox `Popup` for the RTL half). jsdom: the `side` / `align` matrix produces the section 13 keywords; `data-side` / `data-align` equal the requested values with no layout; with `getComputedStyle` stubbed to a flipped `position-area` and the shim's `toggle`, they become the resolved values, return to the requested ones on close, and an unchanged value causes no render (render counter); a logical `side` costs exactly one render per show and one per hide (render counter, review M1); the scroll path deterministically (review M2): with `requestAnimationFrame` replaced by a manual queue and `document.addEventListener` spied, a show installs the `scroll` / `resize` listeners, a dispatched `scroll` with the stub changed reads the old value at once and in frame 1 and the new one in frame 2, a scroll between the frames re-runs the pair, a scroll **before** the first frame of a pending pair costs at most one extra pair at the end (it sets the same restart flag), and a hide or an unmount removes both listeners, cancels the pending frame and reads nothing after. Browser (`*.browser.test.tsx`, all three engines): `data-side` after an edge flip on open, back on close; after a scroll that moves the trigger to an edge, `data-side` equals the side the popup box actually sits on (the geometry invariant: Chromium keeps the option chosen at show, #92; Firefox and WebKit re-choose, section 13.2), never "flips to X", with the engine outcome pinned behind a runtime probe so the Chromium row fails the day the bug is fixed (review L5); `align="start"` and `side="inline-end"` under `<html dir="rtl">` (mirrored in every engine); the same inside a `dir="rtl"` **container** branching on `anchorPositionHonoursParentDirection` (`src/__tests__/engine.ts`, a runtime probe of Mozilla 2019601): mirrored where it holds, and where it does not (Firefox) the documented misplacement is asserted, never skipped. |
 

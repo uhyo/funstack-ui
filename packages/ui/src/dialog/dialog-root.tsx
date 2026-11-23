@@ -2,13 +2,19 @@
 import { useCallback, useInsertionEffect, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
-import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  StateValue,
+  UrgentChangeHandler,
+} from "../internal/types.js";
 import { useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
 import type { DialogContextValue } from "./dialog-context.js";
 
-/** Details passed as the second argument of `openChangeAction`. */
+/** Details passed as the second argument of `openChangeAction` and `onOpenChange`. */
 export interface DialogOpenChangeDetails extends ActionDetails {
   /**
    * `"activate"`: the user acted on a part: Trigger (open), Close or Form submit (close).
@@ -20,7 +26,8 @@ export interface DialogOpenChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
   /**
    * On close: `dialog.returnValue`: the `value` of the Close button or the form submitter that
-   * closed it, `""` for a dismiss. On open: `undefined`.
+   * closed it; for a fact (`onOpenChange`), what the browser left (`""` for Escape or a click
+   * outside, the argument of a script `close(value)`). On open: `undefined`.
    */
   readonly returnValue: string | undefined;
 }
@@ -42,8 +49,9 @@ export interface DialogRootState {
  */
 export interface DialogRootProps {
   /**
-   * Controlled open state. `undefined` means uncontrolled (and, with `defaultOpen` and
-   * `openChangeAction` also absent, JS-free mode).
+   * Controlled open state. `undefined` means uncontrolled (and, with `defaultOpen`,
+   * `openChangeAction` and `onOpenChange` also absent, JS-free mode). A controlled Root needs
+   * `onOpenChange` too: the browser closes the dialog without asking (development warns).
    */
   open?: boolean;
   /**
@@ -52,22 +60,33 @@ export interface DialogRootProps {
    */
   defaultOpen?: boolean;
   /**
-   * Awaited for `true` (the dialog opens when it resolves and the content has rendered) and for
-   * a `false` the user asked a part for (`Dialog.Close`, a `Dialog.Form` submit or settled
-   * action, a foreign close command: the dialog closes with `details.returnValue` when it
-   * resolves, with a view transition if the Popup's `transition` is set; a controlled parent
-   * that keeps `open` vetoes it). A notification for a dismissal (Escape, Android back, a click
-   * outside: the dialog is already closed, `returnValue` is `""`; the action runs inside the
-   * Root's transition, and a controlled parent that keeps `open` gets it re-opened, which is
-   * not a veto). A dismissal while a part's close is in flight is not notified on its own: if that
-   * close is vetoed, the dismissal is notified (`"dismiss"`) when the veto settles, and the dialog
-   * stays closed. May be a Server Function. Rejections reach the nearest Error Boundary above
-   * Root.
+   * Requests only. Awaited for `true` (the dialog opens when it resolves and the content has
+   * rendered) and for a `false` the user asked a part for (`Dialog.Close`, a `Dialog.Form`
+   * submit or settled action, a foreign close command: the dialog closes with
+   * `details.returnValue` when it resolves, with a view transition if the Popup's `transition` is
+   * set; a controlled parent that keeps `open` vetoes it). Never called for a dismissal: that goes
+   * to `onOpenChange`. May be a Server Function. Rejections reach the nearest Error Boundary
+   * above Root.
    *
    * A `setState` placed after your own `await` is not a Transition update; wrap it in
    * `startTransition` (React limitation).
    */
   openChangeAction?: ChangeAction<boolean, DialogOpenChangeDetails>;
+  /**
+   * Facts only: the dialog was closed without the library closing it (Escape, Android back, an
+   * assistive-technology dismiss, a click outside with `lightDismiss`, script `close()` /
+   * `requestClose()`). Always `false`, with `returnValue` as the browser left it. Called
+   * synchronously in the platform's `close` event, outside any Transition, and not awaited:
+   * nothing is pending and no view transition runs; the dialog is already closed and its
+   * committed state is already `false` (uncontrolled). A dismissal while a part's close is in
+   * flight is reported at once and supersedes that close.
+   *
+   * Controlled: set your state **directly** here (`onOpenChange={setOpen}`), not in
+   * `startTransition` and not after an `await`; a parent that keeps `open={true}` gets the
+   * dialog re-opened at once. May return a promise (a Server Function); a rejection or a throw
+   * goes to `reportError`.
+   */
+  onOpenChange?: UrgentChangeHandler<boolean, DialogOpenChangeDetails>;
   /**
    * `showModal()` (top layer, backdrop, inert page, Escape) or `show()`.
    *
@@ -90,13 +109,14 @@ const isDialogOpen = (dialog: HTMLDialogElement): boolean => dialog.open;
  * Owns the ids, the mode, the open state and the context. Renders no DOM, so it has no `ref`,
  * `className` or `style`; `pending` is exposed through `children(state)` and the Trigger.
  *
- * Without `open`, `defaultOpen` and `openChangeAction` the Dialog runs in **JS-free mode**: the
- * Trigger is a native `command="show-modal"` invoker and the browser owns everything. With any of
- * them it runs in **library mode**: opening is a transition (the Trigger shows `data-pending`,
- * content renders from committed state, `showModal()` runs when it has committed), and so is a
- * close a part asks for (Close, Form, a foreign close command: `openChangeAction(false)` is
- * awaited, `close(returnValue)` runs when it has committed). Dismissals (Escape, a click
- * outside) are the browser's and `openChangeAction(false)` is a notification.
+ * Without `open`, `defaultOpen`, `openChangeAction` and `onOpenChange` the Dialog runs in
+ * **JS-free mode**: the Trigger is a native `command="show-modal"` invoker and the browser owns
+ * everything. With any of them it runs in **library mode**: opening is a request, a transition
+ * (the Trigger shows `data-pending`, content renders from committed state, `showModal()` runs
+ * when it has committed), and so is a close a part asks for (Close, Form, a foreign close
+ * command: `openChangeAction(false)` is awaited, `close(returnValue)` runs when it has
+ * committed). Dismissals (Escape, a click outside) are the browser's facts, reported to
+ * `onOpenChange`.
  *
  * @see https://ui.funstack.work/components/dialog
  */
@@ -104,6 +124,7 @@ export function DialogRoot({
   open,
   defaultOpen,
   openChangeAction,
+  onOpenChange,
   modal = true,
   children,
 }: DialogRootProps) {
@@ -115,6 +136,7 @@ export function DialogRoot({
     open,
     defaultOpen,
     openChangeAction,
+    onOpenChange,
     details: dialogDetails,
     isShown: isDialogOpen,
   });
@@ -134,8 +156,8 @@ export function DialogRoot({
   }, []);
 
   // A library-owned close (design 2.3): `openChangeAction(false)` is awaited and the Popup's
-  // apply effect calls `close(returnValue)` in the commit that ends it. A dismissal's
-  // `notifyClosed` records no `returnValue`.
+  // apply effect calls `close(returnValue)` in the commit that ends it. A fact's `notifyClosed`
+  // records no `returnValue`.
   const requestClose = useCallback(
     (event: Event | undefined, reason: ChangeReason, returnValue: string): void => {
       if (mode !== "library" || !intended()) return;

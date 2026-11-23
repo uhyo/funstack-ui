@@ -132,6 +132,14 @@ export function PendingOptimisticPage() {
           nothing; it is never "in between". To dim the old content while the next one loads, select
           through the state owner.
         </li>
+        <li>
+          <strong>Never for a fact.</strong> A <a href="/concepts/action-props#fact">fact</a>, a
+          change that had already happened when the library heard of it (a popup dismissed with
+          Escape or a click outside), is reported to an <code>on*</code> handler and is not awaited,
+          so nothing is pending for it: the popup, <code>data-open</code> and the committed state
+          all change at once (
+          <a href="/concepts/browser-owned-state#requests-and-facts">Requests and facts</a>).
+        </li>
       </ul>
       <p>
         The same names exist in the function props (<code>className</code>, <code>style</code>,{" "}

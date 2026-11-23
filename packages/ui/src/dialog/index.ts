@@ -12,11 +12,11 @@ import { DialogTrigger } from "./dialog-trigger.js";
 /**
  * Dialog built on `<dialog>` and Invoker Commands: `Root` (no DOM) > `Trigger`
  * (`button[command=show-modal]`) + `Popup` (`dialog`) > `Title`, `Description`, `Form`, `Close`.
- * JS-free when the Root has none of `open` / `defaultOpen` / `openChangeAction`; otherwise
- * opening is a transition (pending Trigger, content from committed state), and so is a close a
- * part asks for (Close, Form, a foreign close command: `openChangeAction(false)` awaited, then
- * `close(returnValue)`); dismissals (Escape, a click outside) are the browser's, notified
- * through `openChangeAction(false)`.
+ * JS-free when the Root has none of `open` / `defaultOpen` / `openChangeAction` /
+ * `onOpenChange`; otherwise opening is a request, a transition (pending Trigger, content from
+ * committed state), and so is a close a part asks for (Close, Form, a foreign close command:
+ * `openChangeAction(false)` awaited, then `close(returnValue)`); dismissals (Escape, a click
+ * outside) are the browser's facts, reported to `onOpenChange(false)`.
  *
  * @see https://ui.funstack.work/components/dialog
  */

@@ -7,7 +7,8 @@ import type { OverlayRootValue } from "../internal/use-overlay-root.js";
  * The Root's machinery (`useOverlayRoot`, as Popover's) with the `<dialog>` as the popup element
  * and a close's `returnValue`. `mode` "static" is JS-free mode, where the browser owns open and
  * close through Invoker Commands; in "library" mode opening and the closes a part asks for are
- * library-owned, dismissals browser-owned and notified (design section 2).
+ * library-owned requests, dismissals browser-owned facts reported to `onOpenChange` (design
+ * section 2, overlay-open-change.md).
  */
 export interface DialogContextValue extends Omit<
   OverlayRootValue<HTMLDialogElement, [returnValue: string]>,
@@ -19,7 +20,7 @@ export interface DialogContextValue extends Omit<
    * A library-owned close (library mode, design 2.3): a Close part, a `method="dialog"` submit,
    * a Form's settle close, a foreign close command. Records `returnValue` for the apply effect's
    * `close()` and dispatches `false` (`openChangeAction(false)` awaited). A no-op when `false` is
-   * already intended. `notifyClosed` (a native close) records nothing.
+   * already intended. `notifyClosed` (a fact: a native close) records nothing.
    */
   readonly requestClose: (
     event: Event | undefined,

@@ -37,6 +37,7 @@ function Mini({
     open: undefined,
     defaultOpen: undefined,
     openChangeAction: undefined,
+    onOpenChange: undefined,
     details: popoverDetails,
     onDispatch,
   });
@@ -234,6 +235,7 @@ describe("shared popover hooks: Menu's extension points", () => {
         open: undefined,
         defaultOpen: undefined,
         openChangeAction: () => {},
+        onOpenChange: undefined,
         // Inline, new on every render.
         details: (event, reason) => ({ event, reason }),
         onDispatch: () => onDispatch(),

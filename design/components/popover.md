@@ -2420,3 +2420,39 @@ event; other engines ignore the attribute, so give the button a click path (make
 Trigger) when the card must open everywhere; point to Tooltip for name/description content.
 Release notes: "fix: a library-mode Popover opened by an `interestfor` button now hides on
 lost interest (Chromium), and lost interest during a pending open cancels it (#127)."
+## Amendment: requests and facts, `onOpenChange` (#148, 2026-11-24, user decision; implemented 2026-11-24)
+
+Design: `design/components/overlay-open-change.md` (sections 2 and 3 are Popover's; conventions
+resolved question 45). It overrides every place above that calls a dismissal's
+`openChangeAction(false)` a "notification" (2 mode table, 2.3, 2.5, 3.1, 4.1 to 4.4, 10.2, 11,
+12, 13):
+
+- `Popover.Root` gains **`onOpenChange?: UrgentChangeHandler<boolean,
+  PopoverOpenChangeDetails>`**. `openChangeAction` hears **requests only**: Trigger opens and
+  closes, `Popover.Close`, foreign opens (routed at `beforetoggle`), a popup found open at
+  hydration (`"platform"`), lost interest while an interest open is still pending
+  (`"dismiss"`).
+- A **fact** is the `toggle` (closed) of a hide the library did not perform in its apply effect:
+  Escape, Android back, AT dismiss, light dismiss, another `auto` popover or a modal dialog, a
+  parent popover closing, script `hidePopover()` (`"dismiss"`); a foreign `popovertarget` or
+  `hide-popover` / `toggle-popover` invoker (`"activate"`, with its `ToggleEvent` /
+  `CommandEvent`); lost interest after an interest open (`"dismiss"`, the `loseinterest` event).
+  In that listener the Root supersedes every request in flight, writes committed `false`
+  urgently (uncontrolled) and calls `onOpenChange(false, details)` synchronously. No
+  `data-pending`, no view transition, no `fsui-popover-close` type; the CSS exit and `held`
+  work as before.
+- The library's own `hidePopover()` is recognised by a marker set in the apply effect (as
+  Dialog's `libraryClose`), no longer by "`false` is intended", so a dismissal during a pending
+  part close is reported at once (2.5 of the design).
+- **#115 changes mechanism**: a non-button Trigger pressed while open finds the popup already
+  hidden by light dismiss (`hiddenBeforeToggle()`); its click records an `"activate"` intent with
+  the click and dispatches nothing, and the pending `toggle` reports the fact. The development
+  warning for a non-button Trigger now says the close is a dismissal reported to `onOpenChange`.
+- **Controlled**: a parent that keeps `open={true}` after a fact gets the popup re-shown in the
+  fact's own commit (`epoch` in the Root value re-renders the Popup; the apply effect re-shows),
+  or once the requests the fact superseded settled. `open` without `onOpenChange` warns once.
+  Call-site examples gain `onOpenChange={setOpen}`.
+- **JS-free mode** is selected only when the Root has none of `open`, `defaultOpen`,
+  `openChangeAction`, `onOpenChange`.
+- Errors: a promise `onOpenChange` returns, and a throw, go to `reportError`; a request the fact
+  superseded that later rejects goes to `reportError` too.

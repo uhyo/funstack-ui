@@ -1,19 +1,11 @@
 "use client";
-import {
-  use,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useTransition,
-} from "react";
+import { use, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, FocusEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { DialogContext } from "../dialog/dialog-context.js";
 import { createActionDetails } from "../internal/action-details.js";
 import { announce as speak } from "../internal/announce.js";
+import { callUrgentHandler } from "../internal/call-urgent-handler.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import type { ChangeReason, RenderProp, StateValue } from "../internal/types.js";
@@ -171,7 +163,6 @@ export function ToastViewport({
   const [rejected, setRejected] = useState(() =>
     toastManagerInternals(manager).isTaken(listener.current!),
   );
-  const [, startCloseTransition] = useTransition();
 
   const regionRef = useRef<HTMLElement | null>(null);
   const roots = useRef(new Map<string, HTMLElement>());
@@ -275,23 +266,21 @@ export function ToastViewport({
     }
   };
 
-  const scheduleCloseActions = (
+  /**
+   * A toast's `onClose` (#148: a handler, not an action): called synchronously where the close is
+   * applied to the queue, after the entry is marked ending, outside any transition, and not
+   * awaited (`callUrgentHandler`: a throw or a returned promise's rejection goes to
+   * `reportError`, the queue write above stands).
+   */
+  const callCloseHandlers = (
     closed: readonly Entry[],
     reason: ChangeReason,
     event: Event | undefined,
   ): void => {
     for (const entry of closed) {
-      const closeAction = entry.options.closeAction;
-      if (closeAction === undefined) continue;
-      const details = createActionDetails(event, { id: entry.options.id, reason });
-      // Not in the closing handler itself: the toast is gone first, then the action runs in the
-      // Viewport's own transition (its rejection reaches the boundary above the Viewport).
-      queueMicrotask(() => {
-        if (!mounted.current) return;
-        startCloseTransition(async () => {
-          await closeAction(details);
-        });
-      });
+      const onClose = entry.options.onClose;
+      if (onClose === undefined) continue;
+      callUrgentHandler(onClose, createActionDetails(event, { id: entry.options.id, reason }));
     }
   };
 
@@ -308,7 +297,7 @@ export function ToastViewport({
       ),
     );
     syncTimers();
-    scheduleCloseActions(closing, reason, event);
+    callCloseHandlers(closing, reason, event);
   };
 
   const drop = (id: string): void => {
@@ -340,7 +329,7 @@ export function ToastViewport({
     snapshotExitBaselines(result.leaving);
     write(result.next);
     syncTimers();
-    scheduleCloseActions(result.dismissed, "dismiss", undefined);
+    callCloseHandlers(result.dismissed, "dismiss", undefined);
   };
 
   const setActionPending = (id: string, pending: boolean): void => {

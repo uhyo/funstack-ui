@@ -290,28 +290,29 @@ describe("Dialog", () => {
         await flushTasks(2);
         expect(action).toHaveBeenCalledTimes(1);
         expect(popup().open).toBe(true);
+        // A dismissal (a fact, not dispatched), then Space opens again.
         await act(async () => popup().requestClose());
         await flushTasks(2);
         trigger().focus();
         await user.keyboard(" ");
         await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(3);
-        expect(action.mock.calls[2]![0]).toBe(true);
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(action.mock.calls[1]![0]).toBe(true);
       });
     });
 
-    it("non-modal: Escape inside the dialog closes it with reason 'dismiss'", async () => {
+    it("non-modal: Escape inside the dialog closes it: a 'dismiss' fact", async () => {
       const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode="uncontrolled" modal={false} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" modal={false} fact={fact} />);
       await openThroughTrigger(user);
       expect(popup().open).toBe(true);
       screen.getByTestId("close").focus();
       await user.keyboard("{Escape}");
       expect(popup().open).toBe(false);
       await flushTasks(2);
-      expect(action).toHaveBeenLastCalledWith(false, expect.anything());
-      expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+      expect(fact).toHaveBeenLastCalledWith(false, expect.anything());
+      expect(fact.mock.calls.at(-1)![1].reason).toBe("dismiss");
     });
 
     it("non-modal JS-free: Escape closes too", async () => {
@@ -484,9 +485,9 @@ describe("Dialog", () => {
       await flushTasks(2);
     });
 
-    it("Root state.pending is true while a re-open waits for a dismissal's notification", async () => {
+    it("Root state.pending is false after a dismissal (a fact) and true while the re-open runs", async () => {
       const user = setupUser();
-      const closing = deferred();
+      const opening = deferred();
       const action = vi.fn<ActionFn>();
       render(
         <Dialog.Root defaultOpen={false} openChangeAction={action}>
@@ -500,13 +501,14 @@ describe("Dialog", () => {
         </Dialog.Root>,
       );
       await openThroughTrigger(user);
-      action.mockImplementationOnce(() => closing.promise);
+      action.mockImplementationOnce(() => opening.promise);
       await act(async () => popup().requestClose());
       await flushTasks(2);
+      expect(screen.getByTestId("root")).toHaveTextContent("open=false pending=false");
       await user.click(trigger());
       expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=true");
       expectPending(trigger());
-      await act(async () => closing.resolve());
+      await act(async () => opening.resolve());
       await flushTasks(2);
       expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=false");
       expect(popup().open).toBe(true);
@@ -516,11 +518,11 @@ describe("Dialog", () => {
   describe("render element", () => {
     it("render={<dialog />} keeps id, ARIA and the listeners", async () => {
       const user = setupUser();
-      const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       render(
         <Harness
           mode="uncontrolled"
-          action={action}
+          fact={fact}
           popup={{ render: <dialog className="custom" /> }}
         />,
       );
@@ -530,7 +532,7 @@ describe("Dialog", () => {
       expect(popup().getAttribute("aria-labelledby")).toBe(screen.getByTestId("title").id);
       await act(async () => popup().requestClose());
       await flushTasks(2);
-      expect(action).toHaveBeenLastCalledWith(false, expect.anything());
+      expect(fact).toHaveBeenLastCalledWith(false, expect.anything());
     });
 
     it("a link Trigger in library mode dispatches through the click and gets no type", async () => {
@@ -595,6 +597,7 @@ describe("Dialog", () => {
               if (next) await server.promise;
               startTransition(() => setOpen(next));
             }}
+            onOpenChange={setOpen}
           >
             <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
             <Dialog.Popup data-testid="popup" aria-label="x">
@@ -637,11 +640,11 @@ describe("Dialog", () => {
       fireEvent.click(target, point);
     }
 
-    it("modal: a click on the dialog outside its box closes it with reason 'dismiss'", async () => {
+    it("modal: a click on the dialog outside its box closes it: a 'dismiss' fact", async () => {
       const user = setupUser();
-      const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
-      render(<Harness mode="uncontrolled" action={action} popup={{ lightDismiss: true }} />);
+      render(<Harness mode="uncontrolled" fact={fact} popup={{ lightDismiss: true }} />);
       await openThroughTrigger(user);
       mockRect(popup());
       pressAndClick(popup(), { clientX: 150, clientY: 150 }); // inside the box
@@ -650,7 +653,7 @@ describe("Dialog", () => {
       pressAndClick(popup(), { clientX: 10, clientY: 10 }); // the ::backdrop
       expect(requestClose).toHaveBeenCalledTimes(1);
       await flushTasks(2);
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
     });
 
     it("modal: without lightDismiss a backdrop click does nothing", async () => {
@@ -683,11 +686,13 @@ describe("Dialog", () => {
       async (_label, experimental_closedBy) => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
+        const fact = vi.fn<ActionFn>();
         render(
           <Harness
             mode="uncontrolled"
             modal={false}
             action={action}
+            fact={fact}
             popup={{ lightDismiss: true, experimental_closedBy }}
           />,
         );
@@ -697,14 +702,14 @@ describe("Dialog", () => {
         await user.click(trigger());
         await flushTasks(2);
         expect(popup().open).toBe(false);
-        expect(action).toHaveBeenCalledTimes(2);
-        const [next, details] = action.mock.calls[1]!;
+        expect(fact).toHaveBeenCalledTimes(1);
+        const [next, details] = fact.mock.calls[0]!;
         expect(next).toBe(false);
         expect(details.reason).toBe("dismiss");
         expect(details.event?.type).toBe("close");
-        // The click ran while the dialog was still optimistically open: no re-open.
+        // The click ran while the dialog was still optimistically open: no re-open, no request.
         await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(2);
+        expect(action).toHaveBeenCalledTimes(1);
         expect(popup().open).toBe(false);
       },
     );
@@ -1069,6 +1074,34 @@ describe("Dialog", () => {
         </Dialog.Root>,
       );
       expect(error).toHaveBeenCalledWith(expect.stringContaining("the mode changed after mount"));
+    });
+
+    // #148, overlay-open-change.md 2.11 and 6.2
+    it("onOpenChange alone selects library mode; a script close(v) is a fact with its returnValue", async () => {
+      const user = setupUser();
+      const onOpenChange = vi.fn<ActionFn>();
+      render(
+        <Dialog.Root onOpenChange={onOpenChange}>
+          <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="x">
+            <span data-testid="content">content</span>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      // Library mode: content from committed state, not mounted while closed.
+      expect(content()).toBeNull();
+      await openThroughTrigger(user);
+      expect(content()).toBeInTheDocument();
+      await act(async () => popup().close("from-script"));
+      await flushTasks(2);
+      expect(onOpenChange).toHaveBeenCalledTimes(1);
+      const [next, details] = onOpenChange.mock.calls[0]!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("dismiss");
+      expect(details.returnValue).toBe("from-script");
+      expect(details.event!.type).toBe("close");
+      expect(content()).toBeNull();
+      expect(trigger()).not.toHaveAttribute("data-open");
     });
 
     it("warns for transition and keepMounted={false} in JS-free mode", () => {

@@ -248,7 +248,7 @@ describe("Toast", () => {
     // #63 L5
     it("a dismissed toast that never rendered leaves at once, never as an ending Root", async () => {
       const seen = new Set<string>();
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(
         <Harness
           manager={manager}
@@ -262,16 +262,14 @@ describe("Toast", () => {
         />,
       );
       const a = await call(() => manager({ title: "A", duration: null }));
-      const b = await call(() => manager({ title: "B", duration: null, closeAction }));
+      const b = await call(() => manager({ title: "B", duration: null, onClose }));
       await call(() => manager({ title: "C", duration: null }));
       expect([...seen]).toEqual([a]);
-      // Queued beyond `limit`: dismissed without rendering, `closeAction` still runs.
+      // Queued beyond `limit`: dismissed without rendering, `onClose` still runs.
       await call(() => manager.dismiss(b));
       await flushMicrotasks(2);
       expect([...seen]).toEqual([a]);
-      expect(closeAction).toHaveBeenCalledWith(
-        expect.objectContaining({ id: b, reason: "dismiss" }),
-      );
+      expect(onClose).toHaveBeenCalledWith(expect.objectContaining({ id: b, reason: "dismiss" }));
       // dismiss(): the visible one exits, the queued one (C) is never rendered.
       await call(() => manager.dismiss());
       expect([...seen]).toEqual([a]);
@@ -286,10 +284,10 @@ describe("Toast", () => {
       const first = vi.fn();
       const second = vi.fn();
       render(<Harness manager={manager} />);
-      const a = await call(() => manager({ title: "A", closeAction: first }));
+      const a = await call(() => manager({ title: "A", onClose: first }));
       const b = await call(() => {
         manager.dismiss();
-        return manager({ title: "Saved", closeAction: second });
+        return manager({ title: "Saved", onClose: second });
       });
       await flushMicrotasks(2);
       expect(queryRoot(a)).toBeNull();
@@ -305,13 +303,13 @@ describe("Toast", () => {
       const first = vi.fn();
       const second = vi.fn();
       render(<Harness manager={manager} />);
-      await call(() => manager({ id: "sync", title: "Syncing", closeAction: first }));
+      await call(() => manager({ id: "sync", title: "Syncing", onClose: first }));
       await act(async () => {
         vi.advanceTimersByTime(4000);
       });
       await call(() => {
         manager.dismiss("sync");
-        manager({ id: "sync", title: "Synced", closeAction: second });
+        manager({ id: "sync", title: "Synced", onClose: second });
       });
       await flushMicrotasks(2);
       expect(root("sync")).toHaveTextContent("Synced");
@@ -333,16 +331,16 @@ describe("Toast", () => {
     });
 
     it("toast() then dismiss() in one tick closes the new toast too", async () => {
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(<Harness manager={manager} />);
       const id = await call(() => {
-        const added = manager({ title: "Gone", closeAction });
+        const added = manager({ title: "Gone", onClose });
         manager.dismiss();
         return added;
       });
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
-      expect(closeAction.mock.calls[0]![0]).toMatchObject({ id, reason: "dismiss" });
+      expect(onClose.mock.calls[0]![0]).toMatchObject({ id, reason: "dismiss" });
     });
 
     it("renders `limit` toasts in chronological order and queues the rest in order", async () => {
@@ -587,10 +585,10 @@ describe("Toast", () => {
     it("calls the toast's action with details.id and the native click; closes with activate", async () => {
       const user = setupUser();
       const action = vi.fn();
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(<Harness manager={manager} />);
       const id = await call(() =>
-        manager({ title: "Archived", action: { label: "Undo", action }, closeAction }),
+        manager({ title: "Archived", action: { label: "Undo", action }, onClose }),
       );
       await user.click(screen.getByTestId(`action-${id}`));
       await flushMicrotasks(2);
@@ -601,8 +599,8 @@ describe("Toast", () => {
       expect(details.event?.type).toBe("click");
       expect(Object.keys(details)).toEqual(["id"]);
       expect(queryRoot(id)).toBeNull();
-      expect(closeAction).toHaveBeenCalledTimes(1);
-      const close = closeAction.mock.calls[0]![0] as ToastCloseDetails;
+      expect(onClose).toHaveBeenCalledTimes(1);
+      const close = onClose.mock.calls[0]![0] as ToastCloseDetails;
       expect(close.id).toBe(id);
       expect(close.reason).toBe("activate");
       expect(close.event?.type).toBe("click");
@@ -660,18 +658,18 @@ describe("Toast", () => {
 
     it("Close dispatches dismiss with the click", async () => {
       const user = setupUser();
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(<Harness manager={manager} />);
-      const id = await call(() => manager({ title: "Hi", closeAction }));
+      const id = await call(() => manager({ title: "Hi", onClose }));
       const button = screen.getByTestId(`close-${id}`);
       expect(button).toHaveAttribute("type", "button");
       expect(button).not.toHaveAttribute("command");
       await user.click(button);
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
-      expect(closeAction).toHaveBeenCalledTimes(1);
-      expect(closeAction.mock.calls[0]![0]).toMatchObject({ id, reason: "dismiss" });
-      expect((closeAction.mock.calls[0]![0] as ToastCloseDetails).event?.type).toBe("click");
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose.mock.calls[0]![0]).toMatchObject({ id, reason: "dismiss" });
+      expect((onClose.mock.calls[0]![0] as ToastCloseDetails).event?.type).toBe("click");
     });
   });
 
@@ -679,14 +677,14 @@ describe("Toast", () => {
     it("pending on Action and Root while the Undo runs; the timer does not elapse; closes after", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
       const d = deferred();
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(<Harness manager={manager} />);
       const id = await call(() =>
         manager({
           title: "Archived",
           duration: 1000,
           action: { label: "Undo", action: () => d.promise },
-          closeAction,
+          onClose,
         }),
       );
       await act(async () => {
@@ -701,7 +699,7 @@ describe("Toast", () => {
       await act(async () => d.resolve());
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
-      expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
+      expect(onClose.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
 
     it("closeOnSettle={false} keeps the toast", async () => {
@@ -781,13 +779,13 @@ describe("Toast", () => {
       vi.stubGlobal("reportError", reportError);
       const errors: unknown[] = [];
       const d = deferred();
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(<Harness manager={manager} boundary={(e) => errors.push(e)} />);
       const id = await call(() =>
         manager({
           title: "Archived",
           action: { label: "Undo", action: () => d.promise },
-          closeAction,
+          onClose,
         }),
       );
       await act(async () => {
@@ -803,7 +801,7 @@ describe("Toast", () => {
       await flushMicrotasks(2);
       expect(reportError).toHaveBeenCalledExactlyOnceWith(failure);
       expect(errors).toEqual([]);
-      expect(closeAction.mock.calls.map(([details]) => details.reason)).toEqual(["dismiss"]);
+      expect(onClose.mock.calls.map(([details]) => details.reason)).toEqual(["dismiss"]);
       expect(consoleError).not.toHaveBeenCalled();
     });
 
@@ -883,14 +881,14 @@ describe("Toast", () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
       const d = deferred();
       const undo = vi.fn(() => d.promise);
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(<Harness manager={manager} />);
       const id = await call(() =>
         manager({
           title: "A",
           duration: 1000,
           action: { label: "Undo", action: undo },
-          closeAction,
+          onClose,
         }),
       );
       const action = screen.getByTestId(`action-${id}`);
@@ -917,8 +915,8 @@ describe("Toast", () => {
       await act(async () => d.resolve());
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
-      expect(closeAction).toHaveBeenCalledTimes(1);
-      expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(onClose.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
 
     // T2
@@ -1126,7 +1124,7 @@ describe("Toast", () => {
       const runs = [deferred(), deferred()];
       let call_ = 0;
       const undo = vi.fn(() => runs[call_++]!.promise);
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       render(
         <Harness
           manager={manager}
@@ -1140,7 +1138,7 @@ describe("Toast", () => {
         />,
       );
       const id = await call(() =>
-        manager({ title: "A", action: { label: "Undo", action: undo }, closeAction }),
+        manager({ title: "A", action: { label: "Undo", action: undo }, onClose }),
       );
       await act(async () => {
         fireEvent.click(screen.getByTestId("act"));
@@ -1156,7 +1154,7 @@ describe("Toast", () => {
       await act(async () => runs[1]!.resolve());
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
-      expect(closeAction).toHaveBeenCalledTimes(1);
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('"run" on a closing Action: the first run resolves, the latest rejects: the boundary, the toast stays', async () => {
@@ -1216,18 +1214,18 @@ describe("Toast", () => {
     });
   });
 
-  describe("closeAction", () => {
+  describe("onClose", () => {
     it("is called once per close with each reason", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
       const reasons: string[] = [];
-      const closeAction = (d: ToastCloseDetails) => {
+      const onClose = (d: ToastCloseDetails) => {
         reasons.push(`${d.id}:${d.reason}`);
       };
       render(<Harness manager={manager} limit={10} />);
-      const a = await call(() => manager({ id: "a", title: "A", closeAction }));
-      const b = await call(() => manager({ id: "b", title: "B", closeAction, duration: null }));
-      const c = await call(() => manager({ id: "c", title: "C", closeAction, duration: null }));
-      const e = await call(() => manager({ id: "e", title: "E", closeAction, duration: null }));
+      const a = await call(() => manager({ id: "a", title: "A", onClose }));
+      const b = await call(() => manager({ id: "b", title: "B", onClose, duration: null }));
+      const c = await call(() => manager({ id: "c", title: "C", onClose, duration: null }));
+      const e = await call(() => manager({ id: "e", title: "E", onClose, duration: null }));
       await act(async () => {
         vi.advanceTimersByTime(5000);
       });
@@ -1252,23 +1250,58 @@ describe("Toast", () => {
       expect(reasons).toHaveLength(4);
     });
 
-    it("is not called synchronously inside the dismissal click", async () => {
-      const closeAction = vi.fn();
+    // #148: a handler, not an action (conventions 2.1).
+    it("is called synchronously inside the dismissal click", async () => {
+      const onClose = vi.fn();
       render(<Harness manager={manager} />);
-      const id = await call(() => manager({ title: "A", closeAction }));
+      const id = await call(() => manager({ title: "A", onClose }));
       let calledDuringClick = false;
       const button = screen.getByTestId(`close-${id}`);
       await act(async () => {
         fireEvent.click(button);
-        calledDuringClick = closeAction.mock.calls.length > 0;
+        calledDuringClick = onClose.mock.calls.length > 0;
         await Promise.resolve();
       });
-      expect(calledDuringClick).toBe(false);
-      expect(closeAction).toHaveBeenCalledTimes(1);
+      expect(calledDuringClick).toBe(true);
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it("runs in a transition: its rejection reaches the boundary above the Viewport", async () => {
+    it("is not awaited: an unrelated transition commits while a slow onClose is still pending", async () => {
+      const slow = deferred();
+      const onClose = vi.fn(() => slow.promise);
+      let setLabel!: (label: string) => void;
+      function Unrelated() {
+        const [label, set] = useState("old");
+        setLabel = set;
+        return <output data-testid="unrelated">{label}</output>;
+      }
+      render(
+        <>
+          <Harness manager={manager} />
+          <Unrelated />
+        </>,
+      );
+      const id = await call(() => manager({ title: "A", onClose }));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`close-${id}`));
+      });
+      await flushMicrotasks(2);
+      expect(onClose).toHaveBeenCalledTimes(1);
+      // Were onClose awaited inside a transition (the old `closeAction`), every transition in
+      // the app would be entangled with it and this one would wait for `slow` (conventions 2.3
+      // item 5).
+      await act(async () => {
+        startTransition(() => setLabel("new"));
+      });
+      await flushMicrotasks(2);
+      expect(screen.getByTestId("unrelated")).toHaveTextContent("new");
+      await act(async () => slow.resolve());
+    });
+
+    it("a rejection goes to reportError, not the boundary above the Viewport", async () => {
       silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
       const errors: unknown[] = [];
       const failure = new Error("delete failed");
       render(
@@ -1279,7 +1312,7 @@ describe("Toast", () => {
       const id = await call(() =>
         manager({
           title: "A",
-          closeAction: async () => {
+          onClose: async () => {
             await Promise.resolve();
             throw failure;
           },
@@ -1289,16 +1322,43 @@ describe("Toast", () => {
         fireEvent.click(screen.getByTestId(`close-${id}`));
       });
       await flushMicrotasks(2);
-      expect(errors).toEqual([failure]);
+      expect(errors).toEqual([]);
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(failure);
+      expect(screen.queryByTestId("error-catcher")).toBeNull();
+    });
+
+    it("a synchronous throw goes to reportError; the toast still closes and the others still hear theirs", async () => {
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const failure = new Error("handler bug");
+      const other = vi.fn();
+      render(<Harness manager={manager} limit={10} />);
+      await call(() =>
+        manager({
+          id: "a",
+          title: "A",
+          duration: null,
+          onClose: () => {
+            throw failure;
+          },
+        }),
+      );
+      await call(() => manager({ id: "b", title: "B", duration: null, onClose: other }));
+      await call(() => manager.dismiss());
+      await flushMicrotasks(2);
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(failure);
+      expect(other).toHaveBeenCalledTimes(1);
+      expect(queryRoot("a")).toBeNull();
     });
 
     it("is not called when the Viewport unmounts; the queue survives for the next Viewport", async () => {
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       const { unmount } = render(<Harness manager={manager} />);
-      const id = await call(() => manager({ title: "Keep me", closeAction }));
+      const id = await call(() => manager({ title: "Keep me", onClose }));
       unmount();
       await flushMicrotasks(2);
-      expect(closeAction).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
       render(<Harness manager={manager} />);
       await flushMicrotasks(2);
       expect(root(id)).toHaveTextContent("Keep me");
@@ -2553,7 +2613,7 @@ describe("Toast", () => {
       // The Undo opens a confirmation dialog with an urgent update while it is still pending (a
       // transition update would wait for the Undo itself).
       const d = deferred();
-      const closeAction = vi.fn();
+      const onClose = vi.fn();
       function UrgentDialog() {
         const [open, setOpen] = useState(false);
         return (
@@ -2582,7 +2642,7 @@ describe("Toast", () => {
           title: "Archived",
           duration: 30,
           action: { label: "Undo", action: () => d.promise },
-          closeAction,
+          onClose,
         }),
       );
       const element = root(id);
@@ -2604,11 +2664,11 @@ describe("Toast", () => {
       expectPending(element);
       await elapse(80);
       expect(queryRoot(id)).not.toBeNull();
-      expect(closeAction).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
       await act(async () => d.resolve());
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
-      expect(closeAction.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
+      expect(onClose.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
 
     it("warns when the Viewport is rendered inside a Dialog", async () => {

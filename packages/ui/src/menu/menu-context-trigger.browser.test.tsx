@@ -449,9 +449,9 @@ describe("Menu.ContextTrigger (browser)", () => {
   });
 
   describe("closing", () => {
-    it("a right-click outside closes in every engine ('dismiss'); a middle-click likewise", async () => {
+    it("a right-click outside closes in every engine (a 'dismiss' fact); a middle-click likewise", async () => {
       const action = vi.fn<OpenAction>();
-      render(<Harness root={{ openChangeAction: action }} />);
+      render(<Harness root={{ onOpenChange: action }} />);
       await openAt(100, 100);
       const outside = rect(screen.getByTestId("outside"));
       await act(async () => {
@@ -498,12 +498,13 @@ describe("Menu.ContextTrigger (browser)", () => {
       expect(activated).not.toHaveBeenCalled();
     });
 
-    it("a left click outside closes ('dismiss'); a left click on an item activates and closes", async () => {
+    it("a left click outside closes (a 'dismiss' fact); a left click on an item activates and closes (a request)", async () => {
       const action = vi.fn<OpenAction>();
+      const fact = vi.fn<OpenAction>();
       const activated = vi.fn();
       render(
         <Harness
-          root={{ openChangeAction: action }}
+          root={{ openChangeAction: action, onOpenChange: fact }}
           content={
             <Menu.Item data-testid="rename" action={activated}>
               Rename
@@ -514,12 +515,13 @@ describe("Menu.ContextTrigger (browser)", () => {
       await openAt(100, 100);
       await user.click(screen.getByTestId("outside"));
       await expect.poll(() => isOpen()).toBe(false);
-      await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
+      await settle(() => expect(fact.mock.calls.at(-1)?.[1].reason).toBe("dismiss"));
       await openAt(100, 100);
       await user.click(item("rename"));
       await expect.poll(() => isOpen()).toBe(false);
       expect(activated).toHaveBeenCalledTimes(1);
       expect(action.mock.calls.at(-1)![1].reason).toBe("activate");
+      expect(fact).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -798,7 +800,7 @@ describe("Menu.ContextTrigger (browser)", () => {
       await expect.poll(() => isOpen()).toBe(false);
     });
 
-    it('transition="pop": the outside right-click hides at once; only the notification commit runs one', async () => {
+    it('transition="pop": the outside right-click hides at once and runs no view transition (a fact)', async () => {
       render(<Plain transition="pop" />);
       await mouse.click(100, 100, "right");
       await expect.poll(() => isOpen()).toBe(true);
@@ -807,11 +809,9 @@ describe("Menu.ContextTrigger (browser)", () => {
       const outside = rect(screen.getByTestId("outside"));
       await mouse.click(outside.left + 20, outside.top + 20, "right");
       await expect.poll(() => isOpen()).toBe(false);
-      // As Escape (menu.browser.test.tsx): the dismissal's notification commit, popup already
-      // hidden when it starts.
-      await expect.poll(() => calls.length).toBe(2);
-      expect(calls[1]!.openAtStart).toBe(false);
-      await transitions[1]!.finished;
+      // As Escape (menu.browser.test.tsx): the fact's commit is urgent (#148).
+      await quietPeriod(100, "a dismissal must not start a view transition");
+      expect(calls).toHaveLength(1);
     });
 
     it("without transition: none for an open, a move, an outside close or an activation", async () => {
@@ -1001,8 +1001,9 @@ describe("Menu.ContextTrigger (browser)", () => {
 
     it("a held-button move released off the menu stays open before 500 ms and closes after", async () => {
       const action = vi.fn<OpenAction>();
+      const fact = vi.fn<OpenAction>();
       const time = watchGestureTime();
-      render(<Harness root={{ openChangeAction: action }} />);
+      render(<Harness root={{ openChangeAction: action, onOpenChange: fact }} />);
       await openAt(100, 100);
       // A move with the button held: the menu re-shows at the new point and re-captures.
       await act(async () => {
@@ -1044,7 +1045,7 @@ describe("Menu.ContextTrigger (browser)", () => {
       expect(time.elapsed()).toBeGreaterThanOrEqual(500);
       await expect.poll(() => isOpen()).toBe(false);
       await flushFor();
-      expect(action.mock.calls.at(-1)).toEqual([
+      expect(fact.mock.calls.at(-1)).toEqual([
         false,
         expect.objectContaining({ reason: "dismiss" }),
       ]);
@@ -1211,9 +1212,9 @@ describe("Menu.ContextTrigger (browser)", () => {
       });
     }
 
-    it("a wheel over the page closes a point menu ('dismiss') and the page scrolls", async () => {
+    it("a wheel over the page closes a point menu (a 'dismiss' fact) and the page scrolls", async () => {
       const action = vi.fn<OpenAction>();
-      render(<ScrollPage root={{ openChangeAction: action }} />);
+      render(<ScrollPage root={{ onOpenChange: action }} />);
       await openArmed(100, 100);
       await act(async () => {
         await wheel(400, 400, 0, 200);

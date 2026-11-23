@@ -1,10 +1,13 @@
 # Overlay open state: requests and facts (`openChangeAction` / `onOpenChange`)
 
 Status: **accepted** (2026-11-24, GitHub issue #148; every open point decided by the user the
-same day, conventions resolved question 45). **Not implemented yet.** Until the implementation
-lands, the sections of `design/conventions.md` and of the component designs that this document
-lists in 12.2 still describe the shipped behaviour; conventions 2.1 and 2.6 already carry the
-rule.
+same day, conventions resolved question 45). **Implemented 2026-11-24** (branch
+`feat/148-on-open-change`; probes and notes in `memo/developer/issue-148.md`). The conventions
+sections of 12.2 are amended in place; the component designs carry a short "#148" amendment
+that points here. One deviation from the sketch of section 11, recorded in conventions 3.4: the
+optimistic passthrough stays the plain committed value and the epoch lives in the reducer's
+closure, because an object passthrough defeated React's render bailout (an update loop with an
+inline ref).
 
 Scope: `Popover.Root`, `Menu.Root` (context menu and submenus included), `Combobox.Root`
 (`open` only), `Dialog.Root`, and Toast's `closeAction`. Tooltip is covered to say what does not
@@ -37,9 +40,8 @@ Inputs: `docs/vision.md`; conventions 2.1, 2.2, 2.4, 2.6, 3.5, 5.1; the componen
 
 ## 1. The rule
 
-The rule, as written into conventions 2.1 / 2.6 at acceptance. Principle 3 of `docs/vision.md`
-still has the old "one exception React forces" paragraph; it is outside `design/` and must be
-reworded to this text (a product-owner task, 12.2):
+The rule, as written into conventions 2.1 / 2.6 at acceptance, and into principle 3 of
+`docs/vision.md` (bc0512c), which replaced its old "one exception React forces" paragraph:
 
 > A prop named `action` or `fooAction` is a **request**. The library calls it before the change
 > is committed, inside a transition, and awaits it; the outcome decides the state. A rejection,

@@ -5,11 +5,13 @@ import type { MenuOpenChangeDetails } from "@funstack/ui/menu";
 import { sleep } from "./fake-api.js";
 
 // A slow `openChangeAction` on the menu and on its submenu (a nested Root has its own): a
-// pretend server call of 2 seconds. Opening: the Trigger (or SubmenuTrigger) gets data-open and
-// data-pending at once, the menu is shown when the action settles. Choosing an item closes the
-// menu when the close's action settles. Escape and a click outside are the browser's: the menu
-// hides at once and the action only hears about it. The browser exposes each trigger as
-// expanded exactly while its menu is shown. The readout is plain text, not a live region.
+// pretend server call of 2 seconds for every request. Opening: the Trigger (or SubmenuTrigger)
+// gets data-open and data-pending at once, the menu is shown when the action settles. Choosing an
+// item closes the menu when the close's action settles. Escape and a click outside are the
+// browser's, a fact: the menu hides at once, nothing is pending and the action is not called;
+// `onOpenChange` reports it (also for a submenu closed with its parent). The browser exposes each
+// trigger as expanded exactly while its menu is shown. The readout is plain text, not a live
+// region.
 export function MenuSlowOpen() {
   const [log, setLog] = useState("(none yet)");
   const [view, setView] = useState("List");
@@ -22,13 +24,19 @@ export function MenuSlowOpen() {
       // After an await: wrap the update in startTransition (React limitation).
       startTransition(() => setLog(`${call}: settled`));
     };
+  // A fact: called in the browser's event, not awaited. A plain setState here is urgent.
+  const dismissed =
+    (menu: string) =>
+    (open: boolean, { reason }: MenuOpenChangeDetails) => {
+      setLog(`${menu} onOpenChange(${open}, "${reason}")`);
+    };
   const choose = (next: string) => () => startTransition(() => setView(next));
 
   return (
     <div className="demo-stack">
       <div className="demo-row">
         <span>View: {view}</span>
-        <Menu.Root openChangeAction={slow("menu")}>
+        <Menu.Root openChangeAction={slow("menu")} onOpenChange={dismissed("menu")}>
           <Menu.Trigger className="demo-button">
             {({ pending }) => (
               <>Options{pending && <span className="demo-spinner" aria-hidden />}</>
@@ -38,7 +46,7 @@ export function MenuSlowOpen() {
             <Menu.Item action={choose("List")}>List</Menu.Item>
             <Menu.Item action={choose("Grid")}>Grid</Menu.Item>
             <Menu.Separator />
-            <Menu.Root openChangeAction={slow("submenu")}>
+            <Menu.Root openChangeAction={slow("submenu")} onOpenChange={dismissed("submenu")}>
               <Menu.SubmenuTrigger>
                 {({ pending }) => (
                   <>Sort by{pending && <span className="demo-spinner" aria-hidden />}</>

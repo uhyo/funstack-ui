@@ -223,7 +223,7 @@ export function ContextMenuPage() {
 
       <h4>Moving and closing</h4>
       <Table
-        head={["Input", "What happens", "reason"]}
+        head={["Input", "What happens", "Reported as"]}
         rows={[
           [
             "Right-click elsewhere in the region while open",
@@ -233,7 +233,7 @@ export function ContextMenuPage() {
           [
             "Right-click or middle-click outside the menu",
             "Closes at once, for every menu (a Menu opened from its button too): the browser's own light dismiss ignores those buttons in Chromium, and native menus close on any click",
-            '`"dismiss"`',
+            '`onOpenChange`, `"dismiss"`',
           ],
           [
             "Right-click inside the menu",
@@ -243,22 +243,22 @@ export function ContextMenuPage() {
           [
             "Release of the held button or finger over an item, after sliding onto it",
             "The item is activated, as a click would (see Press-drag-release)",
-            '`"activate"`',
+            '`openChangeAction`, `"activate"`',
           ],
           [
             "Release of the held button outside the menu, after moving, at least 500 ms after the menu appeared",
             "Closes at once",
-            '`"dismiss"`',
+            '`onOpenChange`, `"dismiss"`',
           ],
           [
             "A scroll of the page, or of a scroller around the region",
             "Closes at once (a menu at a point only; see Scrolling)",
-            '`"dismiss"`',
+            '`onOpenChange`, `"dismiss"`',
           ],
           [
             "An item's activation, Escape, Tab, a left click outside",
             "As Menu",
-            '`"activate"` / `"dismiss"`',
+            'the activation: `openChangeAction`, `"activate"`; the others: `onOpenChange`, `"dismiss"`',
           ],
         ]}
       />
@@ -524,7 +524,7 @@ export function ContextMenuPage() {
       <BehaviourSection
         id="browser-owned-state"
         summary={
-          'As in Menu: light dismiss and Escape are the browser\'s; a dismissal is notified with `reason: "dismiss"`.'
+          'As in Menu: light dismiss and Escape are the browser\'s; a dismissal is a fact, reported to `onOpenChange` with `reason: "dismiss"`. So are the closes the library performs at once and cannot hold: a right- or middle-click outside, a scroll under a menu placed at a point, a release outside after a long press.'
         }
       />
 
@@ -545,7 +545,8 @@ export function ContextMenuPage() {
           The Menu styles apply as they are (<code>margin: 0; inset: auto</code> on the popup is
           what a point-placed menu wants too). Enter and exit CSS and <code>transition</code> as
           Menu: the open and library-driven closes animate with <code>transition</code>; dismissals
-          and the outside right-click with CSS; a move is instant.
+          and the outside right-click are facts and animate with CSS only (no view transition); a
+          move is instant.
         </li>
         <li>
           On iOS a long-press over text starts a selection and the loupe. Only a{" "}

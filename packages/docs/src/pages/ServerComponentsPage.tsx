@@ -101,6 +101,27 @@ import { saveOpenSections } from "./actions"; // "use server"
 <Accordion.Root defaultValue={user.openSections} valueChangeAction={saveOpenSections}>
   ...
 </Accordion.Root>`}</CodeBlock>
+      <p>
+        A Server Function can be passed to an{" "}
+        <a href="/concepts/action-props#on-handler">
+          <code>on*</code> handler
+        </a>{" "}
+        too: it is called and not awaited, nothing shows pending, and a rejection goes to{" "}
+        <code>reportError</code>.
+      </p>
+      <ConceptExample component="Dialog" href="/components/dialog">
+        <p>
+          A Dialog closed by its Close button is a request (<code>openChangeAction</code>), and
+          closed with Escape a fact (<code>onOpenChange</code>). To remember either, pass the Server
+          Function to both props. It receives <code>(open, details)</code>; this dialog has no
+          Trigger, so it is only ever called with <code>false</code>.
+        </p>
+        <CodeBlock>{`<Dialog.Root
+  defaultOpen={!user.sawWelcome}
+  openChangeAction={rememberClosed}
+  onOpenChange={rememberClosed}
+>`}</CodeBlock>
+      </ConceptExample>
 
       <h3 id="before-hydration">Before hydration</h3>
       <p>

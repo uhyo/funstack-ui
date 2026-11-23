@@ -29,6 +29,84 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          <strong>Breaking:</strong> requests and facts (<a href={issue(148)}>#148</a>;{" "}
+          <a href="/concepts/browser-owned-state#requests-and-facts">Requests and facts</a>). On{" "}
+          <code>Popover.Root</code>, <code>Menu.Root</code>, <code>Combobox.Root</code> and{" "}
+          <code>Dialog.Root</code>:
+          <ul>
+            <li>
+              <code>openChangeAction</code> is no longer called for a close the library did not
+              perform on request: Escape, a click outside, focus leaving the popup, a parent menu
+              closing its submenu, your own invoker button closing the popup, script{" "}
+              <code>hidePopover()</code> / <code>close()</code>, and so on. These closes are{" "}
+              <a href="/concepts/action-props#fact">facts</a>, reported to the new{" "}
+              <code>onOpenChange</code> instead. Code that checks <code>reason === "dismiss"</code>{" "}
+              inside <code>openChangeAction</code> must move to <code>onOpenChange</code>.
+            </li>
+            <li>
+              A controlled Root needs <code>onOpenChange</code> as well:{" "}
+              <code>
+                open={"{open}"} openChangeAction={"{setOpen}"} onOpenChange={"{setOpen}"}
+              </code>
+              . Without it the popup re-opens after every dismissal (development warns).
+            </li>
+            <li>
+              <code>onOpenChange</code> must set state directly, not in <code>startTransition</code>{" "}
+              and not after an <code>await</code>.
+            </li>
+            <li>
+              A dismissal is no longer pending: no <code>data-pending</code> on the Trigger,{" "}
+              <code>state.pending</code> stays <code>false</code>, the committed state is{" "}
+              <code>false</code> at once, and the callback is not awaited.
+            </li>
+            <li>
+              A dismissal starts no view transition and carries no{" "}
+              <code>fsui-&lt;component&gt;-close</code> type: <code>transition</code> on a Popup
+              animates opens and the closes a part asks for; a dismissal is animated by CSS only.
+            </li>
+            <li>
+              A controlled Root that keeps <code>open={"{true}"}</code> after a dismissal is
+              re-opened at once, not after the callback settled.
+            </li>
+            <li>
+              Errors: a failing dismissal callback no longer reaches an Error Boundary; a rejected
+              promise returned from <code>onOpenChange</code>, or a throw, goes to{" "}
+              <code>reportError</code>.
+            </li>
+            <li>
+              A dismissal during a pending close is reported at once; a request that was in flight
+              is superseded (its rejection goes to <code>reportError</code>).{" "}
+              <code>Dialog.Root</code> no longer holds such a dismissal back.
+            </li>
+            <li>
+              A Server Function passed to <code>openChangeAction</code> no longer hears dismissals;
+              pass it to <code>onOpenChange</code> too.
+            </li>
+            <li>
+              JS-free mode (Popover, Dialog): <code>onOpenChange</code> on the Root selects library
+              mode.
+            </li>
+          </ul>
+          Not changing: a popup opened before hydration is still a request,{" "}
+          <code>openChangeAction(true, {'{ reason: "platform" }'})</code>. Two closes keep{" "}
+          <code>reason: "dismiss"</code> and stay requests to <code>openChangeAction</code>: the
+          pointer leaving a hover-opened submenu, and lost interest while an{" "}
+          <code>interestfor</code> open is still pending.
+        </li>
+        <li>
+          <strong>Breaking:</strong> <code>toast({"{ closeAction }"})</code> is renamed{" "}
+          <code>onClose</code>. It is called synchronously when the toast closes, is not awaited, no
+          longer holds other transitions, and its rejection goes to <code>reportError</code> instead
+          of the Error Boundary above the Viewport (<a href={issue(148)}>#148</a>).
+        </li>
+        <li>
+          <code>Combobox.Root</code>'s <code>onInputValueChange</code> may return a promise: the
+          development warning is gone, and a rejection or a throw goes to <code>reportError</code>.
+          Every <code>on*</code> handler the library defines follows that rule (
+          <a href="/concepts/action-props#handlers">Action props</a>, <a href={issue(148)}>#148</a>
+          ).
+        </li>
+        <li>
           <strong>Breaking:</strong> a pending <code>Button</code> no longer ignores clicks or
           renders <code>aria-disabled="true"</code>: every click, Enter or Space runs its{" "}
           <code>action</code> (or submits its function <code>formAction</code>) again. Add{" "}

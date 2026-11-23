@@ -137,8 +137,9 @@ export interface PopoverPopupProps extends Omit<
  * In library mode the children render from committed state, so content that suspends keeps the
  * popover closed (and the Trigger pending) until it is ready; `showPopover({ source: trigger })`
  * runs in the layout effect of the commit that mounted them, and a library-driven close runs
- * `hidePopover()` in the commit that ends it. Dismissals are the browser's: the native `toggle`
- * event becomes `openChangeAction(false, { reason: "dismiss" })`.
+ * `hidePopover()` in the commit that ends it. Dismissals are the browser's facts: the native
+ * `toggle` event makes committed state `false` urgently and calls `onOpenChange(false, { reason:
+ * "dismiss" })`; no view transition runs for them.
  *
  * Owned keys (conventions 1.2): `id`, `popover`, `open`, `aria-modal`, `aria-labelledby` and
  * `aria-describedby` (token-merged), and `data-side` / `data-align` unless `side` is `null`.

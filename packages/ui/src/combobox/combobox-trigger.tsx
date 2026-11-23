@@ -164,8 +164,14 @@ export function ComboboxTrigger({
       event.preventDefault();
       if (disabled) return;
       const native = event.nativeEvent;
-      if (popover.intended()) popover.requestClose(native, "activate");
-      else popover.requestOpen(native, "activate");
+      if (popover.intended()) {
+        // A non-button Trigger after light dismiss (#115): the hide is a fact; name its cause.
+        if (popover.hiddenBeforeToggle()) {
+          popover.recordCloseIntent({ reason: "activate", event: native });
+        } else {
+          popover.requestClose(native, "activate");
+        }
+      } else popover.requestOpen(native, "activate");
       ctx.inputRef.current?.focus();
     },
     "data-open": dataAttr(popover.optimistic),

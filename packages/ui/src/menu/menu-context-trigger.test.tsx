@@ -1002,10 +1002,10 @@ describe("Menu.ContextTrigger", () => {
     ];
 
     it.each(openers)(
-      "opened %s: a contextmenu outside hides at once, then 'dismiss'",
+      "opened %s: a contextmenu outside hides at once, then a 'dismiss' fact",
       async (_, open) => {
         const action = vi.fn<OpenAction>();
-        render(<Harness withTrigger root={{ openChangeAction: action }} />);
+        render(<Harness withTrigger root={{ onOpenChange: action }} />);
         await open();
         expect(isOpen()).toBe(true);
         const hide = vi.spyOn(HTMLElement.prototype, "hidePopover");
@@ -1022,7 +1022,7 @@ describe("Menu.ContextTrigger", () => {
 
     it.each(openers)("opened %s: a middle-button pointerdown outside closes", async (_, open) => {
       const action = vi.fn<OpenAction>();
-      render(<Harness withTrigger root={{ openChangeAction: action }} />);
+      render(<Harness withTrigger root={{ onOpenChange: action }} />);
       await open();
       act(() => {
         screen
@@ -1205,6 +1205,7 @@ describe("Menu.ContextTrigger", () => {
                 openChangeAction: (next) => {
                   startTransition(() => setOpen(next));
                 },
+                onOpenChange: setOpen,
               }}
             />
           </>
@@ -1665,7 +1666,7 @@ describe("Menu.ContextTrigger", () => {
 
     it("a release outside after moving dismisses only after 500 ms", async () => {
       const open = vi.fn<OpenAction>();
-      render(<Harness root={{ openChangeAction: open }} content={<DragItems />} />);
+      render(<Harness root={{ onOpenChange: open }} content={<DragItems />} />);
       // 100 ms after the open, 10 px away, outside: still open.
       await rightClick(region(), 312, 148);
       hit = document.body;
@@ -1937,9 +1938,9 @@ describe("Menu.ContextTrigger", () => {
         vi.advanceTimersToNextFrame();
       });
 
-    it("a point menu closes on a scroll of the document, with 'dismiss'", async () => {
+    it("a point menu closes on a scroll of the document, with a 'dismiss' fact", async () => {
       const open = vi.fn<OpenAction>();
-      render(<Harness root={{ openChangeAction: open }} />);
+      render(<Harness root={{ onOpenChange: open }} />);
       await rightClick(region());
       await nextFrame();
       const hide = vi.spyOn(HTMLElement.prototype, "hidePopover");
@@ -2100,14 +2101,18 @@ describe("Menu.ContextTrigger", () => {
       ]);
     });
 
-    it("Escape (hidePopover in the shim) notifies 'dismiss'", async () => {
+    it("Escape (hidePopover in the shim) is a 'dismiss' fact, not a request", async () => {
       const action = vi.fn<OpenAction>();
-      render(<Harness root={{ openChangeAction: action }} />);
+      const fact = vi.fn<OpenAction>();
+      render(<Harness root={{ openChangeAction: action, onOpenChange: fact }} />);
       await rightClick(region());
       await act(async () => popup().hidePopover());
       await flushTasks(2);
-      expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
+      expect(action.mock.calls.map(([next]) => next)).toEqual([true]);
+      expect(fact).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
       expect(region()).not.toHaveAttribute("data-open");
+      expectNotPending(region());
     });
 
     it("Tab out closes the stack", async () => {

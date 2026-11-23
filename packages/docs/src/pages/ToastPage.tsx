@@ -14,7 +14,7 @@ export function ToastPage() {
   return (
     <DocPage
       title="Toast"
-      description="Notifications fed by a toast() function and rendered by your own Viewport: an urgent queue that shows while the action it reports on is still pending, promise toasts, an Undo action prop, closeAction for the Undo window, ariaNotify announcements, and a region that stays interactive above modal dialogs."
+      description="Notifications fed by a toast() function and rendered by your own Viewport: an urgent queue that shows while the action it reports on is still pending, promise toasts, an Undo action prop, an onClose handler for the Undo window, ariaNotify announcements, and a region that stays interactive above modal dialogs."
     >
       <p className="page-intro">
         Toasts report on something that already happened or is happening elsewhere. The input is a
@@ -24,8 +24,9 @@ export function ToastPage() {
         action is pending, so a toast pushed as a transition would appear only after the action it
         reports on. Toast spends its <a href="/why#async-react">Async React</a> budget elsewhere: a
         toast that follows a promise, an Undo that is an ordinary action prop with{" "}
-        <code>data-pending</code>, a <code>closeAction</code> that knows whether the Undo window was
-        used, and a Suspense guard so a toast whose content suspends does not blank the page.
+        <code>data-pending</code>, an <code>onClose</code> handler that knows whether the Undo
+        window was used, and a Suspense guard so a toast whose content suspends does not blank the
+        page.
       </p>
 
       {/* The one Viewport of this page; every example below feeds it. */}
@@ -80,7 +81,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <li>
           Calls made before the Viewport mounts are buffered and shown when it does. A Viewport that
           unmounts leaves its toasts with the manager for the next one (timers stop; no{" "}
-          <code>closeAction</code> runs).
+          <code>onClose</code> is called).
         </li>
       </ul>
 
@@ -90,8 +91,9 @@ toast({ title: "Link copied" });`}</CodeBlock>
         Every queue change (add, update, dismiss, the drop after an exit animation) is a normal,
         urgent update. <code>toast()</code> dispatches from a microtask, so a call inside a{" "}
         <code>startTransition</code> scope, the sync prefix of an action included, escapes the scope
-        and shows at once; calls keep their order. Everything a toast <em>drives</em> is a
-        transition as usual: its Action's action and its <code>closeAction</code>.
+        and shows at once; calls keep their order. What a toast <em>drives</em> is a transition as
+        usual: its Action's action. The report that it left, <code>onClose</code>, is a handler: a
+        fact, called synchronously and not awaited.
       </p>
       <Example file="ToastUrgent.tsx">
         <ToastUrgent />
@@ -136,7 +138,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         ]}
       />
 
-      <h4>Undo and closeAction</h4>
+      <h4>Undo and onClose</h4>
       <p>
         <code>Toast.Action</code> is a{" "}
         <a href="/concepts/pending-and-optimistic#pure-trigger">pure trigger</a>, like{" "}
@@ -162,15 +164,37 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </p>
       </Callout>
       <p>
-        A toast's <code>closeAction</code> runs once when it leaves, in the Viewport's transition,
-        after the toast is already gone: <code>"activate"</code> (its Action settled),{" "}
-        <code>"dismiss"</code> (Close, Escape, <code>toast.dismiss()</code>, a promise toast with no
-        message for its outcome) or <code>"timeout"</code>. That is the "do later, unless undone"
-        pattern:
+        A toast's <code>onClose</code> is called once, synchronously, in the moment the toast is
+        closed (its exit animation, if any, has not run yet): <code>"activate"</code> (its Action
+        settled), <code>"dismiss"</code> (Close, Escape, <code>toast.dismiss()</code>, a promise
+        toast with no message for its outcome) or <code>"timeout"</code>. That is the "do later,
+        unless undone" pattern:
       </p>
       <Example file="ToastUndoWindow.tsx">
         <ToastUndoWindow />
       </Example>
+      <p>
+        <code>onClose</code> is a{" "}
+        <a href="/concepts/action-props#on-handler">handler, not an action</a>: it is not awaited,
+        so a slow <code>deleteForReal</code> holds no other transition in the app, and it may be a
+        Server Function. A rejection, or a throw, goes to <code>reportError</code>; it never reaches
+        an Error Boundary (the toast has already left). To show the user a failure, catch it
+        yourself:
+      </p>
+      <CodeBlock>{`toast({
+  title: "Message deleted",
+  duration: 8000,
+  action: { label: "Undo", action: () => restoreToList(id) },
+  onClose: async ({ reason }) => {
+    if (reason === "activate") return;
+    try {
+      await deleteForReal(id);
+    } catch {
+      restoreToList(id);
+      toast({ title: "Could not delete the message", priority: "high" });
+    }
+  },
+});`}</CodeBlock>
 
       <h4>Timers</h4>
       <p>
@@ -271,10 +295,10 @@ toast({ title: "Link copied" });`}</CodeBlock>
               "What `Toast.Action` renders and runs. `details.id` is the toast's id, so an inline action can update or dismiss its own toast.",
           },
           {
-            name: "closeAction",
-            type: "Action<[ToastCloseDetails]>",
+            name: "onClose",
+            type: "UrgentHandler<ToastCloseDetails>",
             description:
-              'Runs once when the toast leaves, in the Viewport\'s transition; `details.reason` is `"activate"`, `"dismiss"` or `"timeout"`. Not called when the Viewport unmounts.',
+              'A [handler](/concepts/action-props#on-handler), not an action: called once when the toast leaves, synchronously, outside any transition, and not awaited; `details.reason` is `"activate"`, `"dismiss"` or `"timeout"`. May return a promise (a Server Function); a rejection or a throw goes to `reportError`. Not called when the Viewport unmounts.',
           },
           {
             name: "announce",

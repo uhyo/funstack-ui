@@ -229,7 +229,7 @@ describe("Toast (browser)", () => {
       const undo = vi.fn();
       render(<Viewport before={<WithDialog />} />);
       const id = await call(() =>
-        manager({ title: "Archived", action: { label: "Undo", action: undo }, closeAction() {} }),
+        manager({ title: "Archived", action: { label: "Undo", action: undo }, onClose() {} }),
       );
       await user.click(screen.getByTestId("open-dialog"));
       await flushFor();

@@ -1639,3 +1639,26 @@ shared overlay browser suite already asserts it for Menu on CI (13.2). Required:
 class (submenus close with their parent, section 9); MenuPage's Styling section carries the one
 line and the reason, or a link to the general statement if the writer moves it to the
 Transitions page. ContextMenu inherits the fix through `menu.css`.
+## Amendment: requests and facts, `onOpenChange` (#148, 2026-11-24, user decision; implemented 2026-11-24)
+
+Design: `design/components/overlay-open-change.md` (section 4 is Menu's; conventions resolved
+question 45). It overrides every place above that calls a dismissal's `openChangeAction(false)`
+a "notification" (2.2, 3.1, 10, 12):
+
+- Every `Menu.Root` (top level, context menu, submenu) gains **`onOpenChange?:
+  UrgentChangeHandler<boolean, MenuOpenChangeDetails>`**. `openChangeAction` hears **requests
+  only**: Trigger / ContextTrigger / SubmenuTrigger opens (click, keys, long-press, hover after
+  `delay`), foreign opens, a menu found open at hydration (`"platform"`), an item's close after
+  its action (on the root Root), a Trigger click while open (#110), ArrowLeft in a submenu, and
+  the pointer leaving a hover-opened submenu (`"dismiss"`: held by the library, so a request).
+- **Facts** (`onOpenChange(false)`): Escape, light dismiss, another top-layer element, Tab /
+  focus leaving the tree, a right- or middle-click outside, a scroll or a captured-pointer
+  release outside under a context menu, a submenu hidden because its parent closed (whatever
+  closed the parent, an item's request included), a foreign invoker (`"activate"`), script.
+  Synchronous in the `toggle` listener; committed `false` urgently; no `data-pending`, no view
+  transition. A context-menu **move** is neither.
+- An item's action pending and Escape: the menu closes at once (the fact); the item's
+  continuation finds a new open generation and requests nothing; its rejection follows the
+  "owner left" rule (`reportError`).
+- A controlled submenu Root needs `onOpenChange` like any controlled Root (the W1 warning says
+  so); a parent that keeps `open={true}` gets the menu re-shown at once.

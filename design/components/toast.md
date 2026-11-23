@@ -10,7 +10,7 @@ section 21 (`Toast.Root fallback`, for its timer item) was **accepted on 2026-10
 awaits implementation. The code under
 `packages/ui/src/toast/` is the ground truth where this document is silent. Follows
 `design/conventions.md` (accepted, with the section 18 amendments applied; **amended
-2026-11-24, #148, user decision, not implemented yet: `closeAction` is renamed `onClose` and is
+2026-11-24, #148, user decision, implemented 2026-11-24: `closeAction` is renamed `onClose` and is
 a handler, not an action**, section 22; decisions 6, 3.3, 3.4, 9.3, 11, 12, 16.1 and 17 are
 edited in place, the other mentions of `closeAction` below read as `onClose`); where this document
 and the conventions disagree, the conventions win.
@@ -1559,7 +1559,7 @@ fires after the suspended flag is set and the announcement returns early.
 
 ---
 
-## 22. Amendment: `closeAction` becomes `onClose` (#148, 2026-11-24, user decision; not implemented yet)
+## 22. Amendment: `closeAction` becomes `onClose` (#148, 2026-11-24, user decision; implemented 2026-11-24)
 
 Design and reasoning: `design/components/overlay-open-change.md` section 7; the rule:
 conventions 2.1 (resolved question 45).

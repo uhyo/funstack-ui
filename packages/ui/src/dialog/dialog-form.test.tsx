@@ -341,14 +341,16 @@ describe("Dialog", () => {
       ]);
     });
 
-    it("stopPropagation() in onSubmit opts out: the browser closes, notified as a dismissal", async () => {
+    it("stopPropagation() in onSubmit opts out: the browser closes, reported as a 'dismiss' fact", async () => {
       const user = setupUser();
       silenceErrors(); // jsdom: "Not implemented: requestSubmit()" for the uncancelled submit
       const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       render(
         <Harness
           mode="uncontrolled"
           action={action}
+          fact={fact}
           content={
             <Dialog.Form onSubmit={(e) => e.stopPropagation()}>
               <button type="submit" value="ok">
@@ -363,7 +365,8 @@ describe("Dialog", () => {
       // Closed natively, at once.
       expect(popup().open).toBe(false);
       await flushTasks(2);
-      expect(action.mock.calls[1]![1]).toMatchObject({ reason: "dismiss", returnValue: "ok" });
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![1]).toMatchObject({ reason: "dismiss", returnValue: "ok" });
     });
 
     it("a document listener that runs first and stops propagation opts out (React root on the document)", async () => {
@@ -374,11 +377,11 @@ describe("Dialog", () => {
       const stop = (event: Event) => event.stopPropagation();
       document.addEventListener("submit", stop);
       try {
-        const action = vi.fn<ActionFn>();
+        const fact = vi.fn<ActionFn>();
         render(
           <Harness
             mode="uncontrolled"
-            action={action}
+            fact={fact}
             content={
               <Dialog.Form>
                 <button type="submit" value="ok">
@@ -393,7 +396,7 @@ describe("Dialog", () => {
         // Not cancelled by the library: closed natively, at once.
         expect(popup().open).toBe(false);
         await flushTasks(2);
-        expect(action.mock.calls[1]![1]).toMatchObject({ reason: "dismiss", returnValue: "ok" });
+        expect(fact.mock.calls[0]![1]).toMatchObject({ reason: "dismiss", returnValue: "ok" });
       } finally {
         document.removeEventListener("submit", stop);
       }
@@ -553,16 +556,18 @@ describe("Dialog", () => {
       });
     });
 
-    renderBoth("re-open while a dismissal's notification waits for a Form save", (mode) => {
-      it("Escape, then the Trigger: pending until the save settles, then open; no extra close", async () => {
+    renderBoth("Escape while a Form save runs, then a re-open", (mode) => {
+      it("the fact commits at once (not held by the save); the re-open is pending until the save settles; no extra close", async () => {
         const user = setupUser();
         const action = vi.fn<ActionFn>();
+        const fact = vi.fn<ActionFn>();
         const saving = deferred();
         const close = spyClose();
         render(
           <Harness
             mode={mode}
             action={action}
+            fact={fact}
             content={
               <Dialog.Form action={() => saving.promise}>
                 <button type="submit" value="save">
@@ -575,18 +580,21 @@ describe("Dialog", () => {
         await openThroughTrigger(user);
         await user.click(screen.getByRole("button", { name: "Save" }));
         await flushTasks(2);
-        // Escape while the save runs: closed natively; the notification is entangled with the
-        // form's async action (React holds it until the save settles).
+        // Escape while the save runs: closed natively; the fact's commit is urgent, so the
+        // form's async action does not hold it (#148; before, the notification was entangled).
         await act(async () => popup().requestClose());
         await flushTasks(2);
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls[1]![0]).toBe(false);
-        expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-        expectPending(trigger());
-        // The user re-opens: still held, and shown as pending.
+        expect(fact).toHaveBeenCalledTimes(1);
+        expect(fact.mock.calls[0]![0]).toBe(false);
+        expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+        expect(action).toHaveBeenCalledTimes(1);
+        expectNotPending(trigger());
+        expect(trigger()).not.toHaveAttribute("data-open");
+        expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+        // The user re-opens: a request, entangled with the save, and shown as pending.
         await user.click(trigger());
-        expect(action).toHaveBeenCalledTimes(3);
-        expect(action.mock.calls[2]![0]).toBe(true);
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(action.mock.calls[1]![0]).toBe(true);
         expect(trigger()).toHaveAttribute("data-open", "");
         expectPending(trigger());
         expect(popup().open).toBe(false);
@@ -597,7 +605,8 @@ describe("Dialog", () => {
         // close it again, because it was closed after the submit.
         expect(popup().open).toBe(true);
         expect(close).not.toHaveBeenCalled();
-        expect(action).toHaveBeenCalledTimes(3);
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(fact).toHaveBeenCalledTimes(1);
         expectNotPending(trigger());
         expect(trigger()).toHaveAttribute("data-open", "");
       });

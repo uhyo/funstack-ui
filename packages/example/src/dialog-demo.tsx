@@ -11,7 +11,16 @@ import "./dialog-demo.css";
 function logChange(label: string) {
   return (open: boolean, { reason, returnValue }: DialogOpenChangeDetails) => {
     console.log(
-      `[${label}] open=${open} reason=${reason} returnValue=${JSON.stringify(returnValue)}`,
+      `[${label}] openChangeAction open=${open} reason=${reason} returnValue=${JSON.stringify(returnValue)}`,
+    );
+  };
+}
+
+/** A fact (a dismissal): `onOpenChange`, called synchronously and not awaited. */
+function logFact(label: string) {
+  return (open: boolean, { reason, returnValue }: DialogOpenChangeDetails) => {
+    console.log(
+      `[${label}] onOpenChange open=${open} reason=${reason} returnValue=${JSON.stringify(returnValue)}`,
     );
   };
 }
@@ -109,7 +118,11 @@ function OrderRow({ id }: { id: string }) {
   return (
     <li className="dlg-row">
       <span>Order #{id}</span>
-      <Dialog.Root defaultOpen={false} openChangeAction={logChange(`order ${id}`)}>
+      <Dialog.Root
+        defaultOpen={false}
+        openChangeAction={logChange(`order ${id}`)}
+        onOpenChange={logFact(`order ${id}`)}
+      >
         <Dialog.Trigger className="dlg-btn">
           {({ pending }) => (pending ? <Spinner className="dlg-spinner" /> : "Details")}
         </Dialog.Trigger>
@@ -177,7 +190,11 @@ function FormDemo() {
         "fail" to see a rejected save: the Error Boundary inside the dialog shows it and the dialog
         stays open. Current name: <strong>{name}</strong>
       </p>
-      <Dialog.Root defaultOpen={false} openChangeAction={logChange("profile dialog")}>
+      <Dialog.Root
+        defaultOpen={false}
+        openChangeAction={logChange("profile dialog")}
+        onOpenChange={logFact("profile dialog")}
+      >
         <Dialog.Trigger className="dlg-btn">Edit profile</Dialog.Trigger>
         <Dialog.Popup className="dlg" initialFocus="[name=name]">
           <Dialog.Title>Edit profile</Dialog.Title>
@@ -253,7 +270,13 @@ function DismissDemo() {
         modal={modal}
         openChangeAction={(open, { reason, returnValue }) => {
           if (!open)
-            startTransition(() => setLast(`reason=${reason} returnValue="${returnValue}"`));
+            startTransition(() =>
+              setLast(`openChangeAction reason=${reason} returnValue="${returnValue}"`),
+            );
+        }}
+        onOpenChange={(_open, { reason, returnValue }) => {
+          // A fact: urgent, not awaited.
+          setLast(`onOpenChange reason=${reason} returnValue="${returnValue}"`);
         }}
       >
         <Dialog.Trigger className="dlg-btn">
@@ -312,6 +335,11 @@ function NestedDemo() {
           setOpen(next);
           if (!next) setLast(`closed: returnValue="${details.returnValue}"`);
         }}
+        onOpenChange={(next, details) => {
+          logFact("editor")(next, details);
+          setOpen(next);
+          setLast(`dismissed: returnValue="${details.returnValue}"`);
+        }}
       >
         <Dialog.Trigger className="dlg-btn">Open editor</Dialog.Trigger>
         <Dialog.Popup className="dlg">
@@ -367,9 +395,10 @@ function TransitionDemo() {
         <code>transition</code> on the Popup: the opening commit and every close a part asks for
         (Close, the <code>method="dialog"</code> OK button, the controlled close below) run in a
         view transition, so the exit animates in Firefox too. Escape and a click outside are
-        dismissals: the browser closes them with the CSS exit and <code>openChangeAction</code> only
-        hears about it. With "refuse" on, the controlled parent keeps <code>open</code> for a part's
-        close (snap-back, a real veto); a refused dismissal re-opens.
+        dismissals, facts: the browser closes them with the CSS exit and <code>onOpenChange</code>{" "}
+        is called at once (not <code>openChangeAction</code>). With "refuse" on, the controlled
+        parent keeps <code>open</code> for a part's close (snap-back, a real veto); a refused
+        dismissal re-opens at once.
       </p>
       <fieldset className="dlg-flags">
         <legend>Options</legend>
@@ -395,6 +424,12 @@ function TransitionDemo() {
             setLast(`open=${next} reason=${reason} returnValue=${JSON.stringify(returnValue)}`);
             if (next || !refuse) setOpen(next);
           });
+        }}
+        onOpenChange={(next, details) => {
+          // A fact: set state directly (urgent), never after an await.
+          logFact("transition")(next, details);
+          setLast(`onOpenChange reason=${details.reason}`);
+          if (!refuse) setOpen(next);
         }}
       >
         <Dialog.Trigger className="dlg-btn">

@@ -936,6 +936,38 @@ describe("Menu.Item actions", () => {
       expect(hide).not.toHaveBeenCalled();
       expect(isOpen()).toBe(true);
     });
+
+    // #148, overlay-open-change.md 4.3
+    it("Escape while the item's action runs: the fact closes the menu at once; the item requests no close", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const openChange = vi.fn<OpenAction>();
+      const fact = vi.fn<OpenAction>();
+      render(
+        <Harness
+          root={{ openChangeAction: openChange, onOpenChange: fact }}
+          content={
+            <Menu.Item data-testid="archive" action={() => work.promise}>
+              Archive
+            </Menu.Item>
+          }
+        />,
+      );
+      await openMenu(user);
+      await user.click(item("archive"));
+      await act(async () => popup().hidePopover());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      expect(fact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([[false, "dismiss"]]);
+      // Nothing pending on the Trigger: the item's action runs in the item's own transition.
+      expectNotPending(trigger());
+      expect(trigger()).not.toHaveAttribute("data-open");
+      await act(async () => work.resolve());
+      await flushTasks(2);
+      // Its continuation found the menu closed (open-generation guard): no request.
+      expect(openChange.mock.calls.map(([next]) => next)).toEqual([true]);
+      expect(isOpen()).toBe(false);
+    });
   });
 
   // #81
@@ -2025,9 +2057,10 @@ describe("Menu.Root", () => {
   });
 
   // #125
-  it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent", async () => {
+  it("a foreign popovertarget invoker's close is a fact: 'activate' with the ToggleEvent", async () => {
     const action = vi.fn<OpenAction>();
-    render(<Harness root={{ openChangeAction: action }} />);
+    const fact = vi.fn<OpenAction>();
+    render(<Harness root={{ openChangeAction: action, onOpenChange: fact }} />);
     fireEvent.click(trigger());
     await flushTasks(2);
     expect(isOpen()).toBe(true);
@@ -2037,8 +2070,9 @@ describe("Menu.Root", () => {
     act(() => foreign.click());
     await flushTasks(2);
     expect(isOpen()).toBe(false);
-    expect(action).toHaveBeenCalledTimes(2);
-    const [next, details] = action.mock.calls[1]!;
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledTimes(1);
+    const [next, details] = fact.mock.calls[0]!;
     expect(next).toBe(false);
     expect(details.reason).toBe("activate");
     expect(details.event!.type).toBe("beforetoggle");
@@ -2048,9 +2082,10 @@ describe("Menu.Root", () => {
     await flushTasks(2);
     act(() => popup().hidePopover());
     await flushTasks(2);
-    expect(action).toHaveBeenCalledTimes(4);
-    expect(action.mock.calls[3]![1].reason).toBe("dismiss");
-    expect(action.mock.calls[3]![1].event!.type).toBe("toggle");
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(fact).toHaveBeenCalledTimes(2);
+    expect(fact.mock.calls[1]![1].reason).toBe("dismiss");
+    expect(fact.mock.calls[1]![1].event!.type).toBe("toggle");
   });
 
   it("mount with the popup already open (pre-hydration click): one 'platform' dispatch", async () => {
@@ -2490,15 +2525,22 @@ describe("submenus", () => {
     });
   });
 
-  it("item activation in a submenu closes the stack: root 'activate', submenu 'dismiss'", async () => {
+  it("item activation in a submenu closes the stack: a root request ('activate'), a submenu fact ('dismiss')", async () => {
     const user = setupUser();
     const rootAction = vi.fn<OpenAction>();
+    const rootFact = vi.fn<OpenAction>();
     const subAction = vi.fn<OpenAction>();
+    const subFact = vi.fn<OpenAction>();
     const onItem = vi.fn();
     render(
       <Harness
-        root={{ openChangeAction: rootAction }}
-        content={<SubmenuContent sub={{ openChangeAction: subAction }} onItem={onItem} />}
+        root={{ openChangeAction: rootAction, onOpenChange: rootFact }}
+        content={
+          <SubmenuContent
+            sub={{ openChangeAction: subAction, onOpenChange: subFact }}
+            onItem={onItem}
+          />
+        }
       />,
     );
     await openSub(user);
@@ -2509,24 +2551,24 @@ describe("submenus", () => {
     expect(isOpen()).toBe(false);
     expect(rootAction.mock.calls.at(-1)![0]).toBe(false);
     expect(rootAction.mock.calls.at(-1)![1].reason).toBe("activate");
-    expect(subAction.mock.calls.at(-1)![0]).toBe(false);
-    expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    // The root's own hide is the library's (a request): no fact for the root.
+    expect(rootFact).not.toHaveBeenCalled();
+    // The submenu was hidden because its parent closed: a fact for its Root.
+    expect(subAction.mock.calls.map(([next]) => next)).toEqual([true]);
+    expect(subFact).toHaveBeenCalledTimes(1);
+    expect(subFact.mock.calls[0]![0]).toBe(false);
+    expect(subFact.mock.calls[0]![1].reason).toBe("dismiss");
   });
 
-  it("focus leaving the tree hides the root popup at once; every Root gets 'dismiss'", async () => {
+  it("focus leaving the tree hides the root popup at once; every Root gets a 'dismiss' fact", async () => {
     const user = setupUser();
     const rootAction = vi.fn<OpenAction>();
-    const subAction = vi.fn<OpenAction>();
-    const work = deferred();
+    const rootFact = vi.fn<OpenAction>();
+    const subFact = vi.fn<OpenAction>();
     render(
       <Harness
-        root={{
-          openChangeAction: (next, details) => {
-            rootAction(next, details);
-            return next ? undefined : work.promise;
-          },
-        }}
-        content={<SubmenuContent sub={{ openChangeAction: subAction }} />}
+        root={{ openChangeAction: rootAction, onOpenChange: rootFact }}
+        content={<SubmenuContent sub={{ onOpenChange: subFact }} />}
       />,
     );
     await openSub(user);
@@ -2535,12 +2577,13 @@ describe("submenus", () => {
     act(() => {
       fireEvent.blur(item("inbox"), { relatedTarget: screen.getByTestId("elsewhere") });
     });
-    // Immediate, not awaited: the root popup is hidden before any action settles.
+    // Immediate, not awaited: the root popup is hidden by the library, which cannot hold it.
     expect(hide).toHaveBeenCalled();
     expect(isOpen()).toBe(false);
     await flushTasks(2);
-    expect(rootAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
-    expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    expect(rootAction.mock.calls.map(([next]) => next)).toEqual([true]);
+    expect(rootFact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([[false, "dismiss"]]);
+    expect(subFact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([[false, "dismiss"]]);
   });
 
   it("focusout with no relatedTarget or into a submenu closes nothing", async () => {
@@ -2632,10 +2675,10 @@ describe("right- and middle-click (context-menu.md 5, every menu)", () => {
     expect(isOpen()).toBe(true);
   });
 
-  it("a Trigger-opened menu closes at once on a right-click outside ('dismiss')", async () => {
+  it("a Trigger-opened menu closes at once on a right-click outside ('dismiss' fact)", async () => {
     const user = setupUser();
     const action = vi.fn<OpenAction>();
-    render(<Harness root={{ openChangeAction: action }} />);
+    render(<Harness root={{ onOpenChange: action }} />);
     await openMenu(user);
     const hide = spyHide();
     act(() => {

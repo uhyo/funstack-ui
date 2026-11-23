@@ -1443,3 +1443,13 @@ Design-side items, folded in place:
 | L6 | Close-on-scroll ignores scroll events until the first scroll-free animation frame after the open toggle, so a scroll in flight at the open (smooth scroll, momentum) does not close the menu; the watch is cancelled on close. | 4.8 |
 | L7 | Pen gets no `touchmove` guard; the Apple Pencil case is on the #90 checklist. | 2.2 |
 | L1, L2, M1, M3, L5 | Tooltip's and conventions 12's items (nonce cases, one SSR stylesheet per precedence, the `var()` fallback, the removed recipe, the hoverable trade-off). | tooltip.md, conventions 12 |
+## Amendment: requests and facts (#148, 2026-11-24, user decision; implemented 2026-11-24)
+
+Design: `design/components/overlay-open-change.md` (section 4, Menu, covers the context menu;
+conventions resolved question 45). A context-menu Root has Menu's `onOpenChange` (3.1 adds
+nothing else). The closes of section 5 that the library performs immediately and cannot hold (a
+right- or middle-click outside, a scroll of the document or an ancestor, a captured-pointer
+release outside after the drag delay) are **facts**: they are reported to `onOpenChange(false,
+{ reason: "dismiss" })` from the `toggle`, not to `openChangeAction`; nothing pends and no view
+transition runs for them (7, 10: the outside right-click's view transition is gone). An item's
+activation stays a request on the root Root; a move (4.3) is neither.
