@@ -1,0 +1,53 @@
+import { CodeBlock } from "../components/CodeBlock.js";
+import { DocPage } from "../components/DocPage.js";
+
+export function RenderPage() {
+  return (
+    <DocPage
+      title="Replacing the element: render"
+      description="How the render prop replaces the element a FUNSTACK UI part renders: the element form, the function form, and how the part's props are merged into yours."
+    >
+      <p className="page-intro">
+        Every <a href="/getting-started#part">part</a> that renders an element accepts{" "}
+        <code>render</code>. Use it when the default element is not the one you want: a button from
+        your design system, a link instead of a button. You don't need it to style a part; for that,
+        see <a href="/getting-started">Getting started</a>.
+      </p>
+
+      <h3>Two forms</h3>
+      <p>
+        The element form replaces the default element and merges the library's props into it. The
+        function form hands you the props and the state, and you render the element yourself.
+      </p>
+      <CodeBlock>{`// Element form: a design-system button. It must accept \`ref\` and spread its props.
+<Toggle render={<MyButton variant="ghost" />}>Bold</Toggle>
+
+// Function form: full control.
+<Toggle render={(props, state) => <button {...props}>{state.pressed ? "On" : "Off"}</button>} />`}</CodeBlock>
+      <p>
+        On every component page, each part's props table is followed by two fixed lines:{" "}
+        <strong>State</strong>, the object the function props and <code>render</code> receive, and{" "}
+        <strong>Owned</strong>, the props the part sets itself, which a <code>render</code> element
+        cannot override. Everything not listed passes through to the element.
+      </p>
+
+      <h3>Merge rules for the element form</h3>
+      <ul>
+        <li>
+          <code>className</code> values are concatenated; <code>style</code> objects are merged (the
+          element wins). Event handlers the part installs run after the element's own.
+        </li>
+        <li>
+          Attributes the part computes (its <code>role</code>, ARIA state, ids, <code>data-*</code>{" "}
+          state) always win. ARIA id lists (<code>aria-describedby</code>,{" "}
+          <code>aria-labelledby</code>, <code>aria-controls</code>) are merged instead.
+        </li>
+        <li>
+          Everything else, the element wins. <code>type="button"</code> is added when the rendered
+          element is a <code>&lt;button&gt;</code> or a component (which may render one), and left
+          out for another HTML element such as <code>&lt;a&gt;</code>.
+        </li>
+      </ul>
+    </DocPage>
+  );
+}

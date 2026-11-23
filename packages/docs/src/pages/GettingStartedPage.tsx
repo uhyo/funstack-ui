@@ -85,7 +85,7 @@ export function FavoriteButton({ postId, initial }: { postId: string; initial: b
         <a href="/concepts/action-props">Action props</a> page explains the details.
       </p>
 
-      <h3>Styling: data attributes and CSS</h3>
+      <h3 id="styling">Styling: data attributes and CSS</h3>
       <p>
         Components render plain, accessible HTML and ship no styles. Library state appears as{" "}
         <code>data-*</code> attributes, emitted by presence (<code>data-pending=""</code> when true,
@@ -114,60 +114,45 @@ export function FavoriteButton({ postId, initial }: { postId: string; initial: b
   {({ pressed, pending }) => (pending ? <Spinner /> : pressed ? <StarFilled /> : <StarOutline />)}
 </Toggle>`}</CodeBlock>
 
-      <h3>
-        Replacing the element: <code>render</code>
-      </h3>
       <p>
-        Every part that renders an element accepts <code>render</code>. The element form replaces
-        the default element and merges the library's props into it; the function form hands you the
-        props and the state.
+        Each component page lists the fields of a part's state object in the <strong>State</strong>{" "}
+        line under the part's props table.
       </p>
-      <CodeBlock>{`// Element form: a design-system button. It must accept \`ref\` and spread its props.
-<Toggle render={<MyButton variant="ghost" />}>Bold</Toggle>
-
-// Function form: full control.
-<Toggle render={(props, state) => <button {...props}>{state.pressed ? "On" : "Off"}</button>} />`}</CodeBlock>
       <p>
-        On every component page, each part's props table is followed by two fixed lines:{" "}
-        <strong>State</strong>, the object the function props and <code>render</code> receive, and{" "}
-        <strong>Owned</strong>, the props the part sets itself, which a <code>render</code> element
-        cannot override. Everything not listed passes through to the element.
+        To render a different element (your design system's button, a link), pass{" "}
+        <code>render</code>; see{" "}
+        <a href="/concepts/render">
+          Replacing the element: <code>render</code>
+        </a>
+        .
       </p>
-      <p>Merge rules for the element form:</p>
-      <ul>
-        <li>
-          <code>className</code> values are concatenated; <code>style</code> objects are merged (the
-          element wins). Event handlers the part installs run after the element's own.
-        </li>
-        <li>
-          Attributes the part computes (its <code>role</code>, ARIA state, ids, <code>data-*</code>{" "}
-          state) always win. ARIA id lists (<code>aria-describedby</code>,{" "}
-          <code>aria-labelledby</code>, <code>aria-controls</code>) are merged instead.
-        </li>
-        <li>
-          Everything else, the element wins. <code>type="button"</code> is only added when the
-          rendered element is a <code>&lt;button&gt;</code>.
-        </li>
-      </ul>
 
       <h3>What the components share</h3>
+      <p>These props mean the same on every component that has them:</p>
       <Table
-        head={["Pattern", "Meaning"]}
+        head={["Prop", "Meaning"]}
         rows={[
           [
             "`x` / `defaultX` / `xChangeAction`",
             "Controlled value, initial uncontrolled value, and the action called on every change.",
           ],
-          ["`data-pending`", "An action dispatched through this component is in flight."],
           [
             "`transition`",
             "On parts whose content is driven by library state: forwarded to the part's `<ViewTransition default>`. Without it the part renders no `<ViewTransition>`.",
           ],
-          ["`render`", "Element polymorphism (no `asChild`, no `as`)."],
+          [
+            "`render`",
+            "Replaces the rendered element (no `asChild`, no `as`). See [Replacing the element](/concepts/render).",
+          ],
           ["`ref`", "An ordinary prop on every part that renders an element."],
           ["`experimental_*`", "Opt-in use of a platform feature that is not in every engine yet."],
         ]}
       />
+      <p>
+        One attribute is shared too, but it is not a prop: every component with an action renders{" "}
+        <code>data-pending</code> while an action dispatched through it is in flight (see{" "}
+        <a href="#styling">Styling</a> above).
+      </p>
     </DocPage>
   );
 }
