@@ -3307,8 +3307,17 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
 
 ## Open questions
 
-None at the moment. The questions of #146 that stood here are resolved question 44; their
-text is kept below for the record.
+**#148, proposed and pending user review (2026-11-24):
+`design/components/overlay-open-change.md`.** It changes the rule of 2.1 and 2.6 ("an action is
+a change the library can still roll back; an `on*` handler reports one it cannot hold", user
+decision), gives the overlay Roots (Popover, Menu, Combobox, Dialog) `onOpenChange` next to
+`openChangeAction`, and lists the amendments this document needs at acceptance (its section
+12.2). Four questions for the user are in its section 13: a popup found open at hydration, a
+promise returned from `onOpenChange`, the runtime development warning, and Toast's
+`closeAction`. Until it is accepted, 2.1, 2.6 and 3.5 stand as written.
+
+The questions of #146 that stood here are resolved question 44; their text is kept below for
+the record.
 
 ### #146: `whilePending`, the parts of mixed ownership (2026-11-23, resolved: question 44)
 
