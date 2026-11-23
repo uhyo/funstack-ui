@@ -25,7 +25,8 @@ function RowActions() {
         <code>data-pending</code> on the item for a second, then the whole menu closes (with a view
         transition). "Move to" is a submenu: hover it (100 ms), or press ArrowRight. Tab or a click
         outside closes everything. "Refresh" keeps the menu open (<code>closeOnActivate=false</code>
-        ).
+        ), so it runs every activation, also while pending (<code>whilePending</code> defaults to{" "}
+        <code>"run"</code> there); "Archive" ignores a second Enter while it runs.
       </p>
       <Menu.Root openChangeAction={logChange("row menu")}>
         <Menu.Trigger className="menu-btn">Actions ▾</Menu.Trigger>
