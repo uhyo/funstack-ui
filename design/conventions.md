@@ -73,6 +73,16 @@ rejection rows in 10.1; `design/components/button.md` 18 and the Close / Item / 
 of dialog.md, popover.md, menu.md and toast.md. **Implemented 2026-11-24** (branch
 `feat/146-while-pending`, `memo/developer/issue-146.md`).
 
+Amended 2026-11-24 with #148, **user decision** (resolved question 45;
+`design/components/overlay-open-change.md`, accepted, **not implemented yet**): an action is a
+change the library can still roll back, an `on*` handler reports one it cannot hold; overlay
+Roots get `onOpenChange` next to `openChangeAction`; Toast's `closeAction` becomes `onClose`;
+one rule for every `on*` handler (synchronous, not awaited, may return a promise, rejection or
+throw to `reportError`, no promise warning). Applied here: decisions 2 and 11, 2.1, 2.6, the
+Urgent handler row of 10.1. Sections 2.2, 2.4, 3.4, 3.5, 4, 5 and the rest of 10.1 still
+describe the shipped behaviour and are amended with the implementation (that document's 12.2).
+`docs/vision.md` principle 3 still words the old rule and needs the same rewording.
+
 Inputs: `docs/vision.md`, `docs/research/react-async-apis.md`, `docs/research/popover-anchor-tooltip.md`,
 `docs/research/modern-platform-survey.md`, `docs/research/form-controls.md` (wave 2), prior art (Base UI, React Aria Components, Radix,
 Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
@@ -83,7 +93,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
-| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. What a pure trigger does with an activation that arrives while its own action is pending is the prop `whilePending` (`"run"` | `"ignore"`); the default follows who owns the action: `"run"` for a user-owned trigger (`Button`), `"ignore"` for a part whose activation the library owns (a Close part); an ignoring part renders `aria-disabled="true"` while pending (2.5.1; #146, user decision 2026-11-23, replacing the unconditional guard of #79 / #81). **`fooAction` always means a handler the component runs in a transition**; no `on*` handlers in the library API except the urgent lane's `on<State>Change` (row 11, #96). A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), never a handler. |
+| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. What a pure trigger does with an activation that arrives while its own action is pending is the prop `whilePending` (`"run"` | `"ignore"`); the default follows who owns the action: `"run"` for a user-owned trigger (`Button`), `"ignore"` for a part whose activation the library owns (a Close part); an ignoring part renders `aria-disabled="true"` while pending (2.5.1; #146, user decision 2026-11-23, replacing the unconditional guard of #79 / #81). **`fooAction` always means a handler the component runs in a transition**, and since #148 a **request**: a change the library can still roll back. A change the library cannot hold is reported to an `on*` handler instead (row 11, #96, #148): `on<State>Change` or `on<Event>`, never an action. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), not an event prop. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins, and set-valued state without `exclusive` commits the changes whose actions resolved (3.3, #150). "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
@@ -92,7 +102,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
-| 11 | Urgent lane and strings | An urgent state React requires (a controlled text input) keeps `x` / `defaultX` and takes a **handler**, `on<State>Change: UrgentChangeHandler` (sync, outside any transition, not awaited; Combobox's `onInputValueChange`): the one `on*` prop form in the library, named as a handler precisely because it is not an action (#96, **user decision 2026-10-23**; before that `inputValueChangeAction: UrgentChangeAction`). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
+| 11 | Handlers (facts) and strings | A change the library cannot hold (the browser performed it before the library heard: a keystroke in a controlled text input, a dismissed popup, a toast that left) is reported to a **handler**, `on<State>Change: UrgentChangeHandler` or `on<Event>: UrgentHandler`, named as a handler precisely because it is not an action (#96, **user decision 2026-10-23**; generalised by #148, **user decision 2026-11-24**, resolved question 45). **One rule for every `on*` handler the library defines**: called synchronously, outside any transition, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. The handlers: `onInputValueChange` (Combobox), `onOpenChange` (Popover, Menu, Combobox, Dialog Roots), `onClose` (a toast). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 | 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13, wave 11: #20, #53, #88). |
 | 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay, #21; **user decision 2026-10-23**: shipped CSS widens from "positioning only" to "placement and interaction timing, never visuals"). A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>` (wave 11, #88). |
 
@@ -349,26 +359,57 @@ section 2.6 for what this means for the "no handlers" rule.
 | State change | `<state>ChangeAction` | `(next, details)` | `pressedChangeAction`, `valueChangeAction`, `openChangeAction` |
 | Pure trigger (nothing to change) | `action` | `(details)` | `<Button action>`, `<Menu.Item action>` |
 | Commit of a continuous state | `<state>CommitAction` | `(next, details)` | `valueCommitAction` (Slider): once per gesture (pointer release, key press, platform change), awaited in the owner's transition like a change action; the step action `<state>ChangeAction` runs per step. For a continuous control the commit action is the state owner's dispatch (section 3.3). |
-| Other notification | `<event>Action` | `(details)` | reserved; add only when a component needs one |
-| Urgent handler (React forbids a transition) | `on<State>Change` | `(next, details) => void` | `onInputValueChange` (Combobox): a controlled text input's text. **Not an action**: called synchronously in the DOM event, outside any transition, not awaited (section 2.6). The only `on*` form the library defines. |
+| Fact about a state (the library cannot hold the change) | `on<State>Change` | `(next, details) => void` | `onInputValueChange` (Combobox): a controlled text input's text, which React requires to be urgent. `onOpenChange` (Popover, Menu, Combobox, Dialog Roots; #148): the popup was closed without the library performing the close. **Not an action** (the handler rule below). Type `UrgentChangeHandler`. |
+| Fact with no state | `on<Event>` | `(details) => void` | `onClose` (a toast, `toast({ onClose })`; #148, before that `closeAction`): the toast left. Same rule. Type `UrgentHandler`. This row replaces the reserved "Other notification: `<event>Action`" row: a callback for something that already happened is not an action. |
 
 The state name in `<state>ChangeAction` is exactly the controlled prop's name, so the three props
 of a controllable state always read as a set: `pressed` / `defaultPressed` /
 `pressedChangeAction`. This mirrors the `on<State>Change` convention consumers already know from
 Radix and Base UI, with the React docs' `Action` suffix.
 
-**The suffix is the contract** (#96): a prop named `action` or `<anything>Action` is **always**
-a handler the component runs in a transition, sync or async, awaited, with pending state. A
-reader who sees `Action` may rely on that without opening the type. The converse holds too:
-the rare handler React requires to be synchronous (a controlled text input's text) is **not**
-an action and is therefore not named like one; it takes the ordinary handler name
-`on<State>Change`, so the name itself says "this runs in the event". `x` / `defaultX` are
-unchanged for such a state, so the triple reads `inputValue` / `defaultInputValue` /
-`onInputValueChange`.
+**The suffix is the contract** (#96, sharpened by #148): a prop named `action` or
+`<anything>Action` is **always** a handler the component runs in a transition, sync or async,
+awaited, with pending state; and it is always a **request**: called before the change is
+committed, its outcome decides the state, and a rejection or a controlled parent that does not
+adopt rolls the UI back. A reader who sees `Action` may rely on that without opening the type.
 
-Every component has **no `on*` props of its own** beyond that urgent handler. The library never
-names a prop `onClick`, `onChange`, `onOpenChange`, or any other `on*`; a new `on<State>Change`
-needs a React-imposed urgency the component's design doc cites, and a conventions amendment.
+The converse is the `on*` form. **An `on*` handler reports a fact**: a change that had already
+happened when the library heard of it and that the library could not have held (the browser
+performed it in front of the user). The test that separates the two: *if the callback rejects,
+or the parent ignores it, can the library put the UI back without the user noticing?* If yes,
+it is an action; that is why a form reset, a find-in-page reveal and input before hydration
+stay actions with `reason: "platform"` (the DOM is the optimistic state there, and restoring it
+is cheap and invisible; this includes a popup found open at hydration, which the library can
+still hide). A popup the user dismissed, a keystroke and a toast that left fail the test.
+
+**The handler rule** (#148, **user decision 2026-11-24**: one rule, for consistency and
+simplicity). Every `on*` handler the library defines:
+
+1. is called **synchronously**, in the event that reports the fact, outside any transition (a
+   `setState` in its body is an urgent update);
+2. is **not awaited** and has **no pending or optimistic state**;
+3. **may return a promise** (an `async` function, a Server Function): a returned promise's
+   rejection is passed to `reportError`, and so is a synchronous throw (the library catches it
+   so that its own bookkeeping after the call still runs). Nothing reaches an Error Boundary;
+4. gets **no development warning for a returned promise**.
+
+The complete list of such handlers (anything else named `on*` on a part is a DOM pass-through
+prop, section 1.5):
+
+| Handler | On | Reports |
+| --- | --- | --- |
+| `onInputValueChange` | `Combobox.Root` | the text of the input changed (2.6) |
+| `onOpenChange` | `Popover.Root`, `Menu.Root`, `Combobox.Root`, `Dialog.Root` | the popup was closed by something other than a request: Escape, light dismiss, focus leaving, script, … (always `false`; `design/components/overlay-open-change.md`) |
+| `onClose` | a toast (`ToastOptions`) | the toast left, with `details.reason` |
+
+For a state with a handler the triple reads `inputValue` / `defaultInputValue` /
+`onInputValueChange`; a state that has both requests and facts (an overlay's `open`) has four
+props: `open` / `defaultOpen` / `openChangeAction` / `onOpenChange`. The pair exists **only on
+overlay Roots**; no form control gets a second prop.
+
+A new `on*` prop needs the component's design doc to show who performs the change and why the
+library cannot hold it, and a conventions amendment adding it to the list above. The type guard
+(10.1, "Action naming") holds the allow-list.
 
 ### 2.2 Signature and shared types
 
@@ -776,7 +817,7 @@ Every pure trigger accepts both values, so the prop can be computed
 | `Menu.CheckboxItem`, `Menu.RadioItem` | a state change (`useControllableAction`) | state owner | no prop: latest intent wins | unchanged |
 | `Slider.Root`, `NumberField.Root` steps (`valueChangeAction`; `NumberField.Increment` / `Decrement` request them) | a state change, one step of a gesture | state owner's second channel | no prop: every step runs | unchanged |
 | `Form.Submit`, `Dialog.Form` | the form channel (2.7) | React's form | no prop, never guarded | unchanged |
-| a toast's `closeAction` | runs once when the toast leaves, by construction | – | no prop | unchanged |
+| a toast's `onClose` (`closeAction` before #148) | a handler, not an action (2.1): runs once when the toast leaves, by construction | – | no prop | unchanged |
 
 A default that depends on another prop (`closeOnActivate`, `closeOnSettle`) is a cost: each
 page's props table has to spell it ("`"ignore"`, or `"run"` with `closeOnActivate={false}`").
@@ -862,8 +903,8 @@ counter that wants pending state and error routing now simply awaits. Breaking f
 ### 2.6 The "no handlers" rule and urgent updates
 
 The library offers **action props**, which are always transitions. There is no `onClick`, no
-`onPress`, no `onChange`; the one handler-shaped prop is the urgent lane's `on<State>Change`
-below, and it is the one *because* it is not a transition.
+`onPress`, no `onChange`; the only handler-shaped props are the fact handlers of 2.1
+(`on<State>Change`, `on<Event>`), and they are handlers *because* they are not transitions.
 
 What is still reachable, and why it is not a contradiction:
 
@@ -881,9 +922,14 @@ The handler is named with the ordinary React `on<State>Change` form, and the typ
 thing:
 
 ```ts
-/** Called synchronously, outside any Transition, and not awaited: the urgent lane. Not an action. */
+/** Called synchronously, outside any Transition, and not awaited: the urgent lane. Not an action.
+ *  May return a promise; a rejection or a synchronous throw is passed to reportError (2.1). */
 export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> = (next: T, details: Details) => void;
+/** The same for a fact that carries no state (a toast's `onClose`). */
+export type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: Details) => void;
 ```
+
+(`void` as the return type accepts a function that returns a promise.)
 
 Why a handler name and not `inputValueChangeAction: UrgentChangeAction` (the v1 shape, #50):
 `Action` is the library's promise that the component wraps the prop in a transition, awaits it
@@ -892,14 +938,16 @@ the suffix mean "some callback", and the one thing the vision's principle 3 cann
 reader having to open the type to learn whether an action is a transition. The urgent lane is
 exactly the thing an action is not, so it gets exactly the name an action does not: the `on*`
 form the rest of the library reserves. The cost, one `on*` prop in the whole API that a
-consumer might copy, is bounded by the rule that a new `on<State>Change` needs a React-imposed
-urgency the design doc cites (2.1) and by the type guard (10.1, "Action naming").
+consumer might copy, is bounded by the gate of 2.1 (the design doc shows the library cannot
+hold the change) and by the type guard (10.1, "Action naming"). Since #148 the form has three
+users (2.1): the text of a Combobox, the dismissal of an overlay, a toast that left.
 
 Rules: the library sets its own `useState` for the value and calls the handler synchronously
 from the DOM event (and from its own documented writes), never inside `startTransition`, so a
 controlled parent's `setState` in the body is an urgent update; nothing is awaited, pending or
-optimistic for it (the DOM already holds the value; a returned thenable is a dev warning,
-because the author probably wanted an action);
+optimistic for it (the DOM already holds the value); a returned promise is allowed and not
+warned about, and its rejection, like a synchronous throw, goes to `reportError` (the handler
+rule of 2.1, #148; before that a returned thenable was a dev warning on `onInputValueChange`);
 a controlled urgent prop follows the DOM and does not gate it; everything the urgent value
 drives (a deferred query through `useDeferredValue`, an open, a selection) leaves the urgent
 lane at once and is a transition or a deferred render. A library write to an urgent state that
@@ -917,8 +965,9 @@ action (2.3 item 5), so every queue mutation (add, update, dismiss, drop after e
 update. Its input is not a prop at all: the imperative `toast()` builds a command and dispatches
 it from a `queueMicrotask` callback, so a call made inside a `startTransition` scope (an action's
 sync prefix) escapes the scope while order is preserved; the Viewport applies the command with
-`useState`. Everything the toast *drives* (its Action part's action, its `closeAction`) is a
-transition as usual. Such a state has no `UrgentChangeHandler` prop and no `x` / `defaultX`
+`useState`. What the toast *drives* through a request (its Action part's action) is a
+transition as usual; the report that it left is a handler, `onClose` (2.1; #148, before that
+`closeAction`, which ran in the Viewport's transition). Such a state has no `UrgentChangeHandler` prop and no `x` / `defaultX`
 pair, and its commits never run a view transition (5.1).
 
 The same rule holds for **consumer state that reports on a pending action** (a progress value,
@@ -2464,7 +2513,7 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Form channel | Required for every part that exposes `useFormStatus` as its `pending` (`Field.Root`, `Form.Root`, `Form.Submit`): `data-pending` appears while a deferred form action is unresolved and disappears after it settles (also through a portal); a control inside keeps its own `data-pending` for its own action. |
 | Inside a Field | Required for every form control (Switch, Checkbox, RadioGroup, CheckboxGroup, Select, Combobox, Slider, NumberField): rendered inside a `Field.Root`, the part's element (or group element) receives the Field's `id` (or `aria-labelledby`), `name`, `aria-describedby`, `aria-invalid`, and `disabled` / `required` from the Field; its own `data-pending` is unaffected by the form's. |
 | Validity display | Required for Field: a submission attempt with an invalid control shows the message, cancels the native bubble (the `invalid` event is `defaultPrevented`) and focuses the first invalid control in document order; a `form.reset()` clears it. The `:user-invalid` half (changed-then-blurred, live updates, `checkValidity()` showing nothing) runs in browser mode. |
-| Urgent handler (both) | Required for every component with an urgent state (section 2.6): the handler is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; a returned thenable warns once; a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
+| Urgent handler (both) | Required for every component with an urgent state (section 2.6): the handler is called synchronously once per DOM event, outside any transition (a `useTransition` probe in the parent never reports pending for it), with the native event; a controlled parent that sets state in the body keeps the DOM in sync per keystroke; **the handler rule (2.1, #148)**: a returned promise does not warn, its rejection is passed to `reportError` exactly once and not to an Error Boundary, a synchronous throw likewise, and the library's own write still happens; required for every `on*` handler of 2.1 (`onInputValueChange`, `onOpenChange` on the four overlay Roots, a toast's `onClose`); a library rollback write after a **synchronously throwing** transition action is outside a transition as well (section 2.6). |
 | Lanes (consumer) | Required for a component that displays a value a pending action reports (Progress, #68): a post-`await` urgent `setState` renders before the action settles, and a `startTransition`-wrapped one does not. |
 | Action naming (type, library-wide) | One file, `src/__tests__/action-naming.test.ts` (#96): for **every public `*Props` type** exported from `src/index.ts`, every key named `action` or ending in `Action` is a transition action, and every library-defined `on*` key is on an allow-list that names its type (`ComboboxRootProps.onInputValueChange: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`). "Is a transition action" is checked on the **function members** of the prop's type (`Extract<NonNullable<P[K]>, (...args: never[]) => unknown>`): that part must exist and return `unknown` (an `Action` / `ChangeAction`; `UrgentChangeHandler` returns `void` and fails; a key with no function member, say a `string`, fails too). Checking the function part rather than the whole type is what lets `Form.Root`'s `action: string \| ((formData) => unknown)`, React's form channel, pass on its function member instead of failing on the URL string. **DOM pass-through keys are excluded from both checks**, by name, as the union `keyof DOMAttributes<Element> \| keyof DialogHTMLAttributes<HTMLDialogElement> \| keyof ButtonHTMLAttributes<HTMLButtonElement> \| keyof InputHTMLAttributes<HTMLInputElement>`: `DOMAttributes` alone is not enough, because `<dialog>`'s `onCancel` / `onClose` (passed through by `Dialog.Popup` and `Popover.Popup`) live in `DialogHTMLAttributes`, and `<button>` / `<input>`'s `formAction` (`string \| (formData) => void \| Promise<void>`) would otherwise be flagged as a non-transition action. These are React's names, not the library's, and cannot be told apart from library props by type, so the design doc is the guard for them. The helper types have a self-test (a planted `inputValueChangeAction?: UrgentChangeHandler<string>` and a `labelAction?: string` are caught, `action` and `formAction` are not; `onClick` / `onClose` are excluded, `onValueChange` is not). A new public Props type is added to the list in the same commit that exports it (a type-level and a runtime completeness check against `src/index.ts` fail until it is). |
 | Server render | Required for a directive-free Root (Progress, Meter, #68): `renderToString` equals the client markup, and the Root module's import graph reaches no `"use client"` module but its own context. |
@@ -3305,16 +3354,25 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     the last run settles, and only if the latest run resolved (2.5.1, the continuation bullet). Applied: 2.3, 2.4, 2.5, 2.5.1, 3.4, 3.6, 9.4, 10.1; `button.md` 18, `dialog.md`
     3.4, `popover.md` 3.4, `menu.md` 2.3 / 3.4, `toast.md` 3.2 / 11.
 
+45. **Requests and facts (#148)**, user decisions of 2026-11-23 and 2026-11-24 (issue #148
+    comments); design `design/components/overlay-open-change.md`, accepted, **not implemented
+    yet** (no alpha release before it lands). (1) An action is a change the library can still
+    roll back; an `on*` handler reports one it cannot hold. (2) Overlay Roots (Popover, Menu,
+    Combobox, Dialog) get `onOpenChange` for facts next to `openChangeAction` for requests; the
+    pair exists only there. (3) A controlled Root whose parent keeps `open={true}` after a fact
+    re-opens: the prop and the DOM never disagree. (4) An uncontrolled fact commits `false`
+    urgently, with no `data-pending` and no view transition. (5) `reason: "platform"`
+    dispatches stay actions, a popup found open at hydration included, so `onOpenChange` only
+    receives `false`. (6) Toast's `closeAction` becomes `onClose`. (7) One rule for every `on*`
+    handler (2.1): synchronous, not awaited, may return a promise, rejection or throw to
+    `reportError`, no promise warning; `onInputValueChange` loses its warning. (8) The
+    development warning is the static one (`open` without `onOpenChange`); no runtime
+    heuristic. Applied: decisions 2 and 11, 2.1, 2.6, the Urgent handler row of 10.1; the
+    remaining sections follow the implementation (that document's 12.2).
+
 ## Open questions
 
-**#148, proposed and pending user review (2026-11-24):
-`design/components/overlay-open-change.md`.** It changes the rule of 2.1 and 2.6 ("an action is
-a change the library can still roll back; an `on*` handler reports one it cannot hold", user
-decision), gives the overlay Roots (Popover, Menu, Combobox, Dialog) `onOpenChange` next to
-`openChangeAction`, and lists the amendments this document needs at acceptance (its section
-12.2). Four questions for the user are in its section 13: a popup found open at hydration, a
-promise returned from `onOpenChange`, the runtime development warning, and Toast's
-`closeAction`. Until it is accepted, 2.1, 2.6 and 3.5 stand as written.
+None at the moment. #148 is resolved question 45.
 
 The questions of #146 that stood here are resolved question 44; their text is kept below for
 the record.

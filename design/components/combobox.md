@@ -10,6 +10,10 @@ typing, the rollback outside the transition, and the accepted implementation dev
 UrgentChangeHandler`, no longer `inputValueChangeAction: UrgentChangeAction`; edited in place
 (decision 3, 2.2, 3, 3.1, 3.6, 4, 6.2, 9, 10, 11.2, 12.1, 14), migration and implementation
 checklist in the amendment at the end; the historical sections keep the old names.
+**Amended 2026-11-24 (#148, user decision; not implemented yet)**: `onInputValueChange` follows
+the library-wide handler rule (a returned promise is allowed, no warning, rejection or throw to
+`reportError`; edited in place in 4, 9 and 12.1), and `open` gains `onOpenChange` for
+dismissals (amendment at the end; 3.1, 5.4 and 5.5 still describe the shipped behaviour).
 Follows `design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` and `design/components/menu.md` first**: Combobox is built on
@@ -614,9 +618,10 @@ input in a Combobox". This is that design, kept as small as possible:
    The consumer's body runs in the event, so a controlled parent's `setInputValue(next)` is an
    urgent update, which is what React requires for the value prop of a text input.
 3. **Not awaited, no pending, no optimistic.** The text is already in the DOM when the action
-   runs; there is nothing to wait for and nothing to roll back. A returned promise is ignored
-   (development warns once when a thenable comes back, because the author probably wanted
-   `valueChangeAction`).
+   runs; there is nothing to wait for and nothing to roll back. A returned promise is allowed
+   and not awaited: its rejection, and a synchronous throw, go to `reportError` (the handler
+   rule, conventions 2.1; #148). Before #148 development warned once when a thenable came back;
+   that warning is removed.
 4. **Controlled `inputValue` follows the DOM, it does not gate it.** If the parent does not
    adopt a keystroke, React restores the old prop at the end of the event (the usual controlled
    input behaviour); the library's own `useState` is bypassed in controlled mode, so there is
@@ -1053,7 +1058,8 @@ focused. Screen-reader pass (NVDA, JAWS, VoiceOver) in the example app before le
 
 Development warnings: an Option outside a List; a List outside a Popup; a part outside a Root
 (throws, as every component); two Options with one value; `value` / `defaultValue` set with no
-text prop (2.2); a thenable returned from `onInputValueChange` (section 4); a Trigger with
+text prop (2.2); `open` without `onOpenChange` (#148; the thenable warning for
+`onInputValueChange` is removed by #148); a Trigger with
 no accessible name; a List with no `Label` and no `aria-label`; a `render` element of the wrong
 kind (section 1); `transition` toggled between `undefined` and a value (conventions 5.1).
 
@@ -1287,7 +1293,7 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Area | Tests |
 | --- | --- |
 | Roles and ARIA | The section 1 HTML: Input `role=combobox`, `aria-autocomplete=list`, `aria-expanded`, `aria-controls` = List id, `autocomplete=off`, `id` = Label `for`; List `role=listbox`, `aria-labelledby` = Label id, consumer tokens merged; Option `role=option`, derived `id`, `aria-selected` only on the selected one, `aria-disabled`; Trigger / Clear `tabindex=-1`, `type=button`; Popup `popover=auto`, inline placement string; Status `role=status` in the Popup and `role=none` inside the List; List `aria-labelledby` absent (and a dev warning without `aria-label`) when no Label is rendered; hidden input present only with `name`, value `""` for `null`; `required` lands on the Input; duplicate option values warn. |
-| Urgent text (both for `inputValue`) | `user.type("ja")`: the DOM value is updated per keystroke, `onInputValueChange` called synchronously per keystroke with the `input` event and `"activate"`, **not** inside a transition (a `useTransition` spy / `isPending` probe in the parent stays false); a controlled parent that sets state in the body keeps the input in sync; a parent that does not adopt sees the DOM restored; a thenable returned warns once. |
+| Urgent text (both for `inputValue`) | `user.type("ja")`: the DOM value is updated per keystroke, `onInputValueChange` called synchronously per keystroke with the `input` event and `"activate"`, **not** inside a transition (a `useTransition` spy / `isPending` probe in the parent stays false); a controlled parent that sets state in the body keeps the input in sync; a parent that does not adopt sees the DOM restored; the handler rule (#148): a returned promise does not warn, its rejection and a synchronous throw each reach `reportError` once and no Error Boundary, and the text is still written. |
 | Deferred query | A List children function receives `query`; a suspending result for the new query keeps the old options mounted with `data-stale` / `aria-busy` on the List; on resolve the new options and no stale; a slow earlier query resolved after a later one never shows (cache keyed by query). |
 | Open | Typing opens (`openChangeAction(true, "activate")` with the `input` event; `showPopover` called once with `{ source: input }` after the open commit); ArrowDown / ArrowUp / Alt+ArrowDown open; focus alone does not; `openOnClick` makes a click open; Trigger click toggles and focuses the input; `disabled` opens nothing. |
 | Keyboard | The section 8 table: ArrowDown / ArrowUp move `aria-activedescendant` and `data-active`, skip disabled, stop or wrap with `loop`; Alt+ArrowUp accepts or closes; Enter accepts the active option (keydown prevented), does nothing with none (prevented while open, not prevented while closed), commits custom text with `allowCustomValue`; typing, Home, End, ArrowLeft and ArrowRight clear `aria-activedescendant` and are not prevented; Enter right after typing (results stale) accepts nothing stale, with or without `autoHighlight`; open-ness judged against `:popover-open` (a hidden popup with a queued `toggle`: Enter is not prevented); Escape is browser-mode. |
@@ -1307,7 +1313,7 @@ browser-mode; the dismiss path is driven with `hidePopover()`).
 | Post-await rule | Controlled `value` parent updating after `await` inside `startTransition`; controlled `inputValue` parent with a plain `setState`. |
 | `transition` smoke | Popup renders with and without; a close after accept unmounts children in the close commit with `transition`, holds without. |
 | Directive | Every file under `src/combobox/` except `index.ts` begins with `"use client"`. |
-| Types | `UrgentChangeHandler` is exported (and `UrgentChangeAction` is not: no alias, #96); `onInputValueChange` accepts any `(next, details) => void` (the thenable check is a runtime warning); `inputValueChangeAction` is not a prop; `multiple` is not a prop (type test). The library-wide "Action naming" guard (conventions 10.1, `src/__tests__/action-naming.test.ts`) lists `onInputValueChange` as the one allowed `on*` key. |
+| Types | `UrgentChangeHandler` is exported (and `UrgentChangeAction` is not: no alias, #96); `onInputValueChange` accepts any `(next, details) => void`, a promise-returning function included (#148); `inputValueChangeAction` is not a prop; `multiple` is not a prop (type test). The library-wide "Action naming" guard (conventions 10.1, `src/__tests__/action-naming.test.ts`) lists the allowed `on*` keys: `onInputValueChange`, and since #148 `onOpenChange`. |
 
 ### 12.2 Browser mode (`combobox.browser.test.tsx`)
 
@@ -2343,3 +2349,27 @@ listbox light-dismisses it (`(false, "dismiss")`, input keeps focus), on all thr
 `BrowserOwnedStatePage.tsx`'s "a disabled Trigger that stays focusable is no invoker either"
 becomes true as written; ComboboxPage's Trigger owned-keys note gains "(while enabled, or
 natively disabled; not while `aria-disabled`)" next to `popoverTarget`.
+
+## Amendment: requests and facts (#148, 2026-11-24, user decision; not implemented yet)
+
+Design: `design/components/overlay-open-change.md` (section 5 is Combobox's; conventions
+resolved question 45). What it changes here:
+
+| | Before | After |
+| --- | --- | --- |
+| `onInputValueChange` returning a promise | dev warning once; a rejection is unhandled; a throw propagates out of the `input` listener | **allowed, no warning**; the promise is not awaited; a rejection and a synchronous throw go to `reportError`; the text write and everything after it still happen (the handler rule, conventions 2.1) |
+| `openChangeAction` | every open-state change, dismissals as a "notification" | **requests only**: typing and arrow opens, Trigger, `openOnClick`, foreign opens, a popup found open at mount (`"platform"`), the close after an accepted option, Alt+ArrowUp |
+| `onOpenChange` | (none) | **new**, `UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>`, always `false`: Escape, focus leaving the input, light dismiss, another top-layer element, a `Clear` click while open, script `hidePopover()` (`"dismiss"`); a foreign invoker button (`"activate"`) |
+| After a dismissal | optimistic `false`, the action awaited in the Root's transition, `data-pending` on Input and Trigger, committed `false` when it settled | committed `false` in the event's urgent commit; no `data-pending`; no view transition |
+| Controlled `open`, parent keeps `true` after a dismissal (5.5) | re-opens after the action settles | re-opens at once; needs `onOpenChange={setOpen}` not to (development warns for `open` without `onOpenChange`) |
+
+The Root's three states now have three shapes, each for a reason: `value` (requests only:
+`valueChangeAction`), `inputValue` (facts only: `onInputValueChange`), `open` (both).
+Unchanged: the text revert and the custom-value commit after focus leaves (`valueChangeAction`),
+`Clear`'s `null` dispatch, `aria-expanded` from the `shown` mirror, the accept flow (a pending
+`valueChangeAction` is not superseded by an Escape; its continuation requests no close).
+
+Sections 3.1 (Root props), 5.4 (the Closing table's "notification" rows), 5.5 and the
+walkthroughs of 10 are rewritten with the implementation. Developer: the "returned a promise"
+warning text and its test row (amendment #96, implementation checklist) are deleted;
+`onInputValueChange` is called through `callUrgentHandler` (overlay-open-change.md 11).

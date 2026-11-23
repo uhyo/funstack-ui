@@ -1,8 +1,10 @@
 # Overlay open state: requests and facts (`openChangeAction` / `onOpenChange`)
 
-Status: **proposed, pending user review** (2026-11-24, GitHub issue #148). Nothing here is
-implemented. Until it is accepted, `design/conventions.md` and the component designs describe
-the shipped behaviour and win over this document.
+Status: **accepted** (2026-11-24, GitHub issue #148; every open point decided by the user the
+same day, conventions resolved question 45). **Not implemented yet.** Until the implementation
+lands, the sections of `design/conventions.md` and of the component designs that this document
+lists in 12.2 still describe the shipped behaviour; conventions 2.1 and 2.6 already carry the
+rule.
 
 Scope: `Popover.Root`, `Menu.Root` (context menu and submenus included), `Combobox.Root`
 (`open` only), `Dialog.Root`, and Toast's `closeAction`. Tooltip is covered to say what does not
@@ -23,20 +25,21 @@ Inputs: `docs/vision.md`; conventions 2.1, 2.2, 2.4, 2.6, 3.5, 5.1; the componen
 | 3 | Controlled refusal | A controlled Root whose parent keeps `open={true}` after a fact **re-opens**. The prop and the DOM never disagree. | user |
 | 4 | Uncontrolled fact | Committed `open` becomes `false` urgently, in the event. No `data-pending`, no view transition. | user |
 | 5 | Form controls, Accordion | `reason: "platform"` dispatches stay actions. No form control gets a second prop. | user |
-| 6 | Dev warning | `open` without `onOpenChange` warns. A runtime heuristic that never fires on an intentional re-open does not exist (section 9); one with a narrow, stated residual is offered. | user (first half); architect (second half, question 3) |
+| 6 | Dev warning | `open` without `onOpenChange` warns. No runtime heuristic (section 9). | user |
 | 7 | What a fact is, exactly | The `toggle` (closed) / `close` event of a hide **the library did not perform in its apply effect**: everything `notifyClosed` receives today. Channel and `reason` are independent (section 2.2). | architect |
 | 8 | A fact while a request is in flight | The fact wins: it supersedes every request in flight (section 2.5). Dialog's "dismissal kept for a vetoed part close" machinery is deleted. | architect |
-| 9 | Returned promise | `onOpenChange` is not awaited; a returned promise's rejection and a synchronous throw go to `reportError`. No dev warning for a promise, so a Server Function can be passed (section 2.6). | architect (question 2) |
-| 10 | Toast `closeAction` | **Open.** Three options in section 7; recommendation: rename to `onClose`, rejection of a returned promise to `reportError` (option c). | user to decide (question 4) |
-| 11 | A popup found open at hydration | Designed as briefed (a fact, `onOpenChange(true, { reason: "platform" })`), with its costs; the architect asks to reconsider (section 2.12, question 1). | user to confirm |
+| 9 | **Every `on*` handler the library defines** | One library-wide rule: called synchronously, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. Covers `onOpenChange` (four Roots), Toast's `onClose` and the existing `onInputValueChange`, whose promise warning is removed (section 2.6). | user |
+| 10 | Toast `closeAction` | Renamed `onClose`, under rule 9 (section 7). | user |
+| 11 | A popup found open at hydration | Stays a request: `openChangeAction(true, { reason: "platform" })`, as today. `onOpenChange` only ever receives `false` (section 2.12). | user |
 | 12 | Tooltip | No callback today, none added. If one is ever wanted it is `onOpenChange` only. | architect |
 
 ---
 
 ## 1. The rule
 
-Text proposed for conventions 2.1 / 2.6 and for principle 3 of `docs/vision.md` (it replaces "the
-one exception React forces"):
+The rule, as written into conventions 2.1 / 2.6 at acceptance. Principle 3 of `docs/vision.md`
+still has the old "one exception React forces" paragraph; it is outside `design/` and must be
+reworded to this text (a product-owner task, 12.2):
 
 > A prop named `action` or `fooAction` is a **request**. The library calls it before the change
 > is committed, inside a transition, and awaits it; the outcome decides the state. A rejection,
@@ -112,7 +115,8 @@ Types (`internal/types.ts`):
 
 ```ts
 /** A fact about a state: called synchronously in the event that reports it, outside any
- *  Transition, not awaited. A returned promise's rejection is passed to reportError. */
+ *  Transition, not awaited. A returned promise's rejection, or a synchronous throw, is passed
+ *  to reportError (the rule for every `on*` handler, conventions 2.1). */
 export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> = (next: T, details: Details) => void;
 ```
 
@@ -122,6 +126,9 @@ function that returns a promise (a Server Function, an `async` arrow), which is 
 Trade-off, stated: controlled mode now needs two props where it needed one. The two names
 differ by a prefix and a suffix, and the difference is the whole point (one is asked, one is
 told), but it is one more thing to learn. The dev warning of section 9 catches the omission.
+In these four components `onOpenChange` is only ever called with `false` (2.12); the `boolean`
+argument stays for the pair's symmetry (`onOpenChange={setOpen}`) and for a future fact that
+opens.
 Rejected: letting `onOpenChange` alone receive requests too when `openChangeAction` is absent
 (a second meaning for the name), and a combined `openChange` prop (no name left to say which
 lane it runs in).
@@ -140,13 +147,13 @@ Everything dispatched through `requestOpen` / `requestClose` today stays a reque
 
 **Channel and `reason` are independent.** The channel says whether the library held the change;
 `reason` (conventions 2.2, vocabulary unchanged) says what the user did. Most facts are
-`"dismiss"` and most requests `"activate"`, with these crossovers:
+`"dismiss"` and most requests `"activate"`; `"platform"` is always a request (2.12). The
+crossovers:
 
 | Channel | `reason` | Where |
 | --- | --- | --- |
 | `onOpenChange` | `"activate"` | A consumer's own invoker button (`popovertarget`, `commandfor` with a popover command) closes a popover, menu or listbox: the user acted on a button, the browser performed the hide (#125). A non-button Trigger pressed while open (#115). |
 | `openChangeAction` | `"dismiss"` | A close the library does hold although no part asked: the pointer leaving a hover-opened submenu (`menu-hover.ts`), lost interest while an interest open is still pending (nothing is shown yet; the `false` supersedes the open). |
-| `onOpenChange` | `"platform"` | A popup found open at hydration (section 2.12). |
 
 `onOpenChange` is never called for a change the consumer made through the `open` prop, for the
 library's own hide after a request, or for the library's re-open of a refused fact.
@@ -204,7 +211,8 @@ be dismissed is configured on the platform side (Dialog without `lightDismiss`,
 setOpen(o))}`, or a `setOpen` after an `await`, leaves `open={true}` in the event's own commit:
 the popup is re-opened and then closed again when the late update lands. This is the mistake
 the library's own "wrap it in `startTransition`" advice (conventions 2.3 item 4) invites, so
-the docs of every Root say it next to the prop, and section 9 has the warning.
+the docs of every Root say it next to the prop. No warning can catch it reliably (section 9),
+so the sentence in the docs is the whole defence.
 
 A controlled parent's own later updates are its own: if a request that was in flight when the
 fact arrived calls `setOpen(true)` after its `await`, the parent has set `open={true}` and the
@@ -241,19 +249,35 @@ Controlled mode, same situations: the handler is called at once, the parent adop
 If the parent keeps `open={true}`, the re-open waits until nothing is in flight, as the apply
 effect does for every re-application today.
 
-### 2.6 The handler's contract
+### 2.6 The handler's contract: the rule for every `on*` handler
 
-- Called **synchronously inside the platform event's listener**, outside any transition. A
+User decision (2026-11-24): one rule for **every `on*` handler the library defines**, written
+into conventions 2.1. "Consistency and simplicity are very important."
+
+- Called **synchronously** in the event that reports the fact, outside any transition. A
   `setState` in its body is urgent.
-- Called once per fact, with `(next, details)`; `details.event` is the platform event (or the
-  recorded cause: the `CommandEvent`, the `loseinterest` event, the `click`).
 - **Not awaited.** Nothing is pending or optimistic for it.
-- **Errors**: a synchronous throw is caught and passed to `reportError`, so the library's own
-  bookkeeping after the call still runs. If the handler returns a thenable, the library attaches
-  a rejection handler that calls `reportError`. Nothing reaches an Error Boundary: there is no
-  render to throw from and nothing to roll back.
-- **No dev warning for a returned promise** (unlike `onInputValueChange` today, which keeps its
-  warning: a promise per keystroke is always a mistake). Reason: section 2.10. Question 2.
+- **It may return a promise.** The library attaches a rejection handler that calls
+  `reportError`. A synchronous throw is caught and passed to `reportError` too, so the
+  library's own bookkeeping after the call still runs. Nothing reaches an Error Boundary: there
+  is no render to throw from and nothing to roll back.
+- **No dev warning for a returned promise.**
+
+The handlers it covers (the complete list; a search of the public props found no other `on*`
+prop that is not a DOM pass-through):
+
+| Handler | Type | Change |
+| --- | --- | --- |
+| `Popover.Root`, `Menu.Root`, `Combobox.Root`, `Dialog.Root`: `onOpenChange` | `UrgentChangeHandler<boolean, <C>OpenChangeDetails>` | new |
+| `toast({ onClose })` (`ToastOptions`) | `UrgentHandler<ToastCloseDetails>` | renamed from `closeAction` (section 7) |
+| `Combobox.Root`: `onInputValueChange` | `UrgentChangeHandler<string, ComboboxInputValueChangeDetails>` | **its "returned a promise" dev warning is removed**; a rejection or a throw now goes to `reportError` (before: an unhandled rejection; a throw propagated out of the `input` listener) |
+
+Specific to `onOpenChange`: called once per fact with `(next, details)`; `details.event` is
+the platform event (or the recorded cause: the `CommandEvent`, the `loseinterest` event, the
+`click`).
+
+One shared helper implements the rule (`internal/call-urgent-handler.ts`, section 11), so the
+three call sites cannot drift.
 
 ### 2.7 What each surface shows after a dismissal
 
@@ -308,8 +332,9 @@ consequence for #147.
   Escape or a click outside. This is the main behavioural loss of the change.
 - A Server Function may be passed to `onOpenChange`, also from a Server Component. It is called
   from the event and not awaited; nothing shows pending; a rejection goes to `reportError`
-  (2.6). This is why a returned promise is not a dev warning: without it, "remember that the
-  welcome dialog was dismissed" (dialog.md 12.4) would need a Client Component wrapper.
+  (2.6). This is what the "may return a promise" half of the rule buys: without it, "remember
+  that the welcome dialog was dismissed" (dialog.md 12.4) would need a Client Component
+  wrapper.
 
 ```tsx
 // Server Component (dialog.md 12.4, after). A Close button is a request, Escape is a fact:
@@ -335,39 +360,27 @@ already covers.
 
 Menu and Combobox have no JS-free mode; nothing changes there.
 
-### 2.12 A popup found open at hydration
+### 2.12 A popup found open at hydration: a request, unchanged
 
 Library mode renders the native invoker markup, so a click before hydration opens the popup
 natively and empty; at mount the Popup finds it open with committed `false` (popover.md 2.4,
-dialog.md 2.4). Today: `openChangeAction(true, { reason: "platform", event: undefined })`, a
-transition; the content mounts when it settles; a rejection or a refusing parent hides the
-popup.
+dialog.md 2.4) and dispatches `openChangeAction(true, { reason: "platform", event: undefined
+})` in the Root's transition. The content mounts when it settles; a rejection or a refusing
+parent hides the popup. **This stays exactly as it is** (user decision, 2026-11-24).
 
-**As briefed (variant A): a fact.** `onOpenChange(true, { reason: "platform", event: undefined
-})`, called synchronously from the mount layout effect (once under StrictMode).
+Why it is a request although the browser opened the popup first: it passes the rule's test. The
+library can roll it back (it hides an empty popup), and the DOM is the optimistic state, which
+is the reasoning that keeps pre-hydration input on form controls an action (decision 5). Every
+open then goes through one channel, so load-on-open code in the action runs for all of them,
+and Suspense and pending state behave as for any open.
 
-- Uncontrolled: the library writes committed `true`. **In a transition of the Root**, not
-  urgently: the content mounts in that render, and an urgent render whose content suspends
-  would replace the nearest already-shown Suspense boundary with its fallback (principle 1).
-  So the Trigger shows `data-pending` while the content loads, although the handler is "a fact
-  with no pending state". This is the one place the fact lane is not urgent end to end.
-- Controlled: `setOpen(true)` in the handler is urgent; a parent whose popup content can
-  suspend must wrap it in `startTransition` itself, which is the opposite of the rule in 2.4
-  for `false`. A parent that does not adopt gets the popup hidden (the prop wins).
-- `openChangeAction` is **not** called for this open. A consumer who loads on open in the
-  action (`if (open) await preload()`) gets content that mounts without the preload.
+Consequence: **`onOpenChange` is only ever called with `false`** in the four overlays.
 
-**Variant B (the architect's recommendation): it stays a request**, exactly as today:
-`openChangeAction(true, { reason: "platform" })`. Reasons: (1) it passes the rule's own test:
-the library can roll it back (it hides an empty popup), and the DOM is the optimistic state,
-which is the user's reasoning for keeping pre-hydration input on form controls an action
-(decision 5); (2) every open then goes through one channel, so load-on-open code runs for all
-of them; (3) Suspense and pending behave as for any open; (4) no behaviour change, no new
-rows. Consequence of B: `onOpenChange` is only ever called with `false` in the four overlays
-today. The `boolean` argument stays, for the pair's symmetry (`onOpenChange={setOpen}`) and for
-a future fact that opens (a Tooltip callback).
-
-The per-component tables below list this row under variant A and mark it. Question 1.
+History: the first draft of this document specified it as a fact (`onOpenChange(true, {
+reason: "platform" })`) and offered this as the alternative. The fact version skipped the
+action's load-on-open code, needed a transition for the uncontrolled write anyway (an urgent
+mount of suspending content shows the nearest Suspense fallback), and made a controlled parent
+wrap `setOpen(true)` while it must not wrap `setOpen(false)`.
 
 ---
 
@@ -393,6 +406,7 @@ The per-component tables below list this row under variant A and mark it. Questi
 | `<button>` Trigger click while open | `openChangeAction` | `false` | `"activate"` | `click` |
 | `Popover.Close`, after its own `action` if it has one | `openChangeAction` | `false` | `"activate"` | `click` |
 | Lost interest while the interest open is still pending (#127) | `openChangeAction` | `false` | `"dismiss"` | `loseinterest` |
+| Found open at hydration (2.12; unchanged) | `openChangeAction` | `true` | `"platform"` | `undefined` |
 | Escape, Android back, an assistive-technology dismiss | **`onOpenChange`** | `false` | `"dismiss"` | `toggle` `ToggleEvent` |
 | Light dismiss (click outside) | **`onOpenChange`** | `false` | `"dismiss"` | `toggle` |
 | Another `auto` popover or a modal dialog opening outside the stack; a parent popover closing | **`onOpenChange`** | `false` | `"dismiss"` | `toggle` |
@@ -401,7 +415,6 @@ The per-component tables below list this row under variant A and mark it. Questi
 | A foreign `popovertarget` button (#125) | **`onOpenChange`** | `false` | `"activate"` | `beforetoggle` `ToggleEvent` (`source` is the button) |
 | Lost interest after an interest open, popup shown (#127; the library's `hidePopover()` by proxy) | **`onOpenChange`** | `false` | `"dismiss"` | `loseinterest` |
 | A non-button Trigger (`render={<a />}`) pressed while open (#115: light dismiss hides it at `pointerup`, before the `click`) | **`onOpenChange`** | `false` | `"activate"` | `click` |
-| Found open at hydration (2.12, variant A; variant B: `openChangeAction`) | **`onOpenChange`** | `true` | `"platform"` | `undefined` |
 | Controlled `open` changed by the parent; the library's re-open of a refused fact; removal from the document | none | | | |
 
 The #115 row changes mechanism: today the `click` dispatches `(false, "activate")` as a request
@@ -446,6 +459,7 @@ The same two props on every `Menu.Root`: the top-level one, a context-menu Root
 | `ContextTrigger`: `contextmenu`, long-press, Shift+F10 / the Menu key (context-menu.md 2) | `openChangeAction` | `true` | `"activate"` |
 | `SubmenuTrigger`: click, ArrowRight, Enter, hover after `delay` | `openChangeAction` (the submenu's Root) | `true` | `"activate"` |
 | A foreign open (invoker button, script) | `openChangeAction` | `true` | `"activate"` |
+| Found open at hydration (2.12; unchanged) | `openChangeAction` | `true` | `"platform"` |
 | Item activation with `closeOnActivate`, after the item's `action` | `openChangeAction` (the **root** Root) | `false` | `"activate"` |
 | Trigger click while open (#110) | `openChangeAction` | `false` | `"activate"` |
 | ArrowLeft in a submenu | `openChangeAction` (that submenu's Root) | `false` | `"activate"` |
@@ -458,7 +472,6 @@ The same two props on every `Menu.Root`: the top-level one, a context-menu Root
 | A submenu hidden because its parent menu closed, whatever closed the parent (also a request on the root: item activation) | **`onOpenChange`** (the submenu's Root) | `false` | `"dismiss"` |
 | A foreign invoker button closing the root popup (#125, #126) | **`onOpenChange`** | `false` | `"activate"` |
 | Script `hidePopover()` | **`onOpenChange`** | `false` | `"dismiss"` |
-| Found open at hydration (2.12, variant A) | **`onOpenChange`** | `true` | `"platform"` |
 | A context-menu **move** (right-click inside the region while open, context-menu.md 4.3); controlled prop change; re-open of a refused fact | none | | |
 
 ### 4.3 Behaviour
@@ -496,7 +509,7 @@ Sections 2.3 to 2.9 apply to each Root independently. Notes specific to Menu:
 | `openChangeAction` | `ChangeAction<boolean, ComboboxOpenChangeDetails>`: every change | same type; **requests only** |
 | `onOpenChange` | | **new**: `UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>` |
 | `value` / `defaultValue` / `valueChangeAction` | | unchanged: an action |
-| `inputValue` / `defaultInputValue` / `onInputValueChange` | the "one exception" | unchanged in behaviour; reclassified as a fact (the keystroke is in the DOM first) |
+| `inputValue` / `defaultInputValue` / `onInputValueChange` | the "one exception"; a returned promise is a dev warning | reclassified as a fact (the keystroke is in the DOM first); under the rule of 2.6 the promise warning is removed and a rejection or a throw goes to `reportError` |
 
 After the change the Root has three states in three shapes, each for a stated reason: `value`
 (requests only: nothing but the library changes it), `inputValue` (facts only: the browser
@@ -507,13 +520,13 @@ writes every keystroke), `open` (both: parts ask, the browser dismisses).
 | Cause | Channel | `next` | `reason` |
 | --- | --- | --- | --- |
 | Typing; ArrowDown / ArrowUp / Alt+ArrowDown while closed; Trigger click while closed; a pointer click in the input with `openOnClick`; a foreign open | `openChangeAction` | `true` | `"activate"` |
+| Found open at mount (2.12; only script can cause it here; unchanged) | `openChangeAction` | `true` | `"platform"` |
 | The close after an accepted option (after `valueChangeAction` settled); re-accepting the selected option; Trigger click while open (#112); Alt+ArrowUp | `openChangeAction` | `false` | `"activate"` |
 | Escape while open | **`onOpenChange`** | `false` | `"dismiss"` |
 | Focus leaving the input to outside the popup (the library's immediate `hidePopover()`) | **`onOpenChange`** | `false` | `"dismiss"` |
 | Light dismiss; another `auto` popover or modal dialog opening outside; a `Clear` click while open (the button is outside the popup) | **`onOpenChange`** | `false` | `"dismiss"` |
 | A foreign invoker button closing the listbox (#126) | **`onOpenChange`** | `false` | `"activate"` |
 | Script `hidePopover()` | **`onOpenChange`** | `false` | `"dismiss"` |
-| Found open at hydration (2.12, variant A; only script can cause it here) | **`onOpenChange`** | `true` | `"platform"` |
 
 ### 5.3 Behaviour
 
@@ -550,6 +563,7 @@ writes every keystroke), `open` (both: parts ask, the browser dismisses).
 | Cause | Channel | `next` | `reason` | `returnValue` |
 | --- | --- | --- | --- | --- |
 | Trigger click; a foreign `show-modal` command (cancelled, routed) | `openChangeAction` | `true` | `"activate"` | `undefined` |
+| Found open at hydration (2.12; unchanged) | `openChangeAction` | `true` | `"platform"` | `undefined` |
 | `Dialog.Close`, after its own `action` if it has one | `openChangeAction` | `false` | `"activate"` | the Close's `value` |
 | `Dialog.Form` without a function `action`, or any `method="dialog"` submit inside the Popup | `openChangeAction` | `false` | `"activate"` | the submitter's `value` |
 | `Dialog.Form` with a function `action`, when it settled (`closeOnSettle`) | `openChangeAction` | `false` | `"activate"` | the submitter's `value` |
@@ -557,7 +571,6 @@ writes every keystroke), `open` (both: parts ask, the browser dismisses).
 | Escape, Android back, an assistive-technology dismiss (the platform's close request; the JS `keydown` baseline of a non-modal dialog) | **`onOpenChange`** | `false` | `"dismiss"` | `""` |
 | Light dismiss: `lightDismiss` (JS baseline or native `closedby="any"`), including a Trigger click on an open non-modal `lightDismiss` dialog (#116) | **`onOpenChange`** | `false` | `"dismiss"` | `""` |
 | Script `dialog.close(v)` / `requestClose(v)`; `form.submit()` on a `method="dialog"` form | **`onOpenChange`** | `false` | `"dismiss"` | `dialog.returnValue` |
-| Found open at hydration (2.12, variant A) | **`onOpenChange`** | `true` | `"platform"` | `undefined` |
 | Controlled prop change; re-open of a refused fact; removal from the document (no `close` event) | none | | | |
 
 `cancel` stays the consumer's pass-through hook for the platform's close request, with the
@@ -586,68 +599,30 @@ re-open (focus moves back into the dialog by the dialog focusing steps). Dialog-
 
 ---
 
-## 7. Toast: `closeAction` (open; the user decides)
+## 7. Toast: `closeAction` becomes `onClose`
 
-### What it is today
+User decision (2026-11-24): option (c) of the first draft. `closeAction` is renamed `onClose`
+and follows the rule of 2.6.
 
-`toast({ closeAction })`: called once when a toast leaves, with `ToastCloseDetails` (`id`,
+### Why
+
+`toast({ closeAction })` was called once when a toast leaves, with `ToastCloseDetails` (`id`,
 `reason`: `"activate"` when its Action settled, `"dismiss"` for `Toast.Close` / Escape /
 `toast.dismiss()`, `"timeout"`). The queue write that removes the toast is urgent by design
-(conventions 2.6), so the toast is already leaving; the callback then runs from a microtask
-inside the **Viewport's** transition and is awaited there. Nothing visible waits. A rejection
-reaches the Error Boundary above the Viewport.
+(conventions 2.6), so the toast is already leaving; the callback then ran from a microtask
+inside the **Viewport's** transition and was awaited there. By the rule of section 1 that is a
+fact for every reason: there is nothing the library could roll back (the request in a toast is
+`Toast.Action`'s `action`, which stays an action). Running it in a transition also had two side
+effects:
 
-By the rule of section 1 it is a fact for every reason: there is nothing the library could roll
-back (the request in a toast is `Toast.Action`'s `action`, which stays an action). Two side
-effects of running it in a transition that are easy to miss:
+- **Entanglement.** While an async `closeAction` was pending, every transition in the app
+  waited for it (conventions 2.3 item 5): a slow `deleteForReal` that started because a timer
+  elapsed, with no user gesture, delayed an unrelated navigation.
+- **The error surface was the whole toast region.** A rejection replaced everything under the
+  boundary above the Viewport, for a toast that had already left. Elsewhere the rejection of an
+  action whose owner has left is already report-only (conventions 2.4, #152).
 
-- **Entanglement.** While an async `closeAction` is pending, every transition in the app waits
-  for it (conventions 2.3 item 5). A slow `deleteForReal` that started because a timer elapsed,
-  with no user gesture, delays an unrelated navigation.
-- **The error surface is the whole toast region.** A rejection replaces everything under the
-  boundary above the Viewport, for a toast that has already left. Elsewhere the library already
-  decided that the rejection of an action whose owner has left is report-only (conventions 2.4,
-  #152, user-confirmed).
-
-### The options, at the call site (the Undo-window pattern, toast.md 9.3)
-
-**(a) Keep `closeAction`: an explicit exception to the rule.**
-
-```tsx
-toast({
-  title: "Message deleted",
-  duration: 8000,
-  action: { label: "Undo", action: () => restoreToList(id) },
-  closeAction: ({ reason }) => (reason === "activate" ? undefined : deleteForReal(id)),
-});
-```
-
-- No churn. A rejection of `deleteForReal` reaches the Error Boundary above the Viewport.
-- The name keeps promising a request for something that cannot be refused; conventions 2.1 keeps
-  its "Other notification: `<event>Action`" row, the category the user questioned, and the rule
-  gets a sentence "except Toast".
-- Both side effects above stay.
-
-**(b) Rename to `onClose`; no error handling by the library.**
-
-```tsx
-toast({
-  title: "Message deleted",
-  duration: 8000,
-  action: { label: "Undo", action: () => restoreToList(id) },
-  onClose: ({ reason }) => {
-    if (reason !== "activate") void deleteForReal(id).catch(showDeleteFailed);
-  },
-});
-```
-
-- The strictest reading of "a handler": synchronous, return value ignored; a returned promise
-  is a dev warning (as `onInputValueChange`).
-- The pattern the component was designed around gets longer, and a forgotten `.catch` is an
-  `unhandledrejection`. A Server Function cannot be passed without the warning.
-
-**(c) Rename to `onClose`; a returned promise is not awaited, its rejection goes to
-`reportError` (recommended; the product owner's lean).**
+### At the call site (the Undo-window pattern, toast.md 9.3)
 
 ```tsx
 toast({
@@ -657,7 +632,7 @@ toast({
   onClose: ({ reason }) => (reason === "activate" ? undefined : deleteForReal(id)),
 });
 
-// Showing the failure to the user is the consumer's, as it already is in practice:
+// Showing the failure to the user is the consumer's:
 onClose: async ({ reason }) => {
   if (reason === "activate") return;
   try {
@@ -669,23 +644,12 @@ onClose: async ({ reason }) => {
 },
 ```
 
-- The call site is today's with one word changed. A Server Function can be passed directly.
-- An unhandled failure reaches `window`'s `error` event and monitoring tools, and fails a test
-  run that does not expect it; the toast region stays up. Same route as a superseded rejection
-  and an owner-left rejection (conventions 2.4), and the same contract as `onOpenChange` (2.6):
-  one rule for every fact handler that may do async work.
-- Nothing is entangled: an 8-second-old timeout no longer holds the app's transitions.
-- Lost: the Error Boundary route. A consumer who relied on the boundary to show a failed delete
-  must catch (second snippet).
+The first form is the old call site with one word changed, and a Server Function can be passed
+directly. An unhandled failure reaches `window`'s `error` event and monitoring tools, and fails
+a test run that does not expect it; the toast region stays up. Lost: the Error Boundary route.
+A consumer who relied on the boundary to show a failed delete must catch (second form).
 
-### Recommendation: (c)
-
-The rule holds without an exception, the Undo-window call site does not get worse, and the two
-side effects of the transition go away. (b) is the same rule with a worse call site and no
-gain. (a) is the right choice only if the Error Boundary route for a failed background commit
-is considered a feature worth an exception; I think the #152 decision already says it is not.
-
-### Spec for (b) / (c)
+### Spec
 
 | | Before | After |
 | --- | --- | --- |
@@ -693,7 +657,7 @@ is considered a feature worth an exception; I think the #152 decision already sa
 | When | a microtask after the close, inside the Viewport's transition | where the close is applied to the queue (the Viewport's handler, timer callback or command loop), after the entry is marked ending; never inside a transition (the queue is urgent, toast.md 3.4) |
 | Awaited | yes, by the Viewport's transition | no |
 | A `setState` in the body | a transition update | urgent |
-| Rejection / throw | Error Boundary above the Viewport | (c): `reportError`; (b): the consumer's |
+| Rejection / throw | Error Boundary above the Viewport | `reportError` |
 | `reason` values, once per close, not called on Viewport unmount, called for a toast dismissed before it rendered | | unchanged |
 | Viewport `useTransition` for close actions; the "`closeAction` in flight" state row (toast.md 12) | exists | removed |
 
@@ -706,6 +670,10 @@ The name is `onClose`, not `onOpenChange`: a toast has no `open` state (no `open
 `defaultOpen`), so the conventions 2.1 row is "a fact with no state: `on<Event>`", which
 replaces the reserved "Other notification: `<event>Action`" row. `Toast.Action`'s `action`,
 `whilePending` and `closeOnSettle` are untouched.
+
+History: the alternatives were (a) keep `closeAction` as an explicit exception to the rule
+(both side effects stay) and (b) `onClose` with the return value ignored and a dev warning for
+a promise (`void deleteForReal(id).catch(…)` at the call site, no Server Function).
 
 ---
 
@@ -725,11 +693,7 @@ would still cost the native path its only remaining listener, so it is not propo
 
 ## 9. The development warning
 
-**Asked:** warn when user code seems to have ignored `onOpenChange` in controlled mode; at
-minimum `open` without `onOpenChange`; can a runtime heuristic do better without warning on an
-intentional re-open?
-
-### W1 (static, proposed as required)
+User decision (2026-11-24): **the static warning only.**
 
 `open !== undefined && onOpenChange === undefined`, checked once per Root instance after mount
 (`useDevWarning`), in the four Roots:
@@ -743,61 +707,21 @@ Without it the dialog re-opens after every dismissal. Pass `onOpenChange={setOpe
 
 This is React's `value` without `onChange`. React's opt-out is `readOnly`; here it is an
 explicit empty handler, which states the intent in the code. An intentional re-open with a
-handler (`onOpenChange={(o) => { if (!saving) setOpen(o); }}`) never triggers W1.
+handler (`onOpenChange={(o) => { if (!saving) setOpen(o); }}`) never triggers it.
 
-### Can a runtime check do better? Not without a residual.
+**No runtime heuristic.** The mistake the static check cannot see is late adoption: a handler
+that sets state in `startTransition` or after an `await` (2.4). At runtime it looks exactly
+like an intentional re-open followed by an unrelated programmatic close ("the dialog cannot be
+dismissed while saving; it closes when the save completes"): `open` stays `true` in the event's
+own commit and turns `false` in a later one. The difference is when the parent scheduled its
+update, which a child cannot observe; a lane probe fails on entanglement (conventions 2.3 item
+5) and "no user input in between" fails on the same example. The first draft offered a
+100 ms-window heuristic (W3) with a stated residual false positive; the user dropped it. The
+docs sentence next to the prop (2.4) is the defence against late adoption.
 
-The mistake W1 cannot see is **late adoption**: a handler that exists but sets state in
-`startTransition` or after an `await` (2.4). Its signature at runtime is: `open` is still
-`true` in the event's own commit (so the library re-opens), then turns `false` in a later
-commit. An intentional re-open followed by an unrelated programmatic close has exactly the same
-signature: "the dialog cannot be dismissed while saving; it closes when the save completes".
-
-The library cannot tell them apart, because the difference is *when the parent scheduled its
-update*, and that is not observable from a child:
-
-- React exposes nothing about updates pending on a parent, or the lane of a scheduled update.
-- A lane probe (the library starts its own transition right after the handler and checks
-  whether `open` flips in the same commit) fails on entanglement: while any async action is
-  pending, every transition commits together with it (conventions 2.3 item 5), so the save's
-  own `startTransition(() => setOpen(false))` lands in the probe's commit. That is the
-  intentional case, flagged.
-- "No user input in between" fails on the same example (the save completes by itself).
-
-So a heuristic with zero false positives does not exist. What exists is a narrow one:
-
-### W3 (runtime, optional; the user decides)
-
-Warn once per Root when all of these hold:
-
-1. a fact was reported and `open` was still `true` in the commit that followed, so the library
-   re-opened the popup;
-2. `open` became `false` within 100 ms of that re-open;
-3. no request and no further fact went through this Root in between.
-
-```
-Dialog.Root: `open` was still `true` right after onOpenChange(false) and became `false`
-38 ms later, so the dialog was re-opened and closed again. `onOpenChange` must update the
-state directly: not inside startTransition, and not after an await.
-```
-
-- It never fires on an intentional re-open that stays open, and never on a correct handler.
-- It catches the common shape of the mistake: a `startTransition`-wrapped setter with nothing
-  else pending commits within a frame; an adoption after a microtask or a fast `await` too.
-- **False negatives**: a late adoption that takes longer than 100 ms (a slow `await`, a
-  transition held by a pending action). The visible symptom (close, re-open, close) is the same,
-  only unexplained.
-- **The residual false positive**: an intentional refusal whose popup the parent closes
-  programmatically, for an unrelated reason, within 100 ms of the dismissal (the save completes
-  in the same instant the user presses Escape). Rare, the message says what was observed, and
-  it is logged once; but it is not zero.
-
-Recommendation: ship W1 and W3. If "must not warn on an intentional re-open" is meant strictly,
-ship W1 only and rely on the sentence in the docs (2.4). Question 3.
-
-Not proposed: a warning for `open` without `openChangeAction` (a Trigger-less controlled dialog
-is legitimate with `onOpenChange` alone, dialog.md 12.3), and a warning for a promise returned
-from `onOpenChange` (2.6).
+Not warned either: `open` without `openChangeAction` (a Trigger-less controlled dialog is
+legitimate with `onOpenChange` alone, dialog.md 12.3), and a promise returned from any `on*`
+handler (2.6).
 
 ---
 
@@ -832,7 +756,7 @@ three-engine probe). It is unaffected by this design.
 One residual overlap is new only in the sense that it is now the consumer's doing: a controlled
 parent that adopts a fact inside `startTransition` (the late-adoption mistake) gets the
 re-open, and then a controlled close in a transition commit, with a view transition if
-`transition` is set. That is the case W3 reports.
+`transition` is set. The docs name it (2.4); nothing warns (section 9).
 
 Order of work: #148 first, then the #147 probe, which then has one case to cover instead of
 two.
@@ -840,6 +764,10 @@ two.
 ---
 
 ## 11. Implementation sketch (for the developer; not binding in detail)
+
+**First step: the four probes at the end of this section.** The design rests on them; run them
+(throwaway, three engines where a browser is involved) before writing library code, and bring
+a failed one back to the architect.
 
 - **`useControllableAction`**: one new method next to `adopt`:
 
@@ -859,19 +787,22 @@ two.
   Other state owners never call `adoptFact` and are unaffected.
 - **`useOverlayRoot`**: `onOpenChange` in the options and in mode detection; `notifyClosed`
   stops being an alias of `requestClose` and becomes: skip if this is the library's own hide;
-  `adoptFact(false)`; call the handler in `try` / `catch` with the thenable rule (a shared
-  `callUrgentHandler(handler, ...args)` in `internal/`, used by Toast too under option c).
+  `adoptFact(false)`; call the handler through the shared helper below.
+- **`internal/call-urgent-handler.ts`** (new, directive-free): `callUrgentHandler(handler,
+  ...args)` calls the handler in `try` / `catch`, passes a throw to `reportError`, and attaches
+  `.then(undefined, reportError)` to a returned thenable. The three call sites use it:
+  `onOpenChange`, Toast's `onClose`, and Combobox's `onInputValueChange` (where it replaces the
+  "returned a promise" dev warning).
 - **`use-popover-popup.ts`**: the echo of the library's own `hidePopover()` is recognised by a
   marker set in the apply effect (as Dialog's `libraryClose`), not by `intended()`. The apply
   effect's re-open branch is unchanged. The #115 Trigger path (section 3.2).
 - **`dialog-popup.tsx`**: remove `dismissedWhilePending`.
-- **Variant A of 2.12 only**: the mount reconciliation calls the handler and writes committed
-  `true` in the Root's transition instead of `requestOpen`.
-- **Toast (b / c)**: `scheduleCloseActions` becomes a synchronous loop after the queue write;
+- **Mount reconciliation** (2.12): untouched, still `requestOpen(undefined, "platform")`.
+- **Toast**: `scheduleCloseActions` becomes a synchronous loop after the queue write;
   the Viewport's close transition is removed.
 - **Type guard** (`action-naming.test.ts`): the `on*` allow-list gains `onOpenChange` on the
   four Root props types (and `ToastOptions.onClose` if it is covered there).
-- **Not probed yet** (to confirm before coding): (1) updates scheduled from a native `toggle` /
+- **The four probes** (the first step, above): (1) updates scheduled from a native `toggle` /
   `close` listener batch into one synchronous-lane commit with the parent's `setOpen` (expected:
   React reads the priority from `window.event`); (2) the passthrough re-base of `useOptimistic`
   drops the stale patch in the same commit; (3) a re-open inside a running CSS exit reverses it
@@ -902,7 +833,7 @@ two.
 6. **A controlled Root that keeps `open={true}` after a dismissal is re-opened at once**, not
    after the callback settled.
 7. **Errors**: a failing dismissal callback no longer reaches an Error Boundary; a rejected
-   promise returned from `onOpenChange` goes to `reportError`.
+   promise returned from `onOpenChange`, or a throw, goes to `reportError`.
 8. **A dismissal during a pending close is reported at once**; a request that was in flight is
    superseded (its rejection goes to `reportError`). `Dialog.Root` no longer holds such a
    dismissal back.
@@ -910,10 +841,14 @@ two.
    to `onOpenChange` too.
 10. **Submenu Roots**: a submenu closed by its parent menu reports through `onOpenChange`.
 11. **JS-free mode** (Popover, Dialog): `onOpenChange` on the Root selects library mode.
-12. (If 2.12 variant A) a popup opened before hydration is reported through
-    `onOpenChange(true, { reason: "platform" })`, not `openChangeAction`.
-13. (If Toast option b or c) `toast({ closeAction })` is renamed `onClose`; it is not awaited
-    and its rejection no longer reaches the Error Boundary above the Viewport.
+12. **Toast**: `toast({ closeAction })` is renamed `onClose`. It is called synchronously when
+    the toast closes, is not awaited, no longer holds other transitions, and its rejection goes
+    to `reportError` instead of the Error Boundary above the Viewport.
+13. **`Combobox.Root`'s `onInputValueChange`** may return a promise: the development warning is
+    gone, and a rejection or a throw goes to `reportError` (not breaking for correct code).
+
+Not changing: a popup opened before hydration is still reported through
+`openChangeAction(true, { reason: "platform" })`.
 
 A codemod is not worth writing: the mechanical part (add `onOpenChange` next to a controlled
 `openChangeAction`) is one line per Root, and the rest is a decision per call site.
@@ -929,11 +864,15 @@ A codemod is not worth writing: the mechanical part (add `onOpenChange` next to 
   column: `xChangeAction` and "Controlled mode" and "Pending" rows; the "library-owned for some
   causes" bullet); 4.1 / 4.3 (no `data-pending` for a fact); 5.1 and 5.3 (no view transition
   and no close type for a fact); 10.1 (a new row "Fact handler (both)", the Urgent handler row
-  merged into it, the Action naming allow-list); a new resolved question 45.
+  merged into it, the Action naming allow-list). **Already applied at acceptance**: decisions
+  2 and 11, 2.1, 2.6 (the handler rule, `onInputValueChange`'s warning, Toast's `onClose`), the
+  Urgent handler row of 10.1, resolved question 45. The rest (2.2, 2.4, 3.4, 3.5, 4, 5, the new
+  10.1 row) describes shipped behaviour and is amended with the implementation.
 - popover.md 2 (mode table), 2.3, 2.5, 3.1, 4.1 to 4.4, 10.2, 11, 12, 13; dialog.md the same
   sections plus 2.3's stored dismissal, 11.13, 12.4; menu.md 2.2, 3.1, 10, 12; context-menu.md
-  3.1, 5, 7, 10; combobox.md 3.1, 5.4, 5.5, 10; toast.md 3.3, 3.4, 9, 11, 12, 14 (if b / c);
-  tooltip.md 4.1 (the argument).
+  3.1, 5, 7, 10; combobox.md 3.1, 5.4, 5.5, 10; toast.md 3.3, 3.4, 9, 11, 12, 14;
+  tooltip.md 4.1 (the argument). combobox.md and toast.md carry an amendment section for #148
+  since acceptance; the other component designs get theirs with the implementation.
 
 ### 12.3 Churn estimate
 
@@ -950,22 +889,21 @@ be rewritten.
 | `combobox.test.tsx` / `.browser.test.tsx` | 141 / 47 | 5 / 8 | about 13 spy moves; controlled-refusal row rewritten |
 | `dialog.test.tsx`, `dialog-close.test.tsx`, `dialog-form.test.tsx`, `dialog.browser.test.tsx` | 50, 19, 17, 30 | 3 + 16 lines in close / form | about 12 spy moves; the stored-dismissal rows (11.13) deleted and replaced (about 4) |
 | Shared suites: `overlay-open-state-suite.tsx` (38), `overlay-browser-suite.tsx` (9), `overlay-close-part-suite.tsx` (15), `foreign-invoker-press-browser-suite.tsx` (2) | 64 | 6 | the dismissal-notification, refusal and re-open rows rewritten once for all four components (about 10); foreign-invoker rows flip channel |
-| `toast.test.tsx` / `.browser.test.tsx` (if b / c) | 105 / 11 | 51 lines mentioning `closeAction` | a rename in about 20 tests; the "runs in a transition" and "rejection reaches the boundary" rows inverted (2) |
+| `toast.test.tsx` / `.browser.test.tsx` | 105 / 11 | 51 lines mentioning `closeAction` | a rename in about 20 tests; the "runs in a transition" and "rejection reaches the boundary" rows inverted (2) |
 | `use-controllable-action.test.tsx`, `use-popover-hooks.test.tsx`, `action-naming.test.ts` | 15, 9, 4 | | new: `adoptFact` rows (about 6), allow-list entries |
 
 In total: about 95 existing tests edited mechanically (the callback spy changes prop), about
 30 rewritten because the asserted behaviour changes (pending, error route, re-open timing,
 view-transition counts), about 30 new (the "Fact handler" row per component in both modes, a
-fact during each kind of in-flight request, immediate re-open, W1 and W3, the Server Function
-shape). The browser suites carry the rows that matter most (real Escape and light dismiss,
+fact during each kind of in-flight request, immediate re-open, the static warning, the Server
+Function shape, the `reportError` route of each of the three handlers). The browser suites carry the rows that matter most (real Escape and light dismiss,
 view-transition counts in three engines).
 
 **Docs site** (`packages/docs`): the Browser-owned state page (the "Parts vs dismissals"
 section is rewritten around the two channels) and the Action props page (the rule; the handlers
 section) are the two conceptual rewrites; Popover (17 mentions of `openChangeAction`), Dialog
 (19), Menu (6), Context menu (2), Combobox (6) pages each gain a props-table row, a "Requests
-and facts" section and updated controlled examples; Toast page (7 mentions of `closeAction`,
-if b / c); Pending and optimistic, Server Components and Suspense pages: a paragraph each;
+and facts" section and updated controlled examples; Toast page (7 mentions of `closeAction`); Pending and optimistic, Server Components and Suspense pages: a paragraph each;
 Tooltip page: one sentence; Roadmap: the list of 12.1. Ten example files use `openChangeAction`
 or `closeAction` (the controlled ones gain a prop; `ToastUndoWindow.tsx` is renamed inside).
 The agent skill (`skills/funstack-ui-knowledge/SKILL.md`): three lines. The playground
@@ -974,25 +912,17 @@ narrow the recipe line.
 
 ---
 
-## 13. Questions for the user
+## 13. Resolved questions (user, 2026-11-24)
 
-1. **A popup found open at hydration** (2.12). The brief lists it as a fact
-   (`onOpenChange(true, { reason: "platform" })`). By the rule's own test it is a request: the
-   library can roll it back, the DOM is the optimistic state, and it is the overlay's
-   "pre-hydration input", which the user kept as an action for form controls. As a fact it
-   costs: the action's load-on-open code is skipped, the uncontrolled write has to be a
-   transition anyway (Suspense), and a controlled parent must wrap `setOpen(true)` while it
-   must not wrap `setOpen(false)`. **Recommendation: keep it a request** (variant B: no change
-   from today; `onOpenChange` then only ever receives `false` in these four components).
-2. **A promise returned from `onOpenChange`** (2.6, 2.10): not awaited, rejection to
-   `reportError`, no dev warning, so that a Server Function can be passed from a Server
-   Component (**recommended**, and the same rule as Toast option c); or a dev warning as for
-   `onInputValueChange`, which makes "persist a dismissal" need a Client Component.
-3. **The runtime warning W3** (section 9): ship it with its stated residual false positive
-   (**recommended**), or W1 only.
-4. **Toast** (section 7): (a) keep `closeAction` as an exception, (b) `onClose` with no error
-   handling, (c) `onClose` with a returned promise's rejection routed to `reportError`
-   (**recommended**).
-5. For information, no decision needed unless the user disagrees: the pointer leaving a
-   hover-opened submenu stays a request with `reason: "dismiss"` (the library holds that close
-   today), so "dismiss" does not always mean `onOpenChange` (2.2).
+1. **A popup found open at hydration** stays a request, `openChangeAction(true, { reason:
+   "platform" })`; `onOpenChange` only receives `false` (2.12).
+2. **A promise returned from a handler**: allowed, never a warning; rejection and throw to
+   `reportError`. Made a library-wide rule for every `on*` handler, `onInputValueChange`
+   included (2.6).
+3. **The development warning** is the static one only; the runtime heuristic is dropped
+   (section 9).
+4. **Toast**: `closeAction` becomes `onClose` under the handler rule (section 7).
+5. Noted without objection: the pointer leaving a hover-opened submenu stays a request with
+   `reason: "dismiss"`, so "dismiss" does not always mean `onOpenChange` (2.2).
+
+Also decided on the issue: no alpha release until #148 has landed.

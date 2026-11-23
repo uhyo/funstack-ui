@@ -9,7 +9,10 @@ and audited in "Review corrections (#54)" at the end; the leftovers are GitHub i
 section 21 (`Toast.Root fallback`, for its timer item) was **accepted on 2026-10-18** and
 awaits implementation. The code under
 `packages/ui/src/toast/` is the ground truth where this document is silent. Follows
-`design/conventions.md` (accepted, with the section 18 amendments applied); where this document
+`design/conventions.md` (accepted, with the section 18 amendments applied; **amended
+2026-11-24, #148, user decision, not implemented yet: `closeAction` is renamed `onClose` and is
+a handler, not an action**, section 22; decisions 6, 3.3, 3.4, 9.3, 11, 12, 16.1 and 17 are
+edited in place, the other mentions of `closeAction` below read as `onClose`); where this document
 and the conventions disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/toast.md` (primary; its three
@@ -30,7 +33,7 @@ appear only after the very action it reports on had finished. The queue is there
 (research finding 2, the vision's "unless there is a specific reason for urgency"), and Toast
 spends its Async React budget elsewhere: a toast that **follows a promise** from pending to
 settled, an **Undo** that is an ordinary action prop with `data-pending`, a paused timer and a
-close on settle, a **`closeAction`** that tells the consumer whether the Undo window elapsed or
+close on settle, an **`onClose`** handler (`closeAction` before #148) that tells the consumer whether the Undo window elapsed or
 was used, and a **Suspense guard** so a toast whose content suspends fills in when ready without
 hiding the stack.
 
@@ -45,7 +48,7 @@ hiding the stack.
 | 3 | Urgent queue | Every queue mutation (add, update, dismiss, drop after exit) is a normal (urgent) update, dispatched from a microtask so a `toast()` call inside a `startTransition` scope escapes it (research §7). The third documented urgent state after a controlled text input and virtual focus (conventions 2.6). Order is preserved, dismissals included: a `toast.dismiss()` closes the toasts open at that point of the batch and never one added later in the same tick (review H1). |
 | 4 | Promise toasts | `toast.promise(promise, { pending, success, error })` shows `pending` at once with `data-pending`, swaps to `success` / `error` when the promise settles (urgent `update`), announces on settle, and starts the timer only then. It returns a promise that mirrors `promise`, **except** that a rejection is resolved (with `undefined`) when `error` was given: the error toast is the handler the consumer asked for. Returning the promise lets one call feed both the toast and the awaited action prop of the part that started the work (section 3.1). |
 | 5 | Undo | `Toast.Action` is a pure-trigger action prop (`useActionTrigger`, like `Menu.Item`): `data-pending` on the Action and the Root while it runs, the toast's timer paused, the toast closed with `reason: "activate"` when it resolves (`closeOnSettle`, default `true`); a rejection keeps the toast and reaches the nearest Error Boundary above the Viewport. |
-| 6 | `closeAction` | A per-toast action called when the toast leaves, with `details.reason`: `"activate"` (the Action part settled), `"dismiss"` (Close part, Escape, `toast.dismiss()`, a promise toast with no message for its outcome), or `"timeout"` (the timer elapsed; a new `ChangeReason` value, conventions feedback 1). Run inside the Viewport's own transition, not awaited by anything visible: the "commit the deletion when the Undo window elapses" pattern (section 9.3). |
+| 6 | `onClose` (#148; `closeAction` before) | A per-toast **handler** called when the toast leaves, with `details.reason`: `"activate"` (the Action part settled), `"dismiss"` (Close part, Escape, `toast.dismiss()`, a promise toast with no message for its outcome), or `"timeout"` (the timer elapsed; a `ChangeReason` value, conventions feedback 1). Called synchronously where the close is applied, outside any transition, not awaited; it may return a promise, whose rejection goes to `reportError` (the handler rule, conventions 2.1): the "commit the deletion when the Undo window elapses" pattern (section 9.3). |
 | 7 | Top layer | One `popover="manual"` region, shown while it has toasts (exiting ones included), hidden when empty. Re-raised (`hidePopover(); showPopover()`) when a toast is added while it is already open, so a later-opened menu or popover does not cover new toasts. While a library `Dialog` is modal, the region is inside the topmost open modal `<dialog>` and back inline when it closes, because a top-layer region outside a modal dialog is inert and absent from the accessibility tree (research finding 1). Mechanism: the region always portals into a library-owned `display: contents` host element that the library itself moves with a DOM `append` (React never sees the move, so the toasts keep their React state: an Undo in flight stays pending; review M2) between an inline anchor and the topmost modal (a module-level registry Dialog writes to). |
 | 8 | Announcements | `document.ariaNotify(text, { priority })` after the toast's content has committed un-suspended, coalesced per microtask, `priority: "high"` for `priority: "high"` toasts. No live region anywhere. The text defaults to the Title and Description text (`textContent` of the parts), overridable per toast or per Viewport through `announce(toast)` (built-in strings rule, conventions 11). |
 | 9 | Timers | `duration` default 5000 ms; `null` for persistent. A toast with an `action` defaults to persistent (WCAG 2.2.1; product-owner question 3). Paused while the pointer is over the region, focus is inside it, the document is hidden, the window is blurred, the toast is `pending`, or it is queued beyond `limit`; resumed with the remaining time. |
@@ -278,13 +281,17 @@ Viewport, which must render the list with the failure visible, section 15.3), or
 (conventions 2.2). `id` is there so an action declared inline in `toast({ … })` can update or
 dismiss its own toast without a closure variable.
 
-### 3.3 `closeAction` and the Undo window
+### 3.3 `onClose` and the Undo window
 
-A toast's `closeAction` runs once, when the toast leaves, with `ToastCloseDetails`: `{ id,
-reason }` plus the virtual `event`. It is dispatched inside the **Viewport's** `useTransition`
-and awaited there (so a thrown error reaches the boundary above the Viewport, React's rule for
-actions), but nothing visible waits for it: the toast is already gone. Section 9.3 is the
-"delete when the window closes" example; the reason vocabulary is in section 9.1.
+A toast's `onClose` (#148; `closeAction` before) is called once, when the toast leaves, with
+`ToastCloseDetails`: `{ id, reason }` plus the virtual `event`. It is a **handler, not an
+action** (conventions 2.1): the toast is already leaving and nothing can roll that back. It is
+called synchronously where the close is applied to the queue, outside any transition, and is
+not awaited; a `setState` in its body is urgent. It may return a promise (the Undo-window
+delete, a Server Function): a rejection, and a synchronous throw, go to `reportError`, never
+to an Error Boundary, and nothing else in the app waits for it. Section 9.3 is the "delete
+when the window closes" example; the reason vocabulary is in section 9.1; section 22 has the
+before / after.
 
 ### 3.4 The urgent lane, precisely
 
@@ -306,8 +313,9 @@ tick: a toast is on screen in the same frame as the click that produced it. The 
 is the one the research names: Toast's commits never start a document view transition, so its
 animation is CSS (section 10).
 
-What stays on the transition lane: the Action's action (pending state, error routing), the
-`closeAction`, and everything the consumer does in those. This is the same split as Combobox's
+What stays on the transition lane: the Action's action (pending state, error routing) and
+everything the consumer does in it. `onClose` is not on it (#148, section 22; `closeAction`
+was). This is the same split as Combobox's
 text input: the state React or the product requires to be urgent is urgent, everything it drives
 is a transition.
 
@@ -609,15 +617,30 @@ Two patterns, both supported, chosen by the consumer:
     title: "Message deleted",
     action: { label: "Undo", action: () => restoreToList(id) },
     duration: 8000, // the window; an action toast is persistent otherwise
-    closeAction: ({ reason }) => (reason === "activate" ? undefined : deleteForReal(id)),
+    onClose: ({ reason }) => (reason === "activate" ? undefined : deleteForReal(id)),
   });
 }} />
 ```
 
-In the second shape `closeAction` runs for `"timeout"`, `"dismiss"` (Close, Escape, page-level
-`toast.dismiss()`) alike, and not for `"activate"`. It runs in the Viewport's transition: a
-rejection of `deleteForReal` reaches the boundary above the Viewport, and the consumer who wants
-it quieter catches and `toast()`s the failure. A page unload before the timer ends is the
+In the second shape `onClose` is called for `"timeout"`, `"dismiss"` (Close, Escape, page-level
+`toast.dismiss()`) alike, and does nothing for `"activate"`. The returned promise is not
+awaited; a rejection of `deleteForReal` goes to `reportError` (#148; before, it reached the
+boundary above the Viewport). The consumer who wants the user to see the failure catches,
+restores the item and `toast()`s it:
+
+```tsx
+onClose: async ({ reason }) => {
+  if (reason === "activate") return;
+  try {
+    await deleteForReal(id);
+  } catch {
+    restoreToList(id);
+    toast({ title: "Could not delete the message", priority: "high" });
+  }
+},
+```
+
+A page unload before the timer ends is the
 consumer's `pagehide` concern, as in every library.
 
 ---
@@ -739,8 +762,9 @@ export interface ToastOptions {
   /** ms before the toast closes with `reason: "timeout"`; `null` never. Default: the Viewport's `duration`, or `null` when `action` is set. */
   readonly duration?: number | null;
   readonly action?: ToastActionOptions;
-  /** Called once when the toast leaves (section 9). */
-  readonly closeAction?: Action<[ToastCloseDetails]>;
+  /** Called once when the toast leaves (section 9). A handler: synchronous, not awaited; a
+   *  returned promise's rejection goes to reportError (#148; `closeAction` before). */
+  readonly onClose?: UrgentHandler<ToastCloseDetails>;
   /** The text `ariaNotify` speaks; `null` for nothing. Default: Title and Description text. */
   readonly announce?: (toast: ToastItem) => string | null;
   /** Anything the Viewport's children want to render. */
@@ -856,7 +880,7 @@ Action, Close }`, plus the named exports `toast` and `createToastManager` from
 | Pause | Viewport, derived from DOM events and `document.visibilityState` | library-owned, urgent | urgent | `data-paused`, `state.paused` |
 | Timers | Viewport ref map | internal | – | none |
 | Action in flight | the Action part's `useActionTrigger` | transition | transition | `data-pending` on Action and Root (`toast.pending` is set by the Root while its Action runs, through context, so the Viewport pauses the timer) |
-| `closeAction` in flight | Viewport `useTransition` | transition | transition | none (nothing visible waits) |
+| (removed by #148) `closeAction` in flight | was: Viewport `useTransition` | – | – | `onClose` is not awaited; the Viewport has no transition of its own |
 | Suspended content | Root, from the guard | internal | – | none; gates timer and announcement |
 | Focus-return target | Viewport ref | internal | – | none |
 | Modal container | module registry, read with `useSyncExternalStore`; the region's host `div` is moved by the library (section 4.3), never re-created | library-owned, urgent | urgent | none |
@@ -1157,7 +1181,7 @@ tested under "Lanes").
 | Async action | While the Undo promise is unresolved: `data-pending` on Action and Root, the toast's timer does not elapse (fake timers advanced past `duration`); after resolve: the toast closes with `reason: "activate"`; `closeOnSettle={false}` keeps it. |
 | Rejection | Undo rejects: the toast stays, `data-pending` gone, the error reaches an `<ErrorCatcher>` around the Viewport's list; caught-inside variant resolves and closes (the documented trap); caught-and-rethrown keeps the toast (15.3); the toast closed (Close) while Undo is pending, then Undo rejects: passed to `reportError` once (stubbed), the boundary untouched (walkthrough 6, #152). |
 | Overlap and superseded rejection | **N/A since #81** for `Toast.Action` (one run at a time); replaced by the Re-entry rows T1, T2 and T4 in `design/components/button.md` 16.4: the second Undo click is ignored and `defaultPrevented`, `aria-disabled` meanwhile, one close; a single rejecting run reaches the boundary above the Viewport and leaves the toast. |
-| `closeAction` | Called once per close with each reason (`"activate"`, `"dismiss"` for Close / Escape / `dismiss()`, `"timeout"`); runs in a transition (a `useTransition` probe inside it is not needed; assert it is not called synchronously inside the dismissal click, and that its rejection reaches the boundary above the Viewport); not called on Viewport unmount. |
+| `onClose` (#148) | Called once per close with each reason (`"activate"`, `"dismiss"` for Close / Escape / `dismiss()`, `"timeout"`); the handler rule (conventions 10.1, Urgent handler row): called synchronously where the close is applied and outside any transition (a `setState` in it commits while an unrelated deferred action is pending; an unrelated transition is not held by a pending `onClose` promise), a returned promise does not warn, its rejection and a synchronous throw each reach `reportError` once and **not** the boundary above the Viewport, and the toast still closes; not called on Viewport unmount. |
 | Timers | Default 5000; Viewport `duration`; per-toast `duration`; `null` persistent; action toasts persistent by default and timed with `duration`; starts only when visible (queued beyond `limit`) and un-suspended; `update` with a new `duration` restarts. |
 | Pausing | `pointerenter` / `pointerleave`, `focusin` / `focusout`, `visibilitychange` (hidden / visible), window `blur` / `focus` pause and resume with the remaining time; `data-paused` on the Viewport; a `pending` toast's timer alone is paused while its siblings run; the hover pause ends when the region empties under the pointer (#63 L3). |
 | Keyboard | F8 focuses the newest toast and `preventDefault()`s; does nothing with no toasts; `hotkey={null}` installs no listener; `["altKey", "KeyT"]`; ArrowDown / ArrowUp between Roots, no wrap; Escape dismisses the toast containing focus; focus goes to the next toast, else previous, else the element focused before F8 (and before a Tab-in, through `relatedTarget`), else body; Ctrl+F8 (an unlisted modifier) is ignored (review L4). |
@@ -1245,10 +1269,11 @@ packages/ui/src/internal/
   last-announced text and exit baseline are cleared (review L7). `drop(id)` removes an ending
   entry. Visible items are the first `limit` non-ending items plus every ending item; `queued`
   is the remainder's length.
-- **`closeAction` dispatch.** The Viewport keeps one `useTransition`; on a close it runs
-  `startTransition(async () => { await closeAction?.(createActionDetails(event, { id, reason })); })`
-  from the handler or timer that caused it (never from render). Rejections take React's path to
-  the boundary above the Viewport; nothing reads `pending`.
+- **`onClose` call** (#148; was the `closeAction` dispatch in a Viewport `useTransition`). On
+  a close, after the entries are marked ending, the Viewport calls each closed entry's
+  `onClose(createActionDetails(event, { id, reason }))` through `callUrgentHandler`
+  (overlay-open-change.md 11) from the handler, timer or command loop that caused it (never
+  from render, never inside a transition). The Viewport's `useTransition` is removed.
 - **Timers** (`syncToastTimers` / `clearToastTimers`, `toast-timers.ts`). A ref map; an effect keyed on the visible, non-pending, un-suspended ids starts
   missing timers and clears timers of ids that left; `pause()` records the remaining time and
   clears handles, `resume()` restarts them. Pause sources are counted (hover, focus, hidden,
@@ -1531,3 +1556,30 @@ fires after the suspended flag is set and the announcement returns early.
   paragraph (which no longer says the timer starts at once).
 
 **Accepted by the product owner** (2026-10-18). Section 21 is accepted as proposed: `fallback?: ReactNode` on `Toast.Root`, with the narrow conventions 6 rule "`fallback` exists only where the library owns the boundary (Toast alone)". The architect amended conventions 6 (and the 4.1 `ending` wording); implemented in ada1cba with the tests listed above. Closes the M3 timer item of #63.
+
+---
+
+## 22. Amendment: `closeAction` becomes `onClose` (#148, 2026-11-24, user decision; not implemented yet)
+
+Design and reasoning: `design/components/overlay-open-change.md` section 7; the rule:
+conventions 2.1 (resolved question 45).
+
+| | Before | After |
+| --- | --- | --- |
+| Option | `closeAction?: Action<[ToastCloseDetails]>` | `onClose?: UrgentHandler<ToastCloseDetails>` |
+| Kind | an action: run in the Viewport's transition, awaited there | a handler: a toast that left is a fact; nothing can roll it back |
+| When | a microtask after the close | synchronously where the close is applied to the queue, after the entry is marked ending; never inside a transition |
+| A `setState` in the body | a transition update | urgent |
+| A returned promise | awaited; while pending, every transition in the app is entangled with it (conventions 2.3 item 5) | not awaited; nothing waits for it; no development warning |
+| Rejection, synchronous throw | Error Boundary above the Viewport (the whole region is replaced, for a toast that already left) | `reportError`; the region stays |
+| `details` (`id`, `reason`, virtual `event`), once per close, every reason, a toast dismissed before it rendered, not on Viewport unmount | | unchanged |
+
+`Toast.Action`'s `action` stays an action (it is the request: pending state, the toast stays on
+a rejection), with `whilePending` and `closeOnSettle` unchanged. The `"activate"` close that
+follows a resolved Action is reported to `onClose` like every other close.
+
+Migration: rename the option; a consumer who relied on the Error Boundary for a failed
+`closeAction` catches inside `onClose` (9.3). Mentions of `closeAction` in sections not edited
+in place (8, 14, 16.1's Queue and Sync action rows, 20) read as `onClose`; the walkthroughs of
+14 that say "its `closeAction` runs" are unchanged in when and how often.
+
