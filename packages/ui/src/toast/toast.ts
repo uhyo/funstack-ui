@@ -59,7 +59,7 @@ export interface ToastOptions {
    */
   readonly action?: ToastActionOptions | undefined;
   /**
-   * A handler, not an action (#148; `closeAction` before): called once when the toast leaves,
+   * A handler, not an action: called once when the toast leaves,
    * with the reason: `"activate"` (the Action part settled), `"dismiss"` (Close, Escape,
    * `toast.dismiss()`, a promise toast with no message for its outcome) or `"timeout"`. Called
    * synchronously where the close happens, outside any Transition, and not awaited: a slow

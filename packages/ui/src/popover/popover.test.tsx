@@ -1408,6 +1408,53 @@ describe("Popover", () => {
 
     // #115, overlay-open-change.md 3.2: light dismiss hides the popup at `pointerup`, before the
     // click; the click names the cause of the fact the `toggle` reports.
+    // #148 review L2: the marker of the library's own hide is consumed by every `toggle`. A hide
+    // the platform coalesced with a show (one `open` -> `open` toggle) must not leave it set, or
+    // a later dismissal would pass for the library's echo: no fact, `data-open` kept, and the
+    // apply effect re-showing the popup.
+    it("a library hide coalesced with a show leaves no echo marker: a later dismissal is a fact", async () => {
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" action={action} fact={fact} />);
+      await openThroughTrigger(user);
+      const toggles: string[] = [];
+      popup().addEventListener("toggle", (event) =>
+        toggles.push(`${(event as ToggleEvent).oldState}->${(event as ToggleEvent).newState}`),
+      );
+      // A part's close: the library hides in the commit (its marker set); the `toggle` is queued.
+      // A microtask after that hide, before the task runs, the popup is shown again behind the
+      // library's back (its routing `beforetoggle` listener is skipped), so the two toggles
+      // coalesce into one `open -> open`.
+      const showAgain = (event: Event) => {
+        if ((event as ToggleEvent).newState !== "closed") return;
+        popup().removeEventListener("beforetoggle", showAgain);
+        queueMicrotask(() => {
+          const skip = (e: Event) => e.stopPropagation();
+          document.addEventListener("beforetoggle", skip, { capture: true, once: true });
+          popup().showPopover();
+        });
+      };
+      popup().addEventListener("beforetoggle", showAgain);
+      const hide = spyHide();
+      await act(async () => {
+        fireEvent.click(trigger());
+      });
+      await flushTasks(2);
+      expect(hide).toHaveBeenCalledTimes(1);
+      expect(toggles).toEqual(["open->open"]);
+      // Re-open through the library, then a real dismissal.
+      await user.click(trigger());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(trigger()).toHaveAttribute("data-open", "");
+      await act(async () => popup().hidePopover());
+      await flushTasks(2);
+      expect(fact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([[false, "dismiss"]]);
+      expect(trigger()).not.toHaveAttribute("data-open");
+      expect(isOpen()).toBe(false);
+    });
+
     it("a non-button Trigger pressed while open: the light dismiss is a fact, 'activate' with the click", async () => {
       silenceErrors();
       const user = setupUser();

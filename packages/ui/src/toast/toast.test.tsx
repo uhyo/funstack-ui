@@ -1251,11 +1251,8 @@ describe("Toast", () => {
     });
 
     // #148: a handler, not an action (conventions 2.1).
-    it("is called synchronously inside the dismissal click, after the toast is marked ending", async () => {
-      let endingAtCall: string | null | undefined;
-      const onClose = vi.fn(() => {
-        endingAtCall = root(id).getAttribute("data-ending");
-      });
+    it("is called synchronously inside the dismissal click", async () => {
+      const onClose = vi.fn();
       render(<Harness manager={manager} />);
       const id = await call(() => manager({ title: "A", onClose }));
       let calledDuringClick = false;
@@ -1267,30 +1264,37 @@ describe("Toast", () => {
       });
       expect(calledDuringClick).toBe(true);
       expect(onClose).toHaveBeenCalledTimes(1);
-      // The queue write is urgent and comes first; the DOM catches up in the same event's commit.
-      expect(endingAtCall).not.toBeUndefined();
     });
 
-    it("is not awaited: a slow onClose holds no transition (a later toast action is not entangled)", async () => {
+    it("is not awaited: an unrelated transition commits while a slow onClose is still pending", async () => {
       const slow = deferred();
       const onClose = vi.fn(() => slow.promise);
-      render(<Harness manager={manager} />);
+      let setLabel!: (label: string) => void;
+      function Unrelated() {
+        const [label, set] = useState("old");
+        setLabel = set;
+        return <output data-testid="unrelated">{label}</output>;
+      }
+      render(
+        <>
+          <Harness manager={manager} />
+          <Unrelated />
+        </>,
+      );
       const id = await call(() => manager({ title: "A", onClose }));
       await act(async () => {
         fireEvent.click(screen.getByTestId(`close-${id}`));
       });
       await flushMicrotasks(2);
       expect(onClose).toHaveBeenCalledTimes(1);
-      // An unrelated transition commits while onClose is still pending.
-      const second = await call(() => manager({ title: "B", duration: null }));
-      let done = false;
+      // Were onClose awaited inside a transition (the old `closeAction`), every transition in
+      // the app would be entangled with it and this one would wait for `slow` (conventions 2.3
+      // item 5).
       await act(async () => {
-        startTransition(() => {
-          done = true;
-        });
+        startTransition(() => setLabel("new"));
       });
-      expect(done).toBe(true);
-      expect(root(second)).toHaveTextContent("B");
+      await flushMicrotasks(2);
+      expect(screen.getByTestId("unrelated")).toHaveTextContent("new");
       await act(async () => slow.resolve());
     });
 

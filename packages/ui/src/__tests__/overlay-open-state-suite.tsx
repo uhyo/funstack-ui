@@ -1033,7 +1033,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         renderBoth(
           "close then open requested while shown, then a dismissal (2.5 row 3)",
           (mode) => {
-            it("the fact wins: the pending open does not show the popup when it resolves (uncontrolled)", async () => {
+            it("the fact wins: the pending open does not show the popup when it resolves", async () => {
               const user = setupUser();
               const action = vi.fn<Action>();
               const fact = vi.fn<Action>();
