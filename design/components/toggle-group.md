@@ -48,7 +48,7 @@ the items and pending exposed.
 | 9 | `Menu.Trigger` in a Toolbar | Horizontal: unchanged (ArrowDown / ArrowUp open with the first / last item focused; Left / Right are the Toolbar's). **Vertical: the trigger opens on the inline-end arrow (ArrowRight; ArrowLeft under `direction: rtl`) with the first item focused**, and leaves ArrowDown / ArrowUp to the Toolbar, the way `Menu.SubmenuTrigger` opens on the perpendicular axis. Read from `ToolbarContext`. |
 | 10 | ToggleGroup inside Toolbar | Detected through `ToolbarContext` (works under SSR). The group renders `role="group"` with no engine, no `focusgroup`, no `focusgroupstart`; its Items are plain members of the Toolbar's sequence (React Aria's `isInToolbar`). `orientation`, `loop` and `experimental_focusgroup` on such a group are ignored with a dev warning. The group is transparent to the arrow keys (no extra Up / Down within the group; see 7.3). |
 | 11 | `experimental_focusgroup` | On `Toolbar.Root`: `focusgroup="toolbar inline\|block wrap\|nowrap"`. On a standalone `ToggleGroup.Root`: `focusgroup="toolbar inline\|block wrap\|nowrap nomemory"` with `focusgroupstart` on the first pressed Item (the `toolbar` token with an explicit `role="group"`, which wins over the inferred role). Detection as Tabs and Menu (`"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore`, #43); where native, the engine writes no `tabindex` and handles no navigation key. |
-| 12 | Pending and optimistic | `ToggleGroup.Root` owns `useControllableAction` with a patch reducer; `Item` renders optimistic `aria-pressed`; `data-pending` on the Root and on each Item whose optimistic pressed state differs from the committed one (CheckboxGroup 5.3). `Toolbar.Button` runs its `action` through `useActionTrigger` with its own `data-pending`. |
+| 12 | Pending and optimistic | `ToggleGroup.Root` owns `useControllableAction` with a patch reducer (multiple mode; none in exclusive mode, 5.2); `Item` renders optimistic `aria-pressed`; `data-pending` on the Root and on each Item whose optimistic pressed state differs from the committed one (CheckboxGroup 5.3). `Toolbar.Button` runs its `action` through `useActionTrigger` with its own `data-pending`. |
 | 13 | Disabled | `ToggleGroup.Item` and `Root disabled`: native `disabled` (as `Toggle`), skipped by the roving sequence. `Toolbar.Button disabled`: `aria-disabled="true"`, focusable and in the sequence (APG Toolbar example: "so screen reader users are aware of their presence"), never dispatches. |
 | 14 | ViewTransition | `transition` on `ToggleGroup.Item` and `Toolbar.Button` (their content can key on `pending`, the Toggle rule); none on the Roots or the Separator. Types `fsui-toggle-group`, `fsui-toggle-group-press` (`added` non-empty), `fsui-toggle-group-release` (`removed` non-empty); Toolbar emits none. |
 | 15 | Files | `src/toggle-group/`, `src/toolbar/`, `src/internal/use-roving-focus.ts`, `src/internal/toolbar-context.ts`; every part file is `"use client"`. `Menu.Trigger` gains a context read; `Toggle` is untouched. |
@@ -519,7 +519,7 @@ Subpaths `@funstack/ui/toggle-group` and `@funstack/ui/toolbar`; both re-exporte
 
 | State | Kind | Owner | Shown as | Source |
 | --- | --- | --- | --- | --- |
-| ToggleGroup `value` | library-owned | `ToggleGroup.Root` | Items: `aria-pressed`, `data-pressed`, `state.pressed`; Root: `state.value` | **optimistic** (`useOptimistic`, patch reducer, 5.2) |
+| ToggleGroup `value` | library-owned | `ToggleGroup.Root` | Items: `aria-pressed`, `data-pressed`, `state.pressed`; Root: `state.value` | **optimistic** (`useOptimistic`; patch reducer in multiple mode, 5.2) |
 | ToggleGroup `pending` | library-owned | `ToggleGroup.Root` | `data-pending` on Root; on Items per 5.3 | `useTransition()` of the Root |
 | `disabled` | prop | Root, Item | native `disabled`, `data-disabled`, `:disabled` | prop (Item's own or inherited) |
 | `orientation` | prop | both Roots, Items, Separator | `data-orientation` (Toolbar also `aria-orientation`) | prop; inside a Toolbar the Toolbar's |
@@ -541,7 +541,8 @@ change.
 Internally the Root holds a `ReadonlySet<string>` in both modes. Exclusive mode is the set with at
 most one member: `value: string | null` maps to `new Set(value === null ? [] : [value])` on the way
 in and to `set.values().next().value ?? null` on the way out. This is why one details shape and one
-`state.value` shape serve both modes, and why the exclusive patch reducer needs no special case.
+`state.value` shape serve both modes. (The two modes differ in how the set is reduced and
+committed, 5.2: exclusive mode is single-valued and uses no patch reducer, since #150.)
 
 Equality for the controlled / uncontrolled machinery is set equality (the `equals` option of
 `useControllableAction`'s callers, conventions 3.8; here only the no-op guard needs it).
@@ -558,9 +559,24 @@ function reduce(set: ReadonlySet<string>, patch: Patch): ReadonlySet<string> {
 }
 ```
 
-`useOptimistic` gets this reducer with `details` as the patch, exactly as CheckboxGroup 5.2, so
-stacked dispatches re-base: press Bold then Italic while Bold's save is in flight shows both pressed;
-if Bold's save rejects, Italic's patch re-applies on the reverted base and Italic stays pressed.
+**Multiple mode** passes this reducer to `useControllableAction` with `details` as the patch
+(`reducer: (prev, _next, details) => reduce(prev, details)`), as CheckboxGroup 5.2. It has two
+jobs (conventions 3.3, #150). As the optimistic reducer, stacked dispatches re-base: press Bold
+then Italic while Bold's save is in flight shows both pressed; if Bold's save rejects, Italic's
+patch re-applies on the reverted base and Italic stays pressed. As the commit, the uncontrolled
+value is the replay of the resolved dispatches (5.4).
+
+**Exclusive mode passes no reducer** (`reducer: mountExclusive ? undefined : …`; the mode is
+fixed at mount, a later change of `exclusive` warns). The state is single-valued: the optimistic
+value is the dispatched `next`, and the latest dispatch commits it when it resolves, exactly as
+Tabs. A patch reducer is wrong here because an exclusive patch's `removed` is computed from the
+optimistic value at dispatch time, not from what ends up committed. From `left`: press Center
+(rejects), press Right (resolves, `removed: [center]`) would replay to `{left, right}`; press
+Center (rejects), release Center (resolves, `next === null`) would replay to `{left}`, bringing
+back an Item the user moved away from (review finding 1 of #150). With no reducer both end on
+the resolved action's `next`. Trade-off, accepted: in controlled exclusive mode the optimistic
+value no longer re-bases onto a parent change made while a press is pending; it shows `next`, as
+Tabs does.
 
 The Item's click asks the Root to toggle its value; the Root computes the patch against the
 **optimistic** set (conventions 2.3 item 8):
@@ -592,13 +608,23 @@ optimistic and the committed set; no part renders the committed set in the DOM.
 
 ### 5.4 Overlap
 
-- **Uncontrolled**: the latest dispatch's `next` was computed from the optimistic set, so it already
-  contains the earlier in-flight presses; the latest-dispatch guard commits it. Correct by
-  construction (conventions 2.5).
+- **Uncontrolled, multiple**: only resolved dispatches are committed (#150). When the last
+  overlapping dispatch settles, the ones whose actions resolved are replayed with the reducer
+  onto the committed set, in dispatch order; a rejected one leaves no trace. Press Bold
+  (rejects), press Italic (resolves): the group ends with Italic only, although Italic's action
+  was called with `["bold", "italic"]`. So an action persists `details.added` /
+  `details.removed`, not `next` (conventions 2.5).
+  History: until #150 the latest dispatch's `next` was committed and this section called that
+  "correct by construction"; `next` contains earlier in-flight presses even when they later
+  reject, and the Error Boundary a superseded rejection reached until #145 hid it.
+- **Uncontrolled, exclusive**: latest intent wins. The latest dispatch commits its `next` when it
+  resolves; earlier dispatches write nothing, whether they resolve or reject.
 - **Controlled, sync prefix** (`setStyles(next)`): writes land in dispatch order; correct.
 - **Controlled, update on success**: whole-value writes land in completion order and can lose a
   change; use the functional update of 2.3. Shown next to every such example in the docs.
-- A superseded dispatch's rejection reaches the boundary through the shared hook (conventions 2.4).
+- A superseded dispatch's rejection (an older one, when a newer dispatch exists) is passed to
+  `reportError` by the shared hook, not to the boundary; the latest dispatch's rejection reaches
+  the boundary (conventions 2.4).
 
 ---
 
@@ -998,8 +1024,8 @@ superseded rejection, which `useActionTrigger` gives it (tested as for `Menu.Ite
 | 2 | Value model (both) | jsdom | Multiple: click dispatches `(next, { added, removed })` with `next` in document order and a fresh array; exclusive: switch carries both `added` and `removed`, deselect gives `null` with `removed: [prev]`; `deselectable={false}` dispatches nothing on the pressed Item; disabled Items (own and Root) never dispatch; `details.event` is the native click (asserted via `details.event`). |
 | 3 | Async action (both) | jsdom | Deferred action: Item `aria-pressed` flips at once, `data-pending` on Root and the Item, sibling committed content unchanged; after resolve pending gone, content updated. Per-Item pending: a second click on the same Item clears its `data-pending` while the Root keeps it. |
 | 4 | Rejection (both) | jsdom | Rejected action reaches `<ErrorCatcher>` above the Root; optimistic reverts; uncontrolled committed unchanged. Caught-inside resolves and commits. |
-| 5 | Overlap | jsdom | Bold then Italic with two deferreds, resolved 2 → 1 and 1 → 2: final committed `[bold, italic]`; stacked patches re-base when 1 rejects. |
-| 6 | Superseded rejection (both) | jsdom | Reject 1 after 2 resolved, and while 2 pends: the catcher records it; 2's outcome unaffected. |
+| 5 | Overlap | jsdom | Bold then Italic with two deferreds, resolved 2 → 1 and 1 → 2: final committed `[bold, italic]`; stacked patches re-base when 1 rejects. Settled changes (#150, uncontrolled multiple): 1 rejects before / after 2 resolves: committed `[italic]`, the rejection reported. Exclusive (uncontrolled, from `left`), both settle orders: a rejected press of Center then a resolved press of Right ends on Right alone; a rejected press of Center then a resolved release ends with nothing pressed. |
+| 6 | Superseded rejection (both) | jsdom | Reject 1 after 2 resolved, and while 2 pends: `reportError` (stubbed) is called once and the catcher is not; 2's outcome unaffected. |
 | 7 | Suspending content (both) | jsdom | 11.6 with `createSuspender`. |
 | 8 | Function props, `render` | jsdom | Root and Item `className` / `style` / `children` / `render` receive the documented state; `render={<MyButton />}` keeps dispatch, class merge, `ref`. `Toolbar.Button render={<a href />}` gets no `type`. |
 | 9 | Post-await rule | jsdom | Controlled parent updating after `await` inside `startTransition` converges in one state. |
@@ -1087,7 +1113,8 @@ import `../internal/platform-attributes.js` for the `focusgroup` / `focusgroupst
 
 - `useControllableAction<ReadonlySet<string>, ToggleGroupValueChangeDetails>` over the internal
   set (`controlled` mapped from `value`, `defaultValue` mapped the same way, `initialValue` an
-  empty set), `reducer` = `reduce` of 5.2, `transitionTypes` from `added` / `removed`,
+  empty set), `reducer` = `reduce` of 5.2 in multiple mode and `undefined` in exclusive mode,
+  `transitionTypes` from `added` / `removed`,
   `warn: { component: "ToggleGroup", prop: "value" }`. The action wrapper converts `next` to the
   consumer's shape (`string[]` in document order, or `string | null`) before calling
   `valueChangeAction`.

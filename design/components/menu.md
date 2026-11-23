@@ -928,7 +928,9 @@ Notation: `C` / `O` / `P` as in Popover. Uncontrolled root menu, `keepMounted={f
    `keepMounted`.
 5. **RadioItem switch, overlap.** "By date" then "By name" before the first settles: optimistic
    follows the latest; `data-pending` moves to "By name" and stays on the group; the first
-   resolution is superseded; the final committed value is "name".
+   resolution is superseded; the final committed value is "name". If the first action rejects
+   instead, the error is passed to `reportError`, not to the boundary, and the menu stays as the
+   newer pick left it (conventions 2.4, #145).
 6. **Submenu by hover, then keyboard.** Pointer moves over "Move to": `pointermove` focuses it;
    `pointerenter` starts the 100 ms timer → `requestOpen` with cause "none" → submenu opens
    beside the item, focus still on "Move to". ArrowRight → the SubmenuTrigger's handler: the
@@ -1059,7 +1061,8 @@ landed with #41); a rejection goes to the boundary above the item and leaves the
 superseded rejection on the same item, two clicks with the first rejecting after the second
 resolved, was caught by the hook and thrown from the item's render; since #81 an `Item` never has
 two runs in flight, so that row is N/A for `Item` and stays for `CheckboxItem` / `RadioItem`,
-`design/components/button.md` 16.4 M4.) A
+`design/components/button.md` 16.4 M4. Since #145 a superseded rejection of a `CheckboxItem` or
+`RadioGroup` dispatch is passed to `reportError` instead of the boundary, conventions 2.4.) A
 close that belongs to an earlier open is dropped (open-generation guard, section 14); this
 applies to `Item` and to `closeOnActivate` on `CheckboxItem` / `RadioItem` alike (deviation 6).
 Submenu content that suspends holds the submenu's open with `data-pending` on the
@@ -1096,7 +1099,7 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | Rejection (both) | Item rejects: `ErrorCatcher` inside the Popup receives it, menu open, `hidePopover` not called. CheckboxItem rejects: `aria-checked` rolls back, catcher receives. RadioGroup likewise. Caught-inside variants commit. |
 | Overlap | Two RadioItem dispatches out of order: optimistic latest, committed latest. Two Item clicks (#81): action called **once**, the second is ignored and `defaultPrevented`, `aria-disabled="true"` meanwhile, one `requestClose`. |
 | Open-generation guard | Dismiss (`hidePopover()`) and re-open while an Item's, a `closeOnActivate` CheckboxItem's and a `closeOnActivate` RadioItem's action is pending (`keepMounted` for the radio, since uncontrolled state unmounts with the items); on resolve the menu stays open, `requestClose` not called. The re-open commits only when the action settles (walkthrough 11). |
-| Superseded rejection (both) | CheckboxItem / RadioGroup: the older dispatch rejects after and while the newer is pending; the catcher gets it. Item: the older click's rejection reaches the catcher through `useActionTrigger` (one row each for `Popover.Close` and `Dialog.Close` as well; they fail without the hook). |
+| Superseded rejection (both) | CheckboxItem / RadioGroup: the older dispatch rejects after and while the newer is pending; `reportError` (stubbed) gets it once, the catcher does not (#145). Item: N/A since #81 (one run at a time; `Popover.Close` and `Dialog.Close` likewise), replaced by the Re-entry and single-run rejection rows of `design/components/button.md` 16.4. |
 | Suspending content (both) | Popup children suspend on open: `showPopover` not called, Trigger pending; resolve: called, first item focused. Submenu likewise with `data-pending` on the SubmenuTrigger. |
 | Function props / `render` | Every part's state; `render={<a href />}` on an Item activates through Enter (via `click()`) and click; `render={<div role="separator" />}` on Separator. |
 | Post-await rule | Controlled Root and controlled CheckboxItem / RadioGroup updating after `await`. |
@@ -1152,7 +1155,7 @@ packages/ui/src/menu/                    (as implemented in #41)
   menu-dom.ts               # no directive: items from the DOM, typeahead text, isRtl, capturePointer, isEditableTarget
   menu.test.tsx, menu.browser.test.tsx
 packages/ui/src/internal/
-  use-action-trigger.ts     # "use client": useActionTrigger({ openGeneration?, ignoreWhilePending?, captureSuperseded? }) => { pending, run(work, then?) } (shared with Popover.Close, Dialog.Close)
+  use-action-trigger.ts     # "use client": useActionTrigger({ openGeneration?, ignoreWhilePending? }) => { pending, run(work, then?) } (shared with Popover.Close, Dialog.Close)
   use-delayed-pair.ts       # "use client": createDelayedPair() / useDelayedPair(): one open-or-close timer slot with cancelClose (Tooltip uses the factory inside its effect)
   use-overlay-root.ts, use-popover-popup.ts, use-popover-trigger.ts, overlay-popup.tsx   # Popover 14; extension points below
 ```
@@ -1182,8 +1185,8 @@ packages/ui/src/internal/
   "activate"); })`: the hook reads the root Root's open generation when `run` is called and skips
   `then` when it changed by the time the action resolved, meaning the user dismissed the menu and
   opened it again while the action ran and the close belonged to the earlier open (Popover 3.4,
-  product-owner decision at the Popover review). The hook also surfaces a superseded click's
-  rejection (section 12). `CheckboxItem` and `RadioItem` with `closeOnActivate` apply the same
+  product-owner decision at the Popover review). A superseded click cannot occur on an `Item`
+  since #81 (section 12). `CheckboxItem` and `RadioItem` with `closeOnActivate` apply the same
   guard through `closeStackLater` in `menu-context.ts` (their state lives in
   `useControllableAction`, so they do not use the hook; deviation 6). `Popover.Close` and
   `Dialog.Close` use the same hook.

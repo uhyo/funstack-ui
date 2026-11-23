@@ -723,7 +723,8 @@ failure-prone saves add an `aria-live` region.
 `defaultValue="a"`, options a…e, `valueChangeAction={async (next) => { await save(next); }}`.
 `ArrowDown` three times on the closed select: three `change` events, three dispatches (b, c, d),
 `O` re-based each time, the pending option always the latest, `P` true until all settle, the
-latest-dispatch guard commits only d. In Chromium's customizable select the same presses open the
+latest-dispatch guard commits only d; a rejection of b's or c's save is passed to `reportError`,
+not to the boundary (conventions 2.4, #145). In Chromium's customizable select the same presses open the
 picker and move focus, and only `Enter` dispatches once. The guidance is the conventions' own:
 await only what the UI must wait for (`(next) => { void save(next); }` for a preference), or
 leave `valueChangeAction` off and let the form carry the value. There is no manual activation
@@ -900,7 +901,7 @@ the browser row).
 | Async action (both) | While unresolved: `data-pending` on Root, Trigger and the picked Option only; `select.value` is the picked value in the DOM; `data-selected` moved. After resolve: pending gone, value committed / parent updated. |
 | Rejection (both) | Uncaught: `ErrorCatcher` above the Root receives it; uncontrolled internal value unchanged. Where the Select stays mounted (caught inside, controlled veto): `select.value` and `data-selected` back on the old option, no `data-pending`. |
 | Overlap | Two picks resolved out of order: DOM and `data-selected` on the latest throughout, final committed is the latest; 9.6 (pick back the committed value) calls both actions and commits the committed value. |
-| Superseded rejection (both) | The older pick rejects after and while the newer is pending: the boundary gets it, the newer's outcome unaffected. |
+| Superseded rejection (both) | The older pick rejects after and while the newer is pending: `reportError` (stubbed) gets it once, the boundary does not; the newer's outcome unaffected. |
 | Suspending content (both) | Dependent `<Suspender />` keyed on the consumer's state: old content stays, no fallback above the component, Root `data-pending`; then new content. |
 | Late options (6.2) | Controlled `value="c"` with options under `<Suspense>` + `createSuspender`: before resolve `selectedIndex === -1` and **no dispatch**; after resolve `select.value === "c"`, still no dispatch; the same with an enabled fallback option (DOM `""` before, no dispatch); uncontrolled likewise. |
 | Platform: mount reconciliation | `renderToString` with `"a"` selected, set `select.value = "c"` before `hydrateRoot`: exactly one dispatch `("c", { reason: "platform", event: undefined })`; StrictMode still one; a controlled parent that refuses → DOM back on `"a"` after settle; **no dispatch** when the value matches no option (fallback-only DOM) at mount; a late hydrated option (Suspense boundary hydrating after the Root, DOM pick set before reveal) → one dispatch; a late created option → none. |

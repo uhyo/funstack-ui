@@ -53,7 +53,10 @@ a transition, the urgent lane is `on<State>Change: UrgentChangeHandler` in 2.1, 
 2026-10-24 with the wave 16 refactoring fold, #100: `disabledButton` in 1.2, the two-channel
 capture in 2.4 and 3.4, the production-bundle rule for development text in 7.2, the shared
 control hooks in 3.8, the `internal/` layout in 9.1, the cross-channel row in 10.1, the
-shipped-CSS modules in 12).
+shipped-CSS modules in 12; amended 2026-11-23 with #145, **user decision**, and #150, see resolved
+question 42: superseded rejections go to `reportError` in 2.4, 3.4 and 10.1 (the two-channel
+capture of #100 is gone), the set-valued commit in 2.5, 3.3 and 3.4, `report-superseded.ts` in 9.1,
+the Overlap row in 10.1).
 Binding for every component design in
 `design/components/`. `docs/vision.md` wins over this document; this document wins
 over any individual component design.
@@ -69,7 +72,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
 | 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. A pure trigger ignores activation while its own action is pending and renders `aria-disabled="true"` meanwhile (#79). **`fooAction` always means a handler the component runs in a transition**; no `on*` handlers in the library API except the urgent lane's `on<State>Change` (row 11, #96). A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), never a handler. |
-| 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins. "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
+| 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins, and set-valued state without `exclusive` commits the changes whose actions resolved (3.3, #150). "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says (#35). `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine (#38). Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
@@ -552,39 +555,66 @@ What a consumer can rely on:
 ### 2.4 Errors
 
 An action that throws or rejects reaches the **nearest Error Boundary above the library
-component that owns the transition** (the `Root`, or the component itself). The library never
+component that owns the transition** (the `Root`, or the component itself), with one exception:
+the rejection of a **superseded** action (an older one, when a newer action of the same owner was
+dispatched before it settled) is passed to the global `reportError` instead. The library never
 swallows an error. There is no `errorAction` prop in v0.
 
-React alone does not guarantee this when dispatches overlap. `useTransition` stores one thenable
-per `startTransition` call as a state update and only the newest is ever unwrapped, so an older
-action's rejection is dropped entirely: no boundary, no `reportError`, no `unhandledrejection`
-(verified by the reviewer on 19.3.1, both resolution orders, both modes). The library closes that
-gap (product-owner decision): the shared hook attaches a rejection handler to every dispatch it
-is not the latest for, stores the first such error in state, and **throws it from render** on the
-next commit, so a superseded action's failure reaches the same nearest boundary as a latest one.
+Why the exception (#145, user decision 2026-11-23, option B of
+`memo/architect/143-design-questions.md`). `useTransition` stores one thenable per
+`startTransition` call as a state update and only the newest is ever unwrapped, so React drops an
+older action's rejection entirely: no boundary, no `reportError`, no `unhandledrejection`
+(verified on 19.3.1, both resolution orders, both modes). Until #145 the library caught that
+rejection and threw it from render so it reached the boundary too
+(`useSupersededRejection`, removed). That replaced the whole UI because of an intent the user had
+already replaced, and it was a behaviour React does not have for the same code written by hand.
+Now the library does what React's standalone `startTransition` does with a rejection it has no
+boundary for: it reports it. The UI stays up and shows the latest intent; the failure reaches
+`window.onerror`, monitoring tools and test runners.
+
 Contract:
 
-- The latest dispatch's rejection propagates through React's own path (nothing is caught). It
-  reaches the boundary only **after every older overlapping dispatch has settled**: React holds
-  the boundary's commit while the entangled action lane is still pending (section 2.3 item 5).
-  React behaviour, documented so a test that rejects the newest of two dispatches does not expect
-  the fallback before the older one resolves.
-- A superseded dispatch's rejection is caught by the hook, stored, and rethrown from render inside
-  a transition-free update so the boundary sees it on the next render of the owner.
-- Only the first superseded error is kept; later ones are reported through `reportError` to avoid
-  a cascade of boundary resets. Which error wins when both the latest and a superseded dispatch
-  reject is not defined.
+- The **latest** dispatch's rejection propagates through React's own path: the hook rethrows it
+  inside the transition. It reaches the boundary only **after every older overlapping dispatch
+  has settled**: React holds the boundary's commit while the entangled action lane is still
+  pending (section 2.3 item 5). React behaviour, documented so a test that rejects the newest of
+  two dispatches does not expect the fallback before the older one resolves.
+- "Latest" is judged **when the rejection arrives**: a dispatch is superseded when another
+  dispatch of the same hook instance was made after it, whether that one is still pending or has
+  already settled.
+- A **superseded** dispatch's rejection is caught by the hook and passed to `reportSuperseded`
+  (`internal/report-superseded.ts`): the global `reportError` (a window `error` event), or
+  `console.error` in an environment without it. Nothing is thrown, no state is written, no
+  boundary is involved, and the newer dispatch's outcome is unaffected.
+- **Every** superseded rejection of a burst is reported, each once, in the order they arrive.
+  When the latest dispatch rejects as well, it still goes to the boundary; the two routes are
+  independent.
+- Reports **continue after unmount**: the hook has no mounted check, so a superseded action that
+  rejects after its component left is still reported.
+- **Open gap: the latest action's rejection after unmount is dropped.** The hook rethrows it
+  inside the transition, and React routes a transition's rejection only through a render of the
+  component that owns it; with that component gone nothing reads it (probed 2026-11-23 on
+  19.3.1 with `useActionTrigger`: no boundary, no `reportError`, no `unhandledrejection`). So
+  after unmount a superseded failure is reported and a latest one is not. This predates #145
+  (the removed hook dropped both). The fix that matches the rule above is to pass the latest
+  rejection to `reportSuperseded` as well when the owner has unmounted; not decided, not
+  implemented. Reachable today: a `Toast.Action` whose toast is closed while its action runs
+  (toast.md walkthrough 6); by the same reasoning, not probed, a `Menu.Item` or Close part whose
+  overlay is dismissed and unmounts it meanwhile.
 - A consumer who catches inside the action is unaffected, as before.
-- The catch-store-throw lives in one hook, `useSupersededRejection()`
-  (`internal/use-superseded-rejection.ts`), which `useControllableAction` and
-  `useActionTrigger` call themselves. A component with **two transition channels** (Slider
-  and NumberField: steps through `useActionTrigger`, commits through
-  `useControllableAction`) calls it once, **before both hooks**, and passes the result as
-  `captureSuperseded` to both. React retries an errored render with every pending lane, and in
-  that retry a `useTransition` whose action still pends suspends; a rejection thrown after the
-  other channel's `useTransition` would therefore wait for that channel's action to settle.
-  One capture ahead of both transitions reaches the boundary promptly whichever channel
-  rejected (pinned per component, section 10.1).
+- Both hooks (`useControllableAction`, `useActionTrigger`) do this themselves, per instance. A
+  component with **two transition channels** (Slider and NumberField: steps through
+  `useActionTrigger`, commits through `useControllableAction`) needs nothing extra: each channel
+  judges "latest" among its own runs and reports its own superseded rejections, also while the
+  other channel's action is pending. There is no hook-order constraint and no shared capture
+  (`captureSuperseded` is removed).
+- For a **pure trigger** the path is unreachable while the re-entry guard is on (section 2.5):
+  it never has two runs in flight.
+
+Consequence for tests: in a real browser `reportError` dispatches a window `error` event, which
+vitest browser mode counts as an unhandled error, and vitest's jsdom environment has no
+`reportError` (the `console.error` fallback runs). A test that makes an older action reject stubs
+the global (`vi.stubGlobal("reportError", vi.fn())`) and asserts on it (section 10.1).
 
 Optimistic state reverts automatically. Uncontrolled committed state is written only after the
 action resolves, so a rejected action leaves it untouched (section 3.3). A controlled parent gets
@@ -614,16 +644,31 @@ the parent needs to veto.
 
 React neither cancels nor orders overlapping actions. The library's stance:
 
-- **Single-shot components (Toggle, Tabs, Accordion): latest intent wins.** The optimistic reducer
-  already shows the most recent dispatch; the library commits uncontrolled state only for the most
-  recently dispatched action, ignoring earlier ones that resolve later. (Verified: without this
-  guard the slowest promise wins.) An earlier action's *rejection* is not ignored: the hook
-  surfaces it to the boundary itself, because React would drop it (section 2.4).
+- **Single-valued state (Toggle, Tabs, Select, RadioGroup, an overlay's `open`, Accordion and
+  ToggleGroup with `exclusive`): latest intent wins.** The optimistic value already shows the
+  most recent dispatch; the library commits uncontrolled state only for the most recently
+  dispatched action, ignoring earlier ones that resolve later. (Verified: without this guard the
+  slowest promise wins.) An earlier action's *rejection* changes nothing on screen; it is
+  reported through `reportError` (section 2.4).
+- **Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`): every
+  resolved change is kept** (#150). Each dispatch is one change to the set (a patch: `added` /
+  `removed`, or one item opened or closed), and the changes are independent intents, so "latest
+  wins" would be wrong in both directions: the latest `next` is computed from the intended set
+  and so contains earlier in-flight changes, including one whose action later rejects. The
+  uncontrolled value is therefore committed from the dispatches that **resolved**: when the last
+  overlapping dispatch settles, they are replayed with the component's reducer onto the
+  committed value, in dispatch order (not resolution order); a rejected dispatch leaves no trace
+  (section 3.3). Check A (its save rejects), check B (its save resolves): the group ends with B
+  only. Consequence for the consumer: the `next` an action receives is the *intended* value
+  (B's action is called with `[A, B]`), which may contain a change that fails later. An app that
+  persists `next` whole can end out of step with the group; persist `details.added` /
+  `details.removed` (or the one `details.item`) instead. Component docs say so.
 - **Controlled parents are not guarded.** The latest-intent guard protects uncontrolled state
   only. A controlled "update on success" parent that writes the *whole value*
   (`startTransition(() => setChecked(next))` after its `await`) lands writes in completion order,
-  so under overlap with differing completion order the slower, older intent wins; this is the
-  same class of problem as Accordion's multiple mode (`design/components/accordion.md` 2.2).
+  so under overlap with differing completion order the slower, older intent wins, and a
+  set-valued parent that adopts `next` whole also adopts a change whose action rejected (the
+  replay above is uncontrolled only; `design/components/accordion.md` 2.2).
   Recommended: functional updates keyed by what changed, or a sequence check in the parent, or
   uncontrolled mode. Component docs show the pattern next to every "update on success" example.
 - **No queueing in the library.** Components that need ordered, result-threaded actions (forms,
@@ -900,14 +945,53 @@ equal `:popover-open` within a task in every phase. The component doc says so ex
 
 ### 3.3 When uncontrolled state is committed
 
-After the action resolves, inside a re-wrapped `startTransition`, and only if no later action has
-been dispatched since (latest intent wins). This gives:
+After the action resolves, inside a re-wrapped `startTransition`. Which value is written depends
+on the shape of the state (section 2.5):
 
-- Rollback on rejection for free (nothing was written).
+- **Without a reducer** (single-valued state): the dispatch's `next`, and only if no later action
+  has been dispatched since (the latest-dispatch guard; latest intent wins).
+- **With a reducer** (set-valued state: CheckboxGroup, and ToggleGroup and Accordion without
+  `exclusive`; #150): nothing is written while another dispatch of the same owner is in flight.
+  When the last of the overlapping dispatches settles (resolved or rejected), the dispatches that
+  **resolved** are replayed with the reducer onto the committed value, in dispatch order, in one
+  functional update; the rejected ones are skipped. If none resolved, nothing is written. A
+  single dispatch with no overlap is the degenerate case: its change is applied when it
+  resolves.
+
+Both give:
+
+- Rollback on rejection for free (nothing was written for the rejected dispatch).
 - Identical observable timing to writing before the `await`: transition-lane writes inside an
-  async action are held until it settles anyway (verified), so there is no cost to waiting.
+  async action are held until it settles anyway (verified), and React entangles overlapping
+  actions, so waiting for the whole burst costs nothing visible either.
 - Controlled/uncontrolled parity when the controlled parent follows the "update on success"
-  pattern.
+  pattern (for set-valued state: with functional updates keyed by what changed, section 2.5).
+
+Details of the replay:
+
+- **The reducer is the optimistic reducer.** One function does both jobs: it re-bases stacked
+  optimistic patches onto a changed committed value (section 3.4), and it replays resolved
+  changes at commit. It must therefore read the change from `details` (the patch or the item),
+  not from `next`.
+- **Absolute dispatches.** A reducer may adopt `next` whole for a dispatch that is not a change
+  by the user but the whole value the browser left behind. Two exist: CheckboxGroup's **form
+  reset** (`reason: "platform"` with `details.event` set, the `reset` event: a reset replaces the
+  value, so a change rejected after it cannot survive it), and Accordion's **mount
+  reconciliation** in multiple mode (`reason: "platform"` without an event: all pre-hydration
+  clicks as one `next`). CheckboxGroup's mount and late-mount reconciliations stay patches.
+  The two components use opposite tests on `details.event` on purpose; each is stated in its
+  design.
+- **Exclusive modes pass no reducer.** `exclusive` ToggleGroup and Accordion are single-valued:
+  the optimistic value is `next` and the latest dispatch commits it, exactly like Tabs. (A patch
+  reducer there would bring a replaced item back: a rejected press followed by a resolved
+  release replays to the old item.)
+- **When the latest dispatch rejects**, the earlier resolved changes are still committed, and
+  the rejection then reaches the boundary (section 2.4).
+- **Controlled mode writes nothing**, with or without a reducer; the reducer is then only the
+  optimistic re-base.
+- Known leftover (#151): a CheckboxGroup form reset whose target equals the intended value
+  dispatches nothing, so it does not enter the burst; if an earlier in-flight uncheck then
+  rejects, its rollback shows after the reset.
 
 For a continuous control (Slider) "the action" is the gesture's **commit** action: steps
 (`valueChangeAction`) write no uncontrolled state, the commit's resolution does, so a rejected
@@ -932,35 +1016,55 @@ export function useControllableAction<T>(options: {
   defaultValue: T;
   action: ChangeAction<T> | undefined;
   transitionTypes?: (next: T, prev: T, details: ActionDetails) => readonly string[];
+  /** Set-valued state only. Optimistic re-base, and the replay of the uncontrolled commit (3.3). */
+  reducer?: (prev: T, next: T, details: ActionDetails) => T;
 }) {
+  const { reducer } = options;
   const [internal, setInternal] = useState(options.defaultValue);
   const isControlled = options.controlled !== undefined;
   const committed = isControlled ? (options.controlled as T) : internal;
-  const [optimistic, setOptimistic] = useOptimistic(committed, (_prev: T, next: T) => next);
-  const [supersededError, setSupersededError] = useState<unknown>(undefined);
-  // Throw BEFORE useTransition(): when a render throws, React retries with all pending lanes,
-  // and in that retry useTransition would unwrap the still-pending newer action's thenable and
-  // suspend, holding the boundary's fallback commit until that action settles (verified by the
-  // developer). Throwing first lets the boundary commit immediately.
-  if (supersededError !== undefined) throw supersededError; // reaches the same boundary
+  const [optimistic, setOptimistic] = useOptimistic(
+    committed,
+    (prev: T, patch: { next: T; details: ActionDetails }) =>
+      reducer ? reducer(prev, patch.next, patch.details) : patch.next,
+  );
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
+  const inFlight = useRef(0);
+  const burst = useRef<{ next: T; details: ActionDetails; resolved: boolean }[]>([]);
+
+  // Called once per dispatch, resolved or rejected. The last one of a burst commits the replay.
+  function settle(): void {
+    if (--inFlight.current > 0) return;
+    const resolved = burst.current.filter((entry) => entry.resolved);
+    burst.current = [];
+    if (resolved.length === 0) return;
+    startTransition(() =>
+      setInternal((prev) => resolved.reduce((v, e) => reducer!(v, e.next, e.details), prev)),
+    );
+  }
 
   function dispatch(next: T, details: ActionDetails): void {
     const prev = committed;
     const id = ++latest.current;
+    inFlight.current++;
+    const entry = !isControlled && reducer ? { next, details, resolved: false } : null;
+    if (entry) burst.current.push(entry);
     startOwnTransition(async () => {
       for (const type of options.transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
-      setOptimistic(next);
+      setOptimistic({ next, details });
       try {
         await options.action?.(next, details);
       } catch (error) {
-        if (id === latest.current) throw error;   // React routes the latest dispatch's error
-        setSupersededError((prev) => prev ?? error); // React would drop this one (section 2.4)
+        settle();
+        if (id === latest.current) throw error; // React routes the latest dispatch's error
+        reportError(error);                     // React would drop this one (section 2.4)
         return;
       }
-      if (!isControlled && id === latest.current) {
-        startTransition(() => setInternal(next));
+      if (entry) entry.resolved = true;
+      settle();
+      if (!isControlled && !entry && id === latest.current) {
+        startTransition(() => setInternal(next)); // no reducer: the latest dispatch commits `next`
       }
     });
   }
@@ -976,14 +1080,27 @@ is React's root container by the time the action runs); Tabs derives `fsui-tabs-
 comparing their DOM order. `prev` is the committed value at dispatch time, not the optimistic
 one.
 
-The sketch's `supersededError` state is `useSupersededRejection()` in the implementation
-(section 2.4). The hook calls it itself unless the component passes its own through the
-`captureSuperseded` option, which Slider and NumberField do with one capture ahead of both
-their channels.
+In the implementation `reportError(error)` is `reportSuperseded(error)`
+(`internal/report-superseded.ts`: `console.error` where the global is missing), and each burst
+entry keeps the reducer of the render it was dispatched from. The hook holds no error state, so
+it has no ordering constraint against `useTransition` and takes no capture option (the
+`captureSuperseded` option of the pre-#145 design is gone, section 2.4).
 
-The reducer form of `useOptimistic` is mandatory so that stacked optimistic updates are re-based
-onto a changed `committed` value. For single-value states the reducer is `(_, next) => next`;
-multi-item states (Accordion's expanded set) use a real reducer keyed by item.
+`useOptimistic` is always used in its reducer form, so that stacked optimistic updates are
+re-based onto a changed `committed` value. A component passes **no `reducer`** for single-valued
+state (the optimistic value is the dispatched `next`, the uncontrolled commit is the latest
+dispatch's `next`): Toggle, Tabs, Select, RadioGroup, overlay `open`, and the `exclusive` modes
+of ToggleGroup and Accordion. It passes a `reducer` for set-valued state: CheckboxGroup, and
+ToggleGroup and Accordion without `exclusive`. Passing one changes two things at once: the
+optimistic value is re-based change by change, and the uncontrolled commit becomes the replay of
+section 3.3. Rules for a reducer:
+
+- It reads the change from `details` (a patch's `added` / `removed`, or `item` and `open`), not
+  from `next`, except for a dispatch it documents as absolute (3.3).
+- It is pure and does not depend on the optimistic value at dispatch time: it runs again, later,
+  against a different base.
+- A mode that is single-valued passes `undefined`, not a "replace" reducer; with a reducer the
+  dispatch would enter the replay.
 
 Library state never lives in `useSyncExternalStore`: a store mutation during a transition forces a
 blocking re-render and defeats both fallback avoidance and ViewTransition. Reading
@@ -1005,13 +1122,11 @@ if (!started) event.preventDefault();                        // ignored while pe
   judged by the hook's synchronous in-flight counter alone, not the last render's `pending`
   (section 2.5). **Default `true`** since #81 (`design/components/button.md` 16.2); a continuous
   control that runs steps through the hook passes `ignoreWhilePending: false` (Slider,
-  NumberField). The options object is the only form (`{ openGeneration?, ignoreWhilePending?,
-  captureSuperseded? }`; the last is section 2.4's two-channel capture).
+  NumberField). The options object is the only form (`{ openGeneration?, ignoreWhilePending? }`).
 - A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
-  the part; an older run's rejection (the part was clicked again before the first settled) is
-  caught, kept and thrown from the part's render before `useTransition` (the superseded-rejection
-  surfacing of section 2.4), later ones go to `reportError`, and a rejection after the part
-  unmounted is dropped.
+  the part; a superseded run's rejection (reachable only with `ignoreWhilePending: false`: the
+  steps of a continuous control) is passed to `reportError` (section 2.4), every one of a burst,
+  also after the part unmounted.
 - `then` still runs when the part unmounted meanwhile (an overlay's close must happen even though
   the part left with the content), so the only thing that cancels it is the **open-generation
   guard**: with `openGeneration` given, the hook reads the counter when `run` is called and skips
@@ -2006,7 +2121,7 @@ packages/ui/src/
     platform-attributes.ts  # the one `declare module "react"` (section 7.4)
     use-controllable-action.ts  # section 3.4; also intendedValue (3.8 rule 1)
     use-action-trigger.ts   # section 3.4: pure triggers
-    use-superseded-rejection.ts  # section 2.4: the catch-store-throw both hooks share
+    report-superseded.ts    # section 2.4: reportSuperseded(error) -> global reportError, console.error fallback; both hooks call it
     use-render.tsx          # resolves render / className / style / children against state
     render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton (1.2)
     merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
@@ -2156,8 +2271,8 @@ the reason (for example: "Tooltip: open state is browser-owned, no action props"
 | Sync action (both) | Action receives `(next, details)`; `details.event` is the native event; disabled parts never dispatch; no-op interactions never dispatch. |
 | Async action (both) | While the promise is unresolved: `data-pending` on owner and trigger, optimistic state on the trigger, committed state unchanged on content. After resolve: `data-pending` gone, content updated. |
 | Rejection (both) | Rejected action reaches an Error Boundary around the component; optimistic state reverts; uncontrolled committed state unchanged. Caught-inside variant: resolves, commits. |
-| Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled). |
-| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error reaches an Error Boundary around the component (React alone drops it, section 2.4); the newer action's outcome is unaffected. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79; every pure trigger since #81) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. The rows stay required for state owners and for the step actions of continuous controls. A component with two channels (Slider, NumberField) also pins the **cross-channel** case: a superseded rejection on one channel while the other channel's action pends reaches the boundary without waiting for it (section 2.4), in both directions. |
+| Overlap | Two actions in flight, resolved out of order: optimistic shows the latest, final committed state is the latest dispatched (uncontrolled); `data-pending` stays until both settled and nothing commits before that. Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`) also pins the **settled-changes** row (#150): the older action rejects before, and separately after, the newer resolves; the committed value holds the newer change only, on top of the starting value (section 3.3). Its `exclusive` modes pin the opposite: a rejected press followed by a resolved release ends with nothing selected, not with the old item. CheckboxGroup pins a form reset inside a burst (the value ends at the default). |
+| Superseded rejection (both) | Two dispatches; the older rejects **after** the newer resolved, and separately **while** the newer is still pending. In both cases the error is passed to `reportError` exactly once and **not** to an Error Boundary around the component (section 2.4); the newer action's outcome is unaffected. The test stubs the global (`vi.stubGlobal("reportError", vi.fn())`; jsdom has none, and in browser mode an unstubbed report fails the run). The shared suites also pin: every superseded rejection of a burst of three is reported while the latest one still reaches the boundary, and a superseded rejection after unmount is still reported. Required in every component's test file, once per mode, even though the shared hook has its own tests: the component decides how dispatches are wired (which part owns the transition, platform-initiated dispatches), and that wiring is what these rows guard. A pure trigger that ignores re-entry (#79; every pure trigger since #81) declares this row and the Overlap row N/A with that reason: it never has two of its own runs in flight. The rows stay required for state owners and for the step actions of continuous controls. A component with two channels (Slider, NumberField) also pins the **cross-channel** case: a superseded rejection on one channel while the other channel's action pends is reported at once, without waiting for it, in both directions. |
 | Re-entry (pure trigger) | Required for every pure trigger with the guard on (section 2.5; `Button`, #79): while a deferred action pends, a second click, an Enter and a Space each leave the action at one call and are `defaultPrevented`; two synchronous clicks in one `act` call it once (the in-flight counter); a click after the action resolved but before its commit (held by an unrelated pending action) **runs again** while the element still shows `data-pending` (the guard is the counter only; a non-awaiting action clicked three times under that hold is called three times); after settle the next activation runs; `aria-disabled="true"` is present exactly while `data-pending` is and `data-disabled` is not; focus stays on the element throughout; a pass-through `onFocus` / `onPointerEnter` still fires while pending; a `render`ed link's second click is cancelled. |
 | Suspending content (both) | Content keyed on the new value suspends: old content stays, no fallback shown by a boundary above the component, `data-pending` on; after resolve, new content. |
 | Function props | `className`, `style`, `children`, `render` receive the documented state and the attributes agree with it. |
@@ -2957,6 +3072,25 @@ Decided by the product owner, items 1, 2 and 5 confirmed with the user:
     `memo/architect/eval-121-popovertarget.md`. Applied: decision 7, 3.2, 3.5, 7.3, 7.4;
     `popover.md`, `menu.md` and `combobox.md` edited in place plus an amendment each (Popover's
     carries the implementation and test plan).
+42. **Superseded rejections are reported, not thrown (#145); set-valued state commits resolved
+    changes (#150)**, 2026-11-23. #145 is a **user decision** on the architect's evaluation
+    (`memo/architect/143-design-questions.md`, option B): the rejection of an older overlapping
+    action no longer reaches the Error Boundary through a throw from render; it is passed to the
+    global `reportError` (`console.error` where there is none), as React's standalone
+    `startTransition` does. Every superseded rejection of a burst is reported and reports continue
+    after unmount; the latest action's rejection still reaches the boundary. Removed:
+    `useSupersededRejection`, the `captureSuperseded` option, the "throw before `useTransition`"
+    hook-order rule, the "first error of a burst" rule. This reverses the product-owner decision
+    recorded in 2.4 until then ("the library closes the gap"); "the library never swallows an
+    error" stands. #150 was found by that evaluation and was masked by the boundary before:
+    uncontrolled set-valued state committed the latest dispatch's `next`, which contains earlier
+    in-flight changes, so a change whose action rejected was committed. Now a component that
+    passes a `reducer` (CheckboxGroup; ToggleGroup and Accordion without `exclusive`) commits
+    the resolved dispatches, replayed in dispatch order when the last overlapping one settles.
+    From the review (`memo/reviewer/review-145-150.md`): the `exclusive` modes pass no reducer
+    (single-valued, latest wins, as Tabs), and CheckboxGroup's form reset replaces the value
+    whole. Leftover: #151 (a reset equal to the intended value dispatches nothing). Applied: 2.4,
+    2.5, 3.3, 3.4, 9.1, 10.1, decision 3; the component designs edited in place.
 
 ## Open questions
 

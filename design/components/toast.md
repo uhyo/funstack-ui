@@ -907,8 +907,13 @@ It is not set while content is merely suspended (that is the guard's job, and no
    `aria-disabled`; the resolve closes the toast once. (Before #81: two dispatches, the first
    resolve closed, the second's `then` found it gone.)
 6. **Close pressed while Undo is pending.** The toast closes (`"dismiss"`), the Action's
-   transition keeps running to completion in the unmounted part; its `then` is a no-op, its
-   rejection is reported through the hook's unmounted path (`reportError`), never swallowed.
+   transition keeps running to completion in the unmounted part; its `then` is a no-op. Its
+   rejection is **not reported anywhere**: it is the part's latest run, the hook rethrows it
+   inside the transition, and React drops the rejection of a transition whose component has
+   unmounted (probed 2026-11-23 on 19.3.1: no boundary, no `reportError`, no
+   `unhandledrejection`). The earlier text here said `reportError`; that was never the
+   behaviour for a latest run. Open gap against "the library never swallows an error",
+   conventions 2.4.
 7. **Promise toast whose promise never settles.** Stays `pending`, persistent; `toast.dismiss(id)`
    removes it; the returned promise is as unsettled as the input.
 8. **`toast.update` on an ending or unknown id.** Ignored (dev warning for unknown).

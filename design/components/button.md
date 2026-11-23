@@ -928,8 +928,13 @@ export function useActionTrigger(options?: ActionTriggerOptions | (() => number)
 The positional `openGeneration` form may stay accepted for the three existing call sites, or they
 may be edited to the object form (three one-line changes); the developer's choice. Inside:
 `inFlight` is a `useRef(0)`; `run` does `if (ignoreWhilePending && inFlight.current > 0) return false; inFlight.current++;` before `startOwnTransition`, and decrements in a
-`finally` around `await work()`. The superseded-rejection machinery stays (it is reachable for the
-unguarded parts and stays correct for guarded ones).
+`finally` around `await work()`. The superseded-rejection handling stays (it is reachable for the
+unguarded parts and stays correct for guarded ones). **Since #145 (2026-11-23)** that handling is
+one call: a run that is no longer the latest passes its rejection to `reportError`
+(`internal/report-superseded.ts`, conventions 2.4) instead of throwing it from the part's
+render; the latest run's rejection is rethrown inside the transition as before. The hook's
+options are `{ openGeneration?, ignoreWhilePending? }`; the `captureSuperseded` option that #100
+added is gone.
 
 ### 15.3 `Button` sketch
 
@@ -1112,7 +1117,7 @@ the rule of 5.2 and conventions 2.5 to every pure trigger and settles the hook's
 | `Popover.Close` | `action`, then the hide | yes | **guard** |
 | `Menu.Item` | `action`, then the menu close | yes | **guard** |
 | `Toast.Action` | `action`, then the toast close | yes: an Undo / Retry / View run twice is a duplicate side effect (toast.md 4.2 called it "harmless for an idempotent Undo"; it is not harmless for Retry) | **guard** |
-| `Slider.Root` (`runStep`) | each step's `valueChangeAction` | **no**: a continuous control dispatches one step per pointer move or key press and every step must run (conventions 2.1, 10.1 "Continuous control"); the hook is used for per-step `pending` and superseded-rejection surfacing only | unguarded, explicit |
+| `Slider.Root` (`runStep`) | each step's `valueChangeAction` | **no**: a continuous control dispatches one step per pointer move or key press and every step must run (conventions 2.1, 10.1 "Continuous control"); the hook is used for per-step `pending` and superseded-rejection reporting (`reportError` since #145, conventions 2.4) only | unguarded, explicit |
 | `NumberField.Root` (`runStep`) | each step's `valueChangeAction` (press-and-hold) | **no**, as Slider | unguarded, explicit |
 
 ### 16.2 The hook's default flips
@@ -1212,7 +1217,7 @@ The old rows named here are rewritten, not deleted, so the suites keep their cov
 
 | # | Row | Test |
 | --- | --- | --- |
-| H1 | Default | `useActionTrigger()` with no options ignores a second `run` while the first is in flight (`run` returns `false`), and runs it after settle; `{ ignoreWhilePending: false }` runs both. The existing superseded-rejection hook tests move under the `false` option. |
+| H1 | Default | `useActionTrigger()` with no options ignores a second `run` while the first is in flight (`run` returns `false`), and runs it after settle; `{ ignoreWhilePending: false }` runs both. The existing superseded-rejection hook tests move under the `false` option. (Since #145 those rows assert: every superseded rejection of a burst is passed to `reportError` and the latest reaches the boundary; superseded rejections are still reported after unmount and nothing is thrown.) |
 | H2 | Slider / NumberField | `slider.test.tsx` and `number-field.test.tsx` step rows (two steps in flight, out-of-order resolution, superseded step rejection) pass unchanged with the explicit `false`; one new assertion per file: a second step dispatched while the first step's action pends is **called** (guards the explicit opt-out). |
 
 ### 16.5 Docs

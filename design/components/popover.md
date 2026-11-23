@@ -1168,7 +1168,8 @@ Notation: `C` = committed open, `O` = optimistic open, `P` = Root pending. Uncon
    close. Action 1 resolves: superseded, no `setInternal(true)`. Action 2 resolves:
    `setInternal(false)`, `C` already `false`, no change; the apply effect finds nothing to do. Net:
    never opened, both actions called, `openChangeAction` saw `true` then `false`. A superseded
-   rejection is surfaced by the shared hook (conventions 2.4). The Trigger shows `data-pending`
+   rejection (action 1's) is passed to `reportError` by the shared hook, not to the boundary
+   (conventions 2.4, #145). The Trigger shows `data-pending`
    from click 1 until action 2 settles.
 8. **Dismissal during a pending part-initiated close.** As 3 with a slow action: `O=false`,
    `P=true`, `C=true`, popup still open. Escape → browser hides → `toggle(closed)`: `intended()`
@@ -1370,7 +1371,7 @@ update-on-success). Library mode unless stated.
 | Async action (both) | `deferred()` open: `data-open`, `data-pending` and **no `aria-expanded`** (#121) on the Trigger, `showPopover` spy not called, children not rendered; resolve: `showPopover` called once with `{ source: trigger }`, children rendered, still no `aria-expanded`, attributes settled. Part-initiated close with a `deferred()`: popup still open and `:popover-open` while pending, `data-pending` on the Trigger, no `data-open`; resolve: `hidePopover` called once. Dismissal: `hidePopover()` then flush `toggle` → `openChangeAction(false, { reason: "dismiss" })` with the `toggle` event; Trigger pending meanwhile. The `shown` mirror's phases (`"false"` as soon as the `toggle` task has flushed, before the notification settles, also entangled with a pending unrelated action; `"true"` again with a refused dismissal's re-show `toggle`, #118 review M1) are asserted on a `render={<a href="#" />}` Trigger, the one Popover part that still renders `aria-expanded`, and on the Combobox Input in its own file. |
 | Rejection (both) | Open rejects: `ErrorCatcher` receives it, `showPopover` never called, no `data-open`. Part-initiated close rejects: catcher above Root receives it, `hidePopover` never called by the library. Dismissal notification rejects: catcher receives it (component replaced). Controlled refusal of a dismissal → `showPopover` called again once settled; controlled refusal of a part-initiated close → `hidePopover` never called, `data-open` back. Caught-inside variants commit. |
 | Overlap | Walkthrough 11.7 with two `deferred()`s resolved out of order: `openChangeAction` called twice, `showPopover` never called, final `aria-expanded="false"`. And 11.8: a `hidePopover()` + `toggle` during a pending part-initiated close dispatches nothing more. |
-| Superseded rejection (both) | Older dispatch rejects after and while the newer is pending; the catcher gets it; the newer outcome unaffected. |
+| Superseded rejection (both) | Older dispatch rejects after and while the newer is pending; `reportError` (stubbed) gets it once, the catcher does not; the popover ends as the newer dispatch left it. |
 | Suspending content (both) | Children mount `<Suspender>` on open: `showPopover` not called, Trigger pending, no fallback from the boundary above; resolve: `showPopover` called, content present. `keepMounted`: Suspender mounts hidden inside `<Activity>` at page render. |
 | Function props | `className` / `style` / `children` / `render` on every part receive the documented state; JS-free mode passes `open: false`, `pending: false`. |
 | `render` element | `render={<div className="x" />}` on Popup keeps the library attributes and listeners; `render={<a href />}` on Trigger in library mode dispatches through the click handler and gets no `type`; a non-button Trigger in JS-free mode warns. |

@@ -510,7 +510,8 @@ single transition-lane commit:   checked=false, pending gone
 
 Same properties as Toggle 6.5: the action is called once per click in click order; `data-pending`
 lasts until all in-flight actions settle; both dispatches' types land on the final commit; a
-superseded rejection is surfaced by the shared hook (conventions 2.4).
+superseded rejection is passed to `reportError` by the shared hook, not to the Error Boundary
+(conventions 2.4, #145).
 
 ### 6.6 Sequence: form reset (residual browser path)
 
@@ -797,8 +798,8 @@ verified (probe 04), so most rows stay there.
 | 10 | Rejection (both) | jsdom | Caught-inside variant: uncontrolled commits `true`; controlled veto wrapper ends with `checked` false. |
 | 11 | Overlap | jsdom | Two clicks, two deferreds: action receives `true` then `false`; during flight `el.checked === false` and pending. Resolve 2 then 1, and 1 then 2: final `false`, not pending. |
 | 12 | Overlap | jsdom | After resolving only the second deferred, `data-pending` is still present. |
-| 12a | Superseded rejection (both) | jsdom | Resolve 2, then reject 1: `<ErrorCatcher>` records the error; committed value `false`. |
-| 12b | Superseded rejection (both) | jsdom | Reject 1 while 2 is pending: recorded; resolving 2 afterwards does not throw again. |
+| 12a | Superseded rejection (both) | jsdom | `reportError` stubbed. Resolve 2, then reject 1: reported once, `<ErrorCatcher>` records nothing; committed value `false`. |
+| 12b | Superseded rejection (both) | jsdom | Reject 1 while 2 is pending: reported once, nothing caught; resolving 2 afterwards reports nothing more. |
 | 13 | Suspending content (both) | jsdom | Wrapper renders `<Suspender key={value}>` under a `<Suspense fallback>` above the Switch. Click: old content stays, no fallback, `data-pending` on. Resolve: new content, pending gone. |
 | 14 | Function props | jsdom | `className`, `style`, `render` receive `{ checked, pending, disabled }`; while pending they see `checked: true, pending: true` and the attributes agree. |
 | 15 | `render` element | jsdom | `render={<MyInput className="x" style={{…}} />}` renders MyInput's input, merges class, keeps the element's style, forwards `ref`, keeps `type="checkbox"` and `role="switch"`, and clicking still dispatches. A `render` element with `checked`, `defaultChecked` or `aria-checked` has them removed. |

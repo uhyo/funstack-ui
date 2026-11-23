@@ -620,8 +620,9 @@ resolved action: in uncontrolled mode the new value commits (conventions 2.4).
 2. The reducer re-bases: `O` is b, then c, then d. The `data-pending` Item is always the latest
    target; react-dom's post-event restore keeps the DOM on it.
 3. Three `save` calls are in flight; `P` stays true until all three settle. The latest-dispatch
-   guard commits only d. If b's promise rejects after d resolved, the shared hook still routes
-   that error to the boundary (conventions 2.4).
+   guard commits only d. If b's promise rejects (before or after d settles), the shared hook
+   passes that error to `reportError`; the group stays on screen on d. Only d's own rejection
+   reaches the boundary (conventions 2.4, #145).
 
 Compared with Tabs' automatic activation: Tabs can switch to `activationMode="manual"` to avoid a
 round trip per arrow press; radios have no manual mode because checking on arrow *is* the native
@@ -847,7 +848,7 @@ controlled wrapper.
 | Async action (both) | While unresolved: `data-pending` on Root and the clicked Item only; the clicked input is `checked` in the DOM; `data-checked` moved; other Items unchanged. After resolve: pending gone, value committed (uncontrolled) / parent updated (controlled). |
 | Rejection (both) | Uncaught: `ErrorCatcher` above the Root receives the error and the whole group is replaced by the boundary's fallback, so no DOM assertion on the radios; uncontrolled internal value unchanged (re-mount shows the old value). DOM rollback is asserted where the group stays mounted: a controlled parent that catches inside the action and does not update → the previously checked input is `checked` again in the DOM, `data-checked` reverted, no `data-pending`; a controlled veto (9.5) → same; uncontrolled caught-inside variant resolves and commits. |
 | Overlap | Arrow to b then c, resolve b last: DOM and `data-checked` on c throughout, final committed c; walkthrough 9.6 (click back to committed while pending): final committed is the committed value, both actions called. |
-| Superseded rejection (both) | b rejects after c resolved, and while c is pending: error reaches the boundary; c's outcome unaffected. |
+| Superseded rejection (both) | b rejects after c resolved, and while c is pending: the error is passed to `reportError` (stubbed) once and does not reach the boundary; c's outcome unaffected. |
 | Suspending content (both) | Dependent `<Suspender />` keyed on the consumer's state updated in the action: old content stays, no fallback from the boundary above, Root `data-pending`; after resolve, new content. |
 | Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; a controlled parent that refuses the hydration dispatch (or catches a rejection inside the action without updating) → the DOM is back on "a" after settle, group still mounted. StrictMode: still one dispatch. Late-mounting Item: an Item under a Suspense boundary that resolves after hydration, with its DOM `checked` set before reveal, produces one additional dispatch via `onItemMounted()`; two such Items in one commit produce one. |
 | Platform: form reset | Inside a `<form>`: check "b", call `form.reset()` → one dispatch `(a-or-null, { reason: "platform", event: Event("reset") })`, uncontrolled commits it; controlled parent that ignores → DOM re-checks the parent's radio after settle; `<form action>` that succeeds auto-resets and dispatches the same way; a cancelled `reset` event dispatches nothing; `Root disabled` still dispatches on reset; reset whose target equals the optimistic value dispatches nothing. |

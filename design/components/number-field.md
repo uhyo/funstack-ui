@@ -7,7 +7,9 @@ amendment is in `design/components/field-form.md`, "Amendment: `validityElement`
 Implemented in c31588b (playground 0a2c701, docs bff9672); the review
 (`memo/reviewer/number-field.md`, "acceptable with minor fixes") and its fixes (6742cb0,
 36b48f4) are folded in on 2026-10-18, see "Review corrections (#67)" at the end; the wave 16
-refactoring (#100, 2026-10-24) into sections 6 and 15 and the superseded-rejection rows. The code under
+refactoring (#100, 2026-10-24) into sections 6 and 15 and the superseded-rejection rows; #145
+(2026-11-23: a superseded rejection goes to `reportError`, the shared capture of #100 is gone)
+into 6, 12, 14 and 15. The code under
 `packages/ui/src/number-field/` is the ground truth where this document is silent. Follows
 `design/conventions.md` (accepted); where this document and the conventions disagree, the
 conventions win.
@@ -580,7 +582,8 @@ feature and is not designed. Product-owner item 9.
 - A hold while a step transition from a slow `valueChangeAction` is pending: ticks keep
   dispatching steps (each its own run); the input follows `live`; `data-pending` stays on.
 - Two commits resolved out of order: the latest dispatched wins the uncontrolled write; the
-  older one's rejection is surfaced to the boundary (conventions 2.4).
+  older one's rejection is passed to `reportError`, not to the boundary, and causes no rollback
+  (conventions 2.4, #145).
 
 ---
 
@@ -1121,7 +1124,7 @@ step transition) can key a type map on them. A rollback carries no types.
 3. **Typing while a save is pending.** Commit `5` (slow save pending). The user focuses the
    field and types `6`: urgent, the draft shows at once. Blur: `step(6)` + `commit(6)`
    supersedes; the first save's result is ignored for the uncontrolled write (its rejection
-   would be surfaced). `data-pending` stays on until the latest settles.
+   would be passed to `reportError`, conventions 2.4). `data-pending` stays on until the latest settles.
 4. **Enter in a `Form.Root`.** Type `12`, press Enter: `keydown` → `step(12)` + `commit(12)` (the
    sync render writes the hidden input before the key's default action) → the implicit
    submission runs the Form's action with `quantity=12`; the commit action (if any) and the
@@ -1193,7 +1196,7 @@ hold uses fake timers; the wheel row dispatches a `WheelEvent` on the input.
 | Async commit (both) | Deferred `valueCommitAction`: `data-pending` on Root, Input and the source button; the text, the hidden value and `state.value` hold the gesture value; uncontrolled committed state unchanged (a `children` probe) until resolve; then committed. |
 | Rejection (both) | The catcher above Root receives it and the field is gone; uncontrolled: `valueChangeAction(prev, { reason: "dismiss", source: null, event: undefined })` once; controlled: no `"dismiss"`; a retry boundary remounts with `defaultValue` / the adopted value; caught-inside commits; **mounted rollback** (update-on-success parent catching inside): `data-pending` leaves, the text and the hidden input return to the parent's value; a draft open at the rollback stays open and commits later. |
 | No snap | Between two ticks of a hold with a synchronous `valueChangeAction` (settled), the text still shows the last tick; an adopt-steps parent whose content suspends: after release the text shows the gesture value until the content resolves, never the pre-gesture value; a non-adopting controlled parent: follows during the hold, returns to `value` after release once. |
-| Overlap, superseded rejection (both) | Two commits with a slow action (a key press, then typing + blur): `data-pending` stays, the latest wins; the older's rejection reaches the catcher after and while the newer is pending. Cross-channel: a superseded commit rejection while a step pends, and a superseded step rejection while a commit pends, each reach the catcher promptly (conventions 2.4). |
+| Overlap, superseded rejection (both) | Two commits with a slow action (a key press, then typing + blur): `data-pending` stays, the latest wins; the older's rejection is passed to `reportError` (stubbed) once, at once, after and while the newer is pending, never to the catcher. Cross-channel: a superseded commit rejection while a step pends, and a superseded step rejection while a commit pends, are each reported at once (conventions 2.4, #145). |
 | Suspending content (both) | A controlled adopt-steps parent's content keyed on the value suspends on a step: old content stays, no fallback above, `data-pending`; then new content (`await act(async …)`). |
 | Platform path (both) | Mount reconciliation: `renderToString`, set the visible input's value to `"3"` before `hydrateRoot` → one `"platform"` step + commit (`source: null`, `event: undefined`), hidden written to `3`, StrictMode still one; the input focused at hydration → adopted as the draft, no dispatch, **also when the text is unparsable (`"12,"` stays under the caret, review M1)**; a value formatted by another locale (`"1.234,5"` under `en`) → no dispatch and the text re-synced to `"1,234.5"`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → the visible `defaultValue` attribute equals `format(target)` at the `reset` event, the hidden resets natively, one step + commit with the `reset` event, a cancelled reset dispatches nothing, a refusing controlled parent is re-synced; a draft open at reset is cleared. |
 | Forms | `FormData` has `name` = `String(value)`, absent when `disabled`, `""` when `null`; `form` attribute honoured; Enter's implicit submission (a `submit` listener) sees the committed value in `FormData`; the text is never posted. |
@@ -1241,7 +1244,7 @@ space); and Firefox's validation bubble swallows the next click (6.2). The "pare
 packages/ui/src/number-field/
   index.ts                        # no directive; namespace + types; imports platform-attributes
   number-field-context.ts         # "use client": NumberFieldContext (state, bounds, stepBase, pendingSource, ids, visibleRef / hiddenRef, step()/commit()/beginHold()/commitDraft(), syncHidden, onItemMounted, field slice)
-  number-field-root.tsx           # "use client": useSupersededRejection (one capture for both channels), useControllableAction (commit), useActionTrigger (steps), draft / live / hold / stepHeld / pendingSource, stepBase, formatter + parser (memoised), useFieldValueChange, reconciliation + reset (through hiddenRef), announcements, warnings
+  number-field-root.tsx           # "use client": useControllableAction (commit), useActionTrigger (steps), draft / live / hold / stepHeld / pendingSource, stepBase, formatter + parser (memoised), useFieldValueChange, reconciliation + reset (through hiddenRef), announcements, warnings
   number-field-label.tsx          # "use client": registers its id; for=
   number-field-input.tsx          # "use client": visible input (controlled text, handlers, wheel listener) + hidden input (uncontrolled, ref-written, invalid listener, autocomplete=off), syncHidden after every commit, useFieldControl with validityElement, onItemMounted
   number-field-increment.tsx      # "use client": `useStepButtonElement("increment", ...)`
@@ -1253,7 +1256,7 @@ packages/ui/src/number-field/
   number-field-format.test.ts, number-field.test.tsx, number-field.browser.test.tsx, number-field.types.test.tsx
 packages/ui/src/internal/
   decimal.ts                      # no directive: decimalsOf / gridDecimals / roundTo, shared with Slider
-  use-superseded-rejection.ts     # conventions 2.4: called once in the Root, passed as `captureSuperseded` to both hooks
+  report-superseded.ts            # conventions 2.4: both hooks pass a superseded rejection to reportError (the Root does nothing itself)
   announce.ts                     # directive-free (#129): announce(target, message, priority?) and canAnnounce(target): ariaNotify only (the fallback live region was dropped, #113 A1); shared with Combobox, focus-first-invalid and Toast
   field-context.ts                # FieldControlRegistration gains `validityElement?: () => ValidatableElement | null`
   use-field-control.ts            # the option, passed through to registerControl
@@ -1263,11 +1266,11 @@ packages/ui/src/internal/
 - **Root.** `useControllableAction<number | null, NumberFieldValueChangeDetails>({ controlled:
   value, defaultValue: defaultValue ?? null, action: wrappedCommit, transitionTypes: () =>
   ["fsui-number-field", "fsui-number-field-commit"], warn: { component: "NumberField", prop:
-  "value" } })`; `useActionTrigger({ ignoreWhilePending: false, captureSuperseded })` for steps, with
-  `captureSuperseded = useSupersededRejection()` called once **before both hooks** and passed to
-  `useControllableAction` too (conventions 2.4: a superseded commit's rejection while a step
-  pends, or a step's while a commit pends, reaches the boundary without waiting for the other
-  channel); `draft`, `live` (+ `liveSet` ref), `hold`,
+  "value" } })`; `useActionTrigger({ ignoreWhilePending: false })` for steps. Each hook reports its
+  own superseded rejections through `reportError` (conventions 2.4: a superseded commit's
+  rejection while a step pends, or a step's while a commit pends, is reported at once; the
+  shared `captureSuperseded` capture of #100 and its "before both hooks" order were removed
+  with #145); `draft`, `live` (+ `liveSet` ref), `hold`,
   `stepHeld`, `pendingSource` as `useState`; `shownRef`, `liveRef`, `committedRef`,
   `gestureStart`, `commitId`, `lastReason` refs; `formatter = useMemo(() =>
   createNumberFormatter(locale, format), [locale, formatKey])` with `formatKey` a stable

@@ -1580,7 +1580,8 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
    (the close was never committed) → React commits with no state change; the apply effect runs
    (nothing in flight), sees `C=true` and `dialog.open=false` → `showModal()`. Net: the dialog
    re-opens when the user's second click settles, both actions were called, latest intent won.
-   The superseded close's rejection, if any, is surfaced by the shared hook (conventions 2.4).
+   The superseded close's rejection, if any, is passed to `reportError` by the shared hook; the
+   dialog stays up and re-opens as described (conventions 2.4, #145).
    The Trigger shows `data-open` and `data-pending` from the second click until the re-open
    commits (4.2). Variant: the close was an Escape during a `Dialog.Form` save. Both the
    notification and the re-open are entangled with the form's action; when the save settles the
@@ -1894,7 +1895,7 @@ update-on-success). Library mode unless stated.
 | Async action (both) | `deferred()` open: `data-open` + `data-pending` on Trigger, `showModal` spy not called, children not rendered; resolve: `showModal` called once, children rendered, attributes gone. Close notification: `requestClose("x")` → `close` → `openChangeAction(false, { reason: "dismiss", returnValue: "x" })` after... (a `requestClose` from script is a dismiss; the `"activate"` label is asserted through a `command` event with `request-close` and through a `method="dialog"` submit); while pending the Trigger has `data-pending` and no `data-open`. |
 | Rejection (both) | Open rejects: `ErrorCatcher` receives it, `showModal` never called, no `data-open`. Close notification rejects uncaught: the catcher above Root receives it and the whole component is replaced (no re-open to assert). Re-open is asserted where the component stays mounted: controlled parent refusing the close, and a controlled action that catches without adopting `false` → `showModal` called again once settled. Caught-inside variants commit. |
 | Overlap | Walkthrough 11.8 with two `deferred()`s resolved out of order: `openChangeAction` called twice, final `showModal` call count and `data-open` match the latest dispatch. |
-| Superseded rejection (both) | Older dispatch rejects after and while the newer is pending; `ErrorCatcher` gets it; the newer outcome unaffected. |
+| Superseded rejection (both) | Older dispatch rejects after and while the newer is pending; `reportError` (stubbed) gets it once, `ErrorCatcher` does not; the dialog ends as the newer dispatch left it. |
 | Suspending content (both) | Popup children mount `<Suspender>` on open: `showModal` not called, Trigger pending, no fallback from the boundary above; resolve: `showModal` called, content present. `keepMounted`: Suspender mounts hidden at page render inside `<Activity>`. |
 | Function props | `className` / `style` / `children` / `render` on every part receive the documented state; JS-free mode passes `open: false`, `pending: false`. |
 | `render` element | `render={<dialog className="x" />}` keeps `id`, ARIA and the listeners; `render={<a href />}` on Trigger in library mode dispatches through the click handler and gets no `type`; a non-dialog element warns. |
@@ -2125,8 +2126,9 @@ packages/ui/src/internal/use-overlay-root.ts, overlay-popup.tsx, use-overlay-clo
   { recordCloseIntent({ reason: "activate", event: native }); dialog.close(value ?? ""); }`.
   Without `action` the click calls `close(native)` at once; with `action`, `run(() =>
   action(details), () => close(native))`. Errors: the latest click's rejection takes React's
-  route to the boundary; a superseded click's rejection is caught by the hook and thrown from
-  the part's render (ac7064e). `then` is skipped when the open generation changed (3.4) and
+  route to the boundary. A Close has no superseded run since #81 (one run at a time); the hook
+  would pass such a rejection to `reportError` (conventions 2.4, #145; until then it was thrown
+  from the part's render, ac7064e). `then` is skipped when the open generation changed (3.4) and
   still runs after the part unmounted (`requestClose` finds `false` intended, or the dialog is
   closed: a no-op either way). The non-button dev warning fires only in static mode without
   `action`, as `Popover.Close`.

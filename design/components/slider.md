@@ -6,7 +6,8 @@ conventions changes are applied, see "Conventions feedback (applied)" and conven
 question 29). Implemented in 6cef8e7; the review (`memo/reviewer/slider.md`) and its fixes
 (3b96bcb, 8fffbca, 330ba8c) are folded in on 2026-10-18, see "Review corrections (#54)" at the
 end; the wave 16 refactoring (#100, 2026-10-24) into section 15 and the superseded-rejection
-rows. The code under `packages/ui/src/slider/` is the ground truth where this document is silent.
+rows; #145 (2026-11-23: a superseded rejection goes to `reportError`, the shared capture of #100
+is gone) into 2.4, 6, 14 and 15. The code under `packages/ui/src/slider/` is the ground truth where this document is silent.
 Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
 the conventions win.
 
@@ -254,8 +255,8 @@ the gesture's commit resolves, not per step. Consequences, documented on the com
   catches its own failure (walkthrough 4), or a non-adopting parent at release.
 - `valueChangeAction` resolving changes no library state; it is the preview channel.
 - Overlapping gestures (a new drag while a save is pending) follow latest intent: the last
-  commit's value is what lands; the earlier save's result is ignored, its rejection surfaced
-  (with an adopting parent, only after the newer commit settles, 4.4).
+  commit's value is what lands; the earlier save's result is ignored, its rejection passed to
+  `reportError` (conventions 2.4, #145; section 4.4).
 
 ### 2.4 Step, commit, and the "dismiss" revert
 
@@ -307,8 +308,8 @@ async (next, details) => {
 The `"dismiss"` step exists so that a `valueChangeAction` consumer whose preview followed the
 drag follows the rollback too (the Combobox text-revert precedent). It is dispatched in
 uncontrolled mode only, for the latest commit only: a controlled parent owns its state and wrote
-it itself; a superseded commit's rejection is surfaced by the hook and a newer gesture is in
-flight. `details.event` is `undefined` and `details.thumb` is `null`.
+it itself; a superseded commit's rejection is passed to `reportError` by the hook (conventions
+2.4) and rolls nothing back, because a newer commit owns the value. `details.event` is `undefined` and `details.thumb` is `null`.
 
 ---
 
@@ -604,7 +605,8 @@ acted on the whole form).
   The steps it dispatched remain; the preview saw them.
 - A new gesture while a commit is pending: `live` moves at once (urgent); its steps' transitions
   are entangled with the pending save (held until it settles; the thumb still follows); its
-  commit supersedes the earlier one (latest wins); the earlier rejection is surfaced.
+  commit supersedes the earlier one (latest wins); the earlier commit's rejection is passed to
+  `reportError`, not to the boundary (conventions 2.4).
 - A controlled parent that does not adopt steps sees the thumb follow the pointer anyway
   (`live`) and return to `value` when the gesture settles: a per-step veto is visible only at
   release, and it returns once (no `80 → 20 → 80` bounce: `stepHeld` is cleared in the same
@@ -612,12 +614,13 @@ acted on the whole form).
   Clamping is done with `min` / `max` / `step`, not by refusing steps.
 - A step without a `valueChangeAction` starts no transition at all (2.2); `data-pending` is
   then the commit's alone.
-- A superseded commit's rejection with an **adopting** controlled parent (`setValue` in the
-  step action) reaches the boundary only after the newer commit settles: React holds the
-  parent's entangled transition update until every async action of the scope has settled, and
-  the error-retry render reads it. Uncontrolled and update-on-success parents surface it at
-  once (developer deviation 5; the tests pin it per mode). Worth one sentence in the docs'
-  error section.
+- A superseded rejection, on either channel, is reported the moment it arrives, in every mode
+  (uncontrolled, update on success, adopting parent) and whatever the other channel is doing:
+  `reportError` is a plain call from the action's continuation, not a render. (Until #145 the
+  error was thrown from render, and with an **adopting** controlled parent it reached the
+  boundary only after the newer commit settled, developer deviation 5. That mode difference no
+  longer exists.) The **latest** commit's rejection still reaches the boundary, after every
+  older overlapping action has settled (conventions 2.4).
 
 ---
 
@@ -1239,7 +1242,7 @@ Track's `getBoundingClientRect` and polyfill `setPointerCapture` / `releasePoint
 | Rejection (both) | The catcher above Root receives it and the slider is **gone** (the boundary replaced it: no row promises a slide-back it cannot observe, review L1); uncontrolled: `valueChangeAction(prev, { reason: "dismiss", thumb: null, event: undefined })` dispatched once, outside the transition (the `await undefined` yield); controlled: no `"dismiss"` step. A retry boundary remounts the slider showing `defaultValue` (uncontrolled, update on success) or the adopted value (adopt). Caught-inside variants commit. **Mounted rollback**: an update-on-success parent whose commit action catches the failure: `data-pending` leaves, the DOM value, `--slider-value` and `Slider.Value` return to the parent's value, no `"dismiss"`. |
 | No snap | Uncontrolled with a sync `valueChangeAction`: between two simulated moves (after the first step's transition has settled) the input still shows the first step's value. Controlled adopt-steps parent whose dependent content suspends: after release the input shows the gesture value until the content resolves, then the parent's value, never the pre-gesture value in between (guards the `held` derivation of 2.2). Controlled parent that does not adopt steps: the thumb follows during the drag and returns to `value` after release. |
 | Pending without a step action | With no `valueChangeAction`: a press, three moves and a release never set `data-pending` on the Root; a key's `input` holds the value until its `change` (the `stepHeld` row: the react-dom restore must write the new value back); with no actions and a non-adopting controlled parent the release returns to `value` once (no `80 → 20 → 80` bounce). With a `valueChangeAction` each step is pending (the transition is real). |
-| Overlap, superseded rejection (both) | Two key presses with a slow commit: `data-pending` stays, final committed is the latest; the older commit's rejection reaches the catcher after and while the newer is pending; a drag while a commit is pending supersedes it. Cross-channel: a superseded step rejection while commits pend, and a superseded commit rejection while a step pends, each reach the catcher promptly (conventions 2.4). |
+| Overlap, superseded rejection (both) | Two key presses with a slow commit: `data-pending` stays, final committed is the latest; the older commit's rejection is passed to `reportError` (stubbed) once, at once, after and while the newer is pending, never to the catcher, and causes no `"dismiss"` step; a drag while a commit is pending supersedes it. Cross-channel: a superseded step rejection while commits pend, and a superseded commit rejection while a step pends, are each reported at once (conventions 2.4, #145). |
 | Suspending content (both) | A controlled adopt-steps parent's content keyed on the value suspends: old content stays, no fallback above the component, `data-pending` on Root and Thumb; then new content. Any interaction that may suspend runs inside `await act(async …)`: a sync `act` around a suspending update leaves a later async transition pending forever (React logs "A component suspended inside an `act` scope, but the `act` call was not awaited"; documented as unsupported, not a React bug, review L4). |
 | Platform path (both) | Mount reconciliation: `renderToString`, set the input's value before `hydrateRoot` → one `step` + `commit` with `reason: "platform"`, `thumb: null`, `event: undefined`, StrictMode still one, none when equal; late Thumb through `onItemMounted`. Form reset: `form.reset()`, `<button type="reset">`, automatic reset after a successful `<form action>` → `defaultValue` attributes equal the reset target at the time of the `reset` event (uncontrolled: latest `defaultValue`; controlled: mount-time), one `step` + `commit` with the `reset` event, a cancelled `reset` dispatches nothing, a refusing controlled parent gets the DOM re-synced after settle; `disabled` still follows a reset. |
 | Forms | `FormData` has one entry per thumb under the Thumb's or Root's `name`; `disabled` omits them; `form` attribute honoured. |
@@ -1283,7 +1286,7 @@ rows that failed in RadioGroup, Popover, Combobox and Dialog under load.
 packages/ui/src/slider/
   index.ts               # no directive; namespace + types; imports platform-attributes
   slider-context.ts      # "use client": SliderContext (shown values, bounds, step()/commit()/beginGesture(), registry, ids, state flags)
-  slider-root.tsx        # "use client": useSupersededRejection (one capture for both channels), useControllableAction (commit), useActionTrigger (steps), live/gesture/pendingThumb state, pointer gesture, reconciliation, reset, custom properties
+  slider-root.tsx        # "use client": useControllableAction (commit), useActionTrigger (steps), live/gesture/pendingThumb state, pointer gesture, reconciliation, reset, custom properties
   use-thumb-registry.ts  # "use client": the Thumb registry (inputs by index, registerThumb, formElement) and its two dev warnings
   use-slider-dev-warnings.ts  # "use client": the Root's development warnings
   slider-label.tsx       # "use client": registers its id; for= with one thumb
@@ -1295,7 +1298,7 @@ packages/ui/src/slider/
   slider.test.tsx, slider.browser.test.tsx
 packages/ui/src/internal/
   use-native-group-reconciliation.ts   # widen `element` to FormAssociatedElement (an input) and add `onResetEvent` pass-through to useFormReset
-  use-superseded-rejection.ts          # conventions 2.4: called once in the Root, passed as `captureSuperseded` to both hooks
+  report-superseded.ts                 # conventions 2.4: both hooks pass a superseded rejection to reportError (the Root does nothing itself)
   use-register-count.ts                # the mounted-Label count
   decimal.ts                           # decimalsOf / gridDecimals / roundTo (shared with NumberField)
 ```
@@ -1303,11 +1306,11 @@ packages/ui/src/internal/
 - **Root.** `useControllableAction<T, SliderValueCommitDetails>({ controlled: value,
   defaultValue, initialValue: platformDefault(min, max, step), action: wrappedCommit,
   transitionTypes: () => ["fsui-slider", "fsui-slider-commit"], warn: { component: "Slider",
-  prop: "value" } })`; `const { pending: stepPending, run: runStep } = useActionTrigger({ ignoreWhilePending: false,
-  captureSuperseded })`, where `captureSuperseded = useSupersededRejection()` is called once
-  **before both hooks** and passed to `useControllableAction` too (conventions 2.4): a superseded
-  step's rejection while a commit pends, or a superseded commit's while a step pends, is thrown
-  ahead of both `useTransition`s and reaches the boundary without waiting for the other channel;
+  prop: "value" } })`; `const { pending: stepPending, run: runStep } = useActionTrigger({ ignoreWhilePending: false })`.
+  Each hook reports its own superseded rejections through `reportError` (conventions 2.4): a
+  superseded step's rejection while a commit pends, or a superseded commit's while a step pends,
+  is reported at once, and the two hooks may be called in either order (the shared
+  `captureSuperseded` capture of #100, called before both hooks, was removed with #145);
   `live`, `gesture`, `stepHeld`, `pendingThumb` as `useState`; `shown` derived as 2.2 (`stepTo`
   writes `liveRef` / `shownRef` synchronously so a commit in the same event reads them; it sets
   `stepHeld` for every reason but `"dismiss"` and starts the step transition only when
@@ -1375,8 +1378,8 @@ packages/ui/src/internal/
   keyboard table (RTL and vertical Left / Right "by the library"), the "save goes in
   `valueCommitAction`" rule next to every example, and the error section's two sentences: an
   uncontrolled rollback after a rejected save is a remount through the boundary, not a
-  slide-back; with an adopting parent a superseded rejection reaches the boundary after the
-  newer commit settles.
+  slide-back; a superseded save's rejection is reported (`reportError`) and leaves the slider on
+  the newer value.
 
 ---
 

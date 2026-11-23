@@ -246,8 +246,9 @@ DOM structure.
 
 This is the reason `details` carries `added` / `removed` rather than `item` / `checked`: the same
 recipe covers an Item, a Parent and a reset without a branch. Uncontrolled mode needs none of
-this (the latest-dispatch guard commits the latest `next`, which was computed from the optimistic
-set and therefore already includes the earlier clicks).
+this: the Root commits the changes whose actions resolved (5.4). In either mode an action should
+**persist `details.added` / `details.removed`, not `next`**: `next` is the intended set, computed
+on top of earlier in-flight clicks, and one of those can still fail (conventions 2.5).
 
 ### 2.7 Styling
 
@@ -517,11 +518,34 @@ function reduce(set: ReadonlySet<string>, patch: Patch): ReadonlySet<string> {
 }
 ```
 
-`useOptimistic` gets this reducer (conventions 3.4); the patch is `details` itself. Stacked
+`useControllableAction` gets this reducer (conventions 3.4) with one exception, the form reset:
+
+```ts
+reducer: (prev, next, details) =>
+  details.reason === "platform" && details.event !== undefined
+    ? next                    // form reset: absolute, replaces the value whole
+    : reduce(prev, details),  // everything else: the patch is `details` itself
+```
+
+The reducer has two jobs (conventions 3.3, #150). As the **optimistic reducer**, stacked
 dispatches re-base: click A then B while A's save is in flight shows both checked, and if A
-rejects, B's patch re-applies on top of the reverted base. Platform dispatches use the same patch
-form (the diff against `base()`), so one reducer covers every path. (Accordion replaces the whole
-set for its mount dispatch; here the diff is computed anyway, so the patch is used.)
+rejects, B's patch re-applies on top of the reverted base. As the **commit**, the uncontrolled
+value is built from it: the resolved dispatches are replayed onto the committed set when the last
+overlapping one settles (5.4).
+
+Platform dispatches carry the same `added` / `removed` (the diff against `base()`), and the mount
+and late-mount reconciliations are applied as that patch. The **form reset** is not: a reset says
+"the value is now the default", not "these boxes changed", so the reducer adopts its `next`
+whole. As a patch it would miss a value that an earlier in-flight dispatch had already removed
+from `base()`: check A (committed), uncheck A (its save will reject), check B, reset
+(`removed: [b]`), then A's uncheck rejects; replaying `removed: [b]` onto `{a}` leaves A checked
+in a form that was reset to nothing (review finding 2 of #150). The test for "this is the reset"
+is `reason === "platform"` with `details.event` set: `useNativeGroupReconciliation` passes an
+event to `onPlatformChange` only from its `reset` listener (the reset button, `form.reset()`,
+React's automatic reset after a form action); the mount and late-mount paths pass none. **That
+contract is load-bearing**: a new platform path that carries an event would be treated as
+absolute. (Accordion's rule is the mirror image: its event-less mount dispatch is the absolute
+one, accordion.md 4.1.)
 
 ```ts
 // Root: Item toggle
@@ -551,13 +575,29 @@ renders committed state in the DOM, but Items and the Parent compare against it.
 
 ### 5.4 Overlap
 
-- **Uncontrolled**: the latest dispatch's `next` was computed from the optimistic set, so it
-  already contains the earlier in-flight clicks; the latest-dispatch guard commits it and the
-  earlier `next`s are ignored. Correct by construction.
+- **Uncontrolled**: only resolved dispatches are committed (#150). Each dispatch is recorded;
+  when the last overlapping one settles, the ones whose actions resolved are replayed with the
+  reducer of 5.2 onto the committed set, in dispatch order (not resolution order), in one
+  transition update. A rejected dispatch leaves no trace: check A (rejects), check B (resolves)
+  ends on `{b}`. Nothing is committed before the whole burst has settled, which is when React
+  would release the writes anyway (entanglement, conventions 2.3 item 5).
+  History: until #150 the latest dispatch's `next` was committed and this section called that
+  "correct by construction". It was not: `next` is computed from the intended set, so it
+  contains earlier in-flight clicks even when their actions later reject (B's action is called
+  with `[a, b]`). The Error Boundary that a superseded rejection reached until #145 hid the
+  wrong value.
+- The action's `next` therefore can be ahead of what the group commits. Persist the patch (2.6).
+- A **form reset** inside a burst replaces the value whole (5.2), then later resolved patches
+  apply on top of it. Known leftover (#151): a reset whose target already equals the intended
+  value dispatches nothing (8.2), so it does not enter the burst; if an earlier in-flight
+  uncheck then rejects, that box comes back checked after the reset. Proposed fix, not
+  implemented: on the reset path, dispatch whenever a dispatch is in flight.
 - **Controlled, sync prefix** (`setToppings(next)`): writes land in dispatch order; correct.
 - **Controlled, update on success**: whole-value writes land in *completion* order and can lose a
   change; use the functional update of 2.6. Documented next to every such example.
-- A superseded dispatch's rejection reaches the boundary through the shared hook (conventions 2.4).
+- A superseded dispatch's rejection (an older one, when a newer dispatch exists) is passed to
+  `reportError` by the shared hook, not to the boundary; the latest dispatch's rejection reaches
+  the boundary, after the earlier resolved changes were committed (conventions 2.4).
 
 ---
 
@@ -862,11 +902,13 @@ none (commit; memory unchanged, since neither all nor none is partial). Click: `
 ### 10.5 Rapid clicks on two Items, resolved out of order
 
 `C={}`. Click A (slow), click B (fast): dispatch 1 `added:[a]`, `next=[a]`; dispatch 2
-`added:[b]`, `next=[a,b]` (from `O`). `O={a,b}` throughout. B resolves first: it is the latest
-dispatch (id 2), so uncontrolled `C={a,b}` is written when its transition can commit, which is
-only after A settles too (entanglement, conventions 2.3 item 5). A resolves: id 1 is not the
-latest; nothing is written. Final `C={a,b}`. If A rejects after B resolved, the shared hook throws
-A's error from render (conventions 2.4); `O` has already converged on `{a,b}` through B's commit.
+`added:[b]`, `next=[a,b]` (from `O`). `O={a,b}` throughout. B resolves first: its entry is
+marked resolved, nothing is written yet (A is still in flight). A resolves: the burst has
+settled, both patches are replayed in dispatch order onto `{}`: `C={a,b}`, one commit. If A
+**rejects** instead (before or after B resolved), A's error is passed to `reportError`
+(conventions 2.4; no boundary), only B's patch is replayed, `C={b}`, and A's box rolls back
+while B's stays checked. B's action was called with `[a,b]`: a server that stored that array now
+disagrees with the group, which is why actions persist the patch (2.6).
 
 ### 10.6 Unchecking the last box in a required group, pending
 
@@ -958,8 +1000,8 @@ controlled veto), as in the RadioGroup and Switch plans.
 | 3 | Sync action (both) | jsdom | `(next, details)` shape: `next` is a fresh array in document order; `details.reason === "activate"`, `details.added` / `removed` one element, `details.event.type === "click"`; clicking a disabled Item, any Item under `Root disabled`, or a click already `defaultPrevented` by a pass-through `onClick` never dispatches. |
 | 4 | Async action (both) | jsdom | While unresolved: `data-pending` on Root and the clicked Item only; its DOM `checked` and `data-checked` flipped; other Items unchanged. After resolve: pending gone, value committed / parent updated. |
 | 5 | Rejection (both) | jsdom | Uncaught: `ErrorCatcher` receives the error; uncontrolled internal value unchanged on remount. Controlled, caught inside without updating: DOM `checked` and `data-checked` reverted, no `data-pending`. Uncontrolled caught-inside: commits. |
-| 6 | Overlap | jsdom | Click A then B (A slow): `O={a,b}` throughout; final committed `{a,b}` (uncontrolled); controlled functional-update wrapper ends on `{a,b}` with B resolving first; click A twice fast: A not `data-pending` after the second click while Root is, final committed `{}`. |
-| 7 | Superseded rejection (both) | jsdom | A rejects after B resolved, and while B is pending: error reaches the boundary; B's outcome unaffected. |
+| 6 | Overlap | jsdom | Click A then B (A slow): `O={a,b}` throughout; final committed `{a,b}` (uncontrolled); controlled functional-update wrapper ends on `{a,b}` with B resolving first; click A twice fast: A not `data-pending` after the second click while Root is, final committed `{}`. Settled changes (#150, uncontrolled): A rejects before / after B resolves: committed `{b}`, A's rejection reported, no boundary. |
+| 7 | Superseded rejection (both) | jsdom | A rejects after B resolved, and while B is pending: `reportError` (stubbed) is called once with the error and the boundary is not reached; B's outcome unaffected. |
 | 8 | Suspending content (both) | jsdom | Dependent `<Suspender />` keyed on the consumer's state updated in the action: old content stays, no fallback, Root `data-pending`; after resolve, new content. |
 | 9 | Value model | jsdom | Duplicates in `value` / `defaultValue` ignored; a value with no Item survives an Item toggle and is absent from `FormData`; `next` order follows DOM order after Items are reordered; set-equal controlled `value` in a different order does not re-base optimistic state. |
 | 10 | Parent derivation | jsdom | Over three values: none → unchecked, no dash; one → `el.indeterminate === true`, `data-indeterminate=""`, `el.checked === false`; all → `checked`, no dash; `values={[]}` → unchecked, no dash, click dispatches nothing. Derivation follows an Item click **immediately** (while pending) and reverts on rollback. |
@@ -976,7 +1018,7 @@ controlled veto), as in the RadioGroup and Switch plans.
 | 21 | Platform: partial hydration works | jsdom | Suspense boundary between Root and some Items, Root hydrated, boundary dehydrated: a click on a hydrated Item dispatches normally and throws nothing; after the boundary hydrates its Items show the right `data-checked` (attribute sync) and no partial-hydration warning is logged. |
 | 22 | Platform: form reset | jsdom | Check two, `form.reset()` → one dispatch `([], { reason: "platform", event: reset, added: [], removed: [both] })`; uncontrolled commits; controlled parent that ignores → DOM re-checks after settle; `<form action>` success auto-resets and dispatches the same way; a reset that both checks and unchecks carries `added` and `removed`; cancelled `reset` → nothing; `Root disabled` still dispatches; reset whose target set-equals the base → nothing. |
 | 23 | Platform: base comparison and `equals` | jsdom | Two synchronous `form.reset()` while a reset is pending dispatch once; a reset whose `readDefault()` is a *new Set with the same members* as the base dispatches nothing (guards the `equals` option: `Object.is` would dispatch). |
-| 24 | Platform: reset target by mode | jsdom | Uncontrolled: after a new `defaultValue` (inside a transition), reset returns to it and dispatches; controlled: reset returns to mount-time values and the parent is notified. |
+| 24 | Platform: reset target by mode | jsdom | Uncontrolled: after a new `defaultValue` (inside a transition), reset returns to it and dispatches; controlled: reset returns to mount-time values and the parent is notified. Reset inside a burst (#150 review, uncontrolled, `defaultValue=[]`): check A (resolves), uncheck A (pending), check B (resolves), reset (`([], "platform", removed: [b])`, resolves), then A's uncheck rejects: nothing checked, the rejection reported, no boundary. |
 | 25 | `preventDefault` warning | jsdom | `details.event.preventDefault()` inside the action logs the dev warning once per element (Item and Parent); the action still ran. |
 | 26 | `details` is virtual | jsdom | `JSON.stringify(details) === '{"reason":"activate","added":["a"],"removed":[]}'`; `details.event` is the native event; a fake Server Function receives the same shape. |
 | 27 | Function props | jsdom | `className` / `style` on Root, Label, Item, Parent receive the documented state (`value` optimistic on Root, `checked` / `indeterminate` / `pending` per part); `children` on Root and Label receive Root state; Item and Parent have no `children`. |
@@ -1066,7 +1108,8 @@ interface CheckboxGroupContextValue {
   normalisation of `value` and `defaultValue` (`toSet` from `internal/value-set.ts`).
 - `useControllableAction<ReadonlySet<string>, CheckboxGroupValueChangeDetails>({ controlled,
   defaultValue, initialValue: EMPTY, action: action && ((next, details) => action(fromSet(next),
-  details)), transitionTypes: (_n, _p, d) => […], reducer: (prev, _next, d) => reduce(prev, d),
+  details)), transitionTypes: (_n, _p, d) => […], reducer: the function of 5.2 (`applyPatch`
+  from `internal/value-set.ts`, or `next` whole for the form reset),
   warn: { component: "CheckboxGroup.Root", prop: "value" } })`. `fromSet` sorts by the document
   order of the group's Items read from the fieldset at call time (5.1).
 - `dispatchPatch` (5.2) and `base()` with the explicit null check.

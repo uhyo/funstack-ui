@@ -23,7 +23,7 @@ called out.
 | 3 | What the element shows | Optimistic `pressed` (Toggle is both owner and trigger). `pending` from the component's own `useTransition`. No committed value is exposed on the element. |
 | 4 | Next value | `next = !optimistic`, not `!committed`, so a second click while pending reverses the first (verified). |
 | 5 | Disabled while pending | **No.** The button stays enabled; repeated clicks are latest-wins. Consumers who want it use `render` or CSS (section 6.6). |
-| 6 | Errors | Reach the nearest Error Boundary above the `Toggle`; for a superseded (non-latest) dispatch the shared hook rethrows from render because React would drop it (conventions 2.4). Optimistic state reverts; uncontrolled committed state untouched. |
+| 6 | Errors | Reach the nearest Error Boundary above the `Toggle`; a superseded (non-latest) dispatch's rejection is passed to `reportError` by the shared hook instead, because React would drop it (conventions 2.4, #145). Optimistic state reverts; uncontrolled committed state untouched. |
 | 7 | ViewTransition | `<ViewTransition default={transition}>` outermost, **only when `transition` is given** (conventions 5.1, #35); no boundary otherwise; types `fsui-toggle` plus `fsui-toggle-press` / `fsui-toggle-release`. It animates the *settling* of an action and rollbacks, **not the optimistic flip** (section 7, verified). |
 | 8 | ARIA | `aria-pressed="true" \| "false"` only; never `"mixed"`. Native Space/Enter. Accessible name must stay stable across states. |
 | 9 | Forms | `type="button"` always; no `name`/`value` submission in v0. |
@@ -474,11 +474,13 @@ Verified in both resolution orders. Properties:
   (`fsui-toggle`, `fsui-toggle-press`, `fsui-toggle-release` all present).
 - **If action 1 rejects**, React drops the rejection: `useTransition` keeps only the newest
   thenable, so nothing reaches a boundary, `reportError` or `unhandledrejection` (verified by the
-  reviewer, both orders, both modes). The shared hook catches rejections of non-latest dispatches,
-  stores the first, and throws it from render so it reaches the boundary above the Toggle exactly
-  as a latest-dispatch rejection would (conventions 2.4). Action 2's outcome is unaffected: if it
-  resolved, `false` was committed and then the boundary fallback replaces the Toggle; if it is still
-  pending, the boundary fallback appears while it is in flight.
+  reviewer, both orders, both modes). The shared hook catches the rejection of a non-latest
+  dispatch and passes it to the global `reportError` (conventions 2.4): monitoring tools and the
+  console see it, no Error Boundary does, and the Toggle stays on screen. Action 2's outcome is
+  unaffected: if it resolved, `false` is committed; if it is still pending, the Toggle stays
+  pending and shows `false`. Only the latest dispatch's rejection replaces the Toggle with the
+  boundary's fallback. (Until #145 the hook threw the superseded error from render, so the
+  boundary took over for an intent the user had already replaced.)
 
 ### 6.6 Decision: not disabled while pending
 
@@ -652,8 +654,8 @@ are on the DOM only.
 | 10 | Rejection (both) | Caught-inside variant: action resolves; uncontrolled commits `true`; the controlled "veto" wrapper ends with `aria-pressed="false"` and no `data-pending`. |
 | 11 | Overlap | Two clicks with two deferreds; action receives `true` then `false`; during flight `aria-pressed="false"` and pending. Resolve 2 then 1: final `"false"`, not pending. Repeat resolving 1 then 2: same final state. |
 | 12 | Overlap | After resolving only the second of two deferreds, `data-pending` is still present (pending covers all in-flight actions). |
-| 12a | Superseded rejection (both) | Two clicks, two deferreds. Resolve 2, then reject 1: `<ErrorCatcher>` records the error (React alone would drop it) and the wrapper's committed value is `false`. |
-| 12b | Superseded rejection (both) | Two clicks; reject 1 while 2 is still pending: the catcher records the error; resolving 2 afterwards does not throw again or change the recorded error. |
+| 12a | Superseded rejection (both) | Two clicks, two deferreds, `reportError` stubbed. Resolve 2, then reject 1: `reportError` is called once with the error (React alone would drop it), `<ErrorCatcher>` records nothing, and the wrapper's committed value is `false`. |
+| 12b | Superseded rejection (both) | Two clicks; reject 1 while 2 is still pending: reported once, the catcher records nothing; resolving 2 afterwards reports nothing more. |
 | 13 | Suspending content (both) | Wrapper renders `<Suspender key={value}>` under a `<Suspense fallback>` above the Toggle. Click: old content stays, fallback not shown, `data-pending` on. Resolve the suspender: new content, pending gone. |
 | 14 | Function props | `className`, `style`, `children` each receive `{ pressed, pending, disabled }`; while a deferred action is pending they see `pressed: true, pending: true` and the attributes agree. |
 | 15 | `render` element | `render={<MyButton className="x" style={{ color: "red" }} />}` renders MyButton's button, merges class (`"x"` plus the Toggle's), keeps the element's style, forwards `ref` to the real `<button>`, and clicking still dispatches. |

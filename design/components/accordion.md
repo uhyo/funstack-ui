@@ -133,7 +133,8 @@ exclusivity, so it is opt-in. A second, platform-level caveat: when several `<de
 ### 2.2 Library mode
 
 Any of `value`, `defaultValue`, `valueChangeAction` on Root turns the Accordion into a normal
-FUNSTACK state owner: `useControllableAction` from the conventions with a set-valued reducer.
+FUNSTACK state owner: `useControllableAction` from the conventions, with a set-valued reducer in
+multiple mode and none in exclusive mode (4.1).
 
 ```tsx
 // Uncontrolled, async: the panel opens when the action resolves.
@@ -156,8 +157,10 @@ FUNSTACK state owner: `useControllableAction` from the conventions with a set-va
 Caveat for **multiple mode**: `next` is the whole set, and a parent that writes `setOpen(next)`
 after its own `await` lands those writes in *completion* order, so two overlapping actions (open
 A, then open B) can end with the slower one's stale set winning and a change lost. Prefer a
-functional update keyed by the item that changed, or stay uncontrolled (where the hook's
-latest-dispatch guard already handles this):
+functional update keyed by the item that changed, or stay uncontrolled (where the Root commits
+the changes whose actions resolved, 4.1). For the same reason an action in multiple mode should
+persist `details.item` / `details.open`, not `next`: `next` is the intended set and can contain
+an earlier change whose action fails later (conventions 2.5):
 
 ```tsx
 valueChangeAction={async (_next, details) => {
@@ -191,9 +194,11 @@ and the Root's dispatch is the conventions' shape:
 startOwnTransition(async () => {
   addTransitionType("fsui-accordion");
   addTransitionType(open ? "fsui-accordion-expand" : "fsui-accordion-collapse");
-  setOptimistic({ value: item, open });         // reducer: add/remove, or replace when exclusive
+  setOptimistic({ value: item, open });         // multiple: reducer add/remove; exclusive: `next`
   await valueChangeAction?.(next, details);
+  // exclusive (no reducer): the latest dispatch commits `next`
   if (!isControlled && id === latest.current) startTransition(() => setInternal(next));
+  // multiple (reducer): the resolved dispatches are replayed when the last one settles (4.1)
 });
 ```
 
@@ -425,7 +430,7 @@ Panel has no `pending` (conventions 4.3) and no `data-open`: its visibility is t
 
 ### 4.1 Reducer
 
-`useOptimistic` in reducer form, keyed by item (conventions 3.4):
+**Multiple mode** passes a reducer keyed by item to `useControllableAction` (conventions 3.4):
 
 ```ts
 type Patch = { value: string; open: boolean };
@@ -433,9 +438,41 @@ function reduce(set: ReadonlySet<string>, patch: Patch, exclusive: boolean): Rea
   if (!patch.open) { const next = new Set(set); next.delete(patch.value); return next; }
   return exclusive ? new Set([patch.value]) : new Set(set).add(patch.value);
 }
+
+// Root, multiple mode only
+reducer: (prev, next, details) =>
+  details.reason === "platform" && details.event === undefined
+    ? next                                             // mount reconciliation: adopted whole
+    : reduce(prev, { value: details.item, open: details.open }, false),
 ```
 
-Stacked patches re-base onto a changed committed set. The order problem one might expect (A then
+The reducer does two jobs (conventions 3.3, #150):
+
+- **Optimistic re-base.** Stacked patches re-base onto a changed committed set.
+- **The uncontrolled commit.** Each dispatch is one item's change. When the last overlapping
+  dispatch settles, the dispatches whose actions **resolved** are replayed with the reducer onto
+  the committed set, in dispatch order; a rejected one leaves no trace. Open A (its action
+  rejects), open B (resolves): the Accordion ends with B open only, although B's action was
+  called with `["a", "b"]`. Before #150 the latest dispatch's `next` was committed, which kept A
+  open (hidden then by the Error Boundary that a superseded rejection used to reach).
+
+The **mount reconciliation** dispatch (2.3: `reason: "platform"`, no event) carries all
+pre-hydration clicks as one `next` and names only one of the items in `details`, so the reducer
+adopts its `next` whole. It cannot sit in a burst behind a click whose action later rejects: it
+runs from the Root's mount layout effect, the Root's first possible dispatch, and again only when
+an `<Activity>` re-shows the Root, where a pending click's item already has DOM `open` equal to
+the intended value and nothing is dispatched. A find-in-page reveal (`reason: "platform"` with
+the `toggle` event) is one item's change and is replayed like a click.
+
+**Exclusive mode passes no reducer.** The state is single-valued: the optimistic value is the
+dispatched `next` (which `reduce(..., exclusive = true)` computed at dispatch time, from the
+intended set), and the latest dispatch commits it, exactly like Tabs. A patch reducer would be
+wrong here: open B (rejects), then close B (resolves) would replay "remove B" onto the committed
+`{a}` and re-open A, although the user's last intent, and the value the resolved action was
+called with, is `null` (review finding 1 of #150). The Root follows the live `exclusive` prop;
+changing it while actions are in flight is not supported (it changes the value's type).
+
+The order problem one might expect in multiple mode (A then
 B dispatched, B commits first, A's older patch re-applies on top of B's commit) does not occur:
 B's post-await commit is a transition update inside an async-action scope and is held until A
 settles too (`react-async-apis.md` §2, entanglement case 2), so patches are reverted together.
@@ -451,8 +488,10 @@ Worth one browser check during implementation (`memo/architect/accordion-notes.m
 
 ### 4.3 Error, rollback, veto
 
-Unchanged from the conventions: a rejected action reaches the Error Boundary nearest the Root;
-optimistic state reverts; uncontrolled committed state was never written. In both cases the
+Unchanged from the conventions: a rejected action reaches the Error Boundary nearest the Root
+(a superseded one, an older action when a newer dispatch exists, is passed to `reportError`
+instead, conventions 2.4);
+optimistic state reverts; uncontrolled committed state was never written for it. In both cases the
 `open` attribute never changed, so there is nothing to revert in the DOM. The one DOM-side
 rollback is the platform path (2.3): a find-in-page open that the parent refuses is closed by the
 layout effect when the transition ends.
@@ -834,7 +873,8 @@ and controlled wrappers (controlled follows update-on-success). Library mode unl
 | Sync action (both) | Click dispatches `(next, { event, reason: "activate", item, open })`; `event` is the native `MouseEvent`; disabled items never dispatch and the click is default-prevented; clicking a link inside the summary neither toggles nor dispatches; multiple vs exclusive compute `next` correctly. |
 | Async action (both) | While unresolved: `data-pending` on Root, Item, Trigger; `data-open` on Trigger/Item; `details.open` false; Panel `state.open` false. After resolve: `open` true, `data-pending` gone. |
 | Rejection (both) | `ErrorCatcher` receives the error; `data-open` gone; `details.open` still false; uncontrolled value unchanged. Caught-inside: commits. |
-| Overlap | Walkthrough 9.3 with `deferred()` resolved out of order; final `open` attributes match the latest dispatch; action called twice. |
+| Overlap | Walkthrough 9.3 with `deferred()` resolved out of order; final `open` attributes match the latest dispatch; action called twice. Multiple, uncontrolled (#150): the older open rejects before / after the newer resolves: only the newer item is open, the rejection is reported. Exclusive, uncontrolled: a rejected open then a resolved close of the same item, both settle orders: nothing is open (the previously open item does not come back). |
+| Superseded rejection (both) | The older dispatch rejects after and while the newer is pending: `reportError` (stubbed) is called once, the catcher is not; the newer outcome unaffected (conventions 10.1). |
 | Suspending content (both) | Panel function child mounts `<Suspender>` when open; old state stays, no fallback from the boundary above, `data-pending` on; after resolve, open and content present. |
 | Function props | `className`/`style`/`children`/`render` on all four parts receive the documented state; JS-free mode passes `open: undefined`. |
 | `render` element | `render={<details className="x" />}` on Item and `render={<summary />}` on Trigger keep the library's handlers and `ref`; dev warning when the mounted tag is wrong. |
@@ -897,7 +937,8 @@ packages/ui/src/accordion/
 - **Normalisation.** Root converts `string | null` ⇄ `Set<string>` at the prop boundary (`toSet`,
   `setsEqual`, `EMPTY_SET` from `internal/value-set.ts`, shared with ToggleGroup and
   CheckboxGroup) and calls
-  `useControllableAction` with the set; the reducer in 4.1 is passed in. `next` for the action is
+  `useControllableAction` with the set; the reducer in 4.1 is passed in in multiple mode only
+  (`exclusive ? undefined : …`). `next` for the action is
   converted back before the call.
 - **Registry.** `registerTrigger(el) => cleanup` through a callback ref in Trigger; Root keeps a
   `Set<HTMLElement>` in a ref and sorts by document order (`compareDocumentOrder`,
