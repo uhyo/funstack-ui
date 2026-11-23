@@ -40,12 +40,29 @@ export function WhyPage() {
   return (
     <DocPage
       title="Why FUNSTACK UI"
-      description="Why choose FUNSTACK UI: headless React components that already do the async work React 19 asks for. Pending and optimistic state, Suspense, transitions and the platform, built in."
+      description="Why choose FUNSTACK UI: headless React components built for Async React, which already do the async work for you. Pending and optimistic state, Suspense, transitions and the platform, built in."
     >
       <p className="page-intro">
-        React 19 added actions, transitions, <code>useOptimistic</code>, Suspense for data and{" "}
-        <code>&lt;ViewTransition&gt;</code>. FUNSTACK UI is a headless component library that uses
-        them for you, so the async work around every button, tab and dialog is already done.
+        React 18 brought transitions and Suspense for data fetching. React 19 added actions and{" "}
+        <code>useOptimistic</code>, and React 19.3 made <code>&lt;ViewTransition&gt;</code> stable.
+        FUNSTACK UI is a headless component library that uses them for you, so the async work around
+        every button, tab and dialog is already done.
+      </p>
+
+      <h3 id="async-react">Built for Async React</h3>
+      <p>
+        Async React is the React team's name for using these features together (the{" "}
+        <a href="https://react.dev/blog/2025/10/16/react-conf-2025-recap">
+          Async React talks at React Conf 2025
+        </a>
+        ). The idea is good async UX built in: while data loads or a request runs, the screen stays
+        responsive, shows what is pending, and switches to the result when it is ready, without each
+        app wiring that by hand.
+      </p>
+      <p>
+        FUNSTACK UI bets on this idea and is <strong>Async React-native</strong>: the components
+        start the transitions, show optimistic and pending state and wait for Suspense themselves.
+        You get good async UI by using them, without wiring it yourself.
       </p>
 
       <h3 id="what-you-stop-writing">What you stop writing</h3>
@@ -105,11 +122,6 @@ const [isPending, startTransition] = useTransition();
             "[Action props](/concepts/action-props): run in a transition, may be async. Optimistic and pending state built in.",
           ],
           [
-            "**Content that loads data**",
-            "Usually updated urgently, so content that suspends shows its fallback unless you add a transition.",
-            "[Old content stays on screen](/concepts/suspense) until the new content is ready.",
-          ],
-          [
             "**Popups**",
             "JavaScript for positioning, layering and dismissal, so older browsers work too.",
             "The [platform](/concepts/browser-owned-state): Popover API, `<dialog>`, CSS Anchor Positioning. Some components work before hydration.",
@@ -123,11 +135,6 @@ const [isPending, startTransition] = useTransition();
             "**Browsers**",
             "Wide support, including older versions.",
             "Latest stable Chrome, Edge, Safari and Firefox. No fallbacks.",
-          ],
-          [
-            "**Maturity**",
-            "Stable APIs, large component sets.",
-            "Experimental alpha. APIs change without notice.",
           ],
         ]}
       />
