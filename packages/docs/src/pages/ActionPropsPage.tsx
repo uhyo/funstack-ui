@@ -444,8 +444,8 @@ type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: De
       <p>
         In a controlled overlay, set state directly in the handler:{" "}
         <code>onOpenChange={"{setOpen}"}</code>, not inside <code>startTransition</code> and not
-        after an <code>await</code>. Here the "wrap it in{" "}
-        <code>startTransition</code>" advice above inverts.
+        after an <code>await</code>. Here the "wrap it in <code>startTransition</code>" advice above
+        inverts.
       </p>
 
       <h3 id="urgent-lane">The urgent lane</h3>
