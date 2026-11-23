@@ -37,8 +37,9 @@ export function nonInvokerMessage(
   return (
     `${part}: rendered a <${tag}>. Only a <button> is the ${popover}'s invoker: a press on ` +
     `this element while the ${popup} is open closes it through light dismiss before the ` +
-    "click, so the close is not awaited, openChangeAction(false) cannot veto it and " +
-    "there is no exit transition. Render a <button>."
+    "click, so the close is a dismissal (reported to onOpenChange) rather than a request: " +
+    "openChangeAction(false) is not called, cannot veto it and there is no view transition. " +
+    "Render a <button>."
   );
 }
 
@@ -46,7 +47,7 @@ export function nonInvokerMessage(
 export interface PopoverTriggerHookState {
   /** Optimistic open state. A Popover in JS-free mode (the browser owns it) reports `false`. */
   readonly open: boolean;
-  /** The Root's transition is pending (an open, a part-initiated close or a dismissal notification). */
+  /** The Root's transition is pending: an open or a part-initiated close (never a dismissal). */
   readonly pending: boolean;
   /** The `disabled` prop. */
   readonly disabled: boolean;
@@ -118,7 +119,8 @@ export function usePopoverTrigger<State>(
 
   const state: PopoverTriggerHookState = {
     open: ctx.optimistic,
-    // Opens, part-initiated closes and dismissal notifications all belong to the Trigger (4.2).
+    // Opens and part-initiated closes belong to the Trigger (4.2); a dismissal is a fact and
+    // pends nothing (overlay-open-change.md 2.7).
     pending: ctx.pending,
     disabled,
   };
@@ -169,6 +171,13 @@ export function usePopoverTrigger<State>(
     }
     const native = event.nativeEvent;
     if (ctx.intended()) {
+      if (ctx.hiddenBeforeToggle()) {
+        // A non-button Trigger (#115): light dismiss hid the popup at `pointerup`, before this
+        // click. The hide is a fact, reported by its pending `toggle`; this click only names its
+        // cause (overlay-open-change.md 3.2).
+        ctx.recordCloseIntent({ reason: "activate", event: native });
+        return;
+      }
       ctx.requestClose(native, "activate");
     } else {
       // First: what it records (Menu's open cause) must be in place before anything can show the

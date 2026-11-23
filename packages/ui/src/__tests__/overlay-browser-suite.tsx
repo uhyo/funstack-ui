@@ -2,7 +2,8 @@
 // Popover and Menu (#109, audit T8). They need a real engine: Escape as a close request and the
 // platform's focus return, CSS exit animations and the deferred unmount (design 4.4), and
 // `<ViewTransition>` around the top-layer element (the library-owned closes run inside the update
-// callback; a dismissal only notifies). The jsdom half is overlay-open-state-suite.tsx.
+// callback; a dismissal is a fact, an urgent commit that starts none: #148,
+// design/components/overlay-open-change.md 2.8). The jsdom half is overlay-open-state-suite.tsx.
 //
 // Each component's `.browser.test.tsx` calls `describeOverlayInBrowser` with a driver; the rows
 // that differ per component (Dialog's 10.3 capture, the focus return of a keyboard-activated Close,
@@ -49,6 +50,8 @@ type OpenChangeFn<D> = (next: boolean, details: D) => unknown;
  */
 export interface OverlayBrowserHarnessProps<D> {
   action?: OpenChangeFn<D>;
+  /** The Root's `onOpenChange` (facts: dismissals). */
+  fact?: OpenChangeFn<D>;
   /** The Popup's class (the exit CSS). */
   className?: string;
   /** Rendered inside the popup after the default content (a running progress bar). */
@@ -334,15 +337,19 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
   const isOpen = () => config.isOpen(popup());
 
   describe(`${config.name} (shared overlay suite)`, () => {
-    it("Escape closes with reason 'dismiss'; focus returns to the Trigger", async () => {
+    it("Escape closes: a 'dismiss' fact to onOpenChange, nothing pending; focus returns to the Trigger", async () => {
       const action = vi.fn<Action>();
-      render(<Harness action={action} />);
+      const fact = vi.fn<Action>();
+      render(<Harness action={action} fact={fact} />);
       await config.open();
       await user.keyboard("{Escape}");
       expect(isOpen()).toBe(false);
       expect(trigger()).toHaveFocus();
-      await settle(() => expect(action).toHaveBeenCalledTimes(2));
-      const [next, details] = action.mock.calls[1]!;
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(trigger()).not.toHaveAttribute("data-pending");
+      expect(trigger()).not.toHaveAttribute("data-open");
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("dismiss");
       config.dismissDetails?.(details);
@@ -439,8 +446,9 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           const focusesButtons = await pressFocusesButtons();
           const work = deferred();
           const action = vi.fn<Action>((next) => (next ? undefined : work.promise));
+          const fact = vi.fn<Action>();
           const Rendered = press.Harness ?? Harness;
-          render(<Rendered action={action} />);
+          render(<Rendered action={action} fact={fact} />);
           await config.open();
           await flushFor();
           leaveActEnvironment();
@@ -467,6 +475,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
                 // click.
                 expect(isOpen()).toBe(true);
                 expect(action).toHaveBeenCalledTimes(calls);
+                expect(fact).not.toHaveBeenCalled();
               }
             },
           });
@@ -476,6 +485,7 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
             await quietPeriod(80, "a press inside must neither close nor dispatch");
             expect(isOpen()).toBe(true);
             expect(action).toHaveBeenCalledTimes(calls);
+            expect(fact).not.toHaveBeenCalled();
             expect(document.activeElement).toBe(focusAtPress);
             return;
           }
@@ -498,13 +508,19 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
             work.resolve();
             await expect.poll(() => isOpen()).toBe(false);
             await expect.poll(() => trigger().hasAttribute("data-pending")).toBe(false);
+            // The library's own close: no fact.
+            expect(fact).not.toHaveBeenCalled();
           } else {
-            // Hidden by the platform (or the library's light dismiss) at once; notified.
+            // Hidden by the platform (or the library's light dismiss) at once: a fact, reported
+            // to onOpenChange; nothing pending and no request.
             await expect.poll(() => isOpen(), { timeout: 1000 }).toBe(false);
-            await expect.poll(() => action.mock.calls.length).toBe(calls + 1);
-            expect(last()[0]).toBe(false);
-            expect(last()[1].reason).toBe("dismiss");
-            expect(last()[1].event?.type).toBe(config.dismissEvent);
+            await expect.poll(() => fact.mock.calls.length).toBe(1);
+            const [next, details] = fact.mock.calls[0]!;
+            expect(next).toBe(false);
+            expect(details.reason).toBe("dismiss");
+            expect(details.event?.type).toBe(config.dismissEvent);
+            expect(action).toHaveBeenCalledTimes(calls);
+            expect(trigger()).not.toHaveAttribute("data-pending");
             work.resolve();
           }
 
@@ -512,14 +528,15 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           if (config.popoverTarget) await expectInvokerExpanded(trigger(), popup(), false);
           await quietPeriod(50, "no re-open and no second dispatch");
           expect(isOpen()).toBe(false);
-          expect(action).toHaveBeenCalledTimes(calls + 1);
+          expect(action).toHaveBeenCalledTimes(press.outcome === "awaited" ? calls + 1 : calls);
+          expect(fact).toHaveBeenCalledTimes(press.outcome === "awaited" ? 0 : 1);
         },
       );
     });
 
     // The library-owned closes run inside the view transition's update callback; a dismissal
-    // (the platform already closed the popup) runs one only for its notification commit. The
-    // rows click in-page outside `act`, because `act` would flush React's queue itself.
+    // (the platform already closed the popup) is a fact whose commit is urgent and starts none
+    // (#148). The rows click in-page outside `act`, because `act` would flush React's queue itself.
     describe("ViewTransition", () => {
       const vt = setUpViewTransitionRows(config.isOpen);
 
@@ -584,22 +601,19 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
         },
       );
 
-      it('transition="pop": a dismissal runs one only for the notification commit, popup already closed', async () => {
+      it('transition="pop": a dismissal runs no view transition (a fact: an urgent commit)', async () => {
         render(<Plain transition="pop" />);
         await vt.open();
         expect(vt.calls).toHaveLength(1);
         await dismiss();
         expect(isOpen()).toBe(false);
-        await expect.poll(() => vt.calls.length).toBe(2);
-        expect(vt.calls[1]!.openAtStart).toBe(false);
-        await vt.transitions[1]!.finished;
         await expect.poll(() => content()).toBeNull();
-        await quietPeriod(50, "the release of the held content must not start a view transition");
-        expect(vt.calls).toHaveLength(2);
+        await quietPeriod(100, "a dismissal must not start a view transition");
+        expect(vt.calls).toHaveLength(1);
       });
 
       it.each([false, true])(
-        'transition="pop" plus a CSS exit (recipe=%s): a dismissal runs one view transition, not two',
+        'transition="pop" plus a CSS exit (recipe=%s): a dismissal runs no view transition; the CSS exit alone animates it',
         async (recipe) => {
           addExitStyle("fade", "200ms", { openPseudo, recipe });
           render(<Plain transition="pop" className="fade" />);
@@ -607,18 +621,11 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
           expect(vt.calls).toHaveLength(1);
           await animationsFinished(popup()); // the enter fade
           await dismiss();
-          // The notification commit (design 4.4); the content may be held for the CSS fade.
-          await expect.poll(() => vt.calls.length).toBe(2);
-          await vt.transitions[1]!.ready;
-          // With the recipe, no live new image of the fading popup next to the old one.
-          if (recipe && namesReliable) {
-            expect(popupImages("new"), JSON.stringify(pseudoNames())).toEqual([]);
-          }
-          await vt.transitions[1]!.finished;
-          await expect.poll(() => content()).toBeNull();
-          // Releasing the hold is a normal update: no second document view transition.
-          await quietPeriod(100, "the release of the hold must not start a view transition");
-          expect(vt.calls).toHaveLength(2);
+          // The fact's commit is urgent (#148): the content is held for the CSS fade, released
+          // by a normal update; neither starts a document view transition.
+          await expect.poll(() => content(), { timeout: 2000 }).toBeNull();
+          await quietPeriod(100, "neither the fact nor the release may start a view transition");
+          expect(vt.calls).toHaveLength(1);
         },
       );
 

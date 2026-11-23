@@ -2,8 +2,9 @@
 // `popovertarget` button, or `commandfor` with a popover command) whose focus must not leave
 // (Menu, Combobox; design/components/menu.md 2.2, combobox.md 5.4, conventions 3.5). The Popup
 // prevents the press's `mousedown`, so focus stays where it was, the focus-leaving close never
-// runs, and the click's native toggle closes the popup as `"activate"`, its event naming the
-// button. Without the guard Chromium and Firefox (and Playwright's Linux WebKit, which focuses a
+// runs, and the click's native toggle closes the popup: a fact reported to `onOpenChange` as
+// `"activate"`, its event naming the button (#148). Without the guard Chromium and Firefox (and
+// Playwright's Linux WebKit, which focuses a
 // clicked button) hid it at the press as `"dismiss"`, and the click's toggle re-showed it. One
 // outcome on every engine. The press runs outside React's act environment, with real timing.
 import { screen } from "@testing-library/react";
@@ -21,10 +22,11 @@ export interface ForeignInvokerPressConfig {
   /** The describe block's name. */
   readonly name: string;
   /**
-   * Renders the overlay with `openChangeAction={openAction}` and a `<button data-testid="foreign">`
-   * placed where a press on it, and a drag to its right, is clear of the popup.
+   * Renders the overlay with `openChangeAction={openAction}`, `onOpenChange={fact}` and a
+   * `<button data-testid="foreign">` placed where a press on it, and a drag to its right, is clear
+   * of the popup.
    */
-  readonly render: (openAction: Mock<OpenAction>) => void;
+  readonly render: (openAction: Mock<OpenAction>, fact: Mock<OpenAction>) => void;
   /** The popup (its `id` is what the foreign button names). */
   readonly popup: () => HTMLElement;
   /** Shows the popup the way a user does (inside `act`). */
@@ -41,9 +43,12 @@ export function describeForeignInvokerPressInBrowser(config: ForeignInvokerPress
   const foreign = () => screen.getByTestId("foreign");
   const isOpen = () => config.popup().matches(":popover-open");
 
-  async function setup(attributes: Record<string, string>): Promise<Mock<OpenAction>> {
+  async function setup(
+    attributes: Record<string, string>,
+  ): Promise<{ openAction: Mock<OpenAction>; fact: Mock<OpenAction> }> {
     const openAction = vi.fn<OpenAction>();
-    config.render(openAction);
+    const fact = vi.fn<OpenAction>();
+    config.render(openAction, fact);
     for (const [name, value] of Object.entries(attributes)) {
       foreign().setAttribute(name, value.replace("{popup}", config.popup().id));
     }
@@ -52,7 +57,7 @@ export function describeForeignInvokerPressInBrowser(config: ForeignInvokerPress
     expect(document.activeElement).toBe(config.focusedWhileOpen());
     openAction.mockClear();
     leaveActEnvironment();
-    return openAction;
+    return { openAction, fact };
   }
 
   describe(`${config.name} a press on a foreign invoker while shown (shared overlay suite)`, () => {
@@ -64,16 +69,17 @@ export function describeForeignInvokerPressInBrowser(config: ForeignInvokerPress
         "command",
       ],
     ] as const) {
-      it(`${kind}: focus stays at the press, one (false, 'activate') naming the button, no re-open`, async () => {
-        const openAction = await setup(attributes);
+      it(`${kind}: focus stays at the press, one 'activate' fact naming the button, no re-open`, async () => {
+        const { openAction, fact } = await setup(attributes);
         const focused = config.focusedWhileOpen();
         const atPress = await mouse.pressOn(foreign(), {
           atPress: () => ({ open: isOpen(), focus: document.activeElement }),
         });
         expect(atPress).toEqual({ open: true, focus: focused });
         await expect.poll(() => isOpen()).toBe(false);
-        await expect.poll(() => openAction.mock.calls.length).toBe(1);
-        const [next, details] = openAction.mock.calls[0]!;
+        await expect.poll(() => fact.mock.calls.length).toBe(1);
+        expect(openAction).not.toHaveBeenCalled();
+        const [next, details] = fact.mock.calls[0]!;
         expect(next).toBe(false);
         expect(details.reason).toBe("activate");
         expect(details.event!.type).toBe(eventType);
@@ -83,12 +89,13 @@ export function describeForeignInvokerPressInBrowser(config: ForeignInvokerPress
         config.expectUntouched?.();
         await quietPeriod(100, "the click's toggle must not re-open the popup");
         expect(isOpen()).toBe(false);
-        expect(openAction).toHaveBeenCalledTimes(1);
+        expect(fact).toHaveBeenCalledTimes(1);
+        expect(openAction).not.toHaveBeenCalled();
       });
     }
 
     it("a dragged-off press: the popup stays shown, focus kept, nothing dispatched", async () => {
-      const openAction = await setup({ popovertarget: "{popup}" });
+      const { openAction, fact } = await setup({ popovertarget: "{popup}" });
       const focused = config.focusedWhileOpen();
       const { x, y } = centre(foreign());
       // Off the button to its right, onto the empty page.
@@ -102,6 +109,7 @@ export function describeForeignInvokerPressInBrowser(config: ForeignInvokerPress
       expect(document.activeElement).toBe(focused);
       config.expectUntouched?.();
       expect(openAction).not.toHaveBeenCalled();
+      expect(fact).not.toHaveBeenCalled();
     });
   });
 }

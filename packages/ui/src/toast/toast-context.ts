@@ -6,7 +6,7 @@ import type { ToastItem, ToastPriority } from "./toast.js";
 
 /** What a Root (and the parts under it) need from the Viewport. Stable for the Viewport's life. */
 export interface ToastViewportContextValue {
-  /** Close toasts (`ending: true`), moving focus out first and scheduling `closeAction`. */
+  /** Close toasts (`ending: true`), moving focus out first and calling each `onClose`. */
   readonly close: (ids: readonly string[], reason: ChangeReason, event: Event | undefined) => void;
   /** Remove an ending toast once its exit animations finished. */
   readonly drop: (id: string) => void;

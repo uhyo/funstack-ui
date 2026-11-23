@@ -135,7 +135,7 @@ export function ToastDemo() {
               description: "Deleted for real in 8 s unless you undo.",
               duration: 8000,
               action: { label: "Undo", action: () => console.log(`[toast] ${name} restored`) },
-              closeAction: ({ reason }) => {
+              onClose: ({ reason }) => {
                 if (reason === "activate") return;
                 console.log(`[toast] ${name} deleted for real (${reason})`);
                 setDeleted((d) => [...d, name]);

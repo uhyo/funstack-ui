@@ -1,10 +1,13 @@
 // Shared open-state suite for the overlays built on `useOverlayRoot` (src/internal/use-overlay-root.ts):
 // Dialog, Popover and Menu (#106, audit T8). It pins the Root's contract through the public
 // components: `openChangeAction` plumbing and `details`, optimistic open and pending, part-initiated
-// closes (library-owned: awaited, then the library closes) against dismissals (the platform closed;
-// notified afterwards), rejection and revert, controlled refusal and veto, overlapping and
-// superseded dispatches, suspending content, the platform path (an open found on hydration, a
-// controlled flip) and the stale close-intent clear (design/components/popover.md 2.3).
+// closes (requests, library-owned: awaited, then the library closes) against dismissals (facts:
+// the platform closed; `onOpenChange(false)` synchronously, committed `false` urgently, nothing
+// pending; #148, design/components/overlay-open-change.md), rejection and revert, controlled
+// refusal (an immediate re-open) and veto, overlapping and superseded dispatches (a fact supersedes
+// every request), suspending content, the platform path (an open found on hydration, a controlled
+// flip), the controlled-without-`onOpenChange` warning and the stale close-intent clear
+// (design/components/popover.md 2.3).
 //
 // Each component's test file builds its harness with `createOverlayHarness` and calls
 // `describeOverlayOpenState` with a driver; component-specific rows (Dialog's forms and
@@ -12,7 +15,7 @@
 // shims stand in for the platform: a dismissal is driven with `requestClose()` / `hidePopover()`,
 // which is what Escape or a light dismiss does.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { StrictMode, Suspense, startTransition, useEffect, useState } from "react";
+import { StrictMode, Suspense, startTransition, useEffect, useState, useTransition } from "react";
 import type {
   ComponentPropsWithRef,
   ComponentType,
@@ -54,6 +57,7 @@ export interface OverlayRootProps<D> {
   open?: boolean;
   defaultOpen?: boolean;
   openChangeAction?: (next: boolean, details: D) => Promise<void>;
+  onOpenChange?: (next: boolean, details: D) => void;
 }
 
 export interface OverlayHarnessProps<D> {
@@ -62,9 +66,24 @@ export interface OverlayHarnessProps<D> {
   initialOpen?: boolean;
   /** The consumer's work, awaited by the harness's `openChangeAction`. */
   action?: OpenChangeFn<D>;
+  /**
+   * The consumer's `onOpenChange` body (a fact, #148): called by the harness's handler before it
+   * adopts the value; what it returns is returned to the library (a promise's rejection goes to
+   * `reportError`).
+   */
+  fact?: OpenChangeFn<D>;
+  /**
+   * How the harness's `onOpenChange` adopts a fact: `"urgent"` (default: `setOpen(next)` in the
+   * handler, as the docs say), `"transition"` (the late-adoption mistake: inside
+   * `startTransition`), or `"omit"` (no `onOpenChange` at all: the W1 warning's case).
+   */
+  factAdoption?: "urgent" | "transition" | "omit";
   /** Catch errors thrown by `action` (turns a rejection into success for the library). */
   catchErrors?: boolean;
-  /** Controlled mode: never adopt `false` (a parent that refuses to close). */
+  /**
+   * Controlled mode: never adopt `false` (a parent that refuses to close), from the action or
+   * from `onOpenChange`.
+   */
   refuseClose?: boolean;
   /** Controlled mode: never adopt `true` (a parent that vetoes the open). */
   refuseOpen?: boolean;
@@ -78,7 +97,8 @@ export interface OverlayHarnessProps<D> {
 
 /**
  * Controlled/uncontrolled parity harness. The controlled variant follows "update on success"
- * (`startTransition` after the await, design 2.2); both modes mirror the committed value in
+ * (`startTransition` after the await, design 2.2) for requests and adopts facts in `onOpenChange`
+ * directly (urgent, overlay-open-change.md 2.4); both modes mirror what the consumer was told in
  * `data-testid="committed"`. `renderRoot` renders the component's Root with `rootProps` and the
  * component's own harness props; the parts must carry the test ids `trigger`, `popup` and (in the
  * default content) `content`.
@@ -90,6 +110,8 @@ export function createOverlayHarness<D, P extends object>(
     mode,
     initialOpen = false,
     action,
+    fact,
+    factAdoption = "urgent",
     catchErrors = false,
     refuseClose = false,
     refuseOpen = false,
@@ -111,12 +133,24 @@ export function createOverlayHarness<D, P extends object>(
       startTransition(() => setOpen(next));
     };
 
+    // `void` to the library, but the body's result is passed on: a returned promise is the
+    // consumer's (its rejection goes to `reportError`).
+    const onOpenChange = (next: boolean, details: D): void => {
+      const result = fact?.(next, details);
+      if (!(next && refuseOpen) && !(!next && refuseClose)) {
+        if (factAdoption === "transition") startTransition(() => setOpen(next));
+        else setOpen(next);
+      }
+      return result as void;
+    };
+    const handler = factAdoption === "omit" ? {} : { onOpenChange };
+
     const rootProps: OverlayRootProps<D> =
       mode === "static"
         ? {}
         : mode === "controlled"
-          ? { open, openChangeAction }
-          : { defaultOpen: initialOpen, openChangeAction };
+          ? { open, openChangeAction, ...handler }
+          : { defaultOpen: initialOpen, openChangeAction, ...handler };
 
     let overlay = renderRoot(rootProps, rest as unknown as P);
     if (boundary) overlay = <ErrorCatcher onError={boundary}>{overlay}</ErrorCatcher>;
@@ -150,6 +184,26 @@ export interface OverlaySuiteHarnessProps<D> extends OverlayHarnessProps<D> {
 }
 
 type User = ReturnType<typeof setupUser>;
+
+/**
+ * A component with an async action of its own that waits for `until` once clicked: a transition
+ * pending elsewhere in the app, which every other transition is entangled with (conventions 2.3
+ * item 5). The row must settle `until` before it ends: React's entangled action lane is
+ * module-wide, so a pending one would hold every later file's transitions.
+ */
+function Unrelated({ until }: { until: Promise<void> }) {
+  const [busy, startBusy] = useTransition();
+  return (
+    <button
+      type="button"
+      data-testid="unrelated"
+      data-busy={busy ? "" : undefined}
+      onClick={() => startBusy(() => until)}
+    >
+      Unrelated
+    </button>
+  );
+}
 
 /** A library-owned close through a part of the overlay, by a click. */
 export interface PartClose {
@@ -197,7 +251,7 @@ export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
    * `hidePopover()`). Called inside `act`.
    */
   readonly dismiss: (value?: string) => void;
-  /** The `type` of the event a dismissal's notification carries (`"close"`, `"toggle"`). */
+  /** The `type` of the event a dismissal's `onOpenChange` carries (`"close"`, `"toggle"`). */
   readonly dismissEvent: string;
   /**
    * The library-owned closes through a part, by a click (Dialog: the default content's Close part;
@@ -394,6 +448,17 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           // The library's own close echoes back without a second dispatch.
           expect(action).toHaveBeenCalledTimes(2);
         });
+
+        it("the library's own close is no fact: onOpenChange is not called", async () => {
+          const user = setupUser();
+          const fact = vi.fn<Action>();
+          render(<Harness mode={mode} fact={fact} />);
+          await openThroughTrigger(user);
+          await user.click(trigger());
+          await flushTasks(2);
+          expect(isOpen()).toBe(false);
+          expect(fact).not.toHaveBeenCalled();
+        });
       } else {
         it("a click while optimistically open never dispatches", async () => {
           const user = setupUser();
@@ -499,69 +564,107 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
             expectNotPending(trigger());
             await flushTasks(2);
             expect(content()).toBeNull();
-            // The close event is an echo: no second notification.
+            // The close event is an echo: no second dispatch, and no fact.
             expect(action).toHaveBeenCalledTimes(2);
             // Focus moved back from the part to the Trigger.
             if (part.returnsFocus) expect(trigger()).toHaveFocus();
           });
 
       for (const kind of triggerKinds)
-        it(`dismissal: notified as (false, 'dismiss') with the platform's event; pending meanwhile${kindName(kind)}`, async () => {
+        it(`dismissal: a fact, onOpenChange(false, 'dismiss') in the platform's event; committed false at once, nothing pending${kindName(kind)}`, async () => {
           const user = setupUser();
           const action = vi.fn<Action>();
-          render(<Harness mode={mode} {...triggerProps(kind)} action={action} />);
+          // The fact handler returns a promise that never settles (a Server Function): not awaited.
+          const fact = vi.fn<Action>(() => new Promise(() => {}));
+          render(<Harness mode={mode} {...triggerProps(kind)} action={action} fact={fact} />);
           await openThroughTrigger(user);
-          const d = deferred();
-          action.mockImplementation(() => d.promise);
+          // A listener added after the library's runs after it in the same event: the handler
+          // has been called by then (synchronously, in the platform's event).
+          const calledInEvent = vi.fn();
+          popup().addEventListener(config.dismissEvent, () =>
+            calledInEvent(fact.mock.calls.length),
+          );
           // What Escape or a click outside does: the platform closes at once.
           await act(async () => dismiss("x"));
           expect(isOpen()).toBe(false);
-          // The notification follows the platform's event.
           await flushTasks(2);
-          expect(action).toHaveBeenCalledTimes(2);
-          const [next, details] = action.mock.calls[1]!;
+          expect(calledInEvent).toHaveBeenCalledExactlyOnceWith(1);
+          expect(fact).toHaveBeenCalledTimes(1);
+          const [next, details] = fact.mock.calls[0]!;
           expect(next).toBe(false);
           expect(details.reason).toBe("dismiss");
           if (hasReturnValue) expect(returnValueOf(details)).toBe("x");
           expect(details.event!.type).toBe(config.dismissEvent);
-          expectPending(trigger());
-          expect(trigger()).not.toHaveAttribute("data-open");
-          // `aria-expanded` mirrors the hidden popup from its `toggle`, though committed is still
-          // true until the notification settles (#118).
-          expectShown(kind, false);
-          expect(content()).toBeInTheDocument(); // committed is still true
-          await act(async () => d.resolve());
+          expect(Object.keys(details).sort()).toEqual(config.detailsKeys);
+          // A request channel only: openChangeAction heard the open, nothing else.
+          expect(action).toHaveBeenCalledTimes(1);
+          // No pending state for a fact; committed (content) and optimistic (data-open) agree.
           expectNotPending(trigger());
+          expect(trigger()).not.toHaveAttribute("data-open");
           expectShown(kind, false);
           expect(content()).toBeNull();
           expect(committedText()).toBe("false");
           expect(isOpen()).toBe(false);
         });
 
+      it("a fact while an unrelated async action is pending elsewhere commits at once", async () => {
+        const user = setupUser();
+        const unrelated = deferred();
+        render(
+          <Harness
+            mode={mode}
+            outside={() => <Unrelated until={unrelated.promise} />}
+            fact={() => {}}
+          />,
+        );
+        await openThroughTrigger(user);
+        // An async action in another component's transition, pending for the rest of the row: a
+        // transition commit would be entangled with it (conventions 2.3 item 5), an urgent one is not.
+        await user.click(screen.getByTestId("unrelated"));
+        await act(async () => dismiss());
+        await flushTasks(2);
+        expect(screen.getByTestId("unrelated")).toHaveAttribute("data-busy", "");
+        expect(content()).toBeNull();
+        expect(committedText()).toBe("false");
+        expect(trigger()).not.toHaveAttribute("data-open");
+        expectNotPending(trigger());
+        await act(async () => unrelated.resolve());
+        expect(screen.getByTestId("unrelated")).not.toHaveAttribute("data-busy");
+      });
+
       it("a commit between the platform's close and its event does not re-open", async () => {
         const user = setupUser();
         const action = vi.fn<Action>();
-        const { rerender } = render(<Harness mode={mode} action={action} />);
+        const fact = vi.fn<Action>();
+        const { rerender } = render(<Harness mode={mode} action={action} fact={fact} />);
         await openThroughTrigger(user);
         const open = spyOpen();
         await act(async () => {
           dismiss();
           // A re-render of the Root lands before the queued close event.
-          rerender(<Harness mode={mode} action={action} popup={{ className: "re-rendered" }} />);
+          rerender(
+            <Harness
+              mode={mode}
+              action={action}
+              fact={fact}
+              popup={{ className: "re-rendered" }}
+            />,
+          );
         });
         expect(popup()).toHaveClass("re-rendered");
         expect(isOpen()).toBe(false);
         await flushTasks(2);
         expect(open).not.toHaveBeenCalled();
         expect(isOpen()).toBe(false);
-        expect(action).toHaveBeenLastCalledWith(false, expect.anything());
+        expect(fact).toHaveBeenLastCalledWith(false, expect.anything());
       });
 
       for (const part of partCloses)
-        it(`a dismissal during a pending part-initiated close notifies nothing more (walkthrough 11.13)${partName(part)}`, async () => {
+        it(`a dismissal during a pending part-initiated close is reported at once and supersedes it (overlay-open-change.md 2.5)${partName(part)}`, async () => {
           const user = setupUser();
           const action = vi.fn<Action>();
-          render(<Harness mode={mode} action={action} />);
+          const fact = vi.fn<Action>();
+          render(<Harness mode={mode} action={action} fact={fact} />);
           await openThroughTrigger(user);
           const closing = deferred();
           action.mockImplementation(() => closing.promise);
@@ -573,6 +676,16 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           await act(async () => dismiss());
           await flushTasks(2);
           expect(isOpen()).toBe(false);
+          // Asked, then told: both callbacks were called.
+          expect(fact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+            [false, "dismiss"],
+          ]);
+          expect(committedText()).toBe("false");
+          expect(content()).toBeNull();
+          expect(trigger()).not.toHaveAttribute("data-open");
+          // The superseded request is still running: React's pending reports it (2.5, the one
+          // honest leftover), without `data-open`.
+          expectPending(trigger());
           close.mockClear();
           await act(async () => closing.resolve());
           await flushTasks(2);
@@ -580,10 +693,37 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
             [true, "activate"],
             [false, "activate"],
           ]);
+          expect(fact).toHaveBeenCalledTimes(1);
           // The apply effect found the popup closed: no second close.
           expect(close).not.toHaveBeenCalled();
           expect(isOpen()).toBe(false);
           expect(content()).toBeNull();
+          expectNotPending(trigger());
+        });
+
+      for (const part of partCloses)
+        it(`a superseded part close that rejects after the fact goes to reportError, not the boundary${partName(part)}`, async () => {
+          const user = setupUser();
+          silenceErrors();
+          const reportError = vi.fn();
+          vi.stubGlobal("reportError", reportError);
+          const caught = vi.fn();
+          const action = vi.fn<Action>();
+          render(<Harness mode={mode} action={action} fact={() => {}} boundary={caught} />);
+          await openThroughTrigger(user);
+          const closing = deferred();
+          action.mockImplementation(() => closing.promise);
+          await part.close(user);
+          await act(async () => dismiss());
+          await flushTasks(2);
+          const err = new Error("superseded");
+          await act(async () => closing.reject(err));
+          await flushTasks(2);
+          expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+          expect(caught).not.toHaveBeenCalled();
+          expect(screen.getByTestId("popup")).toBeInTheDocument();
+          expect(isOpen()).toBe(false);
+          expectNotPending(trigger());
         });
     });
 
@@ -659,69 +799,163 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           expect(isOpen()).toBe(mode === "controlled");
         });
 
-      it("dismissal notification rejects: the boundary gets it (the popup was already closed)", async () => {
+      it("a promise onOpenChange returns rejects: reportError, no boundary, the UI untouched", async () => {
         const user = setupUser();
         silenceErrors();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
         const caught = vi.fn();
-        const action = vi.fn<Action>();
-        render(<Harness mode={mode} action={action} boundary={caught} />);
+        const err = new Error("save failed");
+        render(<Harness mode={mode} fact={() => Promise.reject(err)} boundary={caught} />);
         await openThroughTrigger(user);
-        action.mockImplementation(async () => {
-          throw new Error("save failed");
-        });
         await act(async () => dismiss());
         await flushTasks(2);
-        expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "save failed" }));
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(caught).not.toHaveBeenCalled();
+        expect(screen.getByTestId("popup")).toBeInTheDocument();
+        expect(isOpen()).toBe(false);
+        expect(committedText()).toBe("false");
       });
 
-      it("dismissal notification rejects, caught inside: uncontrolled stays closed, controlled re-opens", async () => {
+      it("onOpenChange throws: reportError, and the fact still stands (committed false)", async () => {
         const user = setupUser();
-        const action = vi.fn<Action>();
-        render(<Harness mode={mode} action={action} catchErrors />);
+        silenceErrors();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const caught = vi.fn();
+        const err = new Error("handler bug");
+        render(
+          <Harness
+            mode={mode}
+            fact={() => {
+              throw err;
+            }}
+            boundary={caught}
+          />,
+        );
         await openThroughTrigger(user);
-        action.mockImplementation(async () => {
-          throw new Error("handled");
-        });
-        const open = spyOpen();
         await act(async () => dismiss());
         await flushTasks(2);
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(caught).not.toHaveBeenCalled();
+        // The library's bookkeeping ran before the call: committed `false`. The controlled
+        // harness adopts after the body, so it never adopted: the popup re-opened.
+        expect(isOpen()).toBe(mode === "controlled");
         if (mode === "uncontrolled") {
-          expect(isOpen()).toBe(false);
-          expect(open).not.toHaveBeenCalled();
-        } else {
-          // The controlled harness does not adopt `false` on failure: the popup re-opens.
-          expect(isOpen()).toBe(true);
-          expect(open).toHaveBeenCalledTimes(1);
+          expect(content()).toBeNull();
+          expect(trigger()).not.toHaveAttribute("data-open");
         }
       });
     });
 
     describe("controlled refusal and veto", () => {
       for (const kind of triggerKinds)
-        it(`a refused dismissal re-opens the popup once the notification settles; not a veto${kindName(kind)}`, async () => {
+        it(`a refused dismissal re-opens the popup at once, in the fact's commit; not a veto, nothing pending${kindName(kind)}`, async () => {
           const user = setupUser();
-          const d = deferred();
           const action = vi.fn<Action>();
-          render(<Harness mode="controlled" {...triggerProps(kind)} action={action} refuseClose />);
+          const fact = vi.fn<Action>();
+          render(
+            <Harness
+              mode="controlled"
+              {...triggerProps(kind)}
+              action={action}
+              fact={fact}
+              refuseClose
+            />,
+          );
           await openThroughTrigger(user);
           const open = spyOpen();
-          action.mockImplementation(() => d.promise);
-          await act(async () => dismiss());
-          expect(isOpen()).toBe(false);
-          await flushTasks(2);
-          expectPending(trigger());
-          // Hidden while the notification runs: the mirror says so though committed stays true (#118).
-          expectShown(kind, false);
-          expect(open).not.toHaveBeenCalled();
-          await act(async () => d.resolve());
+          let hiddenByDismissal = true;
+          await act(async () => {
+            dismiss();
+            hiddenByDismissal = !isOpen();
+          });
+          expect(hiddenByDismissal).toBe(true);
+          // The fact's event: the parent was told `false`, kept `open={true}`; the commit that
+          // follows re-applies it (no request, nothing to wait for).
+          await flushTasks(1);
+          expect(fact).toHaveBeenCalledTimes(1);
           expect(open).toHaveBeenCalledTimes(1);
           expect(isOpen()).toBe(true);
           expect(trigger()).toHaveAttribute("data-open", "");
-          // Expanded again with the re-show's `toggle`.
+          expectNotPending(trigger());
+          expect(content()).toBeInTheDocument();
+          // Expanded again with the re-show's `toggle`; no callback for the re-open.
           await flushTasks(2);
           expectShown(kind, true);
-          expectNotPending(trigger());
+          expect(action).toHaveBeenCalledTimes(1);
+          expect(fact).toHaveBeenCalledTimes(1);
         });
+
+      it("a refused dismissal during a pending request re-opens once the request settled", async () => {
+        const user = setupUser();
+        const action = vi.fn<Action>();
+        render(<Harness mode="controlled" action={action} fact={() => {}} refuseClose />);
+        await openThroughTrigger(user);
+        const d = deferred();
+        action.mockImplementation(() => d.promise);
+        await partCloses[0].close(user);
+        const open = spyOpen();
+        await act(async () => dismiss());
+        await flushTasks(2);
+        // The apply effect waits for the superseded request, as for every re-application.
+        expect(isOpen()).toBe(false);
+        expect(open).not.toHaveBeenCalled();
+        await act(async () => d.resolve());
+        await flushTasks(2);
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(true);
+        expectNotPending(trigger());
+      });
+
+      it("a controlled Root without onOpenChange warns once and re-opens after a dismissal", async () => {
+        const user = setupUser();
+        const errors = silenceErrors();
+        render(<Harness mode="controlled" factAdoption="omit" />);
+        await flushTasks(1);
+        const warnings = () =>
+          errors.mock.calls.filter(([m]) => String(m).includes("without `onOpenChange`"));
+        expect(warnings()).toHaveLength(1);
+        expect(String(warnings()[0]![0])).toContain("onOpenChange={setOpen}");
+        await openThroughTrigger(user);
+        const open = spyOpen();
+        await act(async () => dismiss());
+        await flushTasks(2);
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(true);
+        expect(warnings()).toHaveLength(1);
+      });
+
+      it("no warning with onOpenChange, nor in uncontrolled mode without it", async () => {
+        const errors = silenceErrors();
+        const { unmount } = render(<Harness mode="controlled" />);
+        await flushTasks(1);
+        unmount();
+        render(<Harness mode="uncontrolled" factAdoption="omit" />);
+        await flushTasks(1);
+        expect(
+          errors.mock.calls.filter(([m]) => String(m).includes("without `onOpenChange`")),
+        ).toHaveLength(0);
+      });
+
+      it("a parent that adopts the fact late (in startTransition) re-opens, then closes", async () => {
+        const user = setupUser();
+        render(<Harness mode="controlled" factAdoption="transition" />);
+        await openThroughTrigger(user);
+        const open = spyOpen();
+        let close!: MockInstance;
+        await act(async () => {
+          dismiss();
+          close = spyClose();
+        });
+        await flushTasks(2);
+        // The documented mistake (overlay-open-change.md 2.4): `open={true}` in the event's own
+        // commit re-opens the popup; the late `false` then closes it as a controlled close.
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(false);
+        expect(committedText()).toBe("false");
+      });
 
       for (const part of partCloses)
         for (const kind of triggerKinds)
@@ -765,49 +999,82 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
     });
 
     describe("overlap", () => {
-      renderBoth("dismissal notification pending, the user re-opens (walkthrough 11.8)", (mode) => {
-        it("both actions run; the latest intent wins", async () => {
+      renderBoth("a dismissal, then the user re-opens", (mode) => {
+        it("the fact pends nothing; the re-open is a plain request", async () => {
           const user = setupUser();
           const action = vi.fn<Action>();
-          render(<Harness mode={mode} action={action} />);
+          const fact = vi.fn<Action>();
+          render(<Harness mode={mode} action={action} fact={fact} />);
           await openThroughTrigger(user);
-          const closing = deferred();
           const opening = deferred();
-          action.mockImplementationOnce(() => closing.promise);
           action.mockImplementationOnce(() => opening.promise);
           const open = spyOpen();
           await act(async () => dismiss());
           await flushTasks(2);
           expect(trigger()).not.toHaveAttribute("data-open");
+          expectNotPending(trigger());
           await user.click(trigger());
-          expect(action).toHaveBeenCalledTimes(3);
-          expect(action.mock.calls[2]![0]).toBe(true);
+          expect(action.mock.calls.map(([next]) => next)).toEqual([true, true]);
+          expect(fact).toHaveBeenCalledTimes(1);
           expect(trigger()).toHaveAttribute("data-open", "");
-          // Optimistic and committed are both `true` (the close never committed), yet the Root
-          // is pending and the popup is closed: the Trigger shows it.
           expectPending(trigger());
           expect(isOpen()).toBe(false);
-          // Resolve out of order: the open first, then the superseded close.
           await act(async () => opening.resolve());
-          await act(async () => closing.resolve());
           await flushTasks(2);
           expectNotPending(trigger());
-          if (mode === "uncontrolled") {
-            // The latest-dispatch guard ignores the superseded close.
-            expect(trigger()).toHaveAttribute("data-open", "");
-            expect(isOpen()).toBe(true);
-            expect(open).toHaveBeenCalledTimes(1);
-            expect(content()).toBeInTheDocument();
-          } else {
-            // A controlled parent that adopts every resolution in arrival order ends with the
-            // slower one (conventions 2.5: the guard is the parent's job in controlled mode);
-            // the DOM follows the parent.
-            expect(committedText()).toBe("false");
-            expect(trigger()).not.toHaveAttribute("data-open");
-            expect(isOpen()).toBe(false);
-          }
+          expect(trigger()).toHaveAttribute("data-open", "");
+          expect(isOpen()).toBe(true);
+          expect(open).toHaveBeenCalledTimes(1);
+          expect(content()).toBeInTheDocument();
         });
       });
+
+      if (config.triggerToggles) {
+        renderBoth(
+          "close then open requested while shown, then a dismissal (2.5 row 3)",
+          (mode) => {
+            it("the fact wins: the pending open does not show the popup when it resolves (uncontrolled)", async () => {
+              const user = setupUser();
+              const action = vi.fn<Action>();
+              const fact = vi.fn<Action>();
+              render(<Harness mode={mode} action={action} fact={fact} />);
+              await openThroughTrigger(user);
+              const closing = deferred();
+              const opening = deferred();
+              action.mockImplementationOnce(() => closing.promise);
+              action.mockImplementationOnce(() => opening.promise);
+              // Two clicks while shown: a close requested, then an open requested again; the popup
+              // never hid.
+              await user.click(trigger());
+              await user.click(trigger());
+              expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+              expect(isOpen()).toBe(true);
+              expect(trigger()).toHaveAttribute("data-open", "");
+              const open = spyOpen();
+              await act(async () => dismiss());
+              await flushTasks(2);
+              expect(fact).toHaveBeenCalledTimes(1);
+              // The stale optimistic `true` was dropped in the fact's commit.
+              expect(trigger()).not.toHaveAttribute("data-open");
+              expect(content()).toBeNull();
+              await act(async () => opening.resolve());
+              await act(async () => closing.resolve());
+              await flushTasks(2);
+              expectNotPending(trigger());
+              if (mode === "uncontrolled") {
+                expect(isOpen()).toBe(false);
+                expect(open).not.toHaveBeenCalled();
+                expect(trigger()).not.toHaveAttribute("data-open");
+              } else {
+                // A controlled parent's own later updates are its own (2.4): the harness adopts each
+                // resolution in arrival order, the close last.
+                expect(committedText()).toBe("false");
+                expect(isOpen()).toBe(false);
+              }
+            });
+          },
+        );
+      }
 
       if (config.triggerToggles) {
         renderBoth("second click during a pending open (walkthrough 11.7)", (mode) => {
@@ -882,18 +1149,19 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         );
       }
 
-      renderBoth("a dismissal, then a re-open", (mode) => {
+      renderBoth("a part close, a dismissal, then a re-open", (mode) => {
         rows(true, async () => {
           const user = setupUser();
           silenceErrors();
           const caught = vi.fn();
           const action = vi.fn<Action>();
-          render(<Harness mode={mode} action={action} boundary={caught} />);
+          render(<Harness mode={mode} action={action} fact={() => {}} boundary={caught} />);
           await openThroughTrigger(user);
           const older = deferred();
           const newer = deferred();
           action.mockImplementationOnce(() => older.promise);
           action.mockImplementationOnce(() => newer.promise);
+          await partCloses[0].close(user);
           await act(async () => dismiss());
           await flushTasks(2);
           await user.click(trigger());
@@ -1023,13 +1291,14 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           expect(action).toHaveBeenCalledTimes(1);
         });
 
-        it("rejected: the popup is closed again and no close notification follows", async () => {
+        it("rejected: the popup is closed again, no close dispatch and no fact follows", async () => {
           silenceErrors();
           let close!: MockInstance;
+          const fact = vi.fn<Action>();
           const action = vi.fn<Action>(async (next) => {
             if (next) throw new Error("not now");
           });
-          await hydrate(<Harness mode={mode} action={action} catchErrors />, () => {
+          await hydrate(<Harness mode={mode} action={action} fact={fact} catchErrors />, () => {
             close = spyClose();
           });
           await flushTasks(2);
@@ -1037,6 +1306,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
             expect(close).toHaveBeenCalledTimes(1);
             expect(isOpen()).toBe(false);
             expect(action).toHaveBeenCalledTimes(1); // the echo did not dispatch
+            expect(fact).not.toHaveBeenCalled(); // nor was it a fact
           } else {
             // Uncontrolled: a caught error is success, so it commits `true` and stays open.
             expect(isOpen()).toBe(true);
@@ -1044,28 +1314,32 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         });
       });
 
-      it("a controlled parent refusing the pre-hydration open closes it, with no notification", async () => {
+      it("a controlled parent refusing the pre-hydration open closes it, with no dispatch or fact", async () => {
         silenceErrors();
         let close!: MockInstance;
         const action = vi.fn<Action>();
-        await hydrate(<Harness mode="controlled" action={action} refuseOpen />, () => {
+        const fact = vi.fn<Action>();
+        await hydrate(<Harness mode="controlled" action={action} fact={fact} refuseOpen />, () => {
           close = spyClose();
         });
         await flushTasks(2);
         expect(close).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(false);
         expect(action).toHaveBeenCalledTimes(1);
+        expect(fact).not.toHaveBeenCalled();
       });
 
-      it("a controlled `open` flipped programmatically opens and closes, no echo dispatch", async () => {
+      it("a controlled `open` flipped programmatically opens and closes, no echo dispatch or fact", async () => {
         const open = spyOpen();
         const close = spyClose();
         const action = vi.fn<Action>();
+        const fact = vi.fn<Action>();
         let setOpen!: (open: boolean) => void;
         render(
           <Harness
             mode="controlled"
             action={action}
+            fact={fact}
             trigger={false}
             outside={(set) => {
               setOpen = set;
@@ -1085,6 +1359,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(isOpen()).toBe(false);
         await flushTasks(2);
         expect(action).not.toHaveBeenCalled();
+        expect(fact).not.toHaveBeenCalled();
         expect(content()).toBeNull();
       });
 
@@ -1188,7 +1463,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         expect(mounts).toHaveBeenCalledTimes(1);
       });
 
-      it("a dismissal's notification commit unmounts the children (no exit animation); a re-open mounts them again", async () => {
+      it("a dismissal's fact commit unmounts the children (no exit animation); a re-open mounts them again", async () => {
         const user = setupUser();
         render(<Harness mode="uncontrolled" />);
         await openThroughTrigger(user);
@@ -1223,7 +1498,8 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           it(`the dismissal is reported as 'dismiss' (no stale intent from the part's close)${partName(part)}`, async () => {
             const user = setupUser();
             const action = vi.fn<Action>();
-            render(<Harness mode={mode} action={action} />);
+            const fact = vi.fn<Action>();
+            render(<Harness mode={mode} action={action} fact={fact} />);
             await openThroughTrigger(user);
             await part.close(user);
             await flushTasks(2);
@@ -1235,6 +1511,8 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
               [true, "activate"],
               [false, "activate"],
               [true, "activate"],
+            ]);
+            expect(fact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
               [false, "dismiss"],
             ]);
           });

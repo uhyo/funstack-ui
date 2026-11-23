@@ -163,11 +163,12 @@ async function openWithKeyboard(key = "{ArrowDown}") {
 /** The shared suite's harness: the `content` item (focused by a keyboard open), then `inside`. */
 function SuiteHarness({
   action,
+  fact,
   className,
   inside,
 }: OverlayBrowserHarnessProps<MenuOpenChangeDetails>) {
   return (
-    <Basic root={{ openChangeAction: action }} popup={{ className }}>
+    <Basic root={{ openChangeAction: action, onOpenChange: fact }} popup={{ className }}>
       <Menu.Item data-testid="content">Rename</Menu.Item>
       <Menu.Item data-testid="delete">Delete</Menu.Item>
       {inside}
@@ -289,9 +290,9 @@ describe("Menu (browser)", () => {
       expect(action.mock.calls.at(-1)![1].reason).toBe("activate");
     });
 
-    it("Shift+Tab from the first item lands on the Trigger and closes the menu", async () => {
+    it("Shift+Tab from the first item lands on the Trigger and closes the menu (a 'dismiss' fact)", async () => {
       const action = vi.fn<OpenAction>();
-      render(<Basic root={{ openChangeAction: action }} />);
+      render(<Basic root={{ onOpenChange: action }} />);
       await openWithKeyboard();
       await user.tab({ shift: true });
       expect(trigger()).toHaveFocus();
@@ -446,11 +447,11 @@ describe("Menu (browser)", () => {
       expect(Math.round(s.top)).toBe(Math.round(m.top));
     });
 
-    it("Escape closes only the submenu and the library focuses its trigger", async () => {
+    it("Escape closes only the submenu (a 'dismiss' fact) and the library focuses its trigger", async () => {
       const subAction = vi.fn<OpenAction>();
       render(
         <Basic>
-          <Submenu sub={{ openChangeAction: subAction }} />
+          <Submenu sub={{ onOpenChange: subAction }} />
         </Basic>,
       );
       await openSub();
@@ -482,7 +483,7 @@ describe("Menu (browser)", () => {
       const subAction = vi.fn<OpenAction>();
       render(
         <Basic root={{ openChangeAction: action }}>
-          <Submenu sub={{ openChangeAction: subAction }} onInbox={onInbox} />
+          <Submenu sub={{ onOpenChange: subAction }} onInbox={onInbox} />
         </Basic>,
       );
       await openSub();
@@ -492,7 +493,9 @@ describe("Menu (browser)", () => {
       expect(isOpen()).toBe(false);
       expect(isOpen(subElement)).toBe(false);
       expect(trigger()).toHaveFocus();
+      // The root: a request; the submenu, hidden with its parent: a fact.
       expect(action.mock.calls.at(-1)![1].reason).toBe("activate");
+      await settle(() => expect(subAction).toHaveBeenCalledTimes(1));
       expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
     });
 
@@ -537,10 +540,16 @@ describe("Menu (browser)", () => {
       it("a sibling item: the submenu is dismissed at the release, the item's click closes the root through the action", async () => {
         const work = deferred();
         const action = vi.fn<OpenAction>((next) => (next ? undefined : work.promise));
-        const subAction = vi.fn<OpenAction>();
+        // Both channels of the submenu, in arrival order.
+        const subCloses: [string, boolean, string][] = [];
         render(
           <Basic root={{ openChangeAction: action }}>
-            <Submenu sub={{ openChangeAction: subAction }} />
+            <Submenu
+              sub={{
+                openChangeAction: (next, d) => void subCloses.push(["action", next, d.reason]),
+                onOpenChange: (next, d) => void subCloses.push(["fact", next, d.reason]),
+              }}
+            />
           </Basic>,
         );
         await openSub();
@@ -548,11 +557,12 @@ describe("Menu (browser)", () => {
         const calls = action.mock.calls.length;
         leaveActEnvironment();
         await mouse.pressOn(item("delete"), { moveFirst: true });
-        // Light dismiss of the nested popover (a press in the parent menu), or the hover close:
+        // Light dismiss of the nested popover (a press in the parent menu: a fact), or the hover
+        // close (a request the library holds, `reason: "dismiss"`; overlay-open-change.md 2.2):
         // either way a dismissal. The root stays shown through its pending close.
         await expect.poll(() => isOpen(subElement)).toBe(false);
-        await expect.poll(() => subAction.mock.calls.at(-1)?.[0]).toBe(false);
-        expect(subAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+        await expect.poll(() => subCloses.at(-1)?.[1]).toBe(false);
+        expect(subCloses.at(-1)![2]).toBe("dismiss");
         expect(isOpen()).toBe(true);
         expect(document.activeElement).toBe(item("delete"));
         expect(trigger()).toHaveAttribute("data-pending", "");
@@ -570,14 +580,14 @@ describe("Menu (browser)", () => {
         expect(action).toHaveBeenCalledTimes(calls + 1);
       });
 
-      it("an item in the submenu: the root's close is awaited ('activate'); both stay shown until it settles, the submenu then notified ('dismiss')", async () => {
+      it("an item in the submenu: the root's close is awaited ('activate'); both stay shown until it settles, the submenu then gets a 'dismiss' fact", async () => {
         const work = deferred();
         const onInbox = vi.fn();
         const action = vi.fn<OpenAction>((next) => (next ? undefined : work.promise));
         const subAction = vi.fn<OpenAction>();
         render(
           <Basic root={{ openChangeAction: action }}>
-            <Submenu sub={{ openChangeAction: subAction }} onInbox={onInbox} />
+            <Submenu sub={{ onOpenChange: subAction }} onInbox={onInbox} />
           </Basic>,
         );
         await openSub();
@@ -922,9 +932,9 @@ describe("Menu (browser)", () => {
   });
 
   describe("light dismiss and layering", () => {
-    it("a click outside closes with 'dismiss'", async () => {
+    it("a click outside closes: a 'dismiss' fact", async () => {
       const action = vi.fn<OpenAction>();
-      render(<Basic root={{ openChangeAction: action }} />);
+      render(<Basic root={{ onOpenChange: action }} />);
       await openWithKeyboard();
       await user.click(item("outside"));
       expect(isOpen()).toBe(false);
@@ -978,11 +988,12 @@ describe("Menu (browser)", () => {
 
   // #125
   describe("foreign popovertarget invoker", () => {
-    it("a press that keeps focus in the menu closes it with 'activate' and the ToggleEvent", async () => {
+    it("a press that keeps focus in the menu closes it: an 'activate' fact with the ToggleEvent", async () => {
+      const opens = vi.fn<OpenAction>();
       const action = vi.fn<OpenAction>();
       render(
         <Basic
-          root={{ openChangeAction: action }}
+          root={{ openChangeAction: opens, onOpenChange: action }}
           after={
             // A plain button: the root Popup keeps its press from moving focus out of the menu
             // (#126; the press rows are in "a press on a foreign invoker while open").
@@ -998,8 +1009,9 @@ describe("Menu (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       await user.click(foreign);
       await settle(() => expect(isOpen()).toBe(false));
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
+      await settle(() => expect(action).toHaveBeenCalledTimes(1));
+      expect(opens).toHaveBeenCalledTimes(1);
+      const [next, details] = action.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("activate");
       expect(details.event).toBeInstanceOf(ToggleEvent);
@@ -1010,8 +1022,9 @@ describe("Menu (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       await user.keyboard("{Escape}");
       await settle(() => expect(isOpen()).toBe(false));
-      expect(action).toHaveBeenCalledTimes(4);
-      expect(action.mock.calls[3]![1].reason).toBe("dismiss");
+      await settle(() => expect(action).toHaveBeenCalledTimes(2));
+      expect(opens).toHaveBeenCalledTimes(2);
+      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
     });
   });
 
@@ -1156,7 +1169,8 @@ describe("Menu (browser)", () => {
 
   describeForeignInvokerPressInBrowser({
     name: "Menu",
-    render: (openAction) => render(withForeign({ openChangeAction: openAction })),
+    render: (openAction, fact) =>
+      render(withForeign({ openChangeAction: openAction, onOpenChange: fact })),
     popup,
     open: () => openWithKeyboard(),
     focusedWhileOpen: () => item("rename"),
@@ -1164,9 +1178,9 @@ describe("Menu (browser)", () => {
   });
 
   describe("a foreign invoker while open", () => {
-    it("Tab from the last item onto the foreign invoker still closes the menu ('dismiss')", async () => {
+    it("Tab from the last item onto the foreign invoker still closes the menu (a 'dismiss' fact)", async () => {
       const action = vi.fn<OpenAction>();
-      render(withForeign({ openChangeAction: action }));
+      render(withForeign({ onOpenChange: action }));
       screen.getByTestId("foreign").setAttribute("popovertarget", popup().id);
       await openWithKeyboard();
       const calls = action.mock.calls.length;
@@ -1216,18 +1230,23 @@ describe("Menu (browser)", () => {
       await expectInvokerExpanded(trigger(), popup(), true);
     });
 
-    it("Menu.Trigger: collapsed after a refused Escape while the notification runs, expanded again on the re-show", async () => {
-      const work = deferred();
-      render(<Basic root={{ open: true, openChangeAction: () => work.promise }} />);
+    it("Menu.Trigger: a refused Escape re-opens the menu at once (a fresh show), nothing pending; expanded again", async () => {
+      const fact = vi.fn<OpenAction>();
+      render(<Basic root={{ open: true, onOpenChange: fact }} />);
       await expect.poll(() => isOpen()).toBe(true);
       await expectInvokerExpanded(trigger(), popup(), true);
+      const toggles: string[] = [];
+      popup().addEventListener("toggle", (event) => toggles.push((event as ToggleEvent).newState));
       await user.keyboard("{Escape}");
-      await expect.poll(() => isOpen()).toBe(false);
-      expect(trigger()).toHaveAttribute("data-pending", "");
-      await expectInvokerExpanded(trigger(), popup(), false);
-      expect(trigger()).toHaveAttribute("data-pending", "");
-      await act(async () => work.resolve());
+      // Hidden by the platform, then shown again in the fact's own commit (overlay-open-change.md
+      // 2.4): the parent was told `false` and kept `open={true}`.
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
       await expect.poll(() => isOpen()).toBe(true);
+      // The test's listener runs after the library's, whose fact commit (a microtask after that
+      // listener) has already re-shown the popup: the event it sees depends on the engine's
+      // coalescing, so only its arrival is checked.
+      expect(toggles.length).toBeGreaterThan(0);
+      expect(trigger()).not.toHaveAttribute("data-pending");
       await expectInvokerExpanded(trigger(), popup(), true);
     });
   });

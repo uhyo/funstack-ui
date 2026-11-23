@@ -285,8 +285,8 @@ describe("Dialog", () => {
 
       // #116: with `lightDismiss` the Trigger click is also a click outside the still-open
       // dialog. Its `requestOpen` dispatches during the click; the dismissal's queued `close`
-      // event dispatches after it, so the dismissal is the last intent and the dialog ends
-      // closed, on the JS path and the native one alike.
+      // event follows it, a fact that supersedes every request in flight (the part's close and
+      // that open), so the dialog ends closed, on the JS path and the native one alike.
       it.each([
         ["without experimental_closedBy", false],
         ["with experimental_closedBy (JS fallback)", true],
@@ -295,10 +295,12 @@ describe("Dialog", () => {
         async (_label, experimental_closedBy) => {
           const user = setupUser();
           const action = vi.fn<ActionFn>();
+          const fact = vi.fn<ActionFn>();
           render(
             <Harness
               mode="uncontrolled"
               action={action}
+              fact={fact}
               modal={false}
               popup={{ lightDismiss: true, experimental_closedBy }}
             />,
@@ -317,9 +319,11 @@ describe("Dialog", () => {
             [true, "activate"],
             [false, "activate"],
             [true, "activate"],
+          ]);
+          expect(fact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
             [false, "dismiss"],
           ]);
-          expect(action.mock.calls[3]![1].event!.type).toBe("close");
+          expect(fact.mock.calls[0]![1].event!.type).toBe("close");
           expect(popup().open).toBe(false);
           expect(trigger()).not.toHaveAttribute("data-open");
           expect(content()).toBeNull();
@@ -354,14 +358,17 @@ describe("Dialog", () => {
   describe("a controlled parent that vetoes the Close part's close (walkthrough 11.14)", () => {
     /**
      * A controlled parent following 11.14: it vetoes a Close part's close (reason
-     * "activate") and adopts everything else, a dismissal included.
+     * "activate") and adopts everything else: the other requests, and every fact
+     * (`onOpenChange={setOpen}`, #148).
      */
     function VetoCloseParent({
       action,
+      fact,
       modal,
       content,
     }: {
       action: ActionFn;
+      fact?: ActionFn;
       modal?: boolean;
       content?: ReactNode;
     }) {
@@ -375,6 +382,10 @@ describe("Dialog", () => {
               await action(next, details);
               if (!next && details.reason === "activate") return; // veto
               startTransition(() => setOpen(next));
+            }}
+            onOpenChange={(next, details) => {
+              fact?.(next, details);
+              setOpen(next);
             }}
           >
             <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
@@ -392,11 +403,12 @@ describe("Dialog", () => {
       );
     }
 
-    it("an Escape during the pending close, then the veto: the dismissal is notified, not undone", async () => {
+    it("an Escape during the pending close: the fact is reported at once; the later veto changes nothing", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       const showModal = spyShowModal();
-      render(<VetoCloseParent action={action} />);
+      render(<VetoCloseParent action={action} fact={fact} />);
       await openThroughTrigger(user);
       expect(showModal).toHaveBeenCalledTimes(1);
       const closing = deferred();
@@ -407,18 +419,21 @@ describe("Dialog", () => {
       await act(async () => popup().requestClose());
       await flushTasks(2);
       expect(popup().open).toBe(false);
-      // Nothing more yet: the user's intent is already "close" (11.13).
-      expect(action).toHaveBeenCalledTimes(2);
+      // Reported the moment it happened (overlay-open-change.md 6.3: nothing is stored).
+      expect(fact.mock.calls.map(([next, d]) => [next, d.reason, d.returnValue])).toEqual([
+        [false, "dismiss", ""],
+      ]);
+      expect(fact.mock.calls[0]![1].event!.type).toBe("close");
+      expect(committedText()).toBe("false");
       action.mockImplementation(() => undefined);
       await act(async () => closing.resolve());
       await flushTasks(2);
-      // The parent vetoed the Close; the dismissal stands and is notified now.
+      // The parent vetoed the Close; the dismissal had already been adopted.
       expect(action.mock.calls.map(([next, d]) => [next, d.reason, d.returnValue])).toEqual([
         [true, "activate", undefined],
         [false, "activate", "x"],
-        [false, "dismiss", ""],
       ]);
-      expect(action.mock.calls[2]![1].event!.type).toBe("close");
+      expect(fact).toHaveBeenCalledTimes(1);
       expect(showModal).toHaveBeenCalledTimes(1); // never re-opened
       expect(popup().open).toBe(false);
       expect(committedText()).toBe("false");
@@ -562,7 +577,7 @@ describe("Dialog", () => {
   // The shared rows are in the open-state suite (overlay-open-state-suite.tsx, "held content");
   // these need Dialog's `requestClose()` and a stubbed exit animation.
   describe("held content (design 4.4)", () => {
-    it("a dismissal held for an exit animation is released by a normal update, not a view transition", async () => {
+    it("a dismissal held for an exit animation starts no view transition at all (#148), and is released by a normal update", async () => {
       const calls = vi.fn<() => never>(() => {
         throw new Error("startViewTransition stub");
       });
@@ -587,13 +602,14 @@ describe("Dialog", () => {
         calls.mockClear();
         await act(async () => popup().requestClose());
         await flushTasks(2);
-        // The notification commit (one document view transition); the content is held.
-        expect(calls).toHaveBeenCalledTimes(1);
+        // The fact's commit is urgent: no document view transition; the content is held for the
+        // CSS exit.
+        expect(calls).not.toHaveBeenCalled();
         expect(content()).toBeInTheDocument();
         await act(async () => fade.resolve());
         await flushTasks(2);
         expect(content()).toBeNull();
-        expect(calls).toHaveBeenCalledTimes(1);
+        expect(calls).not.toHaveBeenCalled();
       } finally {
         Reflect.deleteProperty(document, "startViewTransition");
       }

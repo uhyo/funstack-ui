@@ -78,12 +78,15 @@ const box = (width: number, height: number) => ({
 
 function Library({
   action,
+  fact,
   popup: popupProps,
   children,
   before,
   after,
 }: {
   action?: ActionFn;
+  /** The Root's `onOpenChange` (facts). */
+  fact?: ActionFn;
   popup?: Partial<PopoverPopupProps>;
   children?: ReactNode;
   /** Rendered before the Root (an outside button). */
@@ -98,7 +101,7 @@ function Library({
         Outside
       </button>
       {before}
-      <Popover.Root defaultOpen={false} openChangeAction={action}>
+      <Popover.Root defaultOpen={false} openChangeAction={action} onOpenChange={fact}>
         <Popover.Trigger data-testid="trigger" style={{ width: 100, height: 30 }}>
           Filters
         </Popover.Trigger>
@@ -146,11 +149,12 @@ function Plain({
 /** The shared suite's harness: the content, then `inside`, then a Close part. */
 function SuiteHarness({
   action,
+  fact,
   className,
   inside,
 }: OverlayBrowserHarnessProps<PopoverOpenChangeDetails>) {
   return (
-    <Library action={action} popup={{ className }}>
+    <Library action={action} fact={fact} popup={{ className }}>
       <span data-testid="content">content</span>
       {inside}
       <Popover.Close data-testid="close">Done</Popover.Close>
@@ -300,23 +304,22 @@ describe("Popover (browser)", () => {
     });
 
     // #118, #121
-    it("the exposed state is collapsed right after an Escape, while a slow dismissal notification runs", async () => {
+    it("the exposed state is collapsed right after an Escape; the fact pends nothing, though its handler's promise is slow", async () => {
       const work = deferred();
-      const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
-      render(<Library action={action} />);
+      const fact = vi.fn<ActionFn>(() => work.promise);
+      render(<Library fact={fact} />);
       await user.click(trigger());
       await expect.poll(() => isOpen()).toBe(true);
       await expectExpanded(true);
       await user.keyboard("{Escape}");
       await new Promise((resolve) => setTimeout(resolve, 60));
       expect(isOpen()).toBe(false);
-      expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
-      expect(trigger()).toHaveAttribute("data-pending", "");
+      expect(fact.mock.calls.at(-1)![1].reason).toBe("dismiss");
+      // Not awaited: nothing pending while the handler's promise runs.
+      expect(trigger()).not.toHaveAttribute("data-pending");
+      expect(trigger()).not.toHaveAttribute("data-open");
       await expectExpanded(false);
-      // Still within the notification.
-      expect(trigger()).toHaveAttribute("data-pending", "");
       await act(async () => work.resolve());
-      await expect.poll(() => trigger().hasAttribute("data-pending")).toBe(false);
       await expectExpanded(false);
     });
 
@@ -376,11 +379,13 @@ describe("Popover (browser)", () => {
     });
 
     // #125
-    it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent; Escape and light dismiss stay 'dismiss'", async () => {
+    it("a foreign popovertarget invoker's close is an 'activate' fact with the ToggleEvent; Escape and light dismiss stay 'dismiss'", async () => {
       const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       render(
         <Library
           action={action}
+          fact={fact}
           before={
             <button type="button" data-testid="foreign">
               Foreign
@@ -394,8 +399,9 @@ describe("Popover (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       await user.click(foreign);
       await settle(() => expect(isOpen()).toBe(false));
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
+      expect(action).toHaveBeenCalledTimes(1);
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("activate");
       expect(details.event).toBeInstanceOf(ToggleEvent);
@@ -406,23 +412,27 @@ describe("Popover (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       await user.keyboard("{Escape}");
       await settle(() => expect(isOpen()).toBe(false));
-      expect(action.mock.calls[3]![1].reason).toBe("dismiss");
-      expect(action.mock.calls[3]![1].event!.type).toBe("toggle");
+      await settle(() => expect(fact).toHaveBeenCalledTimes(2));
+      expect(fact.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[1]![1].event!.type).toBe("toggle");
       await user.click(trigger());
       await settle(() => expect(isOpen()).toBe(true));
       await user.click(screen.getByTestId("outside"));
       await settle(() => expect(isOpen()).toBe(false));
-      expect(action).toHaveBeenCalledTimes(6);
-      expect(action.mock.calls[5]![1].reason).toBe("dismiss");
-      expect(action.mock.calls[5]![1].event!.type).toBe("toggle");
+      await settle(() => expect(fact).toHaveBeenCalledTimes(3));
+      expect(action).toHaveBeenCalledTimes(3);
+      expect(fact.mock.calls[2]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[2]![1].event!.type).toBe("toggle");
     });
 
     // #125
     it("a foreign commandfor hide-popover close keeps the CommandEvent though its beforetoggle names the button", async () => {
       const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       render(
         <Library
           action={action}
+          fact={fact}
           before={
             <button type="button" data-testid="foreign">
               Foreign
@@ -439,17 +449,20 @@ describe("Popover (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       await user.click(foreign);
       await settle(() => expect(isOpen()).toBe(false));
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]![1].reason).toBe("activate");
-      expect(action.mock.calls[1]![1].event!.type).toBe("command");
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![1].reason).toBe("activate");
+      expect(fact.mock.calls[0]![1].event!.type).toBe("command");
     });
 
     // #125 review F2
     it("a foreign hide-popover command while closed leaves no intent: a later Escape is 'dismiss'", async () => {
       const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       render(
         <Library
           action={action}
+          fact={fact}
           before={
             <button type="button" data-testid="foreign">
               Foreign
@@ -471,9 +484,10 @@ describe("Popover (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       await user.keyboard("{Escape}");
       await settle(() => expect(isOpen()).toBe(false));
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-      expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].event!.type).toBe("toggle");
     });
 
     // #125 review F1
@@ -481,9 +495,11 @@ describe("Popover (browser)", () => {
       "an interestfor button's hide stays 'dismiss' though its ToggleEvent names the button",
       async () => {
         const action = vi.fn<ActionFn>();
+        const fact = vi.fn<ActionFn>();
         render(
           <Library
             action={action}
+            fact={fact}
             before={
               <button type="button" data-testid="foreign" style={{ display: "block" }}>
                 Foreign
@@ -503,20 +519,22 @@ describe("Popover (browser)", () => {
         // library hides the one it re-showed itself (#127): either way a dismissal.
         await user.hover(screen.getByTestId("outside"));
         await settle(() => expect(isOpen()).toBe(false), 500);
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+        await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
       },
     );
 
-    it("a click outside light-dismisses ('dismiss'); focus stays on the clicked element", async () => {
-      const action = vi.fn<ActionFn>();
-      render(<Library action={action} />);
+    it("a click outside light-dismisses (a 'dismiss' fact); focus stays on the clicked element", async () => {
+      const fact = vi.fn<ActionFn>();
+      render(<Library fact={fact} />);
       await user.click(trigger());
       await settle(() => expect(isOpen()).toBe(true));
       await user.click(screen.getByTestId("outside"));
       expect(isOpen()).toBe(false);
       await settle(() => expect(screen.getByTestId("outside")).toHaveFocus());
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
     });
 
     it("a Trigger click while open closes through the library and does not reopen", async () => {
@@ -631,10 +649,20 @@ describe("Popover (browser)", () => {
   });
 
   describe("nested popovers", () => {
-    function Nested({ action, innerAction }: { action?: ActionFn; innerAction?: ActionFn }) {
+    function Nested({
+      action,
+      innerAction,
+      fact,
+      innerFact,
+    }: {
+      action?: ActionFn;
+      innerAction?: ActionFn;
+      fact?: ActionFn;
+      innerFact?: ActionFn;
+    }) {
       return (
-        <Library action={action}>
-          <Popover.Root defaultOpen={false} openChangeAction={innerAction}>
+        <Library action={action} fact={fact}>
+          <Popover.Root defaultOpen={false} openChangeAction={innerAction} onOpenChange={innerFact}>
             <Popover.Trigger data-testid="inner-trigger">Permissions</Popover.Trigger>
             <Popover.Popup
               data-testid="inner"
@@ -665,7 +693,7 @@ describe("Popover (browser)", () => {
 
     it("Escape closes the inner only and the library focuses the inner Trigger; a second Escape closes the outer", async () => {
       const innerAction = vi.fn<ActionFn>();
-      render(<Nested innerAction={innerAction} />);
+      render(<Nested innerFact={innerAction} />);
       await openBoth();
       expect(inner().contains(document.activeElement)).toBe(true);
       await user.keyboard("{Escape}");
@@ -680,18 +708,20 @@ describe("Popover (browser)", () => {
       expect(trigger()).toHaveFocus();
     });
 
-    it("a click outside closes both and leaves focus alone", async () => {
-      const action = vi.fn<ActionFn>();
-      const innerAction = vi.fn<ActionFn>();
-      render(<Nested action={action} innerAction={innerAction} />);
+    it("a click outside closes both and leaves focus alone; each Root gets its own fact", async () => {
+      const fact = vi.fn<ActionFn>();
+      const innerFact = vi.fn<ActionFn>();
+      render(<Nested fact={fact} innerFact={innerFact} />);
       await openBoth();
       const innerElement = inner();
       await user.click(screen.getByTestId("outside"));
       expect(isOpen(innerElement)).toBe(false);
       expect(isOpen()).toBe(false);
       await settle(() => expect(screen.getByTestId("outside")).toHaveFocus());
-      expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss");
-      expect(innerAction.mock.calls.at(-1)![1].reason).toBe("dismiss");
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      await settle(() => expect(innerFact).toHaveBeenCalledTimes(1));
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      expect(innerFact.mock.calls[0]![1].reason).toBe("dismiss");
     });
 
     it("a click in the outer popup closes the inner only", async () => {
@@ -735,18 +765,20 @@ describe("Popover (browser)", () => {
         expect(popup().contains(document.activeElement)).toBe(true);
       });
 
-      it("the outer popup's heading: the inner popup is light-dismissed ('dismiss'); the outer stays", async () => {
+      it("the outer popup's heading: the inner popup is light-dismissed (a 'dismiss' fact); the outer stays", async () => {
         const action = vi.fn<ActionFn>();
         const innerAction = vi.fn<ActionFn>();
-        render(<Nested action={action} innerAction={innerAction} />);
+        const innerFact = vi.fn<ActionFn>();
+        render(<Nested action={action} innerAction={innerAction} innerFact={innerFact} />);
         await openBoth();
         const outerCalls = action.mock.calls.length;
         const innerCalls = innerAction.mock.calls.length;
         leaveActEnvironment();
         await mouse.pressOn(screen.getByRole("heading", { name: "Filters" }));
         await expect.poll(() => isOpen(inner())).toBe(false);
-        await expect.poll(() => innerAction.mock.calls.length).toBe(innerCalls + 1);
-        const [next, details] = innerAction.mock.calls.at(-1)!;
+        await expect.poll(() => innerFact.mock.calls.length).toBe(1);
+        expect(innerAction).toHaveBeenCalledTimes(innerCalls);
+        const [next, details] = innerFact.mock.calls.at(-1)!;
         expect(next).toBe(false);
         expect(details.reason).toBe("dismiss");
         expect(details.event?.type).toBe("toggle");
@@ -874,7 +906,7 @@ describe("Popover (browser)", () => {
     it("a modal Dialog opened from inside keeps the popup open; Escape closes the Dialog first", async () => {
       const action = vi.fn<ActionFn>();
       render(
-        <Library action={action}>
+        <Library fact={action}>
           <Dialog.Root>
             <Dialog.Trigger data-testid="dialog-trigger">Advanced…</Dialog.Trigger>
             <Dialog.Popup data-testid="dialog" aria-label="Advanced">
@@ -899,11 +931,12 @@ describe("Popover (browser)", () => {
       await settle(() => expect(action.mock.calls.at(-1)![1].reason).toBe("dismiss"));
     });
 
-    it("an unrelated auto popover opening closes the popup with 'dismiss'", async () => {
+    it("an unrelated auto popover opening closes the popup (a 'dismiss' fact)", async () => {
+      const opens = vi.fn<ActionFn>();
       const action = vi.fn<ActionFn>();
       render(
         <>
-          <Library action={action} />
+          <Library action={opens} fact={action} />
           <div popover="auto" data-testid="other">
             Other
           </div>
@@ -913,9 +946,10 @@ describe("Popover (browser)", () => {
       await settle(() => expect(isOpen()).toBe(true));
       act(() => screen.getByTestId("other").showPopover());
       expect(isOpen()).toBe(false);
-      await settle(() => expect(action).toHaveBeenCalledTimes(2));
-      expect(action.mock.calls[1]![0]).toBe(false);
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      await settle(() => expect(action).toHaveBeenCalledTimes(1));
+      expect(opens).toHaveBeenCalledTimes(1);
+      expect(action.mock.calls[0]![0]).toBe(false);
+      expect(action.mock.calls[0]![1].reason).toBe("dismiss");
     });
   });
 
@@ -1157,13 +1191,13 @@ describe("Popover (browser)", () => {
   // pending), no veto, no exit transition. The degraded shape is the same on every engine; the
   // `<button>` Trigger's awaited close is Menu's #110 rows and "a Trigger click while open" above.
   describe("non-button Trigger click while open", () => {
-    it("a link Trigger's press while open hides the popup before the click's (false, 'activate')", async () => {
+    it("a link Trigger's press while open: light dismiss hides the popup before the click; one 'activate' fact naming the click", async () => {
       silenceErrors();
-      const work = deferred();
-      const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
+      const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       render(
         <div style={{ padding: "40px 160px" }}>
-          <Popover.Root defaultOpen={false} openChangeAction={action}>
+          <Popover.Root defaultOpen={false} openChangeAction={action} onOpenChange={fact}>
             <Popover.Trigger
               data-testid="trigger"
               render={<a href="#x" />}
@@ -1201,19 +1235,22 @@ describe("Popover (browser)", () => {
         await mouse.up(x, y);
       });
       await flushFor();
-      // Hidden by the light dismiss before the click, while the action's close is still pending.
+      // Hidden by the light dismiss before the click: a fact (overlay-open-change.md 3.2), its
+      // cause named by the click; no request for an already hidden popup.
       expect(clicks).toEqual([false]);
       expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      expect(action).toHaveBeenCalledTimes(1);
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("activate");
       expect(details.event).toBeInstanceOf(MouseEvent);
       expect(details.event!.type).toBe("click");
-      await act(async () => work.resolve());
+      expect(trigger()).not.toHaveAttribute("data-pending");
       await flushFor();
       expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(2);
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1223,14 +1260,16 @@ describe("Popover (browser)", () => {
   // the single source of the close. Real press, real timing.
   describe("a real press on a foreign invoker while open", () => {
     it.each(["hide-popover", "toggle-popover"])(
-      "command=%s hides it at the click with one (false, 'activate') carrying the CommandEvent",
+      "command=%s hides it at the click: one 'activate' fact carrying the CommandEvent",
       async (command) => {
         const focusesButtons = await pressFocusesButtons();
         const work = deferred();
-        const action = vi.fn<ActionFn>((next) => (next ? undefined : work.promise));
+        const opens = vi.fn<ActionFn>();
+        const action = vi.fn<ActionFn>(() => work.promise);
         render(
           <Library
-            action={action}
+            action={opens}
+            fact={action}
             before={
               <button type="button" data-testid="foreign">
                 Foreign
@@ -1244,6 +1283,7 @@ describe("Popover (browser)", () => {
         await user.click(trigger());
         await settle(() => expect(isOpen()).toBe(true));
         const calls = action.mock.calls.length;
+        expect(calls).toBe(0);
         leaveActEnvironment();
         await mouse.pressOn(foreign, {
           atPress: () => {
@@ -1257,6 +1297,9 @@ describe("Popover (browser)", () => {
         expect(next).toBe(false);
         expect(details.reason).toBe("activate");
         expect(details.event?.type).toBe("command");
+        // The handler's promise is not awaited: nothing pending.
+        expect(trigger()).not.toHaveAttribute("data-pending");
+        expect(opens).toHaveBeenCalledTimes(1);
         work.resolve();
         await expectInvokerExpanded(trigger(), popup(), false);
         // Focus moved to the invoker at the press (outside the popup): the hide returns nothing.
@@ -1315,11 +1358,15 @@ describe("Popover (browser)", () => {
 
   // #127
   describe("interestfor naming a library Popover", () => {
-    /** Renders `Library` with a foreign button before the Root; `interestfor` on `on`. */
-    function setUp(action: ActionFn, on: "foreign" | "trigger" = "foreign") {
+    /**
+     * Renders `Library` with a foreign button before the Root; `interestfor` on `on`. `fact` is
+     * the Root's `onOpenChange` (the lost-interest hide of a shown popup is a fact).
+     */
+    function setUp(action: ActionFn, on: "foreign" | "trigger" = "foreign", fact?: ActionFn) {
       render(
         <Library
           action={action}
+          fact={fact}
           before={
             <button type="button" data-testid="foreign" style={{ display: "block" }}>
               Foreign
@@ -1334,10 +1381,11 @@ describe("Popover (browser)", () => {
     }
 
     it.runIf(supportsInterestFor)(
-      "hover opens through the library, anchored to the Trigger; hover-out hides it ('dismiss', the loseinterest event)",
+      "hover opens through the library, anchored to the Trigger; hover-out hides it (a 'dismiss' fact, the loseinterest event)",
       async () => {
         const action = vi.fn<ActionFn>();
-        const foreign = setUp(action);
+        const fact = vi.fn<ActionFn>();
+        const foreign = setUp(action, "foreign", fact);
         await user.hover(foreign);
         await settle(() => expect(isOpen()).toBe(true));
         expect(action).toHaveBeenCalledTimes(1);
@@ -1352,15 +1400,17 @@ describe("Popover (browser)", () => {
         await settle(() => expect(isOpen()).toBe(false), 500);
         // As the platform's lost-interest hide: no focus return to the Trigger.
         expect(document.activeElement).toBe(document.body);
-        expect(action).toHaveBeenCalledTimes(2);
-        const [next, details] = action.mock.calls[1]!;
+        await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+        expect(action).toHaveBeenCalledTimes(1);
+        const [next, details] = fact.mock.calls[0]!;
         expect(next).toBe(false);
         expect(details.reason).toBe("dismiss");
         expect(details.event!.type).toBe("loseinterest");
         expect((details.event as Event & { source?: unknown }).source).toBe(foreign);
         await quietPeriod(100, "no re-open and no second dispatch");
         expect(isOpen()).toBe(false);
-        expect(action).toHaveBeenCalledTimes(2);
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(fact).toHaveBeenCalledTimes(1);
       },
     );
 
@@ -1368,10 +1418,12 @@ describe("Popover (browser)", () => {
       "Tab to the button opens; Tab away hides, focus on the next element",
       async () => {
         const action = vi.fn<ActionFn>();
+        const fact = vi.fn<ActionFn>();
         // Nothing focusable inside: the dialog focusing steps would move focus into the popup.
         render(
           <Library
             action={action}
+            fact={fact}
             before={
               <button type="button" data-testid="foreign" style={{ display: "block" }}>
                 Foreign
@@ -1398,9 +1450,10 @@ describe("Popover (browser)", () => {
         await user.tab();
         await settle(() => expect(isOpen()).toBe(false), 500);
         expect(screen.getByTestId("next")).toHaveFocus();
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-        expect(action.mock.calls[1]![1].event!.type).toBe("loseinterest");
+        await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+        expect(fact.mock.calls[0]![1].event!.type).toBe("loseinterest");
       },
     );
 
@@ -1486,10 +1539,11 @@ describe("Popover (browser)", () => {
     );
 
     it.runIf(supportsInterestFor)(
-      "Escape while hovered notifies once; a later hover-out does nothing",
+      "Escape while hovered is reported once; a later hover-out does nothing",
       async () => {
         const action = vi.fn<ActionFn>();
-        const foreign = setUp(action);
+        const fact = vi.fn<ActionFn>();
+        const foreign = setUp(action, "foreign", fact);
         const toggles: string[] = [];
         popup().addEventListener("toggle", (event) =>
           toggles.push((event as ToggleEvent).newState),
@@ -1500,21 +1554,24 @@ describe("Popover (browser)", () => {
         await settle(() => expect(isOpen()).toBe(false));
         // The hide's `toggle` arrives (a hide re-entered from `loseinterest` loses it).
         await settle(() => expect(toggles).toEqual(["open", "closed"]));
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-        expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
+        await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+        expect(fact.mock.calls[0]![1].event!.type).toBe("toggle");
         await user.hover(screen.getByTestId("outside"));
-        await quietPeriod(200, "no second close notification and no re-open");
+        await quietPeriod(200, "no second close report and no re-open");
         expect(isOpen()).toBe(false);
-        expect(action).toHaveBeenCalledTimes(2);
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(fact).toHaveBeenCalledTimes(1);
       },
     );
 
     it.runIf(supportsInterestFor)(
-      "the Trigger with interestfor: hover opens, hover-out hides, a click while open is 'activate'",
+      "the Trigger with interestfor: hover opens, hover-out hides (a fact), a click while open is an 'activate' request",
       async () => {
         const action = vi.fn<ActionFn>();
-        setUp(action, "trigger");
+        const fact = vi.fn<ActionFn>();
+        setUp(action, "trigger", fact);
         await user.hover(trigger());
         await settle(() => expect(isOpen()).toBe(true));
         expect(screen.getByRole("textbox")).toHaveFocus();
@@ -1524,20 +1581,22 @@ describe("Popover (browser)", () => {
         expect(document.activeElement).toBe(document.body);
         await quietPeriod(100, "no re-open after the lost-interest hide");
         expect(isOpen()).toBe(false);
-        expect(action).toHaveBeenCalledTimes(2);
-        expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-        expect(action.mock.calls[1]![1].event!.type).toBe("loseinterest");
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(fact).toHaveBeenCalledTimes(1);
+        expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+        expect(fact.mock.calls[0]![1].event!.type).toBe("loseinterest");
         await user.hover(trigger());
         await settle(() => expect(isOpen()).toBe(true));
-        expect(action).toHaveBeenCalledTimes(3);
+        expect(action).toHaveBeenCalledTimes(2);
         await user.click(trigger());
         await settle(() => expect(isOpen()).toBe(false));
-        expect(action).toHaveBeenCalledTimes(4);
-        expect(action.mock.calls[3]![0]).toBe(false);
-        expect(action.mock.calls[3]![1].reason).toBe("activate");
+        expect(action).toHaveBeenCalledTimes(3);
+        expect(action.mock.calls[2]![0]).toBe(false);
+        expect(action.mock.calls[2]![1].reason).toBe("activate");
         await quietPeriod(200, "no re-open while the pointer stays on the Trigger");
         expect(isOpen()).toBe(false);
-        expect(action).toHaveBeenCalledTimes(4);
+        expect(action).toHaveBeenCalledTimes(3);
+        expect(fact).toHaveBeenCalledTimes(1);
       },
     );
 

@@ -44,15 +44,14 @@ export interface CloseHold extends ExitAnimation {
   /**
    * The close's native event (`toggle` / `close`) arrived: hold the content until the exit
    * animations settle, or release a hold now when nothing animates (Firefox, or no CSS exit: the
-   * popup is already `display: none`, the commit is invisible). Call before the notification, so
-   * its commit keeps the children. Nothing for the library's own close (`echo`) with
+   * popup is already `display: none`, the commit is invisible). Call before reporting the fact,
+   * so its commit keeps the children. Nothing for the library's own close (`echo`) with
    * `transition`: the close commit's view transition carried the content out.
    */
   readonly afterClose: (popup: Element, echo: boolean) => void;
   /**
-   * The apply effect's release rule: a hold the close commit set (or a dismissal's notification
-   * commit) that no exit animation is going to release, the popup being hidden and its close
-   * event handled.
+   * The apply effect's release rule: a hold the close commit set (or a fact's commit) that no
+   * exit animation is going to release, the popup being hidden and its close event handled.
    */
   readonly releaseIfIdle: (committed: boolean, awaitingClose: boolean, shown: boolean) => void;
 }

@@ -259,11 +259,13 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
       it("dismissed and re-opened while the action runs: the stale close is dropped", async () => {
         const user = setupUser();
         const action = vi.fn<Action>();
+        const fact = vi.fn<Action>();
         const work = deferred();
         render(
           <Harness
             mode={mode}
             action={action}
+            fact={fact}
             content={withClose({ action: () => work.promise })}
           />,
         );
@@ -282,7 +284,9 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         await flushTasks(2);
         expect(isOpen()).toBe(true);
         expect(close).not.toHaveBeenCalled();
-        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+        // The dismissal is a fact (onOpenChange), not a request: the action heard the two opens.
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, true]);
+        expect(fact.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([[false, "dismiss"]]);
       });
 
       it('whilePending="run": a second click runs the action again; no aria-disabled; one close after both', async () => {
@@ -325,12 +329,14 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
       it('whilePending="run": dismissed and re-opened while both runs pend: both stale closes are dropped', async () => {
         const user = setupUser();
         const action = vi.fn<Action>();
+        const fact = vi.fn<Action>();
         const runs = [deferred(), deferred()];
         let call = 0;
         render(
           <Harness
             mode={mode}
             action={action}
+            fact={fact}
             content={withClose({ action: () => runs[call++]!.promise, whilePending: "run" })}
           />,
         );
@@ -348,7 +354,8 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         await flushTasks(2);
         expect(isOpen()).toBe(true);
         expect(close).not.toHaveBeenCalled();
-        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, true]);
+        expect(fact).toHaveBeenCalledTimes(1);
       });
 
       it.each([

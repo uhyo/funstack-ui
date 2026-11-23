@@ -25,14 +25,27 @@ export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Act
 >;
 
 /**
- * A change **handler** the library calls synchronously, outside any Transition, and does not
- * await: the urgent lane (conventions 2.6; first used by Combobox's `onInputValueChange`). Not an
- * action: nothing is pending or optimistic for it. The body runs during the DOM event, so
- * `(next) => setText(next)` is an urgent update, which is what a controlled text input needs; a
- * returned promise is ignored (development warns once).
+ * A change **handler**: the library reports a fact about a state, a change it could not hold
+ * (conventions 2.1, the handler rule; #96, #148). Called synchronously in the event that reports
+ * it, outside any Transition, and not awaited: nothing is pending or optimistic for it, so
+ * `(next) => setOpen(next)` is an urgent update. Used by Combobox's `onInputValueChange` (the
+ * text of a controlled input) and the overlay Roots' `onOpenChange` (a dismissal). Not an action.
+ *
+ * It may return a promise (an `async` function, a Server Function): a rejection, like a
+ * synchronous throw, is passed to `reportError`. Nothing reaches an Error Boundary and nothing
+ * warns.
  */
 export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> = (
   next: T,
+  details: Details,
+) => void;
+
+/**
+ * A handler for a fact that carries no state (a toast's `onClose`). Same rule as
+ * `UrgentChangeHandler`: synchronous, outside any Transition, not awaited; a returned promise's
+ * rejection or a synchronous throw goes to `reportError`.
+ */
+export type UrgentHandler<Details extends ActionDetails = ActionDetails> = (
   details: Details,
 ) => void;
 
@@ -43,8 +56,10 @@ export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails
  * - `"activate"`: the user acted on a trigger part (click, Enter/Space, label click, focus in an
  *   automatic-activation mode). `details.event` is the native event.
  * - `"dismiss"`: the user closed the component without acting on one of its parts: Escape,
- *   Android back, an assistive-technology dismiss gesture, or a click outside (light dismiss).
- *   `details.event` is the platform's `close` event. Dialog is the first component to use it.
+ *   Android back, an assistive-technology dismiss gesture, or a click outside (light dismiss);
+ *   also a close nobody caused through the component (script, another top-layer element, focus
+ *   leaving). `details.event` is the platform's `close` or `toggle` event. On an overlay Root most
+ *   such closes are facts, reported to `onOpenChange`, not to `openChangeAction` (#148).
  * - `"platform"`: the browser changed the state itself: find-in-page, a form reset (`event` is
  *   the `reset` event), or interaction before hydration found at mount (`event` is `undefined`).
  * - `"timeout"`: the library's own timer closed the component; no user gesture and no platform

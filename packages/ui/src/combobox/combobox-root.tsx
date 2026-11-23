@@ -15,6 +15,7 @@ import type { ReactNode } from "react";
 import { flushSync } from "react-dom";
 import { createActionDetails } from "../internal/action-details.js";
 import { announce, canAnnounce } from "../internal/announce.js";
+import { callUrgentHandler } from "../internal/call-urgent-handler.js";
 import { FieldContext } from "../internal/field-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
@@ -62,7 +63,7 @@ export interface ComboboxInputValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
-/** Details passed as the second argument of `Combobox.Root`'s `openChangeAction`. */
+/** Details passed as the second argument of `Combobox.Root`'s `openChangeAction` and `onOpenChange`. */
 export interface ComboboxOpenChangeDetails extends ActionDetails {
   /**
    * `"activate"`: typing, ArrowDown / ArrowUp / Alt+ArrowDown, the Trigger, a click on the input
@@ -130,8 +131,9 @@ export interface ComboboxRootProps {
    * on every change of the text (typing, and the library's own writes: an accepted option's
    * label, a revert, Clear, a form reset, text typed before hydration). Not awaited; nothing is
    * pending for it. A controlled parent updates its state in the body (an urgent update, which is
-   * what a controlled text input needs). A returned promise is ignored (development warns once: a
-   * fetch belongs in a transition).
+   * what a controlled text input needs). It may return a promise; a rejection, like a throw,
+   * goes to `reportError` (the rule of every `on*` handler). A fetch that results should render
+   * belongs in a transition (`useDeferredValue` of `inputValue`).
    */
   onInputValueChange?: UrgentChangeHandler<string, ComboboxInputValueChangeDetails>;
 
@@ -144,10 +146,19 @@ export interface ComboboxRootProps {
    */
   defaultOpen?: boolean;
   /**
-   * Awaited for opens and for the close after an accepted option (or the Trigger); a
-   * notification for dismissals (Escape, a click outside, focus leaving).
+   * Requests only: awaited for opens and for the close after an accepted option (or the
+   * Trigger, or Alt+ArrowUp). Never called for a dismissal: that goes to `onOpenChange`.
    */
   openChangeAction?: ChangeAction<boolean, ComboboxOpenChangeDetails>;
+  /**
+   * Facts only: the listbox was closed without the library closing it on request (Escape, focus
+   * leaving the input, a click outside, Clear while open, a foreign invoker, script). Always
+   * `false`. Called synchronously, outside any Transition, and not awaited: nothing is pending.
+   * Controlled: set your state **directly** here (`onOpenChange={setOpen}`); a parent that keeps
+   * `open={true}` gets the listbox re-opened. May return a promise; a rejection or a throw goes
+   * to `reportError`.
+   */
+  onOpenChange?: UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>;
 
   /**
    * Free text is a value: Enter with no active option, or focus leaving with text that is not
@@ -211,14 +222,6 @@ const VALUE_TRANSITION_TYPES = transitionTypes("combobox", "select");
 
 const isDev = process.env.NODE_ENV !== "production";
 
-function isThenable(value: unknown): boolean {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as { then?: unknown }).then === "function"
-  );
-}
-
 /** What a value dispatch carries for the Root's own follow-up (by `details` identity). */
 interface DispatchMeta {
   readonly id: number;
@@ -259,6 +262,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     open,
     defaultOpen,
     openChangeAction,
+    onOpenChange,
     allowCustomValue = false,
     autoHighlight = false,
     openOnClick = false,
@@ -294,6 +298,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     open,
     defaultOpen,
     openChangeAction,
+    onOpenChange,
     details: popoverDetails,
   });
 
@@ -317,8 +322,11 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     textRef.current = text;
   });
 
-  const warnedThenable = useRef(false);
-  /** Writes the text (urgent) and calls `onInputValueChange` synchronously (design 2.2). */
+  /**
+   * Writes the text (urgent) and calls `onInputValueChange` synchronously (design 2.2), under the
+   * handler rule (`callUrgentHandler`: a throw or a returned promise's rejection goes to
+   * `reportError`, the write above stands).
+   */
   const writeText = useCallback(
     (next: string, reason: ChangeReason, event: Event | undefined): void => {
       const latest = propsRef.current;
@@ -326,15 +334,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
       textRef.current = next;
       const handler = latest.onInputValueChange;
       if (handler === undefined) return;
-      const result: unknown = handler(next, createActionDetails(event, { reason }));
-      if (isDev && !warnedThenable.current && isThenable(result)) {
-        warnedThenable.current = true;
-        console.error(
-          "Combobox.Root: `onInputValueChange` returned a promise. It is the urgent lane: it is " +
-            "not awaited. Fetch in a transition instead (`valueChangeAction`, or " +
-            "`useDeferredValue` of `inputValue`).",
-        );
-      }
+      callUrgentHandler(handler, next, createActionDetails(event, { reason }));
     },
     [propsRef],
   );
@@ -682,7 +682,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     // IME: the key belongs to the composition (Enter commits it, arrows pick a candidate).
     if (event.isComposing || event.keyCode === 229) return false;
     // What the user sees, not what is intended: right after Escape the platform has hidden the
-    // popup but its `toggle` (and the library's notification) is still queued, and an open that
+    // popup but its `toggle` (and the fact it reports) is still queued, and an open that
     // is still committing shows nothing yet. Enter must submit and arrows must open in both.
     const isOpen = isPopoverOpen(popover.popupRef.current);
     switch (event.key) {

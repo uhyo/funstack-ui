@@ -55,16 +55,19 @@ async function openWithTrigger(): Promise<void> {
 
 function Library({
   action,
+  fact,
   popup: popupProps,
   children,
 }: {
   action?: ActionFn;
+  /** The Root's `onOpenChange` (facts). */
+  fact?: ActionFn;
   popup?: Partial<DialogPopupProps>;
   children?: ReactNode;
 }) {
   return (
     <div style={{ padding: 40 }}>
-      <Dialog.Root defaultOpen={false} openChangeAction={action}>
+      <Dialog.Root defaultOpen={false} openChangeAction={action} onOpenChange={fact}>
         <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
         <Dialog.Popup data-testid="popup" {...popupProps} style={{ width: 300, height: 200 }}>
           <Dialog.Title>Edit profile</Dialog.Title>
@@ -96,7 +99,7 @@ function Plain({
 }: OverlayViewTransitionProps & { keepMounted?: boolean; modal?: boolean }) {
   const [open, setOpen] = useState(false);
   const rootProps = controlled
-    ? { open, openChangeAction: (next: boolean) => setOpen(next) }
+    ? { open, openChangeAction: (next: boolean) => setOpen(next), onOpenChange: setOpen }
     : { defaultOpen: false };
   return (
     <Dialog.Root {...rootProps} modal={modal}>
@@ -135,11 +138,12 @@ function Plain({
 /** The shared suite's harness: the content, then `inside`, then a Close part (value "cancel"). */
 function SuiteHarness({
   action,
+  fact,
   className,
   inside,
 }: OverlayBrowserHarnessProps<DialogOpenChangeDetails>) {
   return (
-    <Library action={action} popup={{ className }}>
+    <Library action={action} fact={fact} popup={{ className }}>
       <span data-testid="content">content</span>
       {inside}
       <Dialog.Close data-testid="close" value="cancel">
@@ -152,10 +156,11 @@ function SuiteHarness({
 /** The suite harness with `lightDismiss` on the Popup. */
 function LightDismissHarness({
   action,
+  fact,
   className,
 }: OverlayBrowserHarnessProps<DialogOpenChangeDetails>) {
   return (
-    <Library action={action} popup={{ className, lightDismiss: true }}>
+    <Library action={action} fact={fact} popup={{ className, lightDismiss: true }}>
       <span data-testid="content">content</span>
       <Dialog.Close data-testid="close">Cancel</Dialog.Close>
     </Library>
@@ -163,9 +168,13 @@ function LightDismissHarness({
 }
 
 /** The suite harness with a `Dialog.Form` whose submitter closes the dialog (value "ok"). */
-function FormHarness({ action, className }: OverlayBrowserHarnessProps<DialogOpenChangeDetails>) {
+function FormHarness({
+  action,
+  fact,
+  className,
+}: OverlayBrowserHarnessProps<DialogOpenChangeDetails>) {
   return (
-    <Library action={action} popup={{ className }}>
+    <Library action={action} fact={fact} popup={{ className }}>
       <span data-testid="content">content</span>
       <Dialog.Form>
         <button type="submit" data-testid="ok" value="ok">
@@ -545,16 +554,16 @@ describe("Dialog (browser)", () => {
       await user.click(popup(), { position: { x: -20, y: -20 }, force: true });
     }
 
-    it("modal, baseline JS: a backdrop click closes; a click inside does not", async () => {
+    it("modal, baseline JS: a backdrop click closes (a 'dismiss' fact); a click inside does not", async () => {
       const action = vi.fn<ActionFn>();
-      render(<Library action={action} popup={{ lightDismiss: true }} />);
+      render(<Library fact={action} popup={{ lightDismiss: true }} />);
       await openWithTrigger();
       await user.click(screen.getByRole("heading"));
       expect(popup().open).toBe(true);
       await clickBackdrop();
       expect(popup().open).toBe(false);
-      await settle(() => expect(action).toHaveBeenCalledTimes(2));
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      await settle(() => expect(action).toHaveBeenCalledTimes(1));
+      expect(action.mock.calls[0]![1].reason).toBe("dismiss");
     });
 
     it("modal without lightDismiss: a backdrop click does nothing", async () => {
@@ -567,9 +576,7 @@ describe("Dialog (browser)", () => {
     it("experimental_closedBy: native closedby='any' where supported, the JS fallback elsewhere", async () => {
       const action = vi.fn<ActionFn>();
       const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
-      render(
-        <Library action={action} popup={{ lightDismiss: true, experimental_closedBy: true }} />,
-      );
+      render(<Library fact={action} popup={{ lightDismiss: true, experimental_closedBy: true }} />);
       expect(popup()).toHaveAttribute("closedby", "any");
       await openWithTrigger();
       await clickBackdrop();
@@ -580,8 +587,8 @@ describe("Dialog (browser)", () => {
       } else {
         expect(requestClose).toHaveBeenCalledTimes(1);
       }
-      await settle(() => expect(action).toHaveBeenCalledTimes(2));
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      await settle(() => expect(action).toHaveBeenCalledTimes(1));
+      expect(action.mock.calls[0]![1].reason).toBe("dismiss");
     });
 
     it("non-modal: a click outside closes it", async () => {
@@ -829,12 +836,18 @@ describe("Dialog (browser)", () => {
     it.each([
       ["without experimental_closedBy", false],
       ["with experimental_closedBy", true],
-    ])("closes with one (false, 'dismiss') from the close event, %s", async (_label, flag) => {
+    ])("closes with one 'dismiss' fact from the close event, %s", async (_label, flag) => {
       const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       const requestClose = vi.spyOn(HTMLDialogElement.prototype, "requestClose");
       render(
         <div style={{ padding: 40 }}>
-          <Dialog.Root defaultOpen={false} modal={false} openChangeAction={action}>
+          <Dialog.Root
+            defaultOpen={false}
+            modal={false}
+            openChangeAction={action}
+            onOpenChange={fact}
+          >
             <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
             <Dialog.Popup
               data-testid="popup"
@@ -859,14 +872,15 @@ describe("Dialog (browser)", () => {
       } else {
         expect(requestClose).toHaveBeenCalledTimes(1);
       }
-      await settle(() => expect(action).toHaveBeenCalledTimes(2));
-      const [next, details] = action.mock.calls[1]!;
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("dismiss");
       expect(details.event?.type).toBe("close");
-      // No re-open: the click ran while the dialog was still optimistically open.
+      // No re-open and no request: the click ran while the dialog was still optimistically open.
       await flushFor(50);
-      expect(action).toHaveBeenCalledTimes(2);
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
       expect(popup().open).toBe(false);
       expect(trigger()).not.toHaveAttribute("data-open");
     });

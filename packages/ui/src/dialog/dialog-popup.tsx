@@ -95,8 +95,9 @@ export interface DialogPopupProps extends Omit<
    * Library mode only. Forwarded to the `<ViewTransition default>` around the dialog. Animates
    * the opening commit, content changes while open, and every library-driven close (a Close
    * part, a Form submit or settled action, a foreign close command, a controlled
-   * `open={false}`), in all engines; dismissals (Escape, a click outside) are the browser's and
-   * animate with CSS only. Ignored (dev warning) in JS-free mode.
+   * `open={false}`), in all engines; dismissals (Escape, a click outside: `onOpenChange`) are the
+   * browser's and animate with CSS only, never with a view transition. Ignored (dev warning) in
+   * JS-free mode.
    *
    * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
    * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
@@ -188,8 +189,9 @@ function valueOf(element: unknown): string {
  * submit, a Form's settle close, a foreign close command) is cancelled and goes through the
  * Root: `openChangeAction(false)` is awaited and `close(returnValue)` runs in the layout effect
  * of the commit that ends it, inside the view transition if `transition` is set. A dismissal
- * (Escape, a click outside) is the browser's: the native `close` event becomes
- * `openChangeAction(false, { reason: "dismiss", returnValue })`.
+ * (Escape, a click outside, script) is the browser's, a fact: the native `close` event makes
+ * committed state `false` urgently and calls `onOpenChange(false, { reason: "dismiss",
+ * returnValue })`; no view transition runs for it.
  *
  * Owned keys (conventions 1.2): `id`, `open`, `closedby`, `aria-labelledby` and
  * `aria-describedby` (token-merged), `data-modal`, `suppressHydrationWarning`.
@@ -213,22 +215,14 @@ export function DialogPopup({
   const { modal, ids, popupRef, triggerRef } = ctx;
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
   // Set by the synchronous `beforetoggle` of a close, cleared by the `close` event a task later:
-  // the dialog is closed but its notification is not dispatched yet, so the apply effect must
-  // not re-open it from a commit that lands in between.
+  // the dialog is closed but its fact is not reported yet, so the apply effect must not re-open
+  // it from a commit that lands in between.
   const awaitingClose = useRef(false);
   // Set right before the library's own `close()` (the apply effect), consumed by the `close`
-  // event it causes: the echo is recognised by its source, not by what is intended.
+  // event it causes: the echo is recognised by its source, not by what is intended. Every other
+  // close is a fact (overlay-open-change.md 6.3), reported the moment it happens, also while a
+  // part's close is in flight: nothing is stored for later.
   const libraryClose = useRef(false);
-  // A dismissal (Escape, a click outside) that closed the dialog while a part-initiated close
-  // was in flight. Its notification was skipped because `false` was intended; if that
-  // close then settles with committed `true` (a controlled parent vetoed it), the apply effect
-  // sends the dismissal instead of re-opening. Valid only for the open generation it was
-  // recorded in: a re-open (Trigger, foreign invoker) supersedes it.
-  const dismissedWhilePending = useRef<{
-    readonly event: Event;
-    readonly returnValue: string;
-    readonly generation: number;
-  } | null>(null);
   const initialFocusTarget = useInitialFocusTarget("Dialog.Popup", "dialog");
 
   // `held`: children stay mounted while the close animates (design 4.4).
@@ -294,31 +288,21 @@ export function DialogPopup({
 
   // The apply effect (design 2.5), as usePopoverPopup's: once nothing is in flight, the DOM
   // follows committed state. Opens on the user's dispatch, `defaultOpen`, a controlled parent,
-  // the re-open of a refused dismissal; closes after a part-initiated close settled, a controlled
-  // close, or a refused pre-hydration open. Also returns focus after a close whose commit
-  // unmounted the focused content, and releases a `held` no exit animation is going to release
-  // (4.4). It runs only for commits that re-render the Popup (the Root's context is memoised):
-  // do not rely on an unrelated render to re-apply state.
+  // the re-open of a dismissal a controlled parent refused (overlay-open-change.md 2.4: in the
+  // fact's own commit, which `epoch` makes re-render the Popup, or once the requests it
+  // superseded settled); closes after a part-initiated close settled, a controlled close, or a
+  // refused pre-hydration open. Also returns focus after a close whose commit unmounted the
+  // focused content, and releases a `held` no exit animation is going to release (4.4). It runs
+  // only for commits that re-render the Popup (the Root's context is memoised): do not rely on an
+  // unrelated render to re-apply state.
   useLayoutEffect(() => {
     if (!isLibrary) return;
     const element = popupRef.current;
     if (element === null || !element.isConnected) return;
     if (!ctx.pending && ctx.latestInFlight() === null) {
-      const dismissed = dismissedWhilePending.current;
       if (ctx.committed && !element.open) {
         // Closed, but its `close` event has not arrived yet: wait for it.
-        if (!awaitingClose.current) {
-          dismissedWhilePending.current = null;
-          if (dismissed !== null && dismissed.generation === ctx.openGeneration()) {
-            // The user dismissed the dialog while a part's close was in flight, and that close
-            // was vetoed: the dismissal stands and is notified now, instead of the
-            // dialog coming back. A parent that keeps `open` again gets it re-opened, as for any
-            // refused dismissal.
-            ctx.notifyClosed(dismissed.event, "dismiss", dismissed.returnValue);
-          } else {
-            openDialog(element);
-          }
-        }
+        if (!awaitingClose.current) openDialog(element);
       } else if (!ctx.committed && element.open) {
         // The library's own close: the `close` listener recognises it by `libraryClose` and
         // dispatches nothing. `close()`, not `requestClose()`: the veto point was
@@ -336,14 +320,10 @@ export function DialogPopup({
         }
       }
     }
-    // The in-flight close settled as a close: the recorded dismissal is moot.
-    if (!ctx.committed && dismissedWhilePending.current !== null && ctx.latestInFlight() === null) {
-      dismissedWhilePending.current = null;
-    }
     // Content that unmounted while the dialog stays open (not a close): forget it.
     if (ctx.committed && element.open) contentProbe.forget();
-    // A hold the close commit set (or a dismissal's notification commit) that no exit animation
-    // is going to release: the dialog is closed and its `close` event has been handled.
+    // A hold the close commit set (or a fact's commit) that no exit animation is going to
+    // release: the dialog is closed and its `close` event has been handled.
     exit.releaseIfIdle(ctx.committed, awaitingClose.current, element.open);
   });
 
@@ -400,8 +380,8 @@ export function DialogPopup({
     }
     // The consumer blocked the submission: the form did not submit, the dialog stays open.
     if (event.defaultPrevented) return;
-    // The consumer opted out with `stopPropagation()`: the browser closes the dialog, notified
-    // as a dismissal. Checked explicitly because React's root can be this same node (FUNSTACK
+    // The consumer opted out with `stopPropagation()`: the browser closes the dialog, reported
+    // as a fact. Checked explicitly because React's root can be this same node (FUNSTACK
     // Static hydrates the document), where `stopPropagation()` does not stop this listener.
     if (event.cancelBubble) return;
     // Cancel the native close; the library closes once `openChangeAction(false)` settled.
@@ -426,23 +406,15 @@ export function DialogPopup({
     libraryClose.current = false;
     if (!isLibrary) return;
 
-    // The library's own `close()` needs no notification.
+    // The library's own `close()` is no fact.
     exit.afterClose(element, echo);
 
     if (echo) return;
     // Closed by the browser: a returnValue a pending part close recorded will never be used.
     ctx.takeCloseReturnValue();
-    if (ctx.intended()) {
-      ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
-    } else {
-      // A part's close is in flight (design walkthrough 11.13): nothing more to notify unless that
-      // close is vetoed (the apply effect).
-      dismissedWhilePending.current = {
-        event: intent?.event ?? event,
-        returnValue: element.returnValue,
-        generation: ctx.openGeneration(),
-      };
-    }
+    // A fact, also while a part's close is in flight: it supersedes that request (committed
+    // `false` now) and `onOpenChange(false)` is called (overlay-open-change.md 2.5, 6.3).
+    ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
   });
 
   const onBeforeToggle = useEffectEvent((event: Event) => {
@@ -458,7 +430,6 @@ export function DialogPopup({
     // `toggle`: an action settling between the open and that task would otherwise still see the
     // old generation and close the new open.
     if (newState === "open") {
-      dismissedWhilePending.current = null;
       ctx.nextOpenGeneration();
       contentProbe.forget();
     }

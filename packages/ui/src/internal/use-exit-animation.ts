@@ -56,7 +56,7 @@ export interface ExitAnimation {
  * The deferred unmount of a top-layer popup's content while its hide animates. `held` is cleared
  * with a normal (urgent) update, never in a transition: the popup is already hidden, nothing
  * visible changes, and only transition commits start a document view transition, so a dismissal
- * runs one (its notification commit) instead of two (design 4.4).
+ * (a fact, an urgent commit) runs none (design 4.4, overlay-open-change.md 2.8).
  */
 export function useExitAnimation(): ExitAnimation {
   const [held, setHeld] = useState(false);

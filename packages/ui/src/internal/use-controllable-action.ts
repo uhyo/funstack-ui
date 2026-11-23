@@ -66,6 +66,22 @@ export interface ControllableAction<T, Details extends ActionDetails> {
    * flushed before paint.
    */
   readonly adopt: (next: T) => void;
+  /**
+   * A fact (#148, design/components/overlay-open-change.md 2.5): `next` is already true in the DOM
+   * (the browser hid a popup the library did not hide). Supersedes every dispatch in flight (none
+   * of them commits uncontrolled state; a later rejection is reported, not thrown), makes `next`
+   * the in-flight intent, drops the optimistic patches of those dispatches, and in uncontrolled
+   * mode writes the committed value. Never calls the action. Every write is urgent: call it from
+   * the platform event's listener, outside any transition, so the change commits in that event's
+   * own (discrete) commit. Advances `epoch`.
+   */
+  readonly adoptFact: (next: T) => void;
+  /**
+   * How many facts were adopted (`adoptFact`). It changes in the fact's commit even when nothing
+   * else does (a controlled parent that keeps its value), so a memoised context that includes it
+   * re-renders its consumers, and their effects can re-apply the value to the DOM.
+   */
+  readonly epoch: number;
 }
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -113,10 +129,19 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   );
   const isControlled = controlled !== undefined;
   const committed = isControlled ? controlled : internal;
+  // The fact epoch (`adoptFact`): urgent state. A patch carries the epoch of its dispatch and the
+  // reducer of the render ignores it once the render's epoch is newer: React re-applies pending
+  // optimistic updates on every render with that render's reducer, so one urgent `setEpoch` drops
+  // every patch of a superseded dispatch in the fact's own commit (probed, issue-148 memo). The
+  // passthrough stays the plain committed value: an object passthrough (`{ value, epoch }`, the
+  // design's sketch) defeats React's bailout of a render whose state did not change, which an
+  // inline ref re-run on every render turns into an update loop.
+  const [epoch, setEpoch] = useState(0);
+  const epochRef = useRef(0);
   const [optimistic, setOptimistic] = useOptimistic(
     committed,
-    (prev: T, patch: { next: T; details: Details }) =>
-      reducer ? reducer(prev, patch.next, patch.details) : patch.next,
+    (prev: T, patch: { next: T; details: Details; epoch: number }) =>
+      patch.epoch < epoch ? prev : reducer ? reducer(prev, patch.next, patch.details) : patch.next,
   );
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
@@ -157,6 +182,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
       // previous value belong to the UI the user acted on, even after the `await`.
       const { committed: prev, isControlled, action, transitionTypes, reducer } = props.current;
       const id = ++latest.current;
+      const dispatchEpoch = epochRef.current;
       inFlight.current.count += 1;
       inFlight.current.next = next;
       // Uncontrolled with a reducer: committed from the burst once every dispatch settled.
@@ -165,7 +191,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
       if (entry) burst.current.push(entry);
       startOwnTransition(async () => {
         for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
-        setOptimistic({ next, details });
+        setOptimistic({ next, details, epoch: dispatchEpoch });
         try {
           await action?.(next, details);
         } catch (error) {
@@ -199,9 +225,23 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
     [props],
   );
 
+  const adoptFact = useCallback(
+    (next: T): void => {
+      // Supersede: no dispatch in flight is the latest any more, so none commits and a later
+      // rejection is reported (2.4). Their settles still count down `inFlight`.
+      latest.current += 1;
+      if (inFlight.current.count > 0) inFlight.current.next = next;
+      burst.current = [];
+      epochRef.current += 1;
+      setEpoch(epochRef.current);
+      if (!props.current.isControlled) setInternal(next);
+    },
+    [props],
+  );
+
   return useMemo(
-    () => ({ committed, optimistic, pending, dispatch, latestInFlight, adopt }),
-    [committed, optimistic, pending, dispatch, latestInFlight, adopt],
+    () => ({ committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFact, epoch }),
+    [committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFact, epoch],
   );
 }
 

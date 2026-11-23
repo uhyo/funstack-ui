@@ -67,7 +67,7 @@ export function plainText(node: unknown): string {
 
 export interface AppliedCommands {
   readonly next: readonly Entry[];
-  /** The open toasts the batch dismissed, in order (their `closeAction`s run). */
+  /** The open toasts the batch dismissed, in order (their `onClose` handlers run). */
   readonly dismissed: readonly Entry[];
   /** Dismissed ids that leave the DOM: not those replaced by a later add with the id. */
   readonly leaving: ReadonlySet<string>;

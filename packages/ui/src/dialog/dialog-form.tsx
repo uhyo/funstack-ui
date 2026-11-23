@@ -37,7 +37,8 @@ export interface DialogFormProps extends Omit<
    * in JS-free mode with `close(value)`. A rejection leaves the dialog open. Without `action`
    * the form renders `method="dialog"`: submitting closes the dialog, natively in JS-free mode
    * and through the Root in library mode (a `preventDefault()` in your own `onSubmit` blocks
-   * both; `stopPropagation()` there leaves the close to the browser, notified as a dismissal).
+   * both; `stopPropagation()` there leaves the close to the browser, reported to `onOpenChange`
+   * as a fact).
    * A string `action` (a URL) is a plain navigating form.
    */
   action?: string | ((formData: FormData) => unknown);

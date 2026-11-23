@@ -2,7 +2,7 @@
 // so a Server Component may import `toast` (for its type, or to pass nothing) without a client
 // reference (design/components/toast.md 13). The parts are client modules.
 import type { ReactNode } from "react";
-import type { Action, ActionDetails, ChangeReason } from "../internal/types.js";
+import type { Action, ActionDetails, ChangeReason, UrgentHandler } from "../internal/types.js";
 
 /** Announcement priority and role of a toast. */
 export type ToastPriority = "normal" | "high";
@@ -59,12 +59,15 @@ export interface ToastOptions {
    */
   readonly action?: ToastActionOptions | undefined;
   /**
-   * Called once when the toast leaves, with the reason: `"activate"` (the Action part settled),
-   * `"dismiss"` (Close, Escape, `toast.dismiss()`, a promise toast with no message for its
-   * outcome) or `"timeout"`. Runs in the Viewport's transition; a rejection reaches the boundary
-   * above the Viewport. Not called when the Viewport unmounts.
+   * A handler, not an action (#148; `closeAction` before): called once when the toast leaves,
+   * with the reason: `"activate"` (the Action part settled), `"dismiss"` (Close, Escape,
+   * `toast.dismiss()`, a promise toast with no message for its outcome) or `"timeout"`. Called
+   * synchronously where the close happens, outside any Transition, and not awaited: a slow
+   * `deleteForReal` holds no other transition. May return a promise (a Server Function); a
+   * rejection or a throw goes to `reportError`, never to an Error Boundary. Not called when the
+   * Viewport unmounts.
    */
-  readonly closeAction?: Action<[details: ToastCloseDetails]> | undefined;
+  readonly onClose?: UrgentHandler<ToastCloseDetails> | undefined;
   /**
    * The text `document.ariaNotify()` speaks for this toast; `null` announces nothing.
    *
@@ -93,7 +96,7 @@ export interface ToastActionDetails extends ActionDetails {
   readonly id: string;
 }
 
-/** Details passed to a toast's `closeAction`. */
+/** Details passed to a toast's `onClose`. */
 export interface ToastCloseDetails extends ActionDetails {
   /** The id of the toast that closed. */
   readonly id: string;
@@ -377,7 +380,7 @@ export function createToastManager(): ToastManager {
       return () => {
         if (listener !== next) return;
         // The queue survives the Viewport (a route-level Viewport remounting on navigation does
-        // not lose an Undo); timers and `closeAction`s do not.
+        // not lose an Undo); timers and `onClose` calls do not.
         retained = next.retain();
         listener = null;
       };

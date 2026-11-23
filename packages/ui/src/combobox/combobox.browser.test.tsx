@@ -248,9 +248,9 @@ describe("Combobox (browser)", () => {
   });
 
   describe("Escape", () => {
-    it("the platform closes the listbox; dismiss is notified; focus and text stay", async () => {
+    it("the platform closes the listbox: a 'dismiss' fact; focus and text stay", async () => {
       const openAction = vi.fn<OpenAction>();
-      render(<Harness root={{ openChangeAction: openAction }} />);
+      render(<Harness root={{ onOpenChange: openAction }} />);
       await typeInto("ja");
       await user.keyboard("{ArrowDown}");
       await user.keyboard("{Escape}");
@@ -263,12 +263,10 @@ describe("Combobox (browser)", () => {
     });
 
     // #118
-    it("aria-expanded on the Input is false right after Escape, while a slow notification runs", async () => {
+    it("aria-expanded on the Input is false right after Escape; nothing pends while a slow onOpenChange runs", async () => {
       const work = deferred();
-      const openAction = vi.fn<OpenAction>(async (next) => {
-        if (!next) await work.promise;
-      });
-      render(<Harness root={{ openChangeAction: openAction }} />);
+      const fact = vi.fn<OpenAction>(() => work.promise);
+      render(<Harness root={{ onOpenChange: fact }} />);
       await typeInto("ja");
       await expect.poll(() => isOpen()).toBe(true);
       await expect.poll(() => input().getAttribute("aria-expanded")).toBe("true");
@@ -276,7 +274,10 @@ describe("Combobox (browser)", () => {
       await sleep(60);
       expect(isOpen()).toBe(false);
       expect(document.activeElement).toBe(input());
-      expect(input()).toHaveAttribute("data-pending", "");
+      expect(fact).toHaveBeenCalledTimes(1);
+      // Not awaited (the rule of every `on*` handler): no pending state.
+      expect(input()).not.toHaveAttribute("data-pending");
+      expect(input()).not.toHaveAttribute("data-open");
       // The Input is no invoker: every engine reads this attribute (#118 review, M1).
       expect(input()).toHaveAttribute("aria-expanded", "false");
       if (browserName === "chromium") {
@@ -286,9 +287,8 @@ describe("Combobox (browser)", () => {
       }
       // The Trigger is a `popovertarget` invoker: no attribute, the browser's state (#121).
       await expectInvokerExpanded(screen.getByTestId("trigger"), popup(), false);
-      expect(input()).toHaveAttribute("data-pending", "");
       work.resolve();
-      await expect.poll(() => input().hasAttribute("data-pending")).toBe(false);
+      expect(input()).not.toHaveAttribute("data-pending");
       expect(input()).toHaveAttribute("aria-expanded", "false");
     });
 
@@ -1091,9 +1091,7 @@ describe("Combobox (browser)", () => {
     it("a link render pressed while open: light-dismissed at the press, one (false, activate), no re-open", async () => {
       vi.spyOn(console, "error").mockImplementation(() => {});
       const openAction = vi.fn<OpenAction>();
-      render(
-        <Harness root={{ openChangeAction: openAction }} trigger={{ render: <a href="#" /> }} />,
-      );
+      render(<Harness root={{ onOpenChange: openAction }} trigger={{ render: <a href="#" /> }} />);
       expect(trigger().tagName).toBe("A");
       expect(trigger()).not.toHaveAttribute("popovertarget");
       // No invoker: the link exposes the shown mirror itself (#118, #121).
@@ -1126,7 +1124,7 @@ describe("Combobox (browser)", () => {
       const openAction = vi.fn<OpenAction>();
       render(
         <Harness
-          root={{ openChangeAction: openAction }}
+          root={{ onOpenChange: openAction }}
           trigger={{ disabled: true, render: <PlainButton /> }}
         />,
       );
@@ -1382,7 +1380,7 @@ describe("Combobox (browser)", () => {
       async () => {
         const openAction = vi.fn<OpenAction>();
         const valueAction = vi.fn<ValueAction>();
-        render(<Harness root={{ openChangeAction: openAction, valueChangeAction: valueAction }} />);
+        render(<Harness root={{ onOpenChange: openAction, valueChangeAction: valueAction }} />);
         await typeInto("j");
         await settle(() => expect(isOpen()).toBe(true));
         openAction.mockClear();
@@ -1554,7 +1552,7 @@ describe("Combobox (browser)", () => {
             defaultValue: "fr",
             defaultInputValue: "France",
             valueChangeAction: valueAction,
-            openChangeAction: openAction,
+            onOpenChange: openAction,
           }}
         />,
       );
@@ -1586,7 +1584,7 @@ describe("Combobox (browser)", () => {
             defaultValue: "fr",
             defaultInputValue: "France",
             valueChangeAction: valueAction,
-            openChangeAction: openAction,
+            onOpenChange: openAction,
           }}
         />,
       );
@@ -1671,7 +1669,7 @@ describe("Combobox (browser)", () => {
   let valueAction: Mock<ValueAction>;
   describeForeignInvokerPressInBrowser({
     name: "Combobox",
-    render: (openAction) => {
+    render: (openAction, fact) => {
       valueAction = vi.fn<ValueAction>();
       render(
         <>
@@ -1679,7 +1677,13 @@ describe("Combobox (browser)", () => {
           <button type="button" data-testid="foreign" style={{ display: "block" }}>
             Foreign
           </button>
-          <Box root={{ valueChangeAction: valueAction, openChangeAction: openAction }} />
+          <Box
+            root={{
+              valueChangeAction: valueAction,
+              openChangeAction: openAction,
+              onOpenChange: fact,
+            }}
+          />
         </>,
       );
     },

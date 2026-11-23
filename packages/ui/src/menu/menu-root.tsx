@@ -1,7 +1,13 @@
 "use client";
 import { use, useCallback, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { ActionDetails, ChangeAction, ChangeReason, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  StateValue,
+  UrgentChangeHandler,
+} from "../internal/types.js";
 import { useDelayedPair } from "../internal/use-delayed-pair.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
@@ -22,7 +28,7 @@ import { isRtl } from "./menu-dom.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-/** Details passed as the second argument of `Menu.Root`'s `openChangeAction`. */
+/** Details passed as the second argument of `Menu.Root`'s `openChangeAction` and `onOpenChange`. */
 export interface MenuOpenChangeDetails extends ActionDetails {
   /**
    * `"activate"`: the user acted on a part: the Trigger or SubmenuTrigger (click, Enter / Space,
@@ -57,18 +63,33 @@ export interface MenuRootState {
  * @see https://ui.funstack.work/components/menu
  */
 export interface MenuRootProps {
-  /** Controlled open state. `undefined` means uncontrolled. */
+  /**
+   * Controlled open state. `undefined` means uncontrolled. A controlled Root needs
+   * `onOpenChange` too: the browser closes the menu without asking (development warns).
+   */
   open?: boolean;
   /** Initial open state when uncontrolled. Opens after hydration. */
   defaultOpen?: boolean;
   /**
-   * Awaited for `true` (the menu opens when it resolves and the items have rendered) and for the
-   * closes the user asks a part for (Trigger toggle, an item's activation, ArrowLeft in a
-   * submenu); a notification for dismissals (Escape, a click outside, Tab, the parent menu
-   * closing). May be a Server Function. A `setState` placed after your own `await` needs
-   * `startTransition` (React limitation).
+   * Requests only. Awaited for `true` (the menu opens when it resolves and the items have
+   * rendered) and for the closes the user asks a part for (Trigger toggle, an item's activation,
+   * ArrowLeft in a submenu, the pointer leaving a hover-opened submenu). Never called for a
+   * dismissal: that goes to `onOpenChange`. May be a Server Function. A `setState` placed after
+   * your own `await` needs `startTransition` (React limitation).
    */
   openChangeAction?: ChangeAction<boolean, MenuOpenChangeDetails>;
+  /**
+   * Facts only: the menu was closed without the library closing it on request (Escape, a click
+   * outside, Tab or focus leaving the menu, a right-click outside, a scroll under a context
+   * menu, the parent menu closing a submenu, a foreign invoker, script). Always `false`. Called
+   * synchronously in the platform's `toggle` event, outside any Transition, and not awaited:
+   * nothing is pending and no view transition runs.
+   *
+   * Controlled: set your state **directly** here (`onOpenChange={setOpen}`), not in
+   * `startTransition` and not after an `await`; a parent that keeps `open={true}` gets the menu
+   * re-opened at once. May return a promise; a rejection or a throw goes to `reportError`.
+   */
+  onOpenChange?: UrgentChangeHandler<boolean, MenuOpenChangeDetails>;
   /**
    * Arrow keys wrap from the last item to the first and back.
    *
@@ -100,9 +121,9 @@ const DEFAULT_FOCUS: MenuOpenFocus = { cause: "first", pointer: false };
  * item of the parent menu) and its Popup opens beside that item.
  *
  * A menu is always in library mode (design/components/menu.md 2.1): opening and the closes a
- * part asks for are transitions (pending Trigger, items render from committed state,
- * `showPopover()` / `hidePopover()` once the change has committed); dismissals are the
- * browser's and `openChangeAction(false)` is a notification.
+ * part asks for are requests, transitions through `openChangeAction` (pending Trigger, items
+ * render from committed state, `showPopover()` / `hidePopover()` once the change has committed);
+ * dismissals are the browser's facts, reported to `onOpenChange`.
  *
  * @see https://ui.funstack.work/components/menu
  */
@@ -110,6 +131,7 @@ export function MenuRoot({
   open,
   defaultOpen,
   openChangeAction,
+  onOpenChange,
   loop = true,
   delay,
   closeDelay,
@@ -157,6 +179,7 @@ export function MenuRoot({
     open,
     defaultOpen,
     openChangeAction,
+    onOpenChange,
     details: popoverDetails,
     onDispatch: (next) => {
       // Any dispatch cancels hover intent (design walkthrough 9).

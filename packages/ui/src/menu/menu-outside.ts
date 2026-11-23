@@ -34,8 +34,8 @@ function scrollsWithin(popup: HTMLElement, target: EventTarget | null, event: Wh
 /**
  * The outside right- and middle-click close of a top-level menu (context-menu.md 5): a
  * `contextmenu` outside the menu tree that this menu's ContextTrigger did not handle, or a
- * middle-button `pointerdown` outside it, hides the root popup at once (`"dismiss"` through the
- * `toggle` notification). Chromium's click-based light dismiss ignores those buttons.
+ * middle-button `pointerdown` outside it, hides the root popup at once (a fact: `"dismiss"` to
+ * `onOpenChange` from the `toggle`). Chromium's click-based light dismiss ignores those buttons.
  *
  * While the menu is placed at a point (4.8; read at each event: a right-click may
  * re-place a Trigger-opened menu), a `scroll` of the document or of an element that contains the

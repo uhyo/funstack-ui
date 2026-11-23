@@ -2,9 +2,10 @@
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createActionDetails } from "./action-details.js";
+import { callUrgentHandler } from "./call-urgent-handler.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { transitionTypes } from "./transition-types.js";
-import type { ActionDetails, ChangeAction, ChangeReason } from "./types.js";
+import type { ActionDetails, ChangeAction, ChangeReason, UrgentChangeHandler } from "./types.js";
 import { useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import { useLatest } from "./use-latest.js";
@@ -13,8 +14,9 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
- * opening and part-initiated closing are library-owned (transitions keyed on committed state);
- * dismissals are the browser's and notified (design/components/popover.md section 2).
+ * opening and part-initiated closing are library-owned requests (transitions keyed on committed
+ * state, `openChangeAction`); dismissals are the browser's facts, adopted urgently and reported to
+ * `onOpenChange` (design/components/popover.md section 2, overlay-open-change.md).
  */
 export type OverlayMode = "static" | "library";
 
@@ -28,7 +30,10 @@ export interface OverlayCloseIntent {
   readonly event: Event | undefined;
 }
 
-/** The `details` every overlay `openChangeAction` receives (Dialog's adds `returnValue`). */
+/**
+ * The `details` every overlay `openChangeAction` and `onOpenChange` receives (Dialog's adds
+ * `returnValue`).
+ */
 export interface OverlayDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
@@ -59,6 +64,12 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   /** The Root's transition is pending (library mode). */
   readonly pending: boolean;
   /**
+   * Grows with every fact (`notifyClosed`). Part of the memoised value so that a fact always
+   * re-renders the parts, even when a controlled parent keeps `open={true}` and nothing else
+   * changed: the Popup's apply effect then re-opens the popup (design 2.4).
+   */
+  readonly epoch: number;
+  /**
    * What the user already intends: the latest in-flight dispatch's `next`, else the optimistic
    * value of the last commit. Safe to call from handlers and effects (layout effects included,
    * also in the commit that changed it), and after an `await`. Not during render.
@@ -88,9 +99,11 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
     ...args: CloseArgs
   ) => void;
   /**
-   * The browser hid the popup (a dismissal or a foreign invoker): dispatch the `false`
-   * notification unless `false` is already intended (the library's own echo, or a dismissal
-   * during a pending part-initiated close).
+   * A fact (#148, overlay-open-change.md 2.2): the browser hid the popup and the library did not
+   * hide it (the caller has already excluded the library's own hide). Supersedes every request in
+   * flight, writes committed `false` urgently (uncontrolled), and calls `onOpenChange(false,
+   * details)` synchronously through the handler rule (`callUrgentHandler`). Call it from the
+   * platform event's listener (`toggle` / `close`), never inside a transition.
    */
   readonly notifyClosed: (
     event: Event | undefined,
@@ -99,6 +112,13 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   ) => void;
   /** From `useControllableAction`: the latest in-flight intent, or `null`. */
   readonly latestInFlight: () => { readonly next: boolean } | null;
+  /**
+   * The popup was shown at its last `toggle` and the DOM has it hidden now: the browser hid it
+   * and its `toggle` has not arrived yet. A non-button Trigger's click lands in that window after
+   * light dismiss hid the popup at `pointerup` (#115): it records an `"activate"` intent for the
+   * fact instead of requesting a close. Handlers only.
+   */
+  readonly hiddenBeforeToggle: () => boolean;
   /** The registered Trigger: `showPopover({ source })` and the focus-return fallback. */
   readonly triggerRef: RefObject<HTMLElement | null>;
   /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()` / `close()`. */
@@ -131,14 +151,17 @@ export interface UseOverlayRootOptions<
   readonly open: boolean | undefined;
   readonly defaultOpen: boolean | undefined;
   readonly openChangeAction: ChangeAction<boolean, Details> | undefined;
+  /** The fact handler (#148): called for a hide the library did not perform. */
+  readonly onOpenChange: UrgentChangeHandler<boolean, Details> | undefined;
   /**
    * `"library"` forces library mode whatever the props (Menu, which has no JS-free mode). Default:
-   * detected from `open` / `defaultOpen` / `openChangeAction` on the first render.
+   * detected from `open` / `defaultOpen` / `openChangeAction` / `onOpenChange` on the first
+   * render.
    */
   readonly mode?: "library";
   /**
-   * Called synchronously for every dispatch, before the action runs (Menu: cancel hover timers,
-   * read the open cause).
+   * Called synchronously for every dispatch, before the action runs, and for every fact, before
+   * `onOpenChange` (Menu: cancel hover timers, read the open cause).
    */
   readonly onDispatch?: (next: boolean, details: Details) => void;
   /** Builds the `details` of a dispatch (`popoverDetails`: `{ reason }`); an open passes no args. */
@@ -168,6 +191,9 @@ function clearLater<Popup extends HTMLElement>(
   }, 0);
 }
 
+/** What the popup is called in the controlled-without-`onOpenChange` warning. */
+const nouns: Record<string, string> = { combobox: "listbox" };
+
 /** The `details` of a popover-like component: `{ reason }` (and `event`). */
 export const popoverDetails = (event: Event | undefined, reason: ChangeReason): OverlayDetails =>
   createActionDetails(event, { reason });
@@ -175,43 +201,63 @@ export const popoverDetails = (event: Event | undefined, reason: ChangeReason): 
 /**
  * The Root of an overlay without its public props: mode detection (once, from the first
  * render), `useControllableAction<boolean>`, ids, refs, close intents, the open generation and
- * the intent-aware `requestOpen` / `requestClose` / `notifyClosed`.
+ * the intent-aware `requestOpen` / `requestClose`, and `notifyClosed` for facts.
  */
 export function useOverlayRoot<
   Details extends ActionDetails,
   Popup extends HTMLElement = HTMLElement,
   CloseArgs extends unknown[] = [],
 >(options: UseOverlayRootOptions<Details, Popup, CloseArgs>): OverlayRootValue<Popup, CloseArgs> {
-  const { component, part, open, defaultOpen, openChangeAction, details, onDispatch } = options;
+  const {
+    component,
+    part,
+    open,
+    defaultOpen,
+    openChangeAction,
+    onOpenChange,
+    details,
+    onDispatch,
+  } = options;
 
   // Mode is decided once, from the first render's props (design 2).
   const isLibraryNow =
     options.mode === "library" ||
     open !== undefined ||
     defaultOpen !== undefined ||
-    openChangeAction !== undefined;
+    openChangeAction !== undefined ||
+    onOpenChange !== undefined;
   const [mode] = useState<OverlayMode>(isLibraryNow ? "library" : "static");
   const isLibrary = mode === "library";
   useDevWarning(
     isLibrary !== isLibraryNow,
     isDev &&
-      `${part}: the mode changed after mount (\`open\`, \`defaultOpen\` and \`openChangeAction\` ` +
-        "were all absent on one render and present on another). Switching between JS-free and " +
-        "library mode is not supported.",
+      `${part}: the mode changed after mount (\`open\`, \`defaultOpen\`, \`openChangeAction\` ` +
+        "and `onOpenChange` were all absent on one render and present on another). Switching " +
+        "between JS-free and library mode is not supported.",
+  );
+  // W1 (overlay-open-change.md 9): React's `value` without `onChange`. Static only: a handler
+  // that adopts late (in a transition, after an `await`) cannot be told from an intentional
+  // re-open, so nothing at runtime warns.
+  const noun = nouns[component] ?? component;
+  useDevWarning(
+    isLibrary && open !== undefined && onOpenChange === undefined,
+    isDev &&
+      `${part}: \`open\` is set without \`onOpenChange\`. The browser can close this ${noun} ` +
+        "without asking (Escape, a click outside), and `onOpenChange` is where a controlled Root " +
+        `is told. Without it the ${noun} re-opens after every dismissal. Pass ` +
+        "`onOpenChange={setOpen}`, or `onOpenChange={() => {}}` if re-opening is what you want.",
   );
 
   // Hooks cannot be conditional: JS-free mode calls the hook too and never dispatches.
-  const { committed, optimistic, pending, dispatch, latestInFlight } = useControllableAction<
-    boolean,
-    Details
-  >({
-    controlled: isLibrary ? open : undefined,
-    defaultValue: isLibrary ? defaultOpen : undefined,
-    initialValue: false,
-    action: isLibrary ? openChangeAction : undefined,
-    transitionTypes: (next) => transitionTypes(component, next ? "open" : "close"),
-    warn: { component: part, prop: "open" },
-  });
+  const { committed, optimistic, pending, dispatch, latestInFlight, adoptFact, epoch } =
+    useControllableAction<boolean, Details>({
+      controlled: isLibrary ? open : undefined,
+      defaultValue: isLibrary ? defaultOpen : undefined,
+      initialValue: false,
+      action: isLibrary ? openChangeAction : undefined,
+      transitionTypes: (next) => transitionTypes(component, next ? "open" : "close"),
+      warn: { component: part, prop: "open" },
+    });
 
   const id = useId();
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -225,7 +271,7 @@ export function useOverlayRoot<
   const committedOptimistic = useLatest(optimistic);
   // `details`, `onDispatch` and `isShown` are usually inline functions: read the committed render's
   // through a ref so that the functions below, and with them the returned value, stay stable.
-  const callbacks = useLatest({ details, onDispatch, isShown: options.isShown });
+  const callbacks = useLatest({ details, onDispatch, onOpenChange, isShown: options.isShown });
   const generation = useRef(0);
   const openGeneration = useCallback(() => generation.current, []);
   const nextOpenGeneration = useCallback(() => {
@@ -283,7 +329,33 @@ export function useOverlayRoot<
     [isLibrary, intended, send],
   );
 
-  const [shown, setShown] = useState(false);
+  const [shown, setShownState] = useState(false);
+  // The last value written, for handlers (`hiddenBeforeToggle`).
+  const shownNow = useRef(false);
+  const setShown = useCallback((next: boolean) => {
+    shownNow.current = next;
+    setShownState(next);
+  }, []);
+  const hiddenBeforeToggle = useCallback((): boolean => {
+    const popup = popupRef.current;
+    return (
+      shownNow.current && popup !== null && !(callbacks.current.isShown ?? isPopoverOpen)(popup)
+    );
+  }, [callbacks]);
+
+  const notifyClosed = useCallback(
+    (event: Event | undefined, reason: ChangeReason, ...args: CloseArgs): void => {
+      if (!isLibrary) return;
+      const { details, onDispatch, onOpenChange } = callbacks.current;
+      const built = details(event, reason, ...args);
+      onDispatch?.(false, built);
+      // Supersede the requests in flight and write committed `false` (urgent), then tell the
+      // consumer; both in the platform event, so one discrete commit follows (design 2.3).
+      adoptFact(false);
+      callUrgentHandler(onOpenChange, false, built);
+    },
+    [isLibrary, callbacks, adoptFact],
+  );
 
   const ids = useMemo(
     () => ({ popup: id, title: `${id}-title`, description: `${id}-description` }),
@@ -301,15 +373,15 @@ export function useOverlayRoot<
       shown,
       setShown,
       pending: isLibrary && pending,
+      epoch,
       intended,
       openGeneration,
       nextOpenGeneration,
       requestOpen,
       requestClose,
-      // The same function as `requestClose`; a separate name because the callers mean different
-      // things (a part asks to close; the platform already closed).
-      notifyClosed: requestClose,
+      notifyClosed,
       latestInFlight,
+      hiddenBeforeToggle,
       triggerRef,
       popupRef,
       recordCloseIntent,
@@ -322,13 +394,17 @@ export function useOverlayRoot<
       committed,
       optimistic,
       shown,
+      setShown,
       pending,
+      epoch,
       intended,
       openGeneration,
       nextOpenGeneration,
       requestOpen,
       requestClose,
+      notifyClosed,
       latestInFlight,
+      hiddenBeforeToggle,
       recordCloseIntent,
       takeCloseIntent,
     ],

@@ -682,10 +682,11 @@ describe("Popover", () => {
       expect(popoverSource(popup())).toBe(trigger());
     });
 
-    it("a foreign hide-popover invoker records an 'activate' intent the toggle consumes", async () => {
+    it("a foreign hide-popover invoker's close is a fact: 'activate' with the CommandEvent", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} fact={fact} />);
       await openThroughTrigger(user);
       const foreign = screen.getByTestId("elsewhere");
       foreign.setAttribute("commandfor", popup().id);
@@ -693,39 +694,42 @@ describe("Popover", () => {
       await user.click(foreign);
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("activate");
       expect(details.event!.type).toBe("command");
     });
 
     it("a foreign command name is matched case-insensitively (as the platform's)", async () => {
-      const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       const user = setupUser();
-      render(<Harness mode={mode} action={action} />);
+      render(<Harness mode={mode} fact={fact} />);
       await openThroughTrigger(user);
       await act(async () => {
         dispatchCommand(popup(), "Hide-Popover", screen.getByTestId("elsewhere"));
         popup().hidePopover();
       });
       await flushTasks(2);
-      expect(action.mock.calls[1]![1].reason).toBe("activate");
+      expect(fact.mock.calls[0]![1].reason).toBe("activate");
     });
 
     // #125
-    it("a foreign popovertarget invoker's close is 'activate' with the ToggleEvent", async () => {
+    it("a foreign popovertarget invoker's close is a fact: 'activate' with the ToggleEvent", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} fact={fact} />);
       await openThroughTrigger(user);
       const foreign = screen.getByTestId("elsewhere");
       foreign.setAttribute("popovertarget", popup().id);
       await user.click(foreign);
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("activate");
       expect(details.event!.type).toBe("beforetoggle");
@@ -735,8 +739,8 @@ describe("Popover", () => {
     // #125 review F1
     it("a close whose source is no popovertarget invoker of the popup stays 'dismiss'", async () => {
       const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} fact={fact} />);
       const foreign = screen.getByTestId("elsewhere");
       // An `interestfor` button (Chromium's lost-interest hide names it), or a `popovertarget`
       // naming another popover.
@@ -759,7 +763,7 @@ describe("Popover", () => {
         await flushTasks(2);
         foreign.removeAttribute(name);
         expect(isOpen()).toBe(false);
-        const [next, details] = action.mock.calls.at(-1)!;
+        const [next, details] = fact.mock.calls.at(-1)!;
         expect(next).toBe(false);
         expect(details.reason).toBe("dismiss");
       }
@@ -768,8 +772,8 @@ describe("Popover", () => {
     // #125
     it("a commandfor toggle-popover close keeps the CommandEvent though its toggle names the button", async () => {
       const user = setupUser();
-      const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} fact={fact} />);
       await openThroughTrigger(user);
       const foreign = screen.getByTestId("elsewhere");
       // `popovertarget` as well: the command takes precedence, and its intent stays.
@@ -779,17 +783,18 @@ describe("Popover", () => {
       await user.click(foreign);
       await flushTasks(2);
       expect(isOpen()).toBe(false);
-      const [next, details] = action.mock.calls[1]!;
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("activate");
       expect(details.event!.type).toBe("command");
     });
 
     // #125
-    it("the Trigger's and Close's closes keep their click; a script hide stays 'dismiss'", async () => {
+    it("the Trigger's and Close's closes keep their click (requests); a script hide is a 'dismiss' fact", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} fact={fact} />);
       await openThroughTrigger(user);
       await user.click(trigger());
       await flushTasks(2);
@@ -806,16 +811,18 @@ describe("Popover", () => {
       // Escape and light dismiss in jsdom: `hidePopover()`, no source.
       await act(async () => popup().hidePopover());
       await flushTasks(2);
-      expect(action).toHaveBeenCalledTimes(6);
-      expect(action.mock.calls[5]![1].reason).toBe("dismiss");
-      expect(action.mock.calls[5]![1].event!.type).toBe("toggle");
+      expect(action).toHaveBeenCalledTimes(5);
+      expect(fact).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].event!.type).toBe("toggle");
     });
 
     // #125 review F2
     it("a hide-popover command at a closed popup leaves no intent for a later close", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} fact={fact} />);
       const foreign = screen.getByTestId("elsewhere");
       foreign.setAttribute("commandfor", popup().id);
       foreign.setAttribute("command", "hide-popover");
@@ -827,15 +834,16 @@ describe("Popover", () => {
       // Escape in jsdom: `hidePopover()`.
       await act(async () => popup().hidePopover());
       await flushTasks(2);
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-      expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].event!.type).toBe("toggle");
     });
 
     it("a hide-popover command that does not close leaves no intent: a later dismissal is 'dismiss'", async () => {
       const user = setupUser();
       const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} fact={fact} />);
       await openThroughTrigger(user);
       // A foreign close command whose hide never happens (a later listener cancelled it): the
       // recorded intent is stale and is dropped a task later (design 2.3).
@@ -846,8 +854,8 @@ describe("Popover", () => {
       expect(isOpen()).toBe(true);
       await act(async () => popup().hidePopover());
       await flushTasks(2);
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
+      expect(action).toHaveBeenCalledTimes(1);
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("dismiss");
       expect(details.event!.type).toBe("toggle");
@@ -868,9 +876,10 @@ describe("Popover", () => {
       expect(isOpen()).toBe(true);
     };
 
-    it("lost interest after an interest open hides the popup: one 'dismiss' with the loseinterest event", async () => {
+    it("lost interest after an interest open hides the popup: one 'dismiss' fact with the loseinterest event", async () => {
       const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} fact={fact} />);
       const foreign = foreignButton();
       await interestOpen(foreign);
       expect(screen.getByTestId("close")).toHaveFocus();
@@ -887,8 +896,10 @@ describe("Popover", () => {
       // The open's focusing steps moved focus inside; no Trigger fallback after this hide (the
       // platform never focuses the invoker; a Trigger with `interestfor` would re-open).
       expect(trigger()).not.toHaveFocus();
-      expect(action).toHaveBeenCalledTimes(2);
-      const [next, details] = action.mock.calls[1]!;
+      // The library hides on the interest's behalf, but cannot hold it: a fact (2.2).
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
+      const [next, details] = fact.mock.calls[0]!;
       expect(next).toBe(false);
       expect(details.reason).toBe("dismiss");
       expect(details.event!.type).toBe("loseinterest");
@@ -998,9 +1009,10 @@ describe("Popover", () => {
       expect(action).not.toHaveBeenCalled();
     });
 
-    it("loseinterest fired from inside another hide (Escape) notifies that hide once", async () => {
+    it("loseinterest fired from inside another hide (Escape) reports that hide once", async () => {
       const action = vi.fn<ActionFn>();
-      render(<Harness mode={mode} action={action} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode={mode} action={action} fact={fact} />);
       const foreign = foreignButton();
       await interestOpen(foreign);
       // Chromium's Escape while the button has interest: `loseinterest` from inside the hide,
@@ -1011,10 +1023,11 @@ describe("Popover", () => {
       });
       await flushTasks(3);
       expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]![0]).toBe(false);
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-      expect(action.mock.calls[1]![1].event!.type).toBe("toggle");
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![0]).toBe(false);
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].event!.type).toBe("toggle");
     });
 
     it("interest regained before the hide task runs keeps the popup shown", async () => {
@@ -1064,14 +1077,14 @@ describe("Popover", () => {
       await flushTasks(3);
       expect(isOpen()).toBe(false);
       await openThroughTrigger(user);
-      expect(action).toHaveBeenCalledTimes(3);
+      expect(action).toHaveBeenCalledTimes(2);
       await act(async () => gainInterest(popup(), foreign));
       act(() => {
         dispatchLoseInterest(popup(), foreign);
       });
       await flushTasks(3);
       expect(isOpen()).toBe(true);
-      expect(action).toHaveBeenCalledTimes(3);
+      expect(action).toHaveBeenCalledTimes(2);
     });
 
     it("a cancelled pending interest open does not make a later Trigger-click open interest-closable", async () => {
@@ -1134,7 +1147,8 @@ describe("Popover", () => {
       const action = vi.fn<ActionFn>((next) =>
         slow ? (next ? opening.promise : closing.promise) : undefined,
       );
-      render(<Harness mode="controlled" action={action} trigger={false} />);
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode="controlled" action={action} fact={fact} trigger={false} />);
       const foreign = screen.getByTestId("elsewhere");
       foreign.setAttribute("interestfor", popup().id);
       await act(async () => gainInterest(popup(), foreign));
@@ -1146,9 +1160,11 @@ describe("Popover", () => {
       });
       await flushTasks(3);
       expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(2);
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
-      expect(action.mock.calls[1]![1].event!.type).toBe("loseinterest");
+      // Shown, then hidden on lost interest: a fact.
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].event!.type).toBe("loseinterest");
 
       slow = true;
       await act(async () => gainInterest(popup(), foreign));
@@ -1159,9 +1175,12 @@ describe("Popover", () => {
       await act(async () => closing.resolve());
       await flushTasks(3);
       expect(isOpen()).toBe(false);
-      expect(action).toHaveBeenCalledTimes(4);
-      expect(action.mock.calls[3]![0]).toBe(false);
-      expect(action.mock.calls[3]![1].reason).toBe("dismiss");
+      // Lost interest while the interest open is still pending (nothing shown): a request that
+      // supersedes the open, with `reason: "dismiss"` (overlay-open-change.md 2.2, crossover).
+      expect(action).toHaveBeenCalledTimes(3);
+      expect(action.mock.calls[2]![0]).toBe(false);
+      expect(action.mock.calls[2]![1].reason).toBe("dismiss");
+      expect(fact).toHaveBeenCalledTimes(1);
       expect(committedText()).toBe("false");
     });
   });
@@ -1304,11 +1323,11 @@ describe("Popover", () => {
   describe("render element", () => {
     it("render={<div className />} keeps the library attributes and listeners", async () => {
       const user = setupUser();
-      const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
       render(
         <Harness
           mode="uncontrolled"
-          action={action}
+          fact={fact}
           popup={{ render: <div className="card" />, className: "popover" }}
         />,
       );
@@ -1317,7 +1336,7 @@ describe("Popover", () => {
       await openThroughTrigger(user);
       await act(async () => popup().hidePopover());
       await flushTasks(2);
-      expect(action.mock.calls[1]![1].reason).toBe("dismiss");
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
     });
 
     it("a link Trigger in library mode dispatches through the click and gets no type", async () => {
@@ -1382,9 +1401,48 @@ describe("Popover", () => {
       expect(warning).toBeDefined();
       expect(warning).not.toContain("JS-free mode");
       expect(warning).toContain("closes it through light dismiss before the click");
-      expect(warning).toContain("not awaited");
+      expect(warning).toContain("onOpenChange");
       expect(warning).toContain("cannot veto");
-      expect(warning).toContain("no exit transition");
+      expect(warning).toContain("no view transition");
+    });
+
+    // #115, overlay-open-change.md 3.2: light dismiss hides the popup at `pointerup`, before the
+    // click; the click names the cause of the fact the `toggle` reports.
+    it("a non-button Trigger pressed while open: the light dismiss is a fact, 'activate' with the click", async () => {
+      silenceErrors();
+      const user = setupUser();
+      const action = vi.fn<ActionFn>();
+      const fact = vi.fn<ActionFn>();
+      render(
+        <Harness
+          mode="uncontrolled"
+          action={action}
+          fact={fact}
+          trigger={{ render: <a href="#x" /> }}
+        />,
+      );
+      await openThroughTrigger(user);
+      await act(async () => {
+        // What the press does: light dismiss hides the popup (its `toggle` is queued), then the
+        // click lands on the Trigger.
+        popup().hidePopover();
+        trigger().click();
+      });
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      // No request for an already hidden popup: the action heard the open only.
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(fact).toHaveBeenCalledTimes(1);
+      const [next, details] = fact.mock.calls[0]!;
+      expect(next).toBe(false);
+      expect(details.reason).toBe("activate");
+      expect(details.event!.type).toBe("click");
+      expect(committedText()).toBe("false");
+      // The next click opens again.
+      await user.click(trigger());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(action.mock.calls.map(([n]) => n)).toEqual([true, true]);
     });
 
     it("does not warn for a <button> Trigger in either mode", () => {
@@ -2006,13 +2064,37 @@ describe("Popover", () => {
   });
 
   describe("mode guard and dev warnings", () => {
-    it("warns when the Root switches from JS-free to library mode", () => {
+    it("warns when the Root switches from JS-free to library mode, naming the four props", () => {
       const error = silenceErrors();
       const { rerender } = render(<Harness mode="static" />);
       rerender(<Harness mode="uncontrolled" />);
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining("Popover.Root: the mode changed after mount"),
       );
+      expect(error).toHaveBeenCalledWith(expect.stringContaining("`onOpenChange`"));
+    });
+
+    // #148, overlay-open-change.md 2.11
+    it("onOpenChange alone selects library mode (uncontrolled), and hears a dismissal", async () => {
+      const user = setupUser();
+      const onOpenChange = vi.fn();
+      render(
+        <Popover.Root onOpenChange={onOpenChange}>
+          <Popover.Trigger data-testid="trigger">Open</Popover.Trigger>
+          <Popover.Popup data-testid="popup" aria-label="p">
+            <span data-testid="content">content</span>
+          </Popover.Popup>
+        </Popover.Root>,
+      );
+      // Library mode: no native `popovertarget` before the click... the Trigger's click is the
+      // library's (cancelled), and the content renders from committed state.
+      expect(content()).toBeNull();
+      await openThroughTrigger(user);
+      expect(content()).toBeInTheDocument();
+      await act(async () => popup().hidePopover());
+      await flushTasks(2);
+      expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false, expect.anything());
+      expect(content()).toBeNull();
     });
 
     it("warns for transition and keepMounted={false} in JS-free mode", () => {

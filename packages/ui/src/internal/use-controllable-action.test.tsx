@@ -88,6 +88,92 @@ describe("useControllableAction: adopt", () => {
   });
 });
 
+// #148 (design/components/overlay-open-change.md 2.5): a fact supersedes every dispatch in flight.
+describe("useControllableAction: adoptFact", () => {
+  it("uncontrolled, nothing in flight: commits urgently, never calls the action, never pending", () => {
+    const { action, hook, value } = setup();
+    act(() => {
+      hook().adoptFact("b");
+    });
+    expect(value()).toBe("b|b|false");
+    expect(hook().latestInFlight()).toBeNull();
+    expect(hook().epoch).toBe(1);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("uncontrolled, a dispatch in flight: drops its optimistic patch, makes the fact the intent, and its resolution commits nothing", async () => {
+    const { action, hook, value } = setup();
+    const d = deferred();
+    action.mockImplementation(() => d.promise);
+    act(() => {
+      hook().dispatch("x", {} as ActionDetails);
+    });
+    expect(value()).toBe("|x|true");
+    act(() => {
+      hook().adoptFact("b");
+    });
+    // The stale patch is gone in the fact's own commit; pending reports the running action.
+    expect(value()).toBe("b|b|true");
+    expect(hook().latestInFlight()).toEqual({ next: "b" });
+    await act(async () => d.resolve());
+    expect(value()).toBe("b|b|false");
+    expect(hook().latestInFlight()).toBeNull();
+  });
+
+  it("a superseded dispatch that rejects after the fact is reported, not thrown", async () => {
+    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const caught = vi.fn();
+    const d = deferred();
+    let hook!: Hook;
+    const view = render(
+      <ErrorCatcher onError={caught}>
+        <Probe action={() => d.promise} onHook={(h) => (hook = h)} />
+      </ErrorCatcher>,
+    );
+    act(() => {
+      hook.dispatch("x", {} as ActionDetails);
+    });
+    act(() => {
+      hook.adoptFact("b");
+    });
+    const err = new Error("superseded");
+    await act(async () => d.reject(err));
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+    expect(caught).not.toHaveBeenCalled();
+    expect(view.getByTestId("value").textContent).toBe("b|b|false");
+  });
+
+  it("a dispatch after the fact works as usual (its patch is not dropped)", async () => {
+    const { action, hook, value } = setup();
+    act(() => {
+      hook().adoptFact("b");
+    });
+    const d = deferred();
+    action.mockImplementation(() => d.promise);
+    act(() => {
+      hook().dispatch("c", {} as ActionDetails);
+    });
+    expect(value()).toBe("b|c|true");
+    await act(async () => d.resolve());
+    expect(value()).toBe("c|c|false");
+  });
+
+  it("controlled: never writes the value; the epoch still changes so consumers re-render", () => {
+    const { action, hook, value } = setup("a");
+    const before = hook();
+    act(() => {
+      hook().adoptFact("b");
+    });
+    expect(value()).toBe("a|a|false");
+    expect(hook().epoch).toBe(1);
+    // A new value object: a memoised context built on it re-renders its parts.
+    expect(hook()).not.toBe(before);
+    expect(action).not.toHaveBeenCalled();
+  });
+});
+
 // #48: the hook's value only changes with its state, so the components' memoised context values
 // built on it are reused when the owner re-renders for anything else.
 describe("useControllableAction: referential stability", () => {

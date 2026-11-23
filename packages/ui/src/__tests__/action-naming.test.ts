@@ -14,14 +14,15 @@ import type * as UI from "../index.js";
  * Guards conventions 10.1 "Action naming" (#96, resolved question 39): across every public
  * `*Props` type, a key named `action` or `…Action` is a transition action (every function member
  * of its type returns `unknown`, as `Action` / `ChangeAction` do; `UrgentChangeHandler` returns
- * `void` and fails), and the only `on*` key the library defines itself is `Combobox.Root`'s
- * `onInputValueChange`. DOM pass-through props (`onClick`, `onClose`, `formAction`, …) are
+ * `void` and fails), and the library's own `on*` keys are exactly the handlers of conventions 2.1
+ * (#148): `Combobox.Root`'s `onInputValueChange` and the overlay Roots' `onOpenChange`, each typed
+ * `UrgentChangeHandler`. DOM pass-through props (`onClick`, `onClose`, `formAction`, …) are
  * excluded when their type is React's. `Form.Root`'s `action` is React's form channel (a URL
  * string or `(formData) => unknown`): its function part returns `unknown` and passes, as it
  * should.
  *
  * Scope: `*Props` types only (conventions 10.1). Exported option objects with callbacks
- * (`ToastOptions.closeAction`, `ToastActionOptions.action`) are not checked here. The check is by
+ * (`ToastActionOptions.action`) are not checked here; `ToastOptions.onClose` has its own row. The check is by
  * return type, not behaviour: whether a component really runs an action in a transition is
  * covered by each component's pending / transition tests.
  *
@@ -350,11 +351,37 @@ describe("action naming (conventions 10.1)", () => {
     expectTypeOf<Offenders>().toEqualTypeOf<{}>();
   });
 
-  it("the library's only own `on*` prop is Combobox.Root's urgent handler", () => {
-    expectTypeOf<OwnHandlers>().toEqualTypeOf<"onInputValueChange">();
+  it("the library's own `on*` props are the handlers of conventions 2.1 (#148)", () => {
+    expectTypeOf<OwnHandlers>().toEqualTypeOf<"onInputValueChange" | "onOpenChange">();
     expectTypeOf<UI.ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<string, UI.ComboboxInputValueChangeDetails> | undefined
     >();
+    // Exactly the four overlay Roots, each with the details type of its `openChangeAction`.
+    type WithOpenChange = {
+      [K in keyof PublicProps]: "onOpenChange" extends OwnHandlerKeys<PublicProps[K]> ? K : never;
+    }[keyof PublicProps];
+    expectTypeOf<WithOpenChange>().toEqualTypeOf<
+      "ComboboxRootProps" | "DialogRootProps" | "MenuRootProps" | "PopoverRootProps"
+    >();
+    expectTypeOf<UI.PopoverRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.PopoverOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.MenuRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.MenuOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.ComboboxRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.ComboboxOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.DialogRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.DialogOpenChangeDetails> | undefined
+    >();
+  });
+
+  it("a toast's close callback is the `onClose` handler, not an action (#148)", () => {
+    expectTypeOf<UI.ToastOptions["onClose"]>().toEqualTypeOf<
+      UI.UrgentHandler<UI.ToastCloseDetails> | undefined
+    >();
+    expectTypeOf<UI.ToastOptions>().not.toHaveProperty("closeAction");
   });
 
   it("lists every Props type exported from src/index.ts", () => {
