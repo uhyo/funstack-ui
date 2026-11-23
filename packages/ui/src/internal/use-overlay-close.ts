@@ -49,7 +49,8 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
  * the browser runs the command. Otherwise the click is cancelled, refused while disabled, and
  * `close` runs, after the `action` when there is one, inside this part's own transition; a
  * second click meanwhile starts nothing (`whilePending`, default `"ignore"`) or runs the action
- * again (`"run"`; the close still happens once), and a close whose open was superseded by a
+ * again (`"run"`; the close happens once, after the last run and only if the latest one
+ * resolved), and a close whose open was superseded by a
  * newer one (dismissed and re-opened meanwhile) is dropped (the open-generation guard).
  */
 export function useOverlayClose<Details extends ActionDetails>(

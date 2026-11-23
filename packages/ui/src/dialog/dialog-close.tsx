@@ -50,7 +50,9 @@ export interface DialogCloseProps extends Omit<
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`
-   * until every run has settled); the dialog still closes once. No effect without `action`.
+   * until every run has settled); the dialog closes once, when the last run settles and only if
+   * the latest run resolved (a rejection leaves it open, as in `"ignore"` mode). No effect
+   * without `action`.
    *
    * @defaultValue `"ignore"`
    */

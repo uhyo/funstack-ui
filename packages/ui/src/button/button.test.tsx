@@ -982,6 +982,9 @@ describe("Button", () => {
       await act(async () => {
         deferreds[0]!.resolve();
       });
+      // React's form status stays pending until every overlapping submission has finished.
+      expectPending(button("A"));
+      expect(button("A")).not.toHaveAttribute("aria-disabled");
       await act(async () => {
         deferreds[1]!.resolve();
       });

@@ -50,7 +50,8 @@ export interface ToastActionProps extends Omit<
    * What a click does while this part's action is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile): one Undo, one Retry. `"run"`: the action runs
    * again; the Action and the Root stay `data-pending` and the timer paused until every run has
-   * settled, and the toast closes once.
+   * settled. With `closeOnSettle` the toast then closes once, if the latest run resolved; a
+   * rejected latest run keeps it, as in `"ignore"` mode.
    *
    * @defaultValue `"ignore"`, or `"run"` with `closeOnSettle={false}`
    */

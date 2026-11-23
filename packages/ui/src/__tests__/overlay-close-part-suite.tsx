@@ -389,7 +389,7 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         },
       );
 
-      it('whilePending="run": the first run resolves, the latest rejects: the boundary; the close still commits once', async () => {
+      it('whilePending="run": the first run resolves, the latest rejects: the boundary; no close, the popup stays open', async () => {
         const user = setupUser();
         silenceErrors();
         const reportError = vi.fn();
@@ -413,16 +413,18 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         await user.click(part());
         await act(async () => runs[0]!.resolve());
         await flushTasks(2);
-        // React holds the close's commit while the part's second run pends (entanglement,
-        // conventions 2.3 item 5), so the part has not left when that run rejects.
+        // The close waits for the last run in flight, and runs only if the latest run resolved
+        // (#146 review F1).
         expect(isOpen()).toBe(true);
+        expect(close).not.toHaveBeenCalled();
         const latest = new Error("latest");
         await act(async () => runs[1]!.reject(latest));
         await flushTasks(2);
         expect(caught).toHaveBeenCalledExactlyOnceWith(latest);
         expect(reportError).not.toHaveBeenCalled();
-        expect(close).toHaveBeenCalledTimes(1);
-        expect(isOpen()).toBe(false);
+        // A rejection leaves the popup open, in "run" mode as in "ignore" mode.
+        expect(close).not.toHaveBeenCalled();
+        expect(isOpen()).toBe(true);
       });
 
       it("a disabled Close never runs its action or closes", async () => {
@@ -496,11 +498,46 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         expect(button).not.toHaveAttribute("aria-disabled");
         expectPending(button);
         await act(async () => runs[0]!.resolve());
+        await flushTasks(2);
+        // Not at the first resolved run: the close waits for the last run in flight.
+        expect(close).not.toHaveBeenCalled();
+        expect(isOpen()).toBe(true);
         await act(async () => runs[1]!.resolve());
         await flushTasks(2);
         expect(close).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(false);
         expectNotPending(button);
+      });
+
+      it('whilePending="run": the first run resolves, the latest rejects: no native close, the popup stays open', async () => {
+        const user = setupUser();
+        silenceErrors();
+        const caught = vi.fn();
+        const runs = [deferred(), deferred()];
+        let call = 0;
+        render(
+          <Harness
+            mode="static"
+            content={
+              <ErrorCatcher onError={caught}>
+                {withClose({ action: () => runs[call++]!.promise, whilePending: "run" })}
+              </ErrorCatcher>
+            }
+          />,
+        );
+        await config.openStatic();
+        const close = spyClose();
+        await user.click(part());
+        await user.click(part());
+        await act(async () => runs[0]!.resolve());
+        await flushTasks(2);
+        expect(close).not.toHaveBeenCalled();
+        const latest = new Error("latest");
+        await act(async () => runs[1]!.reject(latest));
+        await flushTasks(2);
+        expect(caught).toHaveBeenCalledExactlyOnceWith(latest);
+        expect(close).not.toHaveBeenCalled();
+        expect(isOpen()).toBe(true);
       });
 
       it("a render element's aria-disabled is removed while the Close is idle (owned)", () => {

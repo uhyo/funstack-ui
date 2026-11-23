@@ -24,7 +24,9 @@ export interface ActionTrigger {
   readonly pending: boolean;
   /**
    * Runs `work` inside the part's own transition and, once it resolves, `then` (still inside the
-   * transition: a Close part's close, a menu item's close). A rejection skips `then` and reaches
+   * transition: a Close part's close, a menu item's close). With overlapping runs, `then` runs
+   * once, when the last run in flight settles, and only if the latest run resolved: it is the
+   * latest run's `then` (#146 review F1). A rejection skips `then` and reaches
    * the nearest Error Boundary above the part; a run that a later run superseded, or any run
    * once the part unmounted or was hidden by `<Activity>`, passes its rejection to `reportError`
    * instead (conventions 2.4). With
@@ -60,6 +62,19 @@ export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrig
   // same task (React's `pending` is still the stale render value) is seen (conventions 2.5).
   const inFlight = useRef(0);
   const connected = useConnected();
+  // The latest run's continuation once it resolved, waiting for the other runs in flight to
+  // settle. Cleared by every new run: only the latest run's outcome decides (#146 review F1).
+  const resolvedThen = useRef<(() => void) | null>(null);
+
+  // A run settled. When it was the last in flight, the latest run's continuation runs if that
+  // run resolved; a rejected latest run (or a newer run since) left nothing to run.
+  const settled = () => {
+    inFlight.current--;
+    if (inFlight.current > 0) return;
+    const continuation = resolvedThen.current;
+    resolvedThen.current = null;
+    continuation?.();
+  };
 
   const run = (work: () => unknown, then?: () => void): boolean => {
     // The own counter only, not the rendered `pending` (design/components/button.md 5.2): after
@@ -70,20 +85,26 @@ export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrig
     // The open this run belongs to (design/components/popover.md 3.4): if the
     // user dismisses and re-opens while the action runs, its close must not close the new open.
     const generation = openGeneration?.();
+    resolvedThen.current = null;
     startOwnTransition(async () => {
       try {
         await work();
       } catch (error) {
-        inFlight.current--;
         // The latest run's rejection takes React's own route to the boundary while the part is
         // there to render it; otherwise React would drop it, as it drops a superseded one (2.4).
-        if (id === latest.current && connected.current) throw error;
-        reportDropped(error);
+        const rethrow = id === latest.current && connected.current;
+        if (!rethrow) reportDropped(error);
+        settled();
+        if (rethrow) throw error;
         return;
       }
-      inFlight.current--;
-      if (openGeneration !== undefined && openGeneration() !== generation) return;
-      then?.();
+      if (id === latest.current && then !== undefined) {
+        resolvedThen.current = () => {
+          if (openGeneration !== undefined && openGeneration() !== generation) return;
+          then();
+        };
+      }
+      settled();
     });
     return true;
   };

@@ -53,8 +53,9 @@ export interface MenuItemProps extends Omit<
   /**
    * What a click, Enter or Space does while this item's `action` is pending. `"ignore"`:
    * nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs
-   * again (`data-pending` until every run has settled); a closing menu still closes once. No
-   * effect without `action`.
+   * again (`data-pending` until every run has settled); a closing item closes the menu once,
+   * when the last run settles and only if the latest run resolved (a rejection keeps the menu
+   * open, as in `"ignore"` mode). No effect without `action`.
    *
    * @defaultValue `"ignore"`, or `"run"` with `closeOnActivate={false}`
    */

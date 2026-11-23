@@ -91,9 +91,35 @@ describe("useActionTrigger: runs overlap (the default since #146; the continuous
     expect(results).toEqual([true, true]);
     expect(work).toHaveBeenCalledTimes(2);
     await act(async () => runs[1]!.resolve());
+    // The latest resolved, but a run is still in flight: `then` waits (#146 review F1).
+    expect(then).not.toHaveBeenCalled();
     await act(async () => runs[0]!.resolve());
-    expect(then).toHaveBeenCalledTimes(2);
+    expect(then).toHaveBeenCalledTimes(1);
     expect(pending()).toBe("false");
+  });
+
+  it("`then` is the latest run's, once the last run settles; not at all if the latest rejected", async () => {
+    silenceErrors();
+    const { hook } = setup(undefined, () => {});
+    const runs = [deferred(), deferred(), deferred(), deferred()];
+    const thens = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
+    act(() => {
+      hook().run(() => runs[0]!.promise, thens[0]);
+      hook().run(() => runs[1]!.promise, thens[1]);
+    });
+    await act(async () => runs[0]!.resolve());
+    await act(async () => runs[1]!.resolve());
+    expect(thens[0]).not.toHaveBeenCalled();
+    expect(thens[1]).toHaveBeenCalledTimes(1);
+    // The latest rejects after an older run resolved: no `then` at all.
+    act(() => {
+      hook().run(() => runs[2]!.promise, thens[2]);
+      hook().run(() => runs[3]!.promise, thens[3]);
+    });
+    await act(async () => runs[2]!.resolve());
+    await act(async () => runs[3]!.reject(new Error("latest")));
+    expect(thens[2]).not.toHaveBeenCalled();
+    expect(thens[3]).not.toHaveBeenCalled();
   });
 
   // moved from the Close / Item rows, #81

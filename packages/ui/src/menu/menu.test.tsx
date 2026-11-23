@@ -1295,7 +1295,7 @@ describe("Menu.Item actions", () => {
       expect(isOpen()).toBe(true);
     });
 
-    it('"run" on a closing item: the close waits for the second run, whose rejection reaches the boundary; one close', async () => {
+    it('"run" on a closing item: the first run resolves, the latest rejects: the boundary, the menu stays open', async () => {
       const user = setupUser();
       silenceErrors();
       const reportError = vi.fn();
@@ -1320,17 +1320,49 @@ describe("Menu.Item actions", () => {
       expect(call).toBe(2);
       await act(async () => runs[0]!.resolve());
       await flushTasks(2);
-      // React holds the close's commit while the item's second run pends (entanglement,
-      // conventions 2.3 item 5): the item is still there, still pending.
+      // The close waits for the last run in flight and needs the latest run to resolve
+      // (#146 review F1): the item is still there, still pending.
       expect(isOpen()).toBe(true);
       expectPending(item("log"));
       const late = new Error("late");
       await act(async () => runs[1]!.reject(late));
       await flushTasks(2);
-      // The rejecting run is the latest and its item was connected: the boundary, not
-      // reportError; the first run's close commits with it, once.
+      // The latest run rejected: the boundary, not reportError, and no close.
       expect(caught).toHaveBeenCalledExactlyOnceWith(late);
       expect(reportError).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(true);
+    });
+
+    it('"run" on a closing item: the latest resolves first, an older run rejects later: reported, then the menu closes', async () => {
+      const user = setupUser();
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const caught = vi.fn();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      render(
+        <Harness
+          content={
+            <ErrorCatcher onError={caught}>
+              <Menu.Item data-testid="log" whilePending="run" action={() => runs[call++]!.promise}>
+                Log
+              </Menu.Item>
+            </ErrorCatcher>
+          }
+        />,
+      );
+      await openMenu(user);
+      await user.click(item("log"));
+      await user.click(item("log"));
+      await act(async () => runs[1]!.resolve());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      const older = new Error("older");
+      await act(async () => runs[0]!.reject(older));
+      await flushTasks(2);
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+      expect(caught).not.toHaveBeenCalled();
       expect(isOpen()).toBe(false);
     });
   });

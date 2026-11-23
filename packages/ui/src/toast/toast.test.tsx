@@ -1149,31 +1149,39 @@ describe("Toast", () => {
       expect(undo).toHaveBeenCalledTimes(2);
       expect(screen.getByTestId("act")).not.toHaveAttribute("aria-disabled");
       await act(async () => runs[0]!.resolve());
+      await flushMicrotasks(2);
+      // Not at the first resolved run: the toast leaves when the last run settles.
+      expect(queryRoot(id)).not.toBeNull();
+      expectPending(root(id));
       await act(async () => runs[1]!.resolve());
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
       expect(closeAction).toHaveBeenCalledTimes(1);
     });
 
-    it('"run" on a closing Action: the first run closes the toast, the second rejects later: one route, once', async () => {
+    it('"run" on a closing Action: the first run resolves, the latest rejects: the boundary, the toast stays', async () => {
       silenceErrors();
       const reportError = vi.fn();
       vi.stubGlobal("reportError", reportError);
       const runs = [deferred(), deferred()];
       let call_ = 0;
       const errors: unknown[] = [];
+      let last: ToastViewportState | undefined;
       render(
         <Harness
           manager={manager}
-          list={({ toasts }) => (
-            <ErrorCatcher onError={(e) => errors.push(e)}>
-              {toasts.map((t) => (
-                <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`}>
-                  <Toast.Action data-testid="act" whilePending="run" />
-                </Toast.Root>
-              ))}
-            </ErrorCatcher>
-          )}
+          list={(state) => {
+            last = state;
+            return (
+              <ErrorCatcher onError={(e) => errors.push(e)}>
+                {state.toasts.map((t) => (
+                  <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`}>
+                    <Toast.Action data-testid="act" whilePending="run" />
+                  </Toast.Root>
+                ))}
+              </ErrorCatcher>
+            );
+          }}
         />,
       );
       const id = await call(() =>
@@ -1185,15 +1193,18 @@ describe("Toast", () => {
       });
       await act(async () => runs[0]!.resolve());
       await flushMicrotasks(2);
-      // The toast's close is not a transition of the Action, so it does not wait for the second
-      // run: the Action leaves with the toast.
-      expect(queryRoot(id)).toBeNull();
+      // The close waits for the last run in flight and needs the latest run to resolve (#146
+      // review F1): the toast stays, pending.
+      expect(queryRoot(id)).not.toBeNull();
+      expectPending(root(id));
       const late = new Error("late");
       await act(async () => runs[1]!.reject(late));
       await flushMicrotasks(2);
-      // A rejection after the part left is reported (#152), never thrown into the list.
-      expect(reportError).toHaveBeenCalledExactlyOnceWith(late);
-      expect(errors).toEqual([]);
+      // The latest run rejected while the Action was there: the boundary above the list, and
+      // the toast is not closed.
+      expect(errors).toEqual([late]);
+      expect(reportError).not.toHaveBeenCalled();
+      expect(last?.toasts.map((t) => [t.id, t.ending])).toEqual([[id, false]]);
     });
 
     it("types: whilePending on Toast.Action; not on Toast.Close or the toast() action options", () => {
