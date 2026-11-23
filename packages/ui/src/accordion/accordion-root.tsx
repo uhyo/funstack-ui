@@ -267,12 +267,24 @@ export function AccordionRoot(props: AccordionRootProps) {
       action && ((next, details) => action(fromSet(next, exclusive, registeredValues()), details)),
     transitionTypes: (_next, _prev, details) =>
       transitionTypes("accordion", details.open ? "expand" : "collapse"),
-    // One item per dispatch, re-based on the committed set, except the mount reconciliation
-    // (reason "platform", no event), which folds every pre-hydration click into one `next`.
-    reducer: (prev, next, details) =>
-      details.reason === "platform" && details.event === undefined
-        ? next
-        : reduce(prev, details.item, details.open, exclusive),
+    // Multiple: one item per dispatch, re-based on the committed set; it is also how the
+    // uncontrolled commit is folded over the resolved dispatches (#150). Exclusive is
+    // single-valued: no reducer, so the optimistic value is `next` and the latest dispatch
+    // commits it, like Tabs.
+    //
+    // The mount reconciliation (reason "platform", no event) folds every pre-hydration click into
+    // one `next` and is adopted whole. It never sits in a burst behind a click whose action later
+    // rejects: it runs only from the Root's mount layout effect, the Root's first possible
+    // dispatch (children do not dispatch from layout effects, and no user event can run between
+    // a commit and its layout effects). It runs again only when an `<Activity>` re-shows the
+    // Root; a pending click's item then has DOM `open` equal to the optimistic value, so `next`
+    // equals the intended value and nothing is dispatched.
+    reducer: exclusive
+      ? undefined
+      : (prev, next, details) =>
+          details.reason === "platform" && details.event === undefined
+            ? next
+            : reduce(prev, details.item, details.open, false),
     warn: { component: "Accordion.Root", prop: "value" },
   });
 

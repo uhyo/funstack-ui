@@ -21,6 +21,7 @@ import {
   expectNotPending,
   expectPending,
   renderBoth,
+  sequencedDeferreds,
   setupUser,
   flushMicrotasks,
   hydrateFromServer,
@@ -1776,6 +1777,39 @@ describe("CheckboxGroup", () => {
   });
 
   describe("platform: reset target by mode", () => {
+    // #150 review: a reset is absolute. Folded as a diff against the in-flight value, it let a
+    // change the reset did not list (a's uncheck, later rejected) bring `a` back after the reset.
+    it("uncontrolled: a reset mid-burst lands on the default, whatever an earlier change does", async () => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const ds = sequencedDeferreds(4);
+      const action = vi.fn<ActionFn>(() => ds.next());
+      const caught = vi.fn();
+      render(<Harness mode="uncontrolled" initial={[]} inForm action={action} boundary={caught} />);
+      const user = setupUser();
+      await user.click(box("a"));
+      await act(async () => ds[0]!.resolve());
+      expect(checkedValues()).toEqual(["a"]);
+
+      await user.click(box("a")); // uncheck a: rejects later
+      await user.click(box("b")); // check b: resolves
+      await act(async () => ds[2]!.resolve());
+      await act(async () => {
+        form().reset();
+      });
+      await flushMicrotasks();
+      expect(calls(action).at(-1)).toEqual([[], "platform", [], ["b"]]);
+      await act(async () => ds[3]!.resolve());
+      const err = new Error("uncheck a failed");
+      await act(async () => ds[1]!.reject(err));
+
+      expect(caught).not.toHaveBeenCalled();
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+      expect(checkedValues()).toEqual([]);
+      expect(dataChecked()).toEqual([]);
+      expect(dataPending()).toEqual([]);
+    });
+
     it("uncontrolled: a value with no Item returns to defaultValue too", async () => {
       const action = vi.fn<ActionFn>();
       render(

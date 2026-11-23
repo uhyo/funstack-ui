@@ -265,7 +265,7 @@ describe("useControllableAction: uncontrolled reducer commits", () => {
 
   function setupSet(controlled?: readonly string[]) {
     vi.stubGlobal("reportError", vi.fn());
-    const runs = [deferred(), deferred(), deferred()];
+    const runs = [deferred(), deferred(), deferred(), deferred()];
     let call = 0;
     let hook!: SetHook;
     function SetProbe({ onHook }: { onHook: (h: SetHook) => void }) {
@@ -309,19 +309,22 @@ describe("useControllableAction: uncontrolled reducer commits", () => {
     expect(value()).toBe("b|b");
   });
 
+  // Discriminating: dispatch order gives {c}; resolution order would give {a, c}; the old
+  // latest-dispatch commit gave {b, c} (the latest `next` included the rejected b).
   it("applies the resolved changes in dispatch order, whatever order they resolve in", async () => {
     const { runs, toggle, value } = setupSet();
     act(() => toggle("a", true));
     act(() => toggle("a", false));
     act(() => toggle("b", true));
-    await act(async () => {
-      runs[2]!.resolve();
-      runs[1]!.resolve();
-    });
-    // Still in flight: nothing is committed before every dispatch settled.
-    expect(value()).toBe("|b");
+    act(() => toggle("c", true));
+    expect(value()).toBe("|b,c");
+    await act(async () => runs[1]!.resolve());
     await act(async () => runs[0]!.resolve());
-    expect(value()).toBe("b|b");
+    await act(async () => runs[2]!.reject(new Error("b failed")));
+    // Still in flight: nothing is committed before every dispatch settled.
+    expect(value()).toBe("|b,c");
+    await act(async () => runs[3]!.resolve());
+    expect(value()).toBe("c|c");
   });
 
   it("controlled: never writes", async () => {

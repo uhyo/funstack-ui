@@ -264,7 +264,13 @@ export function CheckboxGroupRoot({
       ...(details.added.length > 0 ? ["fsui-checkbox-group-check"] : []),
       ...(details.removed.length > 0 ? ["fsui-checkbox-group-uncheck"] : []),
     ],
-    reducer: (prev, _next, details) => applyPatch(prev, details),
+    // A patch, re-based on the committed set; it is also how the uncontrolled commit is folded
+    // over the resolved dispatches (#150). A form reset (reason "platform" with the `reset`
+    // event) is absolute: adopted whole, so a change rejected after it cannot survive the reset.
+    reducer: (prev, next, details) =>
+      details.reason === "platform" && details.event !== undefined
+        ? next
+        : applyPatch(prev, details),
     warn: { component: "CheckboxGroup.Root", prop: "value" },
   });
   // Deliberately no warning when neither `value` nor `defaultValue` is given: an empty group is

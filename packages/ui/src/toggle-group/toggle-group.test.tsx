@@ -269,8 +269,52 @@ describe("ToggleGroup", () => {
         expect(action.mock.calls[0]?.[0]).toBe("list");
       });
 
-      // #150: the uncontrolled commit folds the resolved dispatches; an exclusive one replaces
-      // the value, so a rejected press in between never leaves two Items pressed.
+      // #150 review: exclusive is single-valued, so the latest resolved dispatch commits its
+      // `next`; a rejected press in between never leaves two Items pressed or brings one back.
+      it.each([
+        ["the rejection first", [0, 1]],
+        ["the resolution first", [1, 0]],
+      ] as const)(
+        "uncontrolled: a rejected press, then a resolved release of it, presses nothing (%s)",
+        async (_label, order) => {
+          const reportError = vi.fn();
+          vi.stubGlobal("reportError", reportError);
+          const ds = sequencedDeferreds(2);
+          const action = vi.fn<ExclusiveActionFn>(() => ds.next());
+          const caught = vi.fn();
+          render(
+            <ErrorCatcher onError={caught}>
+              <ToggleGroup.Root
+                exclusive
+                deselectable
+                aria-label="Alignment"
+                defaultValue="left"
+                valueChangeAction={action}
+              >
+                <ToggleGroup.Item value="left">Left</ToggleGroup.Item>
+                <ToggleGroup.Item value="center">Center</ToggleGroup.Item>
+              </ToggleGroup.Root>
+            </ErrorCatcher>,
+          );
+          const user = setupUser();
+          await user.click(item("Center"));
+          await user.click(item("Center"));
+          expect(action.mock.calls.map(([next]) => next)).toEqual(["center", null]);
+          const err = new Error("center failed");
+          for (const i of order) {
+            await act(async () => {
+              if (i === 0) ds[0]!.reject(err);
+              else ds[1]!.resolve();
+            });
+          }
+          expect(caught).not.toHaveBeenCalled();
+          expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+          expect(item("Left")).toHaveAttribute("aria-pressed", "false");
+          expect(item("Center")).toHaveAttribute("aria-pressed", "false");
+          expectNotPending(root());
+        },
+      );
+
       it.each([
         ["the rejection first", [0, 1]],
         ["the resolution first", [1, 0]],

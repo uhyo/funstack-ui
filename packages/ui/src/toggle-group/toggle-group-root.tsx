@@ -297,12 +297,10 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
       ...(details.added.length > 0 ? ["fsui-toggle-group-press"] : []),
       ...(details.removed.length > 0 ? ["fsui-toggle-group-release"] : []),
     ],
-    // Also the uncontrolled commit (folded over the resolved dispatches, #150): an exclusive press
-    // replaces the value, whatever its `removed` (computed from the optimistic value) says.
-    reducer: (prev, _next, details) =>
-      mountExclusive && details.added.length > 0
-        ? new Set(details.added)
-        : applyPatch(prev, details),
+    // Multiple: a patch, re-based on the committed set; it is also how the uncontrolled commit is
+    // folded over the resolved dispatches (#150). Exclusive is single-valued: no reducer, so the
+    // optimistic value is `next` and the latest dispatch commits it, like Tabs.
+    reducer: mountExclusive ? undefined : (prev, _next, details) => applyPatch(prev, details),
     warn: { component: "ToggleGroup.Root", prop: "value" },
   });
 
