@@ -383,3 +383,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #144 merged (a8a8292). #149 closed not-a-bug (user: leave it; memo/developer/issue-149.md).
 - Architect memo 5450f98. User decisions: #145 option B (reportError) + fix #150 together → developer on feat/145-superseded-report-error. #148 two channels (action = request deciding outcome; dismissals → sync urgent on* notification); sub-decisions pending (name onOpenChange vs onDismiss, controlled keep-open, Toast closeAction, platform dispatches). #147 waits on #148. #146 user wants discussion.
 - Order: #145/#150 → #146 → #148 → #147 (shared hooks). Architect folds conventions after each.
+- MERGED #145/#150 (46abe8a, CI green incl. WebKit); reviewer found 2 regressions in first cut (exclusive modes, reset mid-burst), fixed. Design folded 075019c.
+- New: #151 reset leftover, #152 latest rejection after unmount dropped (predates #145) → developer on fix/151-152. #153 tidy (explicit whole-value marker; Accordion exclusive at mount) — later.
+- User decision needed: set-valued `next` includes still-pending changes (B gets [A,B], group commits [B]); controlled parents adopting `next` whole keep a rejected change. Accept + document (done) or pass `next` without pending changes?
+- Still waiting on user: #146 guard discussion; #148 sub-decisions.
