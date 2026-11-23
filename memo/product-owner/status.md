@@ -387,3 +387,5 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - New: #151 reset leftover, #152 latest rejection after unmount dropped (predates #145) → developer on fix/151-152. #153 tidy (explicit whole-value marker; Accordion exclusive at mount) — later.
 - User decision needed: set-valued `next` includes still-pending changes (B gets [A,B], group commits [B]); controlled parents adopting `next` whole keep a rejected change. Accept + document (done) or pass `next` without pending changes?
 - Still waiting on user: #146 guard discussion; #148 sub-decisions.
+- 2026-11-24: #151/#152 merged. #146 fully decided (Button incl. function formAction "run"; Close parts "ignore"; Menu.Item/Toast.Action follow close option; WhilePending = "run" | "ignore") → developer on feat/146-while-pending. Hidden-owner rejection report-only confirmed.
+- #148 decided: onOpenChange name; controlled keep-open RE-OPENS (prop/DOM consistency); platform dispatches stay actions; dev warning when onOpenChange seems ignored. Open: Toast closeAction (decide from concrete design). Architect writes #148 design after #146 merges. #147 after #148.
