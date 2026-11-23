@@ -52,6 +52,21 @@ export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails
  */
 export type ChangeReason = "activate" | "dismiss" | "platform" | "timeout";
 
+/**
+ * What a pure trigger (`Button`, `Dialog.Close`, `Popover.Close`, `Menu.Item`, `Toast.Action`)
+ * does with an activation that arrives while its own action is pending (conventions 2.5.1):
+ *
+ * - `"run"`: the activation runs the action again, in the same transition; the part shows
+ *   `data-pending` until every run has settled and is never `aria-disabled` because of pending.
+ * - `"ignore"`: the activation starts nothing and its default action (a link's navigation, a
+ *   form submission, a command) is cancelled; the part renders `aria-disabled="true"` while
+ *   pending.
+ *
+ * The default depends on the part: `"run"` where the action is the user's alone (`Button`),
+ * `"ignore"` where the library closes something after it (a Close part, a closing menu item).
+ */
+export type WhilePending = "run" | "ignore";
+
 /** A prop value that is either a plain value or a function of the part's state. */
 export type StateValue<T, State> = T | ((state: State) => T);
 

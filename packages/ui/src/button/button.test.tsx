@@ -2,9 +2,10 @@
 // src/__tests__/directives.test.ts, rows 21-26 in button.browser.test.tsx).
 //
 // Button: no controlled state, so the controlled-parity, optimistic, platform-path, urgent-action,
-// continuous-control and inside-a-Field rows are N/A; the overlap and superseded-rejection rows
-// are N/A because the re-entry guard means a Button never has two of its own runs in flight
-// (rows 5 and 6 replace them).
+// continuous-control and inside-a-Field rows are N/A. The overlap and superseded-rejection rows
+// are required in the default `whilePending="run"` mode (row 5c) and N/A under
+// `whilePending="ignore"`, where a Button never has two of its own runs in flight (rows 5 and 6;
+// design/components/button.md 18.5, conventions 2.5.1).
 import { act, render, screen } from "@testing-library/react";
 import { createRef, startTransition, Suspense, useState, useTransition } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
@@ -230,11 +231,27 @@ describe("Button", () => {
   });
 
   describe("async action (row 3)", () => {
-    it("data-pending and aria-disabled while it runs; focus stays; then all invert", async () => {
+    it("default: data-pending, no aria-disabled while it runs; focus stays; then all invert", async () => {
+      const d = deferred();
+      render(<Button action={() => d.promise}>{(s) => (s.pending ? "Saving" : "Save")}</Button>);
+      await setupUser().click(button("Save"));
+      const el = button("Saving");
+      expectPending(el);
+      expect(el).not.toHaveAttribute("aria-disabled");
+      expect(el).not.toHaveAttribute("data-disabled");
+      expect(document.activeElement).toBe(el);
+      await act(async () => {
+        d.resolve();
+      });
+      expectNotPending(button("Save"));
+      expect(button("Save")).not.toHaveAttribute("aria-disabled");
+    });
+
+    it('"ignore": data-pending and aria-disabled while it runs; focus stays; then all invert', async () => {
       const d = deferred();
       const states: ButtonState[] = [];
       render(
-        <Button action={() => d.promise}>
+        <Button action={() => d.promise} whilePending="ignore">
           {(s) => {
             states.push(s);
             return s.pending ? "Saving" : "Save";
@@ -309,11 +326,15 @@ describe("Button", () => {
     });
   });
 
-  describe("re-entry (row 5)", () => {
+  describe('re-entry, whilePending="ignore" (row 5)', () => {
     it("a second click, Enter and Space while pending are ignored and cancelled", async () => {
       const d = deferred();
       const action = vi.fn(() => d.promise);
-      render(<Button action={action}>Go</Button>);
+      render(
+        <Button action={action} whilePending="ignore">
+          Go
+        </Button>,
+      );
       const clicks = recordClicks();
       const user = setupUser();
       await user.click(button("Go"));
@@ -336,7 +357,11 @@ describe("Button", () => {
     it("two clicks in one task call the action once (the in-flight counter)", () => {
       const d = deferred();
       const action = vi.fn(() => d.promise);
-      render(<Button action={action}>Go</Button>);
+      render(
+        <Button action={action} whilePending="ignore">
+          Go
+        </Button>,
+      );
       let second!: MouseEvent;
       act(() => {
         button("Go").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
@@ -351,7 +376,7 @@ describe("Button", () => {
       const d = deferred();
       const action = vi.fn(() => d.promise);
       render(
-        <Button action={action} render={<a href="#go" />}>
+        <Button action={action} whilePending="ignore" render={<a href="#go" />}>
           Link
         </Button>,
       );
@@ -368,7 +393,7 @@ describe("Button", () => {
       const d = deferred();
       const action = vi.fn(() => d.promise);
       render(
-        <Button action={action} commandfor="p" command="toggle-popover">
+        <Button action={action} whilePending="ignore" commandfor="p" command="toggle-popover">
           Go
         </Button>,
       );
@@ -380,6 +405,193 @@ describe("Button", () => {
       await act(async () => {
         d.resolve();
       });
+    });
+  });
+
+  describe.each([
+    ["default", undefined],
+    ['"run"', "run"],
+  ] as const)("every activation runs, %s (row 5b)", (_label, whilePending) => {
+    it("a second click, Enter and Space while pending each run again and are not cancelled", async () => {
+      const deferreds = sequencedDeferreds(4);
+      const action = vi.fn(() => deferreds.next());
+      render(
+        <Button action={action} whilePending={whilePending}>
+          Go
+        </Button>,
+      );
+      const clicks = recordClicks();
+      const user = setupUser();
+      await user.click(button("Go"));
+      await user.click(button("Go"));
+      button("Go").focus();
+      await user.keyboard("{Enter}");
+      await user.keyboard(" ");
+      expect(action).toHaveBeenCalledTimes(4);
+      expect(clicks).toEqual([false, false, false, false]);
+      expectPending(button("Go"));
+      expect(button("Go")).not.toHaveAttribute("aria-disabled");
+      expect(document.activeElement).toBe(button("Go"));
+      // Out of order: pending stays until the last run settled.
+      for (const i of [3, 0, 2]) {
+        await act(async () => {
+          deferreds[i]!.resolve();
+        });
+        expectPending(button("Go"));
+        expect(button("Go")).not.toHaveAttribute("aria-disabled");
+      }
+      await act(async () => {
+        deferreds[1]!.resolve();
+      });
+      expectNotPending(button("Go"));
+    });
+
+    it("two clicks in one task call the action twice", () => {
+      const d = deferred();
+      const action = vi.fn(() => d.promise);
+      render(
+        <Button action={action} whilePending={whilePending}>
+          Go
+        </Button>,
+      );
+      let second!: MouseEvent;
+      act(() => {
+        button("Go").dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        second = new MouseEvent("click", { bubbles: true, cancelable: true });
+        button("Go").dispatchEvent(second);
+      });
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(second.defaultPrevented).toBe(false);
+    });
+
+    it("a rendered link's second click while pending is not cancelled", () => {
+      const d = deferred();
+      const action = vi.fn(() => d.promise);
+      render(
+        <Button action={action} whilePending={whilePending} render={<a href="#go" />}>
+          Link
+        </Button>,
+      );
+      const link = screen.getByText("Link");
+      expect(click(link).defaultPrevented).toBe(false);
+      expect(click(link).defaultPrevented).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(link).not.toHaveAttribute("aria-disabled");
+    });
+  });
+
+  // Conventions 10.1 Overlap and Superseded rejection rows: required in "run" mode (#146), where
+  // a Button's runs overlap; N/A under "ignore" (never two runs in flight).
+  describe('overlap and superseded rejection, "run" mode (row 5c)', () => {
+    function setupRuns(count: number) {
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const onError = vi.fn();
+      const deferreds = sequencedDeferreds(count);
+      const action = vi.fn(() => deferreds.next());
+      render(
+        <ErrorCatcher onError={onError}>
+          <Button action={action}>Go</Button>
+        </ErrorCatcher>,
+      );
+      for (let i = 0; i < count; i++) click(button("Go"));
+      expect(action).toHaveBeenCalledTimes(count);
+      return { reportError, onError, deferreds };
+    }
+
+    it.each([
+      ["while the newer run is pending", false],
+      ["after the newer run resolved", true],
+    ] as const)(
+      "an older run's rejection %s is reported once, not caught",
+      async (_l, newerFirst) => {
+        const { reportError, onError, deferreds } = setupRuns(2);
+        if (newerFirst) {
+          await act(async () => {
+            deferreds[1]!.resolve();
+          });
+        }
+        const older = new Error("older");
+        await act(async () => {
+          deferreds[0]!.reject(older);
+        });
+        if (!newerFirst) {
+          expectPending(button("Go"));
+          await act(async () => {
+            deferreds[1]!.resolve();
+          });
+        }
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+        expect(onError).not.toHaveBeenCalled();
+        expectNotPending(button("Go"));
+      },
+    );
+
+    it("the latest run's rejection reaches the boundary, after the older run settled", async () => {
+      const { reportError, onError, deferreds } = setupRuns(2);
+      const latest = new Error("latest");
+      await act(async () => {
+        deferreds[1]!.reject(latest);
+      });
+      await act(async () => {
+        deferreds[0]!.resolve();
+      });
+      expect(onError).toHaveBeenCalledExactlyOnceWith(latest);
+      expect(reportError).not.toHaveBeenCalled();
+    });
+
+    it("a burst of three: both older rejections are reported, the latest is caught", async () => {
+      const { reportError, onError, deferreds } = setupRuns(3);
+      const first = new Error("first");
+      const second = new Error("second");
+      await act(async () => {
+        deferreds[0]!.reject(first);
+        deferreds[1]!.reject(second);
+      });
+      expect(reportError.mock.calls).toEqual([[first], [second]]);
+      expect(onError).not.toHaveBeenCalled();
+      const latest = new Error("latest");
+      await act(async () => {
+        deferreds[2]!.reject(latest);
+      });
+      expect(onError).toHaveBeenCalledExactlyOnceWith(latest);
+      expect(reportError).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe("whilePending changes while a run pends (row 5d)", () => {
+    it('"run" to "ignore": aria-disabled with the re-render, the next click is ignored; back: it runs', async () => {
+      const deferreds = sequencedDeferreds(2);
+      const action = vi.fn(() => deferreds.next());
+      const view = render(
+        <Button action={action} whilePending="run">
+          Go
+        </Button>,
+      );
+      click(button("Go"));
+      expect(button("Go")).not.toHaveAttribute("aria-disabled");
+      view.rerender(
+        <Button action={action} whilePending="ignore">
+          Go
+        </Button>,
+      );
+      expect(button("Go")).toHaveAttribute("aria-disabled", "true");
+      expect(click(button("Go")).defaultPrevented).toBe(true);
+      expect(action).toHaveBeenCalledTimes(1);
+      view.rerender(
+        <Button action={action} whilePending="run">
+          Go
+        </Button>,
+      );
+      expect(button("Go")).not.toHaveAttribute("aria-disabled");
+      expect(click(button("Go")).defaultPrevented).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        deferreds[0]!.resolve();
+        deferreds[1]!.resolve();
+      });
+      expectNotPending(button("Go"));
     });
   });
 
@@ -401,14 +613,16 @@ describe("Button", () => {
       );
     }
 
-    it("a click in the held window runs the action again (the guard is the in-flight counter)", async () => {
+    it('"ignore": a click in the held window runs the action again (the guard is the in-flight counter)', async () => {
       const other = deferred();
       const mine = deferred();
       const action = vi.fn(() => mine.promise);
       render(
         <>
           <Other other={other} />
-          <Button action={action}>Go</Button>
+          <Button action={action} whilePending="ignore">
+            Go
+          </Button>
         </>,
       );
       const user = setupUser();
@@ -436,34 +650,41 @@ describe("Button", () => {
       expect(button("Go")).not.toHaveAttribute("aria-disabled");
     });
 
-    it("a non-awaiting action counts every click under an unrelated pending action", async () => {
-      const other = deferred();
-      const increment = vi.fn();
-      render(
-        <>
-          <Other other={other} />
-          <Button
-            action={() => {
-              increment();
-            }}
-          >
-            +1
-          </Button>
-        </>,
-      );
-      const user = setupUser();
-      await user.click(button("Other"));
-      await user.click(button("+1"));
-      await user.click(button("+1"));
-      await user.click(button("+1"));
-      expect(increment).toHaveBeenCalledTimes(3);
-      // The held commit keeps the attributes until the unrelated action settles.
-      expectPending(button("+1"));
-      await act(async () => {
-        other.resolve();
-      });
-      expectNotPending(button("+1"));
-    });
+    it.each([
+      ["default", undefined],
+      ['"ignore"', "ignore"],
+    ] as const)(
+      "%s: a non-awaiting action counts every click under an unrelated pending action",
+      async (_label, whilePending) => {
+        const other = deferred();
+        const increment = vi.fn();
+        render(
+          <>
+            <Other other={other} />
+            <Button
+              whilePending={whilePending}
+              action={() => {
+                increment();
+              }}
+            >
+              +1
+            </Button>
+          </>,
+        );
+        const user = setupUser();
+        await user.click(button("Other"));
+        await user.click(button("+1"));
+        await user.click(button("+1"));
+        await user.click(button("+1"));
+        expect(increment).toHaveBeenCalledTimes(3);
+        // The held commit keeps the attributes until the unrelated action settles.
+        expectPending(button("+1"));
+        await act(async () => {
+          other.resolve();
+        });
+        expectNotPending(button("+1"));
+      },
+    );
   });
 
   describe("two Buttons (row 7)", () => {
@@ -574,6 +795,7 @@ describe("Button", () => {
         <Button
           ref={ref}
           action={action}
+          whilePending="ignore"
           className="mine"
           style={{ color: "red" }}
           render={<button ref={elementRef} className="el" style={{ margin: "1px" }} />}
@@ -661,13 +883,52 @@ describe("Button", () => {
   });
 
   describe("consumer state after await (row 10)", () => {
-    it("commits once per accepted click", async () => {
+    it("default: commits once per click, runs resolved out of order", async () => {
+      const deferreds = sequencedDeferreds(3);
+      function Counter() {
+        const [count, setCount] = useState(0);
+        return (
+          <>
+            <Button
+              action={async () => {
+                await deferreds.next();
+                startTransition(() => setCount((c) => c + 1));
+              }}
+            >
+              Add
+            </Button>
+            <output data-testid="count">{count}</output>
+          </>
+        );
+      }
+      render(<Counter />);
+      const user = setupUser();
+      await user.click(button("Add"));
+      await user.click(button("Add"));
+      await user.click(button("Add"));
+      expect(deferreds.calls).toBe(3);
+      await act(async () => {
+        deferreds[2]!.resolve();
+      });
+      await act(async () => {
+        deferreds[0]!.resolve();
+      });
+      expectPending(button("Add"));
+      await act(async () => {
+        deferreds[1]!.resolve();
+      });
+      expect(screen.getByTestId("count")).toHaveTextContent("3");
+      expectNotPending(button("Add"));
+    });
+
+    it('"ignore": commits once per accepted click', async () => {
       const deferreds = sequencedDeferreds(2);
       function Counter() {
         const [count, setCount] = useState(0);
         return (
           <>
             <Button
+              whilePending="ignore"
               action={async () => {
                 await deferreds.next();
                 startTransition(() => setCount((c) => c + 1));
@@ -698,7 +959,36 @@ describe("Button", () => {
   });
 
   describe("formAction (rows 11-13)", () => {
-    it("per-submitter pending: own submissions only; the form channel on Form.Submit", async () => {
+    it("default: a second click on a pending submitter submits again, not cancelled", async () => {
+      const deferreds = sequencedDeferreds(2);
+      const a = vi.fn<(formData: FormData) => Promise<void>>(() => deferreds.next());
+      render(
+        <form action={() => {}}>
+          <Button formAction={a}>A</Button>
+        </form>,
+      );
+      const user = setupUser();
+      await user.click(button("A"));
+      expectPending(button("A"));
+      expect(button("A")).not.toHaveAttribute("aria-disabled");
+      let second!: MouseEvent;
+      await act(async () => {
+        second = new MouseEvent("click", { bubbles: true, cancelable: true });
+        button("A").dispatchEvent(second);
+      });
+      expect(second.defaultPrevented).toBe(false);
+      expect(a).toHaveBeenCalledTimes(2);
+      expect(button("A")).not.toHaveAttribute("aria-disabled");
+      await act(async () => {
+        deferreds[0]!.resolve();
+      });
+      await act(async () => {
+        deferreds[1]!.resolve();
+      });
+      expectNotPending(button("A"));
+    });
+
+    it('"ignore", per-submitter pending: own submissions only; the form channel on Form.Submit', async () => {
       const da = deferred();
       const db = deferred();
       const a = vi.fn<(formData: FormData) => Promise<void>>(() => da.promise);
@@ -713,8 +1003,12 @@ describe("Button", () => {
         <form action={() => {}}>
           <Probe />
           <Form.Submit>Publish</Form.Submit>
-          <Button formAction={a}>A</Button>
-          <Button formAction={b}>B</Button>
+          <Button formAction={a} whilePending="ignore">
+            A
+          </Button>
+          <Button formAction={b} whilePending="ignore">
+            B
+          </Button>
         </form>,
       );
       expect(button("A")).toHaveAttribute("type", "submit");
@@ -784,7 +1078,7 @@ describe("Button", () => {
       expect(mine).toHaveBeenCalledTimes(1);
     });
 
-    it("an inline formAction keeps pending across a parent re-render (submittedWith)", async () => {
+    it('"ignore": an inline formAction keeps pending across a parent re-render (submittedWith)', async () => {
       const d = deferred();
       const calls = vi.fn();
       function App() {
@@ -796,6 +1090,7 @@ describe("Button", () => {
               rerender
             </button>
             <Button
+              whilePending="ignore"
               formAction={(fd) => {
                 calls(fd);
                 return d.promise;
@@ -925,13 +1220,37 @@ describe("Button", () => {
       });
     }
 
-    it("Dialog.Trigger render={<Button action />}: one click runs the action and opens", async () => {
+    it("default: a second click on Dialog.Trigger render={<Button action />} runs the action again", async () => {
+      const deferreds = sequencedDeferreds(2);
+      const a = vi.fn(() => deferreds.next());
+      render(
+        <Dialog.Root defaultOpen={false}>
+          <Dialog.Trigger render={<Button action={a} />}>Edit</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup">
+            <Dialog.Title>Edit</Dialog.Title>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await setupUser().click(button("Edit"));
+      await flush();
+      click(screen.getByText("Edit", { selector: "button" }));
+      expect(a).toHaveBeenCalledTimes(2);
+      expect(screen.getByText("Edit", { selector: "button" })).not.toHaveAttribute("aria-disabled");
+      await act(async () => {
+        deferreds[0]!.resolve();
+        deferreds[1]!.resolve();
+      });
+      await flush();
+      expect((screen.getByTestId("popup") as HTMLDialogElement).open).toBe(true);
+    });
+
+    it('"ignore", Dialog.Trigger render={<Button action />}: one click runs the action and opens', async () => {
       const d = deferred();
       const a = vi.fn(() => d.promise);
       const clicks = recordClicks();
       render(
         <Dialog.Root defaultOpen={false}>
-          <Dialog.Trigger render={<Button action={a} />}>Edit</Dialog.Trigger>
+          <Dialog.Trigger render={<Button action={a} whilePending="ignore" />}>Edit</Dialog.Trigger>
           <Dialog.Popup data-testid="popup">
             <Dialog.Title>Edit</Dialog.Title>
           </Dialog.Popup>
@@ -1095,6 +1414,16 @@ describe("Button", () => {
       expectTypeOf<root.ButtonProps>().toEqualTypeOf<ButtonProps>();
       expectTypeOf<root.ButtonState>().toEqualTypeOf<ButtonState>();
       expectTypeOf<root.ButtonActionDetails>().toEqualTypeOf<ButtonActionDetails>();
+      // whilePending (#146): the shared union, exported from the root.
+      expectTypeOf<NonNullable<ButtonProps["whilePending"]>>().toEqualTypeOf<"run" | "ignore">();
+      expectTypeOf<root.WhilePending>().toEqualTypeOf<"run" | "ignore">();
+      expectTypeOf<NonNullable<ButtonProps["whilePending"]>>().toEqualTypeOf<root.WhilePending>();
+      // @ts-expect-error -- not a boolean
+      void (<Button whilePending />);
+      // @ts-expect-error -- not a boolean
+      void (<Button whilePending={false} />);
+      // @ts-expect-error -- no other string
+      void (<Button whilePending="queue" />);
       expect(root.Button).toBe(Button);
     });
   });

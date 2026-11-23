@@ -336,4 +336,5 @@ export type {
   RenderProp,
   StateValue,
   UrgentChangeHandler,
+  WhilePending,
 } from "./internal/types.js";

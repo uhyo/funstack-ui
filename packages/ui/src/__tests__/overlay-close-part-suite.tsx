@@ -1,6 +1,8 @@
 // Shared rows for an overlay's Close part with an `action` (Dialog.Close, Popover.Close): the part
-// runs its action (Button's re-entry rules, design/components/button.md 16.4), then the library
-// closes the popup. The rows are the same for both; what differs is the native close
+// runs its action, then the library closes the popup. By default (`whilePending="ignore"`) a
+// second activation meanwhile is ignored (Button's re-entry rules, design/components/button.md
+// 16.4); with `whilePending="run"` it runs again and the Overlap / Superseded rejection rows apply
+// (#146, conventions 2.5.1, button.md 18.5 D7 / P5). The rows are the same for both; what differs is the native close
 // (`close(value)` / `hidePopover()`), the part's value (Dialog's `returnValue`) and how a JS-free
 // popup is opened. Component-specific rows (Dialog's forms and `returnValue` leaks, Popover's
 // native invoker without `action`) stay in the components' files.
@@ -9,7 +11,7 @@ import { useState } from "react";
 import type { ComponentPropsWithRef, ComponentType, ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
-import type { ActionDetails } from "../internal/types.js";
+import type { ActionDetails, WhilePending } from "../internal/types.js";
 import {
   deferred,
   ErrorCatcher,
@@ -31,6 +33,7 @@ import type {
 export interface ClosePartProps {
   readonly "data-testid": string;
   readonly action?: (details: ActionDetails) => unknown;
+  readonly whilePending?: WhilePending;
   readonly disabled?: boolean;
   readonly render?: ReactElement<ComponentPropsWithRef<"button">>;
   readonly children?: ReactNode;
@@ -282,6 +285,146 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
       });
 
+      it('whilePending="run": a second click runs the action again; no aria-disabled; one close after both', async () => {
+        const user = setupUser();
+        const action = vi.fn<Action>();
+        const runs = [deferred(), deferred()];
+        let call = 0;
+        const closeAction = vi.fn(() => runs[call++]!.promise);
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={withClose({ action: closeAction, whilePending: "run" })}
+          />,
+        );
+        await openThroughTrigger(user);
+        const close = spyClose();
+        const button = part();
+        const clicks = recordClicks();
+        await user.click(button);
+        await user.click(button);
+        expect(closeAction).toHaveBeenCalledTimes(2);
+        // Library mode cancels every Close click (its own mechanism, not the guard).
+        expect(clicks).toEqual([true, true]);
+        expect(button).not.toHaveAttribute("aria-disabled");
+        expectPending(button);
+        await act(async () => runs[1]!.resolve());
+        await flushTasks(2);
+        // The close the first resolved run requested commits with the end of every run.
+        expectPending(button);
+        expect(button).not.toHaveAttribute("aria-disabled");
+        await act(async () => runs[0]!.resolve());
+        await flushTasks(2);
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(false);
+        expectNotPending(button);
+      });
+
+      it('whilePending="run": dismissed and re-opened while both runs pend: both stale closes are dropped', async () => {
+        const user = setupUser();
+        const action = vi.fn<Action>();
+        const runs = [deferred(), deferred()];
+        let call = 0;
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={withClose({ action: () => runs[call++]!.promise, whilePending: "run" })}
+          />,
+        );
+        await openThroughTrigger(user);
+        await user.click(part());
+        await user.click(part());
+        await act(async () => config.dismiss());
+        await flushTasks(2);
+        await user.click(trigger());
+        const close = spyClose();
+        await act(async () => {
+          runs[0]!.resolve();
+          runs[1]!.resolve();
+        });
+        await flushTasks(2);
+        expect(isOpen()).toBe(true);
+        expect(close).not.toHaveBeenCalled();
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, true]);
+      });
+
+      it.each([
+        ["while the newer run is pending", false],
+        ["after the newer run resolved", true],
+      ] as const)(
+        'whilePending="run": an older run rejecting %s is reported, not caught',
+        async (_l, newerFirst) => {
+          const user = setupUser();
+          silenceErrors();
+          const reportError = vi.fn();
+          vi.stubGlobal("reportError", reportError);
+          const caught = vi.fn();
+          const runs = [deferred(), deferred()];
+          let call = 0;
+          render(
+            <Harness
+              mode={mode}
+              content={
+                <ErrorCatcher onError={caught}>
+                  {withClose({ action: () => runs[call++]!.promise, whilePending: "run" })}
+                </ErrorCatcher>
+              }
+            />,
+          );
+          await openThroughTrigger(user);
+          await user.click(part());
+          await user.click(part());
+          if (newerFirst) await act(async () => runs[1]!.resolve());
+          const older = new Error("older");
+          await act(async () => runs[0]!.reject(older));
+          if (!newerFirst) await act(async () => runs[1]!.resolve());
+          await flushTasks(2);
+          expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+          expect(caught).not.toHaveBeenCalled();
+          // The newer run resolved: the popup closes.
+          expect(isOpen()).toBe(false);
+        },
+      );
+
+      it('whilePending="run": the first run resolves, the latest rejects: the boundary; the close still commits once', async () => {
+        const user = setupUser();
+        silenceErrors();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const caught = vi.fn();
+        const runs = [deferred(), deferred()];
+        let call = 0;
+        render(
+          <Harness
+            mode={mode}
+            content={
+              <ErrorCatcher onError={caught}>
+                {withClose({ action: () => runs[call++]!.promise, whilePending: "run" })}
+              </ErrorCatcher>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        const close = spyClose();
+        await user.click(part());
+        await user.click(part());
+        await act(async () => runs[0]!.resolve());
+        await flushTasks(2);
+        // React holds the close's commit while the part's second run pends (entanglement,
+        // conventions 2.3 item 5), so the part has not left when that run rejects.
+        expect(isOpen()).toBe(true);
+        const latest = new Error("latest");
+        await act(async () => runs[1]!.reject(latest));
+        await flushTasks(2);
+        expect(caught).toHaveBeenCalledExactlyOnceWith(latest);
+        expect(reportError).not.toHaveBeenCalled();
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(false);
+      });
+
       it("a disabled Close never runs its action or closes", async () => {
         const user = setupUser();
         const action = vi.fn<Action>();
@@ -331,6 +474,33 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         expect(close).toHaveBeenCalledWith(...config.closeArgs);
         expect(isOpen()).toBe(false);
         expect(button).not.toHaveAttribute("aria-disabled");
+      });
+
+      it('whilePending="run": every click runs the action; one native close', async () => {
+        const user = setupUser();
+        const runs = [deferred(), deferred()];
+        let call = 0;
+        const closeAction = vi.fn(() => runs[call++]!.promise);
+        render(
+          <Harness
+            mode="static"
+            content={withClose({ action: closeAction, whilePending: "run" })}
+          />,
+        );
+        await config.openStatic();
+        const close = spyClose();
+        const button = part();
+        await user.click(button);
+        await user.click(button);
+        expect(closeAction).toHaveBeenCalledTimes(2);
+        expect(button).not.toHaveAttribute("aria-disabled");
+        expectPending(button);
+        await act(async () => runs[0]!.resolve());
+        await act(async () => runs[1]!.resolve());
+        await flushTasks(2);
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(false);
+        expectNotPending(button);
       });
 
       it("a render element's aria-disabled is removed while the Close is idle (owned)", () => {

@@ -9,12 +9,12 @@ export interface ActionTriggerOptions {
    */
   readonly openGeneration?: (() => number) | undefined;
   /**
-   * Ignore `run` while a run is in flight (conventions 2.5): `run` returns `false` and starts
+   * Ignore `run` while a run is in flight (conventions 2.5.1): `run` returns `false` and starts
    * nothing. In flight means the hook's synchronous in-flight counter is non-zero (it also sees
    * two activations in one task, before React re-rendered); the last render's `pending` is not
-   * consulted, so a click in a settled-but-held commit window runs. Default `true`: every pure
-   * trigger ignores re-entry. Only the continuous controls (`Slider`, `NumberField`)
-   * pass `false`, because a step is not a re-entry: every step must run.
+   * consulted, so a click in a settled-but-held commit window runs. Default `false`: runs
+   * overlap, as with React's own `useTransition`. A pure trigger passes
+   * `(whilePending ?? <its default>) === "ignore"`, read per render (#146).
    */
   readonly ignoreWhilePending?: boolean | undefined;
 }
@@ -30,7 +30,7 @@ export interface ActionTrigger {
    * instead (conventions 2.4). With
    * `openGeneration`, `then` is skipped when a newer open of the overlay started after the run
    * began. Returns `false` when the run was ignored (a run is in flight and `ignoreWhilePending`
-   * is on, the default), so the part can
+   * is on), so the part can
    * `preventDefault()` the activation, and `true` otherwise.
    */
   readonly run: (work: () => unknown, then?: () => void) => boolean;
@@ -38,11 +38,13 @@ export interface ActionTrigger {
 
 /**
  * The transition of a pure-trigger part: an `action` with no state of its own (`Button`,
- * `Dialog.Close`, `Popover.Close`, `Menu.Item`, `Toast.Action`; conventions 3.4). A second `run`
- * while one is in flight is ignored by default (conventions 2.5, design/components/button.md 16).
+ * `Dialog.Close`, `Popover.Close`, `Menu.Item`, `Toast.Action`; conventions 3.4), and the steps
+ * of the continuous controls (`Slider`, `NumberField`). A second `run` while one is in flight is
+ * ignored only with `ignoreWhilePending` (a part whose `whilePending` is `"ignore"`, conventions
+ * 2.5.1).
  *
- * With `ignoreWhilePending: false` (the continuous controls' steps) runs overlap, and the hook
- * handles superseded rejections as `useControllableAction` does: React keeps only the newest
+ * Without it (`whilePending="run"`, the steps) runs overlap, and the hook handles superseded
+ * rejections as `useControllableAction` does: React keeps only the newest
  * thenable per `useTransition`, so the rejection of a run that a later run superseded reaches no
  * boundary. The hook passes it to `reportError` (`reportDropped`); the latest run's rejection
  * is rethrown inside the transition and reaches the boundary. In both modes, a latest rejection
@@ -50,7 +52,7 @@ export interface ActionTrigger {
  * React would route it only through a render of the part.
  */
 export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrigger {
-  const { openGeneration, ignoreWhilePending = true } = options;
+  const { openGeneration, ignoreWhilePending = false } = options;
 
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);

@@ -31,7 +31,7 @@ export interface MenuCheckboxItemState {
  */
 export interface MenuCheckboxItemProps extends Omit<
   MenuItemProps,
-  "action" | "closeOnActivate" | "className" | "style" | "children" | "render"
+  "action" | "closeOnActivate" | "whilePending" | "className" | "style" | "children" | "render"
 > {
   /** Controlled checked state. `undefined` means uncontrolled. */
   checked?: boolean;

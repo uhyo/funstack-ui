@@ -1,6 +1,7 @@
 // Unit rows for `useActionTrigger` (design/components/button.md 16.4 H1). The parts that use it
 // (Button, Dialog.Close, Popover.Close, Menu.Item, Toast.Action, the Slider and NumberField steps)
-// cover it through their own suites; these rows pin the default and the opt-out.
+// cover it through their own suites; these rows pin the default (runs overlap, #146) and the
+// guard (`ignoreWhilePending: true`, a part whose `whilePending` is "ignore").
 import { act, render } from "@testing-library/react";
 import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -31,9 +32,9 @@ function setup(options?: ActionTriggerOptions, onError?: (error: unknown) => voi
   };
 }
 
-describe("useActionTrigger: re-entry (default)", () => {
+describe('useActionTrigger: ignoreWhilePending: true (whilePending="ignore")', () => {
   it("a second run while the first is in flight is ignored; after settle it runs", async () => {
-    const { hook, pending } = setup();
+    const { hook, pending } = setup({ ignoreWhilePending: true });
     const first = deferred();
     const work = vi.fn(() => first.promise);
     const then = vi.fn();
@@ -66,7 +67,7 @@ describe("useActionTrigger: re-entry (default)", () => {
   it("the run's rejection reaches the boundary above the part", async () => {
     silenceErrors();
     const caught = vi.fn();
-    const { hook, caught: catcher } = setup(undefined, caught);
+    const { hook, caught: catcher } = setup({ ignoreWhilePending: true }, caught);
     const first = deferred();
     act(() => {
       hook().run(() => first.promise);
@@ -77,9 +78,9 @@ describe("useActionTrigger: re-entry (default)", () => {
   });
 });
 
-describe("useActionTrigger: ignoreWhilePending: false (the continuous controls)", () => {
-  it("runs both; pending stays until both settle", async () => {
-    const { hook, pending } = setup({ ignoreWhilePending: false });
+describe("useActionTrigger: runs overlap (the default since #146; the continuous controls)", () => {
+  it("the default runs both; pending stays until both settle", async () => {
+    const { hook, pending } = setup();
     const runs = [deferred(), deferred()];
     const work = vi.fn((i: number) => runs[i]!.promise);
     const then = vi.fn();
@@ -221,6 +222,7 @@ describe("useActionTrigger: the latest rejection once the part left", () => {
   it.each([
     ["the default", undefined],
     ["ignoreWhilePending: false", { ignoreWhilePending: false }],
+    ["ignoreWhilePending: true", { ignoreWhilePending: true }],
   ] as const)("unmounted (%s): reported once, `then` skipped", async (_label, options) => {
     const consoleError = silenceErrors();
     const { reportError, caught, hook, setMode } = setupOwner(options);

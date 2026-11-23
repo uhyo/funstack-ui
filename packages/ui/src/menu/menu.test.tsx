@@ -7,10 +7,12 @@
 // `showPopover()` call instead), anchoring, native `focusgroup`, exit animations and
 // ViewTransition (smoke only).
 //
-// N/A rows: Overlap and Superseded rejection for `Menu.Item` (the re-entry guard means an Item
-// never has two of its own runs in flight, #79, #81); the Item re-entry rows M1-M4
-// (design/components/button.md 16.4) replace them. `CheckboxItem` / `RadioItem` are state owners
-// and keep both rows.
+// `Menu.Item` and the Overlap / Superseded rejection rows (#146, conventions 2.5.1): an Item whose
+// `whilePending` is "ignore" (the default with `closeOnActivate`) never has two of its own runs in
+// flight, so the rows are N/A there and the re-entry rows M1-M4 (design/components/button.md 16.4)
+// pin it; in "run" mode (the default with `closeOnActivate={false}`, or the prop) the rows are
+// required and live in "whilePending (#146)". `CheckboxItem` / `RadioItem` are state owners and
+// keep both rows.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, use, useState } from "react";
@@ -1005,7 +1007,7 @@ describe("Menu.Item actions", () => {
       expect(isOpen()).toBe(false);
     });
 
-    it("closeOnActivate={false}, the second activation is ignored; after settle the next one runs", async () => {
+    it('closeOnActivate={false} whilePending="ignore", the second activation is ignored; after settle the next one runs', async () => {
       const user = setupUser();
       const runs = [deferred(), deferred()];
       let call = 0;
@@ -1013,7 +1015,12 @@ describe("Menu.Item actions", () => {
       render(
         <Harness
           content={
-            <Menu.Item data-testid="refresh" action={action} closeOnActivate={false}>
+            <Menu.Item
+              data-testid="refresh"
+              action={action}
+              closeOnActivate={false}
+              whilePending="ignore"
+            >
               Refresh
             </Menu.Item>
           }
@@ -1044,7 +1051,12 @@ describe("Menu.Item actions", () => {
         <Harness
           content={
             <>
-              <Menu.Item data-testid="refresh" action={() => work.promise} closeOnActivate={false}>
+              <Menu.Item
+                data-testid="refresh"
+                action={() => work.promise}
+                closeOnActivate={false}
+                whilePending="ignore"
+              >
                 Refresh
               </Menu.Item>
               <Menu.Item data-testid="rename">Rename</Menu.Item>
@@ -1113,6 +1125,213 @@ describe("Menu.Item actions", () => {
       await user.click(item("archive"));
       expect(call).toBe(2);
       await act(async () => runs[1]!.resolve());
+    });
+  });
+
+  // #146, conventions 2.5.1: the default follows closeOnActivate; "run" mode overlaps runs.
+  describe("whilePending (#146)", () => {
+    it("closeOnActivate={false} runs every activation by default: no aria-disabled, pending until both settle", async () => {
+      const user = setupUser();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      const action = vi.fn(() => runs[call++]!.promise);
+      const hide = spyHide();
+      render(
+        <Harness
+          content={
+            <Menu.Item data-testid="zoom" action={action} closeOnActivate={false}>
+              Zoom in
+            </Menu.Item>
+          }
+        />,
+      );
+      await openMenu(user);
+      const zoom = item("zoom");
+      zoom.focus();
+      const clicks = recordClicks();
+      await user.keyboard("{Enter}");
+      await user.keyboard("{Enter}");
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(clicks).toEqual([false, false]);
+      expect(zoom).not.toHaveAttribute("aria-disabled");
+      expectPending(zoom);
+      await act(async () => runs[1]!.resolve());
+      expectPending(zoom);
+      expect(zoom).not.toHaveAttribute("aria-disabled");
+      await act(async () => runs[0]!.resolve());
+      await flushTasks(2);
+      expectNotPending(zoom);
+      expect(hide).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(true);
+    });
+
+    it('a closing item with whilePending="run": two calls, one close', async () => {
+      const user = setupUser();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      const action = vi.fn(() => runs[call++]!.promise);
+      const openChange = vi.fn<OpenAction>();
+      const hide = spyHide();
+      render(
+        <Harness
+          root={{ openChangeAction: openChange }}
+          content={
+            <Menu.Item data-testid="log" action={action} whilePending="run">
+              Log
+            </Menu.Item>
+          }
+        />,
+      );
+      await openMenu(user);
+      let second = false;
+      act(() => {
+        fireEvent.click(item("log"));
+        second = fireEvent.click(item("log"));
+      });
+      expect(second).toBe(true); // not cancelled
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(item("log")).not.toHaveAttribute("aria-disabled");
+      await act(async () => runs[0]!.resolve());
+      await act(async () => runs[1]!.resolve());
+      await flushTasks(2);
+      expect(openChange.mock.calls.filter(([next]) => !next)).toHaveLength(1);
+      expect(hide).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(false);
+    });
+
+    it("an explicit whilePending wins over the closeOnActivate default", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const action = vi.fn(() => work.promise);
+      render(
+        <Harness
+          content={
+            <Menu.Item
+              data-testid="keep"
+              action={action}
+              closeOnActivate={false}
+              whilePending="ignore"
+            >
+              Keep
+            </Menu.Item>
+          }
+        />,
+      );
+      await openMenu(user);
+      await user.click(item("keep"));
+      await user.click(item("keep"));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(item("keep")).toHaveAttribute("aria-disabled", "true");
+      await act(async () => work.resolve());
+    });
+
+    function KeepOpen({
+      runs,
+      caught,
+    }: {
+      runs: { promise: Promise<void> }[];
+      caught: () => void;
+    }) {
+      let call = 0;
+      return (
+        <Harness
+          content={
+            <ErrorCatcher onError={caught}>
+              <Menu.Item
+                data-testid="zoom"
+                closeOnActivate={false}
+                action={() => runs[call++]!.promise}
+              >
+                Zoom in
+              </Menu.Item>
+            </ErrorCatcher>
+          }
+        />
+      );
+    }
+
+    it.each([
+      ["while the newer run is pending", false],
+      ["after the newer run resolved", true],
+    ] as const)(
+      '"run": an older run rejecting %s is reported, not caught',
+      async (_l, newerFirst) => {
+        const user = setupUser();
+        silenceErrors();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const caught = vi.fn();
+        const runs = [deferred(), deferred()];
+        render(<KeepOpen runs={runs} caught={caught} />);
+        await openMenu(user);
+        await user.click(item("zoom"));
+        await user.click(item("zoom"));
+        if (newerFirst) await act(async () => runs[1]!.resolve());
+        const older = new Error("older");
+        await act(async () => runs[0]!.reject(older));
+        if (!newerFirst) await act(async () => runs[1]!.resolve());
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+        expect(caught).not.toHaveBeenCalled();
+        expectNotPending(item("zoom"));
+      },
+    );
+
+    it('"run": the latest run rejecting reaches the boundary above the item', async () => {
+      const user = setupUser();
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const caught = vi.fn();
+      const runs = [deferred(), deferred()];
+      render(<KeepOpen runs={runs} caught={caught} />);
+      await openMenu(user);
+      await user.click(item("zoom"));
+      await user.click(item("zoom"));
+      const latest = new Error("latest");
+      await act(async () => runs[1]!.reject(latest));
+      await act(async () => runs[0]!.resolve());
+      expect(caught).toHaveBeenCalledExactlyOnceWith(latest);
+      expect(reportError).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(true);
+    });
+
+    it('"run" on a closing item: the close waits for the second run, whose rejection reaches the boundary; one close', async () => {
+      const user = setupUser();
+      silenceErrors();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const caught = vi.fn();
+      const runs = [deferred(), deferred()];
+      let call = 0;
+      render(
+        <Harness
+          content={
+            <ErrorCatcher onError={caught}>
+              <Menu.Item data-testid="log" whilePending="run" action={() => runs[call++]!.promise}>
+                Log
+              </Menu.Item>
+            </ErrorCatcher>
+          }
+        />,
+      );
+      await openMenu(user);
+      await user.click(item("log"));
+      await user.click(item("log"));
+      expect(call).toBe(2);
+      await act(async () => runs[0]!.resolve());
+      await flushTasks(2);
+      // React holds the close's commit while the item's second run pends (entanglement,
+      // conventions 2.3 item 5): the item is still there, still pending.
+      expect(isOpen()).toBe(true);
+      expectPending(item("log"));
+      const late = new Error("late");
+      await act(async () => runs[1]!.reject(late));
+      await flushTasks(2);
+      // The rejecting run is the latest and its item was connected: the boundary, not
+      // reportError; the first run's close commits with it, once.
+      expect(caught).toHaveBeenCalledExactlyOnceWith(late);
+      expect(reportError).not.toHaveBeenCalled();
+      expect(isOpen()).toBe(false);
     });
   });
 

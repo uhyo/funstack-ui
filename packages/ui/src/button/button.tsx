@@ -12,7 +12,13 @@ import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
-import type { Action, ActionDetails, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  Action,
+  ActionDetails,
+  RenderProp,
+  StateValue,
+  WhilePending,
+} from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
@@ -47,18 +53,30 @@ export interface ButtonProps extends Omit<
   /**
    * Runs inside this Button's own transition on click, Enter or Space (`data-pending`
    * meanwhile). Sync or async; may be a Server Function. A rejection reaches the nearest Error
-   * Boundary above the Button. While it is pending the Button ignores further activation and
-   * renders `aria-disabled="true"`. Not combinable with `formAction` (development error).
+   * Boundary above the Button. A click while it is pending runs it again unless `whilePending`
+   * is `"ignore"`. Not combinable with `formAction` (development error).
    */
   action?: Action<[details: ButtonActionDetails]>;
   /**
    * React's `formAction`: a function (a Server Function, a `useActionState` dispatch, a client
    * function) or a URL, run by React instead of the form's `action` when this Button submits the
    * form. With a function, the Button is `pending` while its own submission runs (not while
-   * another submitter's does), ignores further activation meanwhile, and defaults to
-   * `type="submit"`.
+   * another submitter's does) and defaults to `type="submit"`. A click meanwhile submits again
+   * unless `whilePending` is `"ignore"`; React drops the rejection of an older overlapping
+   * submission, so use `"ignore"` (or `useActionState`) for a submission that must not overlap.
    */
   formAction?: ComponentPropsWithRef<"button">["formAction"];
+  /**
+   * What a click, Enter or Space does while this Button's own `action` (or its own function
+   * `formAction` submission) is pending. `"run"`: it runs as well; the Button shows
+   * `data-pending` until every run has settled. `"ignore"`: it starts nothing, its default action
+   * is cancelled (no second submission, navigation or command), and the Button renders
+   * `aria-disabled="true"` while pending. Use `"ignore"` for an action that must not run twice
+   * (Save, Pay, Delete). No effect on a Button with neither `action` nor a function `formAction`.
+   *
+   * @defaultValue `"run"`
+   */
+  whilePending?: WhilePending;
   /**
    * Owned on a `<button>` and on a component `render` element (set it here, not on the element; a
    * component should spread it); omitted for a host element of another tag (`<a>`). `action`
@@ -104,8 +122,9 @@ export interface ButtonProps extends Omit<
 
 /**
  * A button whose click is a transition (design/components/button.md): `<button type="button">`
- * that runs `action` in its own transition, with `data-pending` and `aria-disabled="true"` while
- * it runs, and ignores further activation meanwhile (conventions 2.5). With a function
+ * that runs `action` in its own transition, with `data-pending` while it runs. A click meanwhile
+ * runs it again, or with `whilePending="ignore"` is ignored while the Button is `aria-disabled`
+ * (conventions 2.5.1). With a function
  * `formAction` it is a form submitter with its own per-submitter pending. Inside a
  * `Toolbar.Root` a disabled Button stays focusable (`aria-disabled`).
  *
@@ -117,6 +136,7 @@ export interface ButtonProps extends Omit<
 export function Button({
   action,
   formAction,
+  whilePending,
   type,
   disabled = false,
   focusableWhenDisabled = false,
@@ -131,7 +151,10 @@ export function Button({
   // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
   // browser and hide the state from AT, so the focusable-disabled branch.
   const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
-  const { pending: ownPending, run } = useActionTrigger();
+  // Button is the fully user-owned trigger: every activation runs unless the consumer opts in
+  // (conventions 2.5.1, design 18).
+  const ignoring = (whilePending ?? "run") === "ignore";
+  const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: ignoring });
 
   // Per-submitter pending (design 6.2): React reports the submitter's function as
   // `status.action`. `submittedWith` keeps the function this Button last submitted with, so an
@@ -178,7 +201,8 @@ export function Button({
       // `undefined` (not `false`) in the focusable case, so the owned key removes a render
       // element's `disabled` too.
       disabled: disabled && !focusable ? true : undefined,
-      "aria-disabled": pending || (disabled && focusable) ? true : undefined,
+      // While pending only when ignoring: a Button that still acts is not unavailable (3.6).
+      "aria-disabled": (pending && ignoring) || (disabled && focusable) ? true : undefined,
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
       onClick: (event: MouseEvent<HTMLButtonElement>) => {
@@ -191,7 +215,7 @@ export function Button({
         }
         if (action === undefined) {
           // A native button (a `formAction` submitter, a command, a link): only the guard.
-          if (formPending) {
+          if (ignoring && formPending) {
             event.preventDefault();
             return;
           }
@@ -199,7 +223,7 @@ export function Button({
           return;
         }
         const details: ButtonActionDetails = createActionDetails(event.nativeEvent, {});
-        // Ignored while pending: do not navigate, submit or run a command either.
+        // Ignored while pending (`"ignore"` only): do not navigate, submit or run a command either.
         if (!run(() => action(details))) event.preventDefault();
       },
     },
