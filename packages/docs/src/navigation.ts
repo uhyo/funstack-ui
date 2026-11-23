@@ -26,6 +26,7 @@ export const conceptNavItems: NavItem[] = [
 ];
 
 export const guideNavItems: NavItem[] = [
+  { path: "/concepts/render", label: "Replacing the element (render)" },
   { path: "/concepts/experimental", label: "Experimental features" },
   { path: "/concepts/content-security-policy", label: "Content Security Policy" },
   { path: "/concepts/ai-agents", label: "Using with AI agents" },

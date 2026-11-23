@@ -20,10 +20,10 @@ export function ToastPage() {
         Toasts report on something that already happened or is happening elsewhere. The input is a
         function, <code>toast()</code>, callable from anywhere: an action body, a store, an effect.
         The output is yours: a <code>Toast.Viewport</code> rendered once maps the queue to parts.
-        The queue is the library's first state that is <strong>urgent by design</strong>: React
-        holds every transition while an async action is pending, so a toast pushed as a transition
-        would appear only after the action it reports on. Toast spends its Async React budget
-        elsewhere: a toast that follows a promise, an Undo that is an ordinary action prop with{" "}
+        The queue is <strong>urgent by design</strong>: React holds every transition while an async
+        action is pending, so a toast pushed as a transition would appear only after the action it
+        reports on. Toast spends its <a href="/why#async-react">Async React</a> budget elsewhere: a
+        toast that follows a promise, an Undo that is an ordinary action prop with{" "}
         <code>data-pending</code>, a <code>closeAction</code> that knows whether the Undo window was
         used, and a Suspense guard so a toast whose content suspends does not blank the page.
       </p>

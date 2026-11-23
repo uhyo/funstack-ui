@@ -93,10 +93,10 @@ export function ComboboxPage() {
       <h4>Typing is urgent; everything it causes is not</h4>
       <p>
         "Everything is a transition" has one exception, and this is it: React requires a controlled
-        text input to update urgently, in the same event as the keystroke. So the text is the
-        library's first <strong>urgent state</strong>. It keeps the usual pair,{" "}
-        <code>inputValue</code> / <code>defaultInputValue</code>, but its callback is a handler, not
-        an action: <code>onInputValueChange</code> (
+        text input to update urgently, in the same event as the keystroke. So the text is{" "}
+        <strong>urgent state</strong>. It keeps the usual pair, <code>inputValue</code> /{" "}
+        <code>defaultInputValue</code>, but its callback is a handler, not an action:{" "}
+        <code>onInputValueChange</code> (
         <a href="/concepts/action-props#urgent-lane">the urgent lane</a>) is called synchronously,
         outside any transition, and never awaited. A controlled parent simply sets its state in the
         body:

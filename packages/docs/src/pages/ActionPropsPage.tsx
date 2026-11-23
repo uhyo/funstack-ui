@@ -178,9 +178,10 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         </li>
         <li>
           <strong>Disabled parts never dispatch</strong> for user interaction, and no-op
-          interactions (clicking the tab that is already selected) do not dispatch either. (A form
-          reset still reaches a disabled native input: the browser resets disabled inputs too, and
-          the form's author asked for it.)
+          interactions (clicking the tab that is already selected) do not dispatch either. A form
+          reset is not a user interaction with the control: <code>form.reset()</code> resets
+          disabled inputs too, so a disabled control still follows it, with{" "}
+          <code>reason: "platform"</code>.
         </li>
         <li>
           <strong>Parts are never natively disabled while pending.</strong> A trigger that changes
@@ -294,10 +295,10 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
       <h3>Server Functions work directly</h3>
       <p>
         A Server Function (<code>"use server"</code>) can be passed straight to any action prop,
-        from a Server Component or a Client Component. <code>details</code> is a plain object of
-        serialisable fields; <code>event</code> is served by a proxy and is not an own property, so
-        React's serialiser never sees it. The server receives <code>(next, details)</code> with{" "}
-        <code>details.event</code> undefined and every other field intact.
+        from a Server Component or a Client Component, without a client wrapper. The server receives
+        the same arguments, <code>(next, details)</code>, with one difference: a DOM event cannot be
+        sent to the server, so <code>details.event</code> is <code>undefined</code> there. Every
+        other field of <code>details</code> (<code>reason</code>, for example) arrives intact.
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
         <CodeBlock>{`// app/post.tsx: a Server Component
@@ -308,12 +309,14 @@ import { setFavorite } from "./actions"; // "use server"
   Favorite
 </Toggle>`}</CodeBlock>
       </ConceptExample>
-      <Callout title="Costs of the virtual event">
+      <Callout title="details.event is not an ordinary field">
         <p>
-          <code>Object.keys(details)</code>, spreading and <code>JSON.stringify</code> do not
-          include <code>event</code>; <code>"event" in details</code> and <code>details.event</code>{" "}
-          do. <code>structuredClone(details)</code> throws. In tests, assert{" "}
-          <code>details.event</code> directly rather than <code>toEqual({"{ event }"})</code>.
+          To keep <code>details</code> serialisable, <code>event</code> is not an own property of
+          the object, so some operations do not see it. <code>Object.keys(details)</code>, spreading
+          and <code>JSON.stringify</code> do not include <code>event</code>;{" "}
+          <code>"event" in details</code> and <code>details.event</code> do.{" "}
+          <code>structuredClone(details)</code> throws. In tests, assert <code>details.event</code>{" "}
+          directly rather than <code>toEqual({"{ event }"})</code>.
         </p>
       </Callout>
 
@@ -342,8 +345,14 @@ import { setFavorite } from "./actions"; // "use server"
         </li>
         <li>
           A part may observe the form channel for a platform side effect: <code>Dialog.Form</code>{" "}
-          closes its dialog once the form action has settled. It never wraps your action, so a
-          Server Function keeps React's progressive enhancement.
+          closes its dialog once the form action has settled. It watches the form's status and
+          passes your action to <code>&lt;form action&gt;</code> unchanged, instead of wrapping it
+          in a function of its own. That matters for a Server Function: React can only{" "}
+          <a href="https://react.dev/reference/react-dom/components/form#handle-form-submission-with-a-server-function">
+            submit a form before JavaScript loads
+          </a>{" "}
+          when the <code>action</code> is the Server Function itself; a client wrapper around it
+          would need JavaScript to run.
         </li>
         <li>
           While a form action is pending, a control's transition waits for it, and the reverse:
@@ -366,11 +375,10 @@ type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails> =
         Nothing is pending or optimistic for it: the DOM already holds the value when it runs, so{" "}
         <code>{"(next) => setText(next)"}</code> is the whole controlled pattern. Everything the
         urgent value drives leaves the urgent lane at once (a deferred query, an open, a selection).
-        A returned promise is ignored and warned about in development. It is the library's one{" "}
-        <code>on*</code> prop, and it is one on purpose: <code>fooAction</code> always means a
-        handler the component runs in a transition, so a callback that must not run in one is named
-        like the plain React handler it is. Nothing else the library defines is an <code>on*</code>
-        prop.
+        A returned promise is ignored and warned about in development. The callback is named{" "}
+        <code>on*</code> on purpose: <code>fooAction</code> always means a handler the component
+        runs in a transition, so a callback that must not run in one is named like the plain React
+        handler it is.
       </p>
 
       <h3>What about native handlers?</h3>
