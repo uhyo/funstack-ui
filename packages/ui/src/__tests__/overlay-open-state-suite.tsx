@@ -850,29 +850,40 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
     });
 
     describe("superseded rejection", () => {
-      /** The older dispatch's settle after the newer one's, in both orders. */
+      /**
+       * The older dispatch's settle after the newer one's, in both orders: the rejection goes to
+       * `reportError`, not the boundary, and the overlay ends as the newer dispatch left it.
+       */
       function rows(
+        newerOpen: boolean,
         setup: () => Promise<{ caught: Mock; older: Deferred<void>; newer: Deferred<void> }>,
       ) {
-        it("the older dispatch rejects after the newer resolved: the boundary gets it", async () => {
-          const { caught, older, newer } = await setup();
-          await act(async () => newer.resolve());
-          await act(async () => older.reject(new Error("older")));
-          await flushTasks(2);
-          expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
-        });
-
-        it("the older dispatch rejects while the newer is pending: the boundary gets it", async () => {
-          const { caught, older, newer } = await setup();
-          await act(async () => older.reject(new Error("older")));
-          await flushTasks(2);
-          expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "older" }));
-          await act(async () => newer.resolve());
-        });
+        it.each([
+          ["after the newer resolved", true],
+          ["while the newer is pending", false],
+        ] as const)(
+          "the older dispatch rejects %s: reported, not thrown",
+          async (_label, newerFirst) => {
+            const reportError = vi.fn();
+            vi.stubGlobal("reportError", reportError);
+            const { caught, older, newer } = await setup();
+            if (newerFirst) await act(async () => newer.resolve());
+            const err = new Error("older");
+            await act(async () => older.reject(err));
+            await flushTasks(2);
+            expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+            if (!newerFirst) await act(async () => newer.resolve());
+            await flushTasks(2);
+            expect(caught).not.toHaveBeenCalled();
+            expect(reportError).toHaveBeenCalledTimes(1);
+            expect(isOpen()).toBe(newerOpen);
+            expectNotPending(trigger());
+          },
+        );
       }
 
       renderBoth("a dismissal, then a re-open", (mode) => {
-        rows(async () => {
+        rows(true, async () => {
           const user = setupUser();
           silenceErrors();
           const caught = vi.fn();
@@ -892,7 +903,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
 
       if (config.triggerToggles) {
         renderBoth("an open, then a close click", (mode) => {
-          rows(async () => {
+          rows(false, async () => {
             const user = setupUser();
             silenceErrors();
             const caught = vi.fn();

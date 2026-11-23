@@ -106,6 +106,12 @@ export interface ValueActionDriver<V, D extends { readonly event: Event | undefi
   commit?(prev: V, next: V, details: D): V;
   /** `commit` gives the same result whatever order two overlapping dispatches resolve in. */
   readonly orderIndependentCommit?: boolean;
+  /**
+   * What the component commits, uncontrolled, when gesture 0's action rejects and gesture 1's
+   * resolves (default `values[2]`). A set-valued component commits only the change of gesture 1
+   * on top of `values[0]` (#150).
+   */
+  readonly withoutFirstGesture?: V;
   /** The text the harness writes for a committed value (default `JSON.stringify`). */
   format?(v: V): string;
   /**
@@ -435,6 +441,40 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         }
       });
 
+      it.each([
+        ["before", true],
+        ["after", false],
+      ] as const)(
+        "commits only the settled changes when the older action rejects %s the newer resolves",
+        async (_label, rejectFirst) => {
+          const reportError = vi.fn();
+          vi.stubGlobal("reportError", reportError);
+          const ds = sequencedDeferreds(2);
+          const onError = vi.fn();
+          render(<Harness mode="uncontrolled" action={() => ds.next()} boundary={onError} />);
+          const user = setupUser();
+
+          await driver.gesture(user, 0);
+          await driver.gesture(user, 1);
+          const err = new Error("older save failed");
+          for (const settle of rejectFirst
+            ? [() => ds[0]!.reject(err), () => ds[1]!.resolve()]
+            : [() => ds[1]!.resolve(), () => ds[0]!.reject(err)]) {
+            await act(async () => {
+              settle();
+            });
+          }
+
+          expect(onError).not.toHaveBeenCalled();
+          expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+          expectNonePending(1);
+          // The rejected change is not part of the committed value (#150).
+          const settled = driver.withoutFirstGesture ?? values[2];
+          driver.expectShown(settled);
+          driver.expectCommitted?.(settled);
+        },
+      );
+
       it("stays pending until every in-flight action settles", async () => {
         const ds = sequencedDeferreds(2);
         render(<Harness mode="uncontrolled" action={() => ds.next()} />);
@@ -461,132 +501,117 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
 
     renderBoth("superseded rejection", (mode) => {
       function renderGestures(onError: (error: unknown) => void, count = 2) {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
         const ds = sequencedDeferreds(count);
         const action = vi.fn<ActionFn>(() => ds.next());
-        render(<Harness mode={mode} action={action} boundary={onError} />);
-        return { ds, action };
+        const view = render(<Harness mode={mode} action={action} boundary={onError} />);
+        return { ds, action, reportError, unmount: view.unmount };
       }
 
-      it("reaches the boundary when the older action rejects after the newer resolved", async () => {
+      /**
+       * The value the component shows once gesture 1 resolved and gesture 0 rejected: what the
+       * "update on success" parent committed, or what the component commits itself (#150).
+       */
+      const settledWithoutFirst = (call: readonly [V, D]): V =>
+        mode === "controlled"
+          ? commitOf(values[0], call)
+          : (driver.withoutFirstGesture ?? values[2]);
+
+      it.each([
+        ["after the newer resolved", true],
+        ["while the newer is pending", false],
+      ] as const)(
+        "is reported, not thrown, when the older action rejects %s",
+        async (_label, newerFirst) => {
+          const consoleError = silenceErrors();
+          const onError = vi.fn();
+          const { ds, action, reportError } = renderGestures(onError);
+          const user = setupUser();
+
+          await driver.gesture(user, 0);
+          await driver.gesture(user, 1);
+          expect(action.mock.calls.map(([next]) => next)).toEqual([values[1], values[2]]);
+
+          if (newerFirst) {
+            await act(async () => {
+              ds[1]!.resolve();
+            });
+            driver.expectShown(values[2]);
+          }
+          const err = new Error("older save failed");
+          await act(async () => {
+            ds[0]!.reject(err);
+          });
+          expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+          if (!newerFirst) {
+            expectAllPending(1);
+            await act(async () => {
+              ds[1]!.resolve();
+            });
+          }
+
+          // No Error Boundary: the UI stays and shows the newer action's outcome.
+          expect(onError).not.toHaveBeenCalled();
+          expect(screen.queryByTestId("error-catcher")).not.toBeInTheDocument();
+          expect(driver.queryControl()).not.toBeNull();
+          expectNonePending(1);
+          const newer = commitOf(values[0], action.mock.calls[1]! as [V, D]);
+          expect(committed().textContent).toBe(format(newer));
+          driver.expectShown(settledWithoutFirst(action.mock.calls[1]! as [V, D]));
+          expect(reportError).toHaveBeenCalledTimes(1);
+          expect(consoleError).not.toHaveBeenCalled();
+        },
+      );
+
+      it("reports every superseded rejection; the latest one still reaches the boundary", async () => {
         silenceErrors();
         const onError = vi.fn();
-        const { ds, action } = renderGestures(onError);
+        const { ds, reportError } = renderGestures(onError, 3);
         const user = setupUser();
 
         await driver.gesture(user, 0);
         await driver.gesture(user, 1);
-        expect(action.mock.calls.map(([next]) => next)).toEqual([values[1], values[2]]);
+        await driver.gesture(user, 2);
 
+        const first = new Error("first");
+        const second = new Error("second");
         await act(async () => {
+          ds[0]!.reject(first);
+          ds[1]!.reject(second);
+        });
+        expect(onError).not.toHaveBeenCalled();
+        expect(reportError.mock.calls).toEqual([[first], [second]]);
+        expect(driver.queryControl()).not.toBeNull();
+
+        const latest = new Error("latest");
+        await act(async () => {
+          ds[2]!.reject(latest);
+        });
+        expect(onError).toHaveBeenCalledExactlyOnceWith(latest);
+        expect(driver.queryControl()).toBeNull();
+        expect(reportError).toHaveBeenCalledTimes(2);
+      });
+
+      it("still reports a superseded rejection after unmount", async () => {
+        const consoleError = silenceErrors();
+        const onError = vi.fn();
+        const { ds, reportError, unmount } = renderGestures(onError);
+        const user = setupUser();
+
+        await driver.gesture(user, 0);
+        await driver.gesture(user, 1);
+        unmount();
+        const err = new Error("too late");
+        await act(async () => {
+          ds[0]!.reject(err);
           ds[1]!.resolve();
         });
         expect(onError).not.toHaveBeenCalled();
-        driver.expectShown(values[2]);
-
-        const err = new Error("older save failed");
-        await act(async () => {
-          ds[0]!.reject(err);
-        });
-        expect(onError).toHaveBeenCalledTimes(1);
-        expect(onError).toHaveBeenCalledWith(err);
-        expect(driver.queryControl()).toBeNull();
-        expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-        // The newer action's outcome is unaffected.
-        const newer = commitOf(values[0], action.mock.calls[1]! as [V, D]);
-        expect(committed().textContent).toBe(format(newer));
-      });
-
-      it("reaches the boundary when the older action rejects while the newer is pending", async () => {
-        silenceErrors();
-        const onError = vi.fn();
-        const { ds, action } = renderGestures(onError);
-        const user = setupUser();
-
-        await driver.gesture(user, 0);
-        await driver.gesture(user, 1);
-        expectAllPending(1);
-
-        const err = new Error("older save failed");
-        await act(async () => {
-          ds[0]!.reject(err);
-        });
-        expect(onError).toHaveBeenCalledTimes(1);
-        expect(onError).toHaveBeenCalledWith(err);
-        expect(driver.queryControl()).toBeNull();
-        expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-
-        // The newer action's outcome is unaffected and nothing is thrown a second time.
-        await act(async () => {
-          ds[1]!.resolve();
-        });
-        expect(onError).toHaveBeenCalledTimes(1);
-        expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
-        const newer = commitOf(values[0], action.mock.calls[1]! as [V, D]);
-        expect(committed().textContent).toBe(format(newer));
-      });
-
-      it("keeps the first superseded error and reports later ones through reportError", async () => {
-        silenceErrors();
-        const reportError = vi.fn();
-        vi.stubGlobal("reportError", reportError);
-        try {
-          const onError = vi.fn();
-          const { ds } = renderGestures(onError, 3);
-          const user = setupUser();
-
-          await driver.gesture(user, 0);
-          await driver.gesture(user, 1);
-          await driver.gesture(user, 2);
-
-          const first = new Error("first");
-          const second = new Error("second");
-          await act(async () => {
-            ds[0]!.reject(first);
-            ds[1]!.reject(second);
-          });
-          expect(onError).toHaveBeenCalledTimes(1);
-          expect(onError).toHaveBeenCalledWith(first);
-          expect(reportError).toHaveBeenCalledTimes(1);
-          expect(reportError).toHaveBeenCalledWith(second);
-
-          await act(async () => {
-            ds[2]!.resolve();
-          });
-          expect(onError).toHaveBeenCalledTimes(1);
-          expect(reportError).toHaveBeenCalledTimes(1);
-        } finally {
-          vi.unstubAllGlobals();
-        }
-      });
-
-      it("ignores a superseded rejection after unmount", async () => {
-        const consoleError = silenceErrors();
-        const reportError = vi.fn();
-        vi.stubGlobal("reportError", reportError);
-        try {
-          const onError = vi.fn();
-          const ds = sequencedDeferreds(2);
-          const { unmount } = render(
-            <Harness mode={mode} action={() => ds.next()} boundary={onError} />,
-          );
-          const user = setupUser();
-
-          await driver.gesture(user, 0);
-          await driver.gesture(user, 1);
-          unmount();
-          await act(async () => {
-            ds[0]!.reject(new Error("too late"));
-            ds[1]!.resolve();
-          });
-          expect(onError).not.toHaveBeenCalled();
-          expect(reportError).not.toHaveBeenCalled();
-          expect(consoleError).not.toHaveBeenCalled();
-        } finally {
-          vi.unstubAllGlobals();
-        }
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(consoleError).not.toHaveBeenCalled();
       });
     });
-
     renderBoth("suspending content", (mode) => {
       it("keeps the old content, no fallback, pending while the new content loads", async () => {
         const suspender = createSuspender();

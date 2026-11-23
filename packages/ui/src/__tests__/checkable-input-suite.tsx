@@ -496,16 +496,17 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
 
     renderBoth("superseded rejection", (mode) => {
       function renderTwoClicks(onError: (error: unknown) => void) {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
         const deferreds = sequencedDeferreds(2);
         const action = vi.fn<ActionFn>(() => deferreds.next());
         render(<Harness mode={mode} action={action} boundary={onError} />);
-        return { deferreds, action };
+        return { deferreds, action, reportError };
       }
 
-      it("reaches the boundary when the older action rejects after the newer resolved (row 12a)", async () => {
-        silenceErrors();
+      it("is reported, not thrown, when the older action rejects after the newer resolved (row 12a)", async () => {
         const onError = vi.fn();
-        const { deferreds, action } = renderTwoClicks(onError);
+        const { deferreds, action, reportError } = renderTwoClicks(onError);
         const user = setupUser();
 
         await user.click(input());
@@ -514,23 +515,23 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await act(async () => {
           deferreds[1]!.resolve();
         });
-        expect(onError).not.toHaveBeenCalled();
         expect(input().checked).toBe(false);
 
         const err = new Error("older save failed");
         await act(async () => {
           deferreds[0]!.reject(err);
         });
-        expect(onError).toHaveBeenCalledTimes(1);
-        expect(onError).toHaveBeenCalledWith(err);
-        expect(screen.queryByRole(role)).not.toBeInTheDocument();
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(onError).not.toHaveBeenCalled();
+        expect(screen.getByRole(role)).toBeInTheDocument();
+        expect(input().checked).toBe(false);
+        expectNotPending(input());
         expect(committed()).toHaveTextContent("false");
       });
 
-      it("reaches the boundary when the older action rejects while the newer is pending (row 12b)", async () => {
-        silenceErrors();
+      it("is reported, not thrown, when the older action rejects while the newer is pending (row 12b)", async () => {
         const onError = vi.fn();
-        const { deferreds } = renderTwoClicks(onError);
+        const { deferreds, reportError } = renderTwoClicks(onError);
         const user = setupUser();
 
         await user.click(input());
@@ -540,14 +541,17 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         await act(async () => {
           deferreds[0]!.reject(err);
         });
-        expect(onError).toHaveBeenCalledTimes(1);
-        expect(onError).toHaveBeenCalledWith(err);
-        expect(screen.getByTestId("error-catcher")).toHaveTextContent("older save failed");
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(onError).not.toHaveBeenCalled();
+        expectPending(input());
 
         await act(async () => {
           deferreds[1]!.resolve();
         });
-        expect(onError).toHaveBeenCalledTimes(1);
+        expect(onError).not.toHaveBeenCalled();
+        expect(reportError).toHaveBeenCalledTimes(1);
+        expect(input().checked).toBe(false);
+        expectNotPending(input());
         expect(committed()).toHaveTextContent("false");
       });
     });

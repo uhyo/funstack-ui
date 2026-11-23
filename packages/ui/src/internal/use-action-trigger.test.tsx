@@ -95,33 +95,29 @@ describe("useActionTrigger: ignoreWhilePending: false (the continuous controls)"
   });
 
   // moved from the Close / Item rows, #81
-  it("a superseded rejection still reaches the boundary", async () => {
-    silenceErrors();
+  it.each([
+    ["while the newer run is pending", false],
+    ["after the newer run resolved", true],
+  ] as const)("a superseded rejection %s is reported, not thrown", async (_label, newerFirst) => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
     const caught = vi.fn();
-    const { hook } = setup({ ignoreWhilePending: false }, caught);
+    const then = vi.fn();
+    const { hook, pending } = setup({ ignoreWhilePending: false }, caught);
     const runs = [deferred(), deferred()];
     act(() => {
-      hook().run(() => runs[0]!.promise);
-      hook().run(() => runs[1]!.promise);
+      hook().run(() => runs[0]!.promise, then);
+      hook().run(() => runs[1]!.promise, then);
     });
-    // The older run rejects while the newer one is still pending.
-    await act(async () => runs[0]!.reject(new Error("first failed")));
-    expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "first failed" }));
-    await act(async () => runs[1]!.resolve());
-  });
-
-  it("a superseded rejection after the newer run resolved still reaches the boundary", async () => {
-    silenceErrors();
-    const caught = vi.fn();
-    const { hook } = setup({ ignoreWhilePending: false }, caught);
-    const runs = [deferred(), deferred()];
-    act(() => {
-      hook().run(() => runs[0]!.promise);
-      hook().run(() => runs[1]!.promise);
-    });
-    await act(async () => runs[1]!.resolve());
-    await act(async () => runs[0]!.reject(new Error("late failure")));
-    expect(caught).toHaveBeenCalledWith(expect.objectContaining({ message: "late failure" }));
+    if (newerFirst) await act(async () => runs[1]!.resolve());
+    const older = new Error("older failed");
+    await act(async () => runs[0]!.reject(older));
+    if (!newerFirst) await act(async () => runs[1]!.resolve());
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+    expect(caught).not.toHaveBeenCalled();
+    // The rejected run skips its `then`; the newer one ran its own.
+    expect(then).toHaveBeenCalledTimes(1);
+    expect(pending()).toBe("false");
   });
 });
 
@@ -139,7 +135,6 @@ describe("useActionTrigger: openGeneration", () => {
     expect(then).not.toHaveBeenCalled();
   });
 });
-
 describe("useActionTrigger: superseded rejections, burst and unmount", () => {
   function runThree(hook: () => ActionTrigger) {
     const runs = [deferred(), deferred(), deferred()];
@@ -149,7 +144,7 @@ describe("useActionTrigger: superseded rejections, burst and unmount", () => {
     return runs;
   }
 
-  it("throws the first of a burst and reports the later ones through reportError", async () => {
+  it("reports every superseded rejection; the latest one reaches the boundary", async () => {
     silenceErrors();
     const reportError = vi.fn();
     vi.stubGlobal("reportError", reportError);
@@ -162,12 +157,15 @@ describe("useActionTrigger: superseded rejections, burst and unmount", () => {
       runs[0]!.reject(first);
       runs[1]!.reject(second);
     });
-    expect(caught).toHaveBeenCalledExactlyOnceWith(first);
-    expect(reportError).toHaveBeenCalledExactlyOnceWith(second);
-    vi.unstubAllGlobals();
+    expect(reportError.mock.calls).toEqual([[first], [second]]);
+    expect(caught).not.toHaveBeenCalled();
+    const latest = new Error("latest");
+    await act(async () => runs[2]!.reject(latest));
+    expect(caught).toHaveBeenCalledExactlyOnceWith(latest);
+    expect(reportError).toHaveBeenCalledTimes(2);
   });
 
-  it("drops superseded rejections once unmounted: nothing thrown or reported", async () => {
+  it("still reports superseded rejections once unmounted; nothing is thrown", async () => {
     const consoleError = silenceErrors();
     const reportError = vi.fn();
     vi.stubGlobal("reportError", reportError);
@@ -180,25 +178,15 @@ describe("useActionTrigger: superseded rejections, burst and unmount", () => {
     );
     const runs = runThree(() => hook);
     view.unmount();
+    const first = new Error("first");
+    const second = new Error("second");
     await act(async () => {
-      runs[0]!.reject(new Error("first"));
-      runs[1]!.reject(new Error("second"));
+      runs[0]!.reject(first);
+      runs[1]!.reject(second);
       runs[2]!.resolve();
     });
     expect(caught).not.toHaveBeenCalled();
-    expect(reportError).not.toHaveBeenCalled();
+    expect(reportError.mock.calls).toEqual([[first], [second]]);
     expect(consoleError).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
-  });
-
-  it("hands superseded rejections to an external captureSuperseded instead of throwing", async () => {
-    const capture = vi.fn();
-    const caught = vi.fn();
-    const { hook } = setup({ ignoreWhilePending: false, captureSuperseded: capture }, caught);
-    const runs = runThree(hook);
-    const older = new Error("older");
-    await act(async () => runs[0]!.reject(older));
-    expect(capture).toHaveBeenCalledExactlyOnceWith(older);
-    expect(caught).not.toHaveBeenCalled();
   });
 });

@@ -29,6 +29,18 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          When an older action rejects after a newer one started, the rejection no longer replaces
+          the component with the Error Boundary: it is passed to the global <code>reportError</code>{" "}
+          (a window <code>error</code> event) and the UI keeps the newer intent. The latest action's
+          rejection still reaches the Error Boundary (<a href={issue(145)}>#145</a>).
+        </li>
+        <li>
+          Uncontrolled CheckboxGroup, and ToggleGroup and Accordion without <code>exclusive</code>,
+          no longer commit a change whose action rejected when a later change's action resolved (
+          <a href={issue(150)}>#150</a>
+          ).
+        </li>
+        <li>
           <strong>Breaking (types):</strong> <code>Combobox.Input</code> owns <code>onFocus</code>,
           which is no longer in its props type; use <code>onFocusCapture</code> to react to focus (
           <a href={issue(132)}>#132</a>).

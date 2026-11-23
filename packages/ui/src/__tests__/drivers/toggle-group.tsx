@@ -56,6 +56,7 @@ export const toggleGroupDriver: ValueActionDriver<string[], ToggleGroupValueChan
     ...details.added.filter((v) => !prev.includes(v)),
   ],
   orderIndependentCommit: true,
+  withoutFirstGesture: ["italic"],
   format: (v) => [...v].sort().join(","),
   transitionTypes: [
     ["fsui-toggle-group", "fsui-toggle-group-press"],

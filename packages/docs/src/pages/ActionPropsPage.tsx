@@ -238,8 +238,11 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         owns the transition (the{" "}
         <a href="/concepts/pending-and-optimistic#state-owner">state owner</a>: usually the{" "}
         <code>Root</code>, or a single-element component such as a Toggle). The library never
-        swallows an error. The optimistic state reverts automatically, and uncontrolled state is
-        only written after success, so a failed action leaves it untouched.
+        swallows an error: the rejection of an older action that a newer one superseded goes to{" "}
+        <code>reportError</code> instead (see{" "}
+        <a href="/concepts/action-props#overlapping-actions">Overlapping actions</a>). The
+        optimistic state reverts automatically, and uncontrolled state is only written after
+        success, so a failed action leaves it untouched.
       </p>
       <p>
         For inline error UI instead, catch inside the action. A caught error makes the action
@@ -261,6 +264,16 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         only for the most recently dispatched action, even if an older one resolves later. The
         components have no queue and no abort signal; if you need to cancel a request, keep an{" "}
         <code>AbortController</code> in a ref inside your action.
+      </p>
+      <p>
+        Components whose value is a set of items (CheckboxGroup, and ToggleGroup and Accordion
+        without <code>exclusive</code>) commit each change on its own instead: once every
+        overlapping action has settled, the changes whose actions resolved are applied in the order
+        they were made, and a change whose action rejected is left out. Check A, then B: if saving A
+        fails and saving B succeeds, the uncontrolled group ends with only B checked. B's action
+        still received <code>["A", "B"]</code> as <code>next</code>, because A was pending when B
+        was clicked, so save <code>details.added</code> and <code>details.removed</code> rather than
+        the whole <code>next</code>.
       </p>
       <p>
         If your actions must run in order, one after another, or each must build on the result of
@@ -287,9 +300,13 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         that called <code>useActionState</code>.
       </p>
       <p>
-        React would silently drop the rejection of a superseded (older) action. The library catches
-        it and rethrows it from render, so it still reaches the same Error Boundary as a failure of
-        the latest action.
+        When an older action rejects after a newer one has started, React does not send the error to
+        an Error Boundary: only the latest action's failure is thrown, and the UI keeps showing the
+        latest intent. The library does the same, and also passes the older rejection to the global{" "}
+        <code>reportError</code>, as React's standalone <code>startTransition</code> does with a
+        rejection it has nowhere else to send. The error is not lost: it fires the window{" "}
+        <code>error</code> event, so error monitoring sees it, and a test runner reports it as an
+        uncaught error.
       </p>
 
       <h3>Server Functions work directly</h3>

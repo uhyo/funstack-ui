@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { ActionDetails, ChangeAction } from "./types.js";
 import { useLatest } from "./use-latest.js";
-import { useSupersededRejection } from "./use-superseded-rejection.js";
+import { reportSuperseded } from "./report-superseded.js";
 
 export interface UseControllableActionOptions<T, Details extends ActionDetails> {
   /** The controlled prop (`x`). `undefined` means uncontrolled. */
@@ -32,17 +32,15 @@ export interface UseControllableActionOptions<T, Details extends ActionDetails> 
    * Optimistic reducer (conventions 3.4). Default: replace the value with `next`. Multi-item
    * states (Accordion's open set) pass a reducer keyed by item, reading the item from `details`,
    * so stacked optimistic patches re-base onto a changed committed value.
+   *
+   * With a reducer, uncontrolled state is also committed through it: once every overlapping
+   * dispatch has settled, the dispatches that resolved are folded onto the committed value in
+   * dispatch order, and a rejected one leaves no trace (#150). Without one, the latest dispatch's
+   * `next` is committed when it resolves (the latest-dispatch guard).
    */
   reducer?: (prev: T, next: T, details: Details) => T;
   /** Names used in development warnings. */
   warn?: { readonly component: string; readonly prop: string };
-  /**
-   * A component with two transition channels (Slider, NumberField) passes one
-   * `useSupersededRejection()` called before both hooks, so a superseded rejection of either
-   * channel is thrown before both `useTransition`s and never waits for the other channel's
-   * pending action. Stable. Default: the hook's own.
-   */
-  readonly captureSuperseded?: ((error: unknown) => void) | undefined;
 }
 
 export interface ControllableAction<T, Details extends ActionDetails> {
@@ -72,6 +70,14 @@ export interface ControllableAction<T, Details extends ActionDetails> {
 
 const isDev = process.env.NODE_ENV !== "production";
 
+/** One uncontrolled reducer-mode dispatch of a burst; `resolved` once its action resolved. */
+interface BurstEntry<T, Details> {
+  readonly next: T;
+  readonly details: Details;
+  readonly reducer: (prev: T, next: T, details: Details) => T;
+  resolved: boolean;
+}
+
 /**
  * What the user intends (conventions 3.8 rule 1): the latest in-flight dispatch's `next`, else
  * `optimistic`. An explicit null check, not `?.next ?? optimistic`, which would drop an in-flight
@@ -92,7 +98,7 @@ function capitalize(s: string): string {
 /**
  * The one place the state model of conventions section 3 is implemented: committed state,
  * optimistic state (`useOptimistic`, reducer form), the component's own transition, the
- * post-`await` write of uncontrolled state, the latest-dispatch guard, and the surfacing of
+ * post-`await` write of uncontrolled state, the latest-dispatch guard, and the reporting of
  * superseded rejections (conventions 2.4).
  */
 export function useControllableAction<T, Details extends ActionDetails = ActionDetails>(
@@ -100,10 +106,6 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
 ): ControllableAction<T, Details> {
   const { controlled, defaultValue, initialValue, action, transitionTypes, reducer, warn } =
     options;
-
-  // Before `useTransition` on purpose (see the hook). Unused (never throws) with an external one.
-  const ownCapture = useSupersededRejection();
-  const captureSuperseded = options.captureSuperseded ?? ownCapture;
 
   const [internal, setInternal] = useState<T>(
     defaultValue === undefined ? initialValue : defaultValue,
@@ -118,6 +120,8 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
   const inFlight = useRef<{ count: number; next: T | undefined }>({ count: 0, next: undefined });
+  /** The uncontrolled reducer-mode dispatches of the current burst (overlapping), in order. */
+  const burst = useRef<BurstEntry<T, Details>[]>([]);
 
   useDevWarnings(isControlled, defaultValue !== undefined, warn);
 
@@ -125,21 +129,38 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   // only with `committed`, `optimistic` and `pending`, and the components' memoised context values
   // are reused across renders that change none of them. They read the props of the last
   // committed render through `props`; they run from handlers, actions and effects, never render.
-  const props = useLatest({ committed, isControlled, action, transitionTypes });
+  const props = useLatest({ committed, isControlled, action, transitionTypes, reducer });
 
+  /**
+   * Marks a dispatch settled. When it was the last one in flight, the uncontrolled reducer-mode
+   * dispatches of the burst that resolved are committed, in dispatch order (see `reducer`).
+   */
   const settle = useCallback((): void => {
     inFlight.current.count -= 1;
-    if (inFlight.current.count === 0) inFlight.current.next = undefined;
+    if (inFlight.current.count > 0) return;
+    inFlight.current.next = undefined;
+    const resolved = burst.current.filter((entry) => entry.resolved);
+    burst.current = [];
+    if (resolved.length === 0) return;
+    startTransition(() =>
+      setInternal((prev) =>
+        resolved.reduce((value, entry) => entry.reducer(value, entry.next, entry.details), prev),
+      ),
+    );
   }, []);
 
   const dispatch = useCallback(
     (next: T, details: Details): void => {
       // Read once, at the call, as the per-render closure did: the action, the mode and the
       // previous value belong to the UI the user acted on, even after the `await`.
-      const { committed: prev, isControlled, action, transitionTypes } = props.current;
+      const { committed: prev, isControlled, action, transitionTypes, reducer } = props.current;
       const id = ++latest.current;
       inFlight.current.count += 1;
       inFlight.current.next = next;
+      // Uncontrolled with a reducer: committed from the burst once every dispatch settled.
+      const entry: BurstEntry<T, Details> | null =
+        !isControlled && reducer ? { next, details, reducer, resolved: false } : null;
+      if (entry) burst.current.push(entry);
       startOwnTransition(async () => {
         for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
         setOptimistic({ next, details });
@@ -147,18 +168,20 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
           await action?.(next, details);
         } catch (error) {
           settle();
-          // The latest dispatch's rejection takes React's own route to the boundary.
+          // The latest dispatch's rejection takes React's own route to the boundary. React drops
+          // a superseded one (it keeps only the newest thenable): it is reported instead (2.4).
           if (id === latest.current) throw error;
-          captureSuperseded(error);
+          reportSuperseded(error);
           return;
         }
+        if (entry) entry.resolved = true;
         settle();
-        if (!isControlled && id === latest.current) {
+        if (!isControlled && !entry && id === latest.current) {
           startTransition(() => setInternal(next));
         }
       });
     },
-    [props, settle, setOptimistic, captureSuperseded],
+    [props, settle, setOptimistic],
   );
 
   const latestInFlight = useCallback((): { readonly next: T } | null => {

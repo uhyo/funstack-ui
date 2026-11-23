@@ -1,6 +1,7 @@
 // Unit rows for `useControllableAction` that no component suite isolates. The state model itself
 // (optimistic, transitions) is covered through every component's suite; the superseded-rejection
-// rules (boundary, one per burst, unmount, external capture) also have direct rows here.
+// rules (reportError, not the boundary; every one of a burst; unmount; the console fallback) and
+// the uncontrolled reducer commit (#150) also have direct rows here.
 import { act, render } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { deferred, ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
@@ -162,25 +163,26 @@ describe("useControllableAction: referential stability", () => {
 
 describe("useControllableAction: superseded rejections", () => {
   /** Three dispatches whose actions settle when the test says; the Probe sits in a boundary. */
-  function setupBurst(options: { captureSuperseded?: (error: unknown) => void } = {}) {
+  function setupBurst() {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
     const runs = [deferred(), deferred(), deferred()];
     let call = 0;
     const caught = vi.fn();
     let hook!: Hook;
-    function CaptureProbe({ onHook }: { onHook: (h: Hook) => void }) {
+    function BurstProbe({ onHook }: { onHook: (h: Hook) => void }) {
       const h = useControllableAction<string, ActionDetails>({
         controlled: undefined,
         defaultValue: undefined,
         initialValue: "",
         action: () => runs[call++]!.promise,
-        captureSuperseded: options.captureSuperseded,
       });
       onHook(h);
       return <output data-testid="value">{h.committed}</output>;
     }
     const view = render(
       <ErrorCatcher onError={caught}>
-        <CaptureProbe onHook={(h) => (hook = h)} />
+        <BurstProbe onHook={(h) => (hook = h)} />
       </ErrorCatcher>,
     );
     act(() => {
@@ -188,56 +190,147 @@ describe("useControllableAction: superseded rejections", () => {
       hook.dispatch("b", {} as ActionDetails);
       hook.dispatch("c", {} as ActionDetails);
     });
-    return { runs, caught, view };
+    return { runs, caught, reportError, view };
   }
 
-  it("throws a superseded dispatch's rejection to the boundary while the latest is pending", async () => {
-    silenceErrors();
-    const { runs, caught } = setupBurst();
-    await act(async () => runs[0]!.reject(new Error("older")));
-    expect(caught).toHaveBeenCalledTimes(1);
-    expect((caught.mock.calls[0]![0] as Error).message).toBe("older");
+  it("reports a superseded dispatch's rejection instead of throwing it", async () => {
+    const { runs, caught, reportError, view } = setupBurst();
+    const older = new Error("older");
+    await act(async () => runs[0]!.reject(older));
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+    expect(caught).not.toHaveBeenCalled();
+    await act(async () => {
+      runs[1]!.resolve();
+      runs[2]!.resolve();
+    });
+    expect(view.getByTestId("value").textContent).toBe("c");
+    expect(reportError).toHaveBeenCalledTimes(1);
   });
 
-  it("throws the first of a burst and reports the later ones through reportError", async () => {
+  it("reports every superseded rejection; the latest one reaches the boundary", async () => {
     silenceErrors();
-    const reportError = vi.fn();
-    vi.stubGlobal("reportError", reportError);
-    const { runs, caught } = setupBurst();
+    const { runs, caught, reportError } = setupBurst();
     const first = new Error("first");
     const second = new Error("second");
+    const latest = new Error("latest");
     await act(async () => {
       runs[0]!.reject(first);
       runs[1]!.reject(second);
     });
-    expect(caught).toHaveBeenCalledExactlyOnceWith(first);
-    expect(reportError).toHaveBeenCalledExactlyOnceWith(second);
-    vi.unstubAllGlobals();
+    expect(reportError.mock.calls).toEqual([[first], [second]]);
+    expect(caught).not.toHaveBeenCalled();
+    await act(async () => runs[2]!.reject(latest));
+    expect(caught).toHaveBeenCalledExactlyOnceWith(latest);
+    expect(reportError).toHaveBeenCalledTimes(2);
   });
 
-  it("drops superseded rejections once unmounted: nothing thrown or reported", async () => {
+  it("still reports superseded rejections once unmounted; nothing is thrown", async () => {
     const consoleError = silenceErrors();
-    const reportError = vi.fn();
-    vi.stubGlobal("reportError", reportError);
-    const { runs, caught, view } = setupBurst();
+    const { runs, caught, reportError, view } = setupBurst();
     view.unmount();
+    const first = new Error("first");
     await act(async () => {
-      runs[0]!.reject(new Error("first"));
-      runs[1]!.reject(new Error("second"));
+      runs[0]!.reject(first);
+      runs[1]!.resolve();
       runs[2]!.resolve();
     });
     expect(caught).not.toHaveBeenCalled();
-    expect(reportError).not.toHaveBeenCalled();
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(first);
     expect(consoleError).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
   });
 
-  it("hands superseded rejections to an external captureSuperseded instead of throwing", async () => {
-    const capture = vi.fn();
-    const { runs, caught } = setupBurst({ captureSuperseded: capture });
+  it("logs with console.error where there is no reportError", async () => {
+    const consoleError = silenceErrors();
+    const { runs, caught } = setupBurst();
+    vi.stubGlobal("reportError", undefined);
     const older = new Error("older");
     await act(async () => runs[0]!.reject(older));
-    expect(capture).toHaveBeenCalledExactlyOnceWith(older);
+    expect(consoleError).toHaveBeenCalledExactlyOnceWith(older);
     expect(caught).not.toHaveBeenCalled();
+  });
+});
+
+// #150: a set-valued (reducer) state commits, uncontrolled, the dispatches that resolved, folded in
+// dispatch order once all of them settled; a rejected dispatch leaves no trace.
+describe("useControllableAction: uncontrolled reducer commits", () => {
+  interface Toggle extends ActionDetails {
+    readonly item: string;
+    readonly on: boolean;
+  }
+  type SetHook = ControllableAction<readonly string[], Toggle>;
+  const apply = (prev: readonly string[], details: Toggle): readonly string[] =>
+    details.on
+      ? [...prev.filter((v) => v !== details.item), details.item].sort()
+      : prev.filter((v) => v !== details.item);
+
+  function setupSet(controlled?: readonly string[]) {
+    vi.stubGlobal("reportError", vi.fn());
+    const runs = [deferred(), deferred(), deferred(), deferred()];
+    let call = 0;
+    let hook!: SetHook;
+    function SetProbe({ onHook }: { onHook: (h: SetHook) => void }) {
+      const h = useControllableAction<readonly string[], Toggle>({
+        controlled,
+        defaultValue: undefined,
+        initialValue: [],
+        action: () => runs[call++]!.promise,
+        reducer: (prev, _next, details) => apply(prev, details),
+      });
+      onHook(h);
+      return (
+        <output data-testid="value">
+          {h.committed.join(",")}|{h.optimistic.join(",")}
+        </output>
+      );
+    }
+    const view = render(<SetProbe onHook={(h) => (hook = h)} />);
+    /** Dispatches a toggle on top of the shown (optimistic) set, as the components do. */
+    const toggle = (item: string, on: boolean) => {
+      const details = { event: undefined, item, on } as Toggle;
+      hook.dispatch(apply(hook.optimistic, details), details);
+    };
+    return { runs, toggle, value: () => view.getByTestId("value").textContent };
+  }
+
+  it.each([
+    ["the rejection first", [0, 1]],
+    ["the resolution first", [1, 0]],
+  ] as const)("drops a rejected item's change (%s)", async (_label, order) => {
+    const { runs, toggle, value } = setupSet();
+    act(() => toggle("a", true));
+    act(() => toggle("b", true));
+    expect(value()).toBe("|a,b");
+    for (const i of order) {
+      await act(async () => {
+        if (i === 0) runs[0]!.reject(new Error("a failed"));
+        else runs[1]!.resolve();
+      });
+    }
+    expect(value()).toBe("b|b");
+  });
+
+  // Discriminating: dispatch order gives {c}; resolution order would give {a, c}; the old
+  // latest-dispatch commit gave {b, c} (the latest `next` included the rejected b).
+  it("applies the resolved changes in dispatch order, whatever order they resolve in", async () => {
+    const { runs, toggle, value } = setupSet();
+    act(() => toggle("a", true));
+    act(() => toggle("a", false));
+    act(() => toggle("b", true));
+    act(() => toggle("c", true));
+    expect(value()).toBe("|b,c");
+    await act(async () => runs[1]!.resolve());
+    await act(async () => runs[0]!.resolve());
+    await act(async () => runs[2]!.reject(new Error("b failed")));
+    // Still in flight: nothing is committed before every dispatch settled.
+    expect(value()).toBe("|b,c");
+    await act(async () => runs[3]!.resolve());
+    expect(value()).toBe("c|c");
+  });
+
+  it("controlled: never writes", async () => {
+    const { runs, toggle, value } = setupSet(["x"]);
+    act(() => toggle("a", true));
+    await act(async () => runs[0]!.resolve());
+    expect(value()).toBe("x|x");
   });
 });

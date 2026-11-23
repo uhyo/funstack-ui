@@ -1241,6 +1241,42 @@ describe("Accordion", () => {
     });
   });
 
+  // #150 review: exclusive mode is single-valued, so the latest resolved dispatch commits its
+  // `next`; the item the user moved away from never comes back.
+  describe("exclusive: a rejected open, then a resolved close (uncontrolled)", () => {
+    it.each([
+      ["the rejection first", [0, 1]],
+      ["the resolution first", [1, 0]],
+    ] as const)("ends with nothing open (%s)", async (_label, order) => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const ds = sequencedDeferreds(2);
+      const action = vi.fn<ActionFn>(() => ds.next());
+      const caught = vi.fn();
+      render(
+        <Harness mode="uncontrolled" exclusive initial="a" action={action} boundary={caught} />,
+      );
+      const user = setupUser();
+      await user.click(trigger("b"));
+      await user.click(trigger("b"));
+      expect(action.mock.calls.map(([next]) => next)).toEqual(["b", null]);
+      const err = new Error("open b failed");
+      for (const i of order) {
+        await act(async () => {
+          if (i === 0) ds[0]!.reject(err);
+          else ds[1]!.resolve();
+        });
+      }
+      expect(caught).not.toHaveBeenCalled();
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+      for (const v of ["a", "b", "c"]) {
+        expectOpenAttr(item(v), false);
+        expect(trigger(v)).not.toHaveAttribute("data-open");
+      }
+      expectNotPending(root());
+    });
+  });
+
   describe("multiple-mode value order", () => {
     it("lists open items in document order, not in the order they were opened", async () => {
       const action = vi.fn<ActionFn>();
