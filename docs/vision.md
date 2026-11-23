@@ -24,8 +24,8 @@ for backwards compatibility; if React were designed today, transitions would be 
 urgent updates would be the opt-out. FUNSTACK UI builds this principle in: state updates triggered
 through the library are transitions unless there is a specific reason for urgency.
 
-(The urgent opt-out exists only where React itself requires it, today the text of a controlled
-text input in a Combobox; see the one exception in principle 3.)
+(Urgency is used only where the change is a fact the library cannot hold, such as the text of a
+controlled text input or a popup the user dismissed; see `on*` handlers in principle 3.)
 
 ### 3. Action props instead of event handlers
 
@@ -34,14 +34,23 @@ Following the "action props" pattern from the React docs, interactive props are 
 wraps them in a transition. Actions may be async (return a promise). The library's preferred API
 offers action props, **not** traditional `onClick`-style handlers.
 
-The suffix is a contract: a prop named `action` or `fooAction` is **always** a handler the
-component runs inside a transition, never anything else. The **one exception** is forced by React,
-not chosen: the text of a controlled text input must update synchronously, in the same event as
-the keystroke ("Transition updates can't be used to control text inputs"). Such a prop is a plain
-synchronous handler, so it is named like one, `on<State>Change` (`Combobox.Root`'s
-`onInputValueChange`), typed `UrgentChangeHandler`, and it is the only `on*` prop form the
-library defines. Nothing else is an `on*` prop: every other state change, including everything
-the urgent text drives (opening, selecting, the query), is an action.
+The name is a contract, and it separates requests from facts:
+
+- A prop named `action` or `fooAction` is a **request**: a change the library can still roll back.
+  The component calls it before the change is committed, inside a transition, and awaits it. A
+  rejection, or a controlled parent that does not adopt the value, rolls the UI back, so the change
+  has pending and optimistic state. Native form controls fit here even when the browser changes the
+  DOM first (a click on a checkbox, a form reset): the DOM is the optimistic state and is restored
+  on failure.
+- A prop named `onFoo` reports a **fact**: a change that had already happened when the library heard
+  of it and that it could not hold, such as the text of a controlled input (React requires it to
+  update synchronously) or a popup the user dismissed with Escape. Every `on*` handler the library
+  defines follows one rule: it is called synchronously, outside any transition, and is not awaited,
+  so there is no pending state. It may return a promise; a rejected promise or a thrown error goes
+  to `reportError`.
+
+Most state has only an action. Where both kinds of change exist (an overlay's `open`), a component
+offers both props, `openChangeAction` and `onOpenChange`.
 
 Consequences:
 
