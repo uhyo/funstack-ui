@@ -35,8 +35,9 @@ export function RoadmapPage() {
           rejection still reaches the Error Boundary (<a href={issue(145)}>#145</a>).
         </li>
         <li>
-          Uncontrolled CheckboxGroup, ToggleGroup and multi-item Accordion no longer commit a change
-          whose action rejected when a later change's action resolved (<a href={issue(150)}>#150</a>
+          Uncontrolled CheckboxGroup, and ToggleGroup and Accordion without <code>exclusive</code>,
+          no longer commit a change whose action rejected when a later change's action resolved (
+          <a href={issue(150)}>#150</a>
           ).
         </li>
         <li>

@@ -266,11 +266,14 @@ valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
         <code>AbortController</code> in a ref inside your action.
       </p>
       <p>
-        Components whose value is a set of items (CheckboxGroup, ToggleGroup and Accordion with
-        several items open) commit each change on its own instead: once every overlapping action has
-        settled, the changes whose actions resolved are applied in the order they were made, and a
-        change whose action rejected is left out. Check A, then B: if saving A fails and saving B
-        succeeds, the uncontrolled group ends with only B checked.
+        Components whose value is a set of items (CheckboxGroup, and ToggleGroup and Accordion
+        without <code>exclusive</code>) commit each change on its own instead: once every
+        overlapping action has settled, the changes whose actions resolved are applied in the order
+        they were made, and a change whose action rejected is left out. Check A, then B: if saving A
+        fails and saving B succeeds, the uncontrolled group ends with only B checked. B's action
+        still received <code>["A", "B"]</code> as <code>next</code>, because A was pending when B
+        was clicked, so save <code>details.added</code> and <code>details.removed</code> rather than
+        the whole <code>next</code>.
       </p>
       <p>
         If your actions must run in order, one after another, or each must build on the result of
