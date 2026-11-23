@@ -228,6 +228,22 @@ Rules:
   `data-pending`. Before #81 a second click was a second dispatch ("harmless for an idempotent
   Undo", not for a Retry).
 
+**Amended 2026-11-23 (#146, conventions 2.5.1; design only, not implemented).** The guard of #81
+is now the prop `whilePending` on `Toast.Action`; the last bullet above describes
+`whilePending="ignore"`. The Action is of **mixed ownership**: the `action` is the consumer's
+(the part's prop or the toast's `action.action`), the close on settle and the paused timer are
+the library's. Recommended default, **open** (conventions "Open questions" 3): it follows
+`closeOnSettle`: `"ignore"` while the toast closes on settle (the default: one Undo, one Retry,
+then the toast leaves), `"run"` with `closeOnSettle={false}` (the toast stays and the button is
+a user-owned trigger; add `whilePending="ignore"` for a Retry that must not overlap). In `"run"`
+mode: `data-pending` on the Action and the Root and the paused timer last until every run has
+settled, no `aria-disabled` from pending, the toast closes once (closing is idempotent), an
+older run's rejection goes to `reportError` and the latest one's to the boundary above the
+Viewport, or to `reportError` once the toast has left (conventions 2.4, #145, #152). The prop is
+on the part only: `ToastActionOptions` (`toast({ action: { label, action } })`) gets no
+`whilePending` field, since the part is where the consumer renders the button (sub-question of
+3).
+
 When the action resolves, the toast closes with `details.reason: "activate"` (`closeOnSettle`,
 default `true`; `false` keeps it, for an action that only navigates). When it rejects, the toast
 stays and the error reaches the nearest Error Boundary above the Viewport; a consumer who wants
@@ -806,6 +822,7 @@ export interface ToastActionState { readonly pending: boolean; readonly toast: T
 export interface ToastActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "className" | "style" | "onClick"> {
   readonly action?: Action<[ToastActionDetails]>;  // default toast.action?.action
   readonly closeOnSettle?: boolean;                 // default true
+  readonly whilePending?: WhilePending;             // #146, section 3.2: default (recommended, open) closeOnSettle ? "ignore" : "run"
   readonly children?: StateValue<ReactNode, ToastActionState>; // default toast.action?.label
   // className / style / render / ref as above
 }

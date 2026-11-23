@@ -735,6 +735,13 @@ export interface DialogCloseProps
    * button is a native `command="request-close"` invoker.
    */
   action?: Action<[details: DialogCloseDetails]>;
+  /**
+   * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
+   * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the dialog
+   * still closes once. No effect without `action`. Conventions 2.5.1 (#146).
+   * Default `"ignore"` (recommended; open question 1 in the conventions).
+   */
+  whilePending?: WhilePending;
   /** Becomes `dialog.returnValue` (and `details.returnValue` of the close notification). */
   value?: string;
   /** Native `disabled`; owned, so a `render` element cannot re-enable the button. */
@@ -777,6 +784,20 @@ for as long as it shows `data-pending`, which here spans the action and the clos
 #81 repeated clicks re-ran the action and the first `requestClose` won; the superseded-rejection
 path is no longer reachable from a Close (conventions 2.5, 10.1). Without `action` nothing
 changed: a repeated click finds `false` already intended and does nothing.
+
+**Amended 2026-11-23 (#146, conventions 2.5.1; design only, not implemented).** The guard of #81
+is now the prop `whilePending`. `Dialog.Close` is a part whose activation the library owns (it
+closes the dialog with no user code), so it keeps ignoring by default: the #81 text above describes
+`whilePending="ignore"`. That default is a **user decision** for the Close as such; for a Close
+that is given an `action` (mixed ownership: the consumer's function, then the library's close)
+it is the architect's **recommendation, open** (conventions "Open questions" 1). With
+`whilePending="run"` every click runs the action again in the part's transition: `data-pending`
+until every run has settled, **no** `aria-disabled` from pending, and each run that resolves
+requests the close, which happens once (idempotent, and dropped for a stale open as below). An
+older run's rejection goes to `reportError`, the latest one's to the boundary above the Close,
+and a run that rejects after an earlier run closed the overlay and unmounted the part is
+reported too (conventions 2.4, #145, #152). Without `action` the prop has no effect: nothing of
+the part's own is pending, and a repeated click finds the close already intended.
 
 **Rejection and veto.** The action rejects: nothing was dispatched, the dialog stays open, the
 error reaches the boundary nearest the Close. `openChangeAction(false)` rejects: the dialog is

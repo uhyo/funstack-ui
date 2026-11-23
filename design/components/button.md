@@ -35,6 +35,10 @@ Radix Themes `loading`, GOV.UK `preventDoubleClick`.
 
 ## Decisions at a glance
 
+> **Amended 2026-11-23 (#146, section 18).** Rows 3 to 5 describe the guard as unconditional.
+> It is now the prop `whilePending`: a Button runs every activation by default and ignores
+> re-entry (with `aria-disabled="true"`) only with `whilePending="ignore"`.
+
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Anatomy | One plain component, `Button` (`@funstack/ui/button`), a `<button type="button">` by default; `render` allowed (`<a href>` included). No parts, no `.Root`. |
@@ -247,16 +251,18 @@ export interface ButtonProps extends Omit<
   /**
    * Runs inside this Button's own transition on click, Enter or Space (`data-pending` meanwhile).
    * Sync or async; may be a Server Function. A rejection reaches the nearest Error Boundary above
-   * the Button. While it is pending the Button ignores further activation and renders
-   * `aria-disabled="true"`. Not combinable with `formAction` (development error).
+   * the Button. A further activation while it is pending runs as well, unless
+   * `whilePending="ignore"` (section 18). Not combinable with `formAction` (development error).
    */
   action?: Action<[details: ButtonActionDetails]>;
+  /** `"run"` (default) or `"ignore"`: section 18.1, conventions 2.5.1 (#146). */
+  whilePending?: WhilePending;
   /**
    * React's `formAction`: a function (a Server Function, a `useActionState` dispatch, a client
    * function) or a URL, run by React instead of the form's `action` when this Button submits the
    * form. With a function, the Button is `pending` while its own submission runs (not while
-   * another submitter's does), ignores further activation meanwhile, and defaults to
-   * `type="submit"`.
+   * another submitter's does) and defaults to `type="submit"`. A further activation meanwhile
+   * submits again unless `whilePending="ignore"` (section 18.3).
    */
   formAction?: ComponentPropsWithRef<"button">["formAction"];
   /**
@@ -367,6 +373,10 @@ CSS hooks next to the attributes: `:focus-visible`, `:hover`, `:active` (platfor
 ---
 
 ## 5. Pending and re-entry
+
+> **Amended 2026-11-23 (#146, section 18).** This section describes a Button with
+> `whilePending="ignore"`. The default is `"run"`: every activation runs, nothing is cancelled,
+> no `aria-disabled` while pending. 5.4 ("No opt-out prop") is replaced by the prop.
 
 ### 5.1 The click handler
 
@@ -1342,3 +1352,162 @@ accepted; the review's items decided as follows and folded into 16 and 17 above.
 | W9 | Review L2: the NumberField disabled-link `preventDefault()` row clicks with `detail: 0`. | Developer adds a `detail: 1` assertion. | 17.3 |
 | W10 | Review L3: a pointer press on a disabled focusable step render takes focus from the input (`pointerdown` returns before `preventDefault()`). | **Accept the suggestion**: cancel the `pointerdown` when disabled too, so a disabled step button never steals focus (Combobox.Trigger / Clear already cancel unconditionally). | 17.1 NumberField row |
 | W11 | Review L4: the #81 changelog says "behaviour change"; a consumer counting clicks through `Menu.Item` / `Toast.Action` changes result silently. | Flag it in the alpha.7 release notes as breaking for that pattern, pointing at the non-awaiting spelling; 16.5 amended by this row. | 16.5 |
+
+---
+
+## 18. #146: `whilePending` (the guard becomes a prop)
+
+Status: **design amendment, 2026-11-23.** The prop, its `"ignore"` value and Button's default
+(every activation runs) are a **user decision, accepted** (issue #146). The opt-out value
+`"run"` and the `formAction` consequence are recommendations, open in
+`design/conventions.md` "Open questions" (5 and 4). Not implemented. The library-wide rule and
+the classification of every pure trigger are conventions 2.5.1; this section is Button's share
+and the developer's work list. It supersedes decisions 3 to 5, sections 5.2 to 5.5 where they
+say "always", and the defaults of section 16.
+
+### 18.1 The prop
+
+```ts
+export interface ButtonProps /* … */ {
+  /**
+   * What an activation does while this Button's own `action` (or its own function `formAction`
+   * submission) is pending. `"run"`: it runs as well; the Button shows `data-pending` until
+   * every run has settled. `"ignore"`: it starts nothing, its default action is cancelled (no
+   * second submit, navigation or command), and the Button renders `aria-disabled="true"` while
+   * pending. Use `"ignore"` for an action that must not run twice (Save, Pay, Delete).
+   *
+   * @defaultValue `"run"`
+   */
+  whilePending?: WhilePending;   // "run" | "ignore", conventions 2.5.1 and 9.4
+}
+```
+
+```tsx
+<Button action={async () => { await incrementOnServer(); }}>+1</Button>   // counts every click
+<Button action={save} whilePending="ignore">Save</Button>                 // one save at a time
+<Button formAction={publish} whilePending="ignore">Publish</Button>       // one submission at a time
+```
+
+Why Button's default is `"run"`: Button is the fully user-owned trigger; the library does
+nothing on a click but run the consumer's function, so it has no ground for a policy on how
+often (conventions 2.5.1). It is also what React's `useTransition` and `<button formAction>` do.
+The cost is stated plainly: **a double click on an unguarded Save runs the save twice**, the bug
+#79 built the guard for. The docs lead the Save example with `whilePending="ignore"`.
+
+### 18.2 Behaviour by value
+
+| | `"run"` (default) | `"ignore"` |
+| --- | --- | --- |
+| Second click, Enter, Space while pending | runs `action` again, in the same transition hook | starts nothing |
+| The click's default action (link navigation, `command`, the `formAction` submission) | not touched by the Button | `preventDefault()`ed |
+| `data-pending`, `state.pending` | from the first run until the last has settled and committed | while the one run is pending |
+| `aria-disabled="true"` from pending | **never** | exactly while `data-pending` |
+| `data-disabled`, `state.disabled` | the `disabled` prop only | the `disabled` prop only |
+| Two runs in flight | yes | never |
+| An older run rejects | `reportError`, once (conventions 2.4, #145) | unreachable |
+| The latest run rejects | Error Boundary above the Button, after older runs settled | Error Boundary above the Button |
+| Guard source | none | the in-flight counter (5.2), or `formPending` for a function `formAction` |
+
+The click handler of 5.1 changes in two places; `ignoring` is `(whilePending ?? "run") === "ignore"`:
+
+```ts
+if (action === undefined) {
+  if (ignoring && formPending) { event.preventDefault(); return; }   // was: if (formPending)
+  submittedWith.current = formAction;
+  return;
+}
+const started = run(() => action(details));   // useActionTrigger({ ignoreWhilePending: ignoring })
+if (!started) event.preventDefault();
+// …
+"aria-disabled": (pending && ignoring) || (disabled && focusable) ? true : undefined,
+```
+
+Everything else in section 5 holds under `"ignore"` as written: the counter-only guard and the
+settled-but-held window (5.2), `aria-disabled` and never native `disabled` (5.3). 5.4 ("No
+opt-out prop") is replaced by the prop; the `void increment()` spelling stays valid for "the UI
+must not wait" but is no longer needed to count clicks.
+
+`disabled` wins over both values. A Button with neither `action` nor a function `formAction` is
+never pending, so the prop does nothing there (no warning). Composition (7.1) is unchanged: in
+`"run"` mode a `Dialog.Trigger render={<Button action={a} />}` runs `a` on every click, as the
+Trigger dispatches on every click.
+
+### 18.3 `formAction`
+
+Under `"run"` a `Button formAction={fn}` is React's submitter with per-submitter pending (6.2)
+and nothing more: a second click submits again, `pending` stays until React's form status
+clears. Overlapping submissions are React's form channel, where **React drops the rejection of
+an older overlapping submission** and the library cannot see it (conventions 2.5.1, open
+question 4). Under `"ignore"` the guard is `formPending` as in 5.2, with its documented
+difference (a render value: a click in a held-commit window is ignored). 6.5 (implicit
+submission): Enter in a field submits again under `"run"`, is cancelled under `"ignore"`.
+
+### 18.4 The other pure triggers (replaces the defaults of section 16)
+
+Conventions 2.5.1 has the table. For the developer: `Dialog.Close`, `Popover.Close`
+(`useOverlayClose`), `Menu.Item` and `Toast.Action` each gain `whilePending?: WhilePending`,
+compute their default, pass `ignoreWhilePending` to the hook and render `aria-disabled` from
+`pending && ignoring`. Recommended defaults, **open** until the user answers questions 1 to 3:
+Close parts `"ignore"`; `Menu.Item` `closeOnActivate ? "ignore" : "run"`; `Toast.Action`
+`closeOnSettle ? "ignore" : "run"`. `useActionTrigger`'s own default becomes `false`
+(conventions 3.4); Slider and NumberField are unaffected. The branch `fix/151-152` merges first;
+nothing here depends on its internals, only on its public behaviour (a latest rejection after
+the part left is reported).
+
+### 18.5 Tests
+
+`button.test.tsx` / `button.browser.test.tsx` (section 13 rows):
+
+| Row | Change |
+| --- | --- |
+| Top-of-file comment | Overlap and Superseded rejection are no longer N/A for Button: required in `"run"` mode, N/A in `"ignore"` mode. |
+| 3 Async action | Default: `data-pending`, **no** `aria-disabled`. With `whilePending="ignore"`: the current assertions. |
+| 5 Re-entry | Whole row under `whilePending="ignore"`. |
+| 5b Every activation runs (new) | Default and explicit `"run"`: while a deferred action pends, a click, an Enter and a Space make three more calls; none is `defaultPrevented`; two `fireEvent.click`s in one `act` call it twice; no `aria-disabled`; runs resolved out of order: `data-pending` stays until the last; `render={<a href>}`: the second click is not cancelled. |
+| 5c Overlap, Superseded rejection (new) | Conventions 10.1 rows for `"run"`: the older run rejects after, and separately while, the newer pends: stubbed `reportError` once, not the catcher; the latest rejects: catcher; a burst of three. |
+| 5d Prop change (new) | `"run"` to `"ignore"` while a run pends: `aria-disabled` appears with the re-render and the next click is ignored; back to `"run"`: it runs. |
+| 6 Settled-but-held | Under `"ignore"` (unchanged). Under the default the "+1 three times" probe needs no special case: three calls. |
+| 8 Suspending content | "clicks ignored meanwhile" is under `"ignore"`; default: a click runs. |
+| 10 Consumer state after await | Default: commits once per click. |
+| 11 `formAction` per-submitter | Default: click A again: `a` called twice, the click not `defaultPrevented`, no `aria-disabled`. With `"ignore"`: the current assertions. |
+| 15 Trigger-wrapped | "a second click leaves `a` at one call" needs `whilePending="ignore"`; default: two calls. |
+| 18 Types | `whilePending` accepts `"run"` / `"ignore"`, rejects `true` and other strings; `WhilePending` exported from the root. |
+| 22 Invoker Command + action (browser) | `"ignore"`: unchanged. Default: the second click runs the action and the command (the popover toggles closed). |
+| 24 Implicit submission (browser) | `"ignore"`: unchanged. Default: the second Enter submits again. |
+| 26 Accessibility tree (browser) | Under `"ignore"`; default: no disabled state on the pending Button. |
+
+Other suites (section 16.4 rows), with the recommended defaults:
+
+| Suite | Change |
+| --- | --- |
+| `dialog.test.tsx`, `popover.test.tsx` | D1, D2, D3, P1, P2 unchanged: they now pin the **default**. New D7 / P5, `whilePending="run"` with `action`: a second click calls `action` again, no `aria-disabled`, `data-pending` until both settle, one `openChangeAction(false)` / one `close()` / one `hidePopover()`, the stale-close guard still holds; the older run rejects: `reportError`; the first resolves and closes, the second rejects after the part left: `reportError` (#152). |
+| `menu.test.tsx` | M1 unchanged (default, `closeOnActivate`). **M2 flips**: a `closeOnActivate={false}` Item runs every activation by default (two calls, no `aria-disabled`) and ignores with `whilePending="ignore"`. New: a closing Item with `whilePending="run"`: two calls, one close. M3 (navigation over a pending item) under `"ignore"`. Overlap / Superseded rejection rows for the `"run"` cases. If question 2 is answered (b), M2 stays as it is. |
+| `toast.test.tsx` | T1 unchanged. The `closeOnSettle={false}` variant (W6) **flips**: two clicks, two calls by default; `whilePending="ignore"` restores one. The timer stays paused and the Root `data-pending` until every run settled. If question 3 is answered (b), it stays. |
+| `use-action-trigger.test.tsx` | H1: the default is `false` (runs overlap); the guard rows run under `{ ignoreWhilePending: true }`. |
+| `slider.test.tsx`, `number-field.test.tsx` | Unchanged (H2 keeps guarding that steps run). |
+| Type tests | `whilePending` on the four parts; absent on `Menu.CheckboxItem`, `Menu.RadioItem`, `Form.Submit`, `Toast.Close`. |
+
+About sixty guard assertions exist today (most in `button.test.tsx` and
+`use-action-trigger.test.tsx`); the bulk move under the prop rather than disappear.
+
+### 18.6 Docs
+
+- **Pending & optimistic page** (`PendingOptimisticPage.tsx`, "A second click while pending",
+  and the pure-trigger definition that links to it): rewritten around the ownership rule, with
+  the counter and the Save examples side by side.
+- **Action props page** (`ActionPropsPage.tsx`): the sentence on pure triggers; remove "do not
+  await" as the way to count clicks.
+- **Button page**: props table row `whilePending` (default `"run"`), the `aria-disabled` text,
+  the `formAction` caveat of 18.3; `ButtonSave.tsx` and `ButtonFormActions.tsx` examples gain
+  `whilePending="ignore"`; a "+1" example shows the default; check `button.css` and the other
+  example stylesheets: a rule that styles pending through `[aria-disabled]` moves to
+  `[data-pending]`.
+- **Dialog, Popover, Menu, Toast pages**: props table row on Close / Item / Action with the
+  default (and its dependency on `closeOnActivate` / `closeOnSettle` if questions 2 and 3 are
+  answered (a)); the "second click is ignored" sentences name the prop.
+- Toolbar and ToggleGroup pages where they describe a pending `Button`; the Roadmap page; the
+  agent skill (`packages/ui/skills/funstack-ui-knowledge/SKILL.md`); JSDoc of the five parts
+  and of `useActionTrigger`; the playground (`button-demo.tsx`, `toolbar-demo.tsx`).
+- **Release notes: breaking for `Button`** (a pending Button no longer ignores clicks or
+  renders `aria-disabled` unless `whilePending="ignore"`), and for keep-open Items / Actions if
+  questions 2 and 3 are answered (a).
