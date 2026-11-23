@@ -6,6 +6,7 @@ import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { PopoverActions } from "../examples/PopoverActions.js";
 import { PopoverShare } from "../examples/PopoverShare.js";
+import { PopoverSlowOpen } from "../examples/PopoverSlowOpen.js";
 import { functionProps, renderProp } from "./shared-props.js";
 
 export function PopoverPage() {
@@ -585,6 +586,35 @@ html:active-view-transition .popover { transition: none; }
             blink. Adopt <code>false</code> for dismissals.
           </p>
         </Callout>
+        <h4 id="slow-open-change-action">
+          A slow <code>openChangeAction</code>
+        </h4>
+        <p>
+          Here every <code>openChangeAction</code> call takes 2 seconds, like a server call. The
+          Trigger is exposed as expanded exactly while the popup is shown:
+        </p>
+        <Example file="PopoverSlowOpen.tsx" css="popover.css">
+          <PopoverSlowOpen />
+        </Example>
+        <ul>
+          <li>
+            Open: the Trigger gets <code>data-open</code> and <code>data-pending</code> at once
+            (here a spinner and ▴) and stays collapsed; the popup is shown, and the Trigger
+            expanded, when the action settles.
+          </li>
+          <li>
+            Close with the Trigger or Close: <code>data-open</code> goes at once, the popup stays
+            shown and the Trigger expanded until the action settles.
+          </li>
+          <li>
+            Escape or a click outside: the popup hides and the Trigger is collapsed at once; the
+            Trigger is pending while the <code>reason: "dismiss"</code> notification runs.
+          </li>
+        </ul>
+        <p>
+          The readout under the example is plain text, not a live region, so it does not interrupt a
+          screen reader.
+        </p>
       </BehaviourSection>
 
       <BehaviourSection

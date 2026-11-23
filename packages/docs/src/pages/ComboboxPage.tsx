@@ -6,6 +6,7 @@ import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ComboboxCountry } from "../examples/ComboboxCountry.js";
 import { ComboboxDrink } from "../examples/ComboboxDrink.js";
+import { ComboboxSlowOpen } from "../examples/ComboboxSlowOpen.js";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ComboboxPage() {
@@ -608,7 +609,38 @@ export function ComboboxPage() {
         summary={
           "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. The typed text is urgent, not optimistic (see [the urgent lane](/concepts/action-props#urgent-lane))."
         }
-      />
+      >
+        <h4 id="slow-open-change-action">
+          A slow <code>openChangeAction</code>
+        </h4>
+        <p>
+          Here every <code>openChangeAction</code> call takes 2 seconds, like a server call. The
+          Input's <code>aria-expanded</code>, and the state the browser exposes on the Trigger,
+          follow the shown listbox:
+        </p>
+        <Example file="ComboboxSlowOpen.tsx" css="combobox.css">
+          <ComboboxSlowOpen />
+        </Example>
+        <ul>
+          <li>
+            Open (type, ArrowDown or the Trigger): the Input and the Trigger get{" "}
+            <code>data-open</code> and <code>data-pending</code> at once and stay collapsed; the
+            listbox is shown and both are expanded when the action settles.
+          </li>
+          <li>
+            Accept an option, or press the Trigger again: the listbox stays shown and both stay
+            expanded until the close's action settles.
+          </li>
+          <li>
+            Escape or a click outside: the listbox hides and both are collapsed at once; both are
+            pending while the <code>reason: "dismiss"</code> notification runs.
+          </li>
+        </ul>
+        <p>
+          The readout under the example is plain text, not a live region, so it does not interrupt a
+          screen reader.
+        </p>
+      </BehaviourSection>
 
       <BehaviourSection
         id="suspense"

@@ -5,6 +5,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { MenuRowActions } from "../examples/MenuRowActions.js";
+import { MenuSlowOpen } from "../examples/MenuSlowOpen.js";
 import { MenuViewOptions } from "../examples/MenuViewOptions.js";
 import { functionProps, renderProp } from "./shared-props.js";
 
@@ -689,7 +690,39 @@ export function MenuPage() {
         summary={
           "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the state the browser exposes on the Trigger follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
         }
-      />
+      >
+        <h4 id="slow-open-change-action">
+          A slow <code>openChangeAction</code>
+        </h4>
+        <p>
+          A submenu's <code>Menu.Root</code> has its own <code>openChangeAction</code>. Here both
+          take 2 seconds, like a server call. Each trigger is exposed as expanded exactly while its
+          menu is shown:
+        </p>
+        <Example file="MenuSlowOpen.tsx" css="menu.css">
+          <MenuSlowOpen />
+        </Example>
+        <ul>
+          <li>
+            Open the menu (click, Enter) or the "Sort by" submenu (hover, ArrowRight): the trigger
+            gets <code>data-open</code> and <code>data-pending</code> at once and stays collapsed;
+            the menu is shown, focus moves into it and the trigger is expanded when the action
+            settles.
+          </li>
+          <li>
+            Choose an item, or click the Trigger again: the menu stays shown and the Trigger
+            expanded until the close's action settles.
+          </li>
+          <li>
+            Escape or a click outside: the menu hides and the Trigger is collapsed at once; the
+            Trigger is pending while the <code>reason: "dismiss"</code> notification runs.
+          </li>
+        </ul>
+        <p>
+          The readout under the example is plain text, not a live region, so it does not interrupt a
+          screen reader.
+        </p>
+      </BehaviourSection>
 
       <BehaviourSection
         id="suspense"
