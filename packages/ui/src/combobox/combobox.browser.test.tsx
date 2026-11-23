@@ -926,15 +926,15 @@ describe("Combobox (browser)", () => {
           name !== `::view-transition-${kind}(root)`,
       );
 
-    // Design 12.2, as the shared overlay suite's "a CSS exit (recipe=%s)" rows (#132): Chromium
-    // keeps a closed popup rendered through its CSS fade, so the accept-close's new snapshot
-    // captures it as a live `::view-transition-new` next to the old image (a double image); the
-    // docs' recipe cuts the fade while a view transition runs. Firefox closes at once: the old
-    // image only either way. WebKit: `display: none` by `ready`, pseudo names unreliable. If the
-    // recipe=false row starts failing, an engine changed; re-check the docs' recipe.
-    describe.each([false, true])("a CSS exit (recipe=%s)", (recipe) => {
-      it("an accepted option has the old image, a live new image only where the box still fades (Chromium, recipe=false); the options are not re-mounted", async () => {
-        addExitStyle("fade", "200ms", { openPseudo: ":popover-open", recipe });
+    // Design 12.2, as the shared overlay suite's "plus a CSS exit" rows (#132, #147): the library
+    // cuts the popup's CSS transitions around its own hide while a view transition runs. Without
+    // the cut Chromium keeps a closed popup rendered through its CSS fade, so the accept-close's
+    // new snapshot captures it as a live `::view-transition-new` next to the old image (a double
+    // image). Firefox closes at once either way. WebKit: `display: none` by `ready`, pseudo names
+    // unreliable.
+    describe("a CSS transition on the popup", () => {
+      it("a CSS exit: an accepted option has the old image only, no live new image; the options are not re-mounted", async () => {
+        addExitStyle("fade", "200ms", { openPseudo: ":popover-open" });
         render(<Plain transition={TYPE_MAP} className="fade" />);
         input().focus();
         await press("j");
@@ -961,10 +961,11 @@ describe("Combobox (browser)", () => {
         await transitions[1]!.ready;
         const fading = getComputedStyle(popup()).display !== "none";
         const seen = JSON.stringify({ names: pseudoNames(), fading });
-        expect(fading, seen).toBe(!recipe && browserName === "chromium");
+        expect(fading, seen).toBe(false);
+        expect(popup().style.getPropertyValue("transition")).toBe("");
         if (browserName !== "webkit") {
           expect(popupImages("old").length, seen).toBeGreaterThan(0);
-          expect(popupImages("new").length > 0, seen).toBe(fading);
+          expect(popupImages("new"), seen).toEqual([]);
         }
         await transitions[1]!.finished;
         expect(isOpen()).toBe(false);
@@ -972,6 +973,18 @@ describe("Combobox (browser)", () => {
         expect(calls).toHaveLength(2);
         observer.disconnect();
         expect(mounts).toBe(0);
+      });
+
+      it("a CSS enter: the open runs the view transition only, the popup is opaque at ready", async () => {
+        addExitStyle("fade", "200ms", { openPseudo: ":popover-open" });
+        render(<Plain transition={TYPE_MAP} className="fade" />);
+        input().focus();
+        await press("j");
+        await expect.poll(() => calls.length).toBe(1);
+        await transitions[0]!.ready;
+        expect(isOpen()).toBe(true);
+        expect(getComputedStyle(popup()).opacity).toBe("1");
+        await transitions[0]!.finished;
       });
     });
 

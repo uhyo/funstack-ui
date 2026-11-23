@@ -29,6 +29,17 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          A popup with both a CSS exit and <code>transition</code> no longer needs the rule{" "}
+          <code>html:active-view-transition .my-popup {"{ transition: none; }"}</code> (
+          <a href={issue(147)}>#147</a>;{" "}
+          <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>
+          ). While a view transition runs, the library turns the popup&apos;s CSS transitions off
+          for the moment of its own show or hide, with an inline{" "}
+          <code>transition: none !important</code> that it removes right after. You can delete the
+          rule; if you keep it, an unrelated view transition of the page still cuts a
+          dismissal&apos;s CSS fade, which the library alone no longer does.
+        </li>
+        <li>
           <strong>Breaking:</strong> requests and facts (<a href={issue(148)}>#148</a>;{" "}
           <a href="/concepts/browser-owned-state#requests-and-facts">Requests and facts</a>). On{" "}
           <code>Popover.Root</code>, <code>Menu.Root</code>, <code>Combobox.Root</code> and{" "}

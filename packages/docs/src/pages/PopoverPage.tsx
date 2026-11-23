@@ -539,8 +539,6 @@ export function PopoverPage() {
         <CodeBlock>{`<Popover.Popup transition={{ "fsui-popover-open": "pop-in", "fsui-popover-close": "pop-out", default: "none" }}>`}</CodeBlock>
         <CodeBlock language="css">{`::view-transition-new(.pop-in) { animation: 160ms ease-out both pop-in; }
 ::view-transition-old(.pop-out) { animation: 120ms ease-in both pop-out; }
-/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
-html:active-view-transition .popover { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }`}</CodeBlock>
@@ -551,8 +549,10 @@ html:active-view-transition .popover { transition: none; }
           </li>
           <li>
             Dismissals (Escape, a click outside) are facts: their commit is urgent, so they start no
-            view transition and animate with the CSS exit only. Keep it, and cut it while a view
-            transition runs, as above (
+            view transition and animate with the CSS exit only. Keep it next to{" "}
+            <code>transition</code>: the library turns the popup&apos;s CSS transitions off for the
+            moment of its own show and hide while a view transition runs, so you need no extra rule
+            (
             <a href="/concepts/transitions#css-exit">
               A popup with a CSS exit and a view transition
             </a>

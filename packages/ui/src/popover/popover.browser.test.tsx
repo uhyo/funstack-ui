@@ -53,6 +53,7 @@ import type {
 import { Popover } from "./index.js";
 import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
 import {
+  addStyle,
   flushFor,
   leaveActEnvironment,
   quietPeriod,
@@ -829,6 +830,53 @@ describe("Popover (browser)", () => {
 
   describe("ViewTransition", () => {
     const vt = setUpViewTransitionRows((element) => element.matches(":popover-open"));
+
+    // #147: the library's cut of the CSS transition around its own show / hide also overrides a
+    // consumer's inline `style={{ transition }}` (it is `!important`), and puts it back as React
+    // wrote it, so React's next `style` diff finds what it left.
+    it('transition="pop" with an inline style transition: the cut applies and the inline value is restored', async () => {
+      const fade = "opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete";
+      addStyle(`
+        .inline-fade { opacity: 0; }
+        .inline-fade:popover-open { opacity: 1; }
+        @starting-style { .inline-fade:popover-open { opacity: 0; } }
+      `);
+      render(
+        <Popover.Root defaultOpen={false}>
+          <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+          <Popover.Popup
+            data-testid="popup"
+            aria-label="Filters"
+            transition="pop"
+            className="inline-fade"
+            style={{ ...box(200, 100), transition: fade }}
+          >
+            <span data-testid="content">content</span>
+            <Popover.Close data-testid="close">Rename</Popover.Close>
+          </Popover.Popup>
+        </Popover.Root>,
+      );
+      const before = popup().getAttribute("style");
+      const inline = popup().style.getPropertyValue("transition");
+      expect(inline).not.toBe("");
+      trigger().click();
+      await expect.poll(() => vt.calls.length).toBe(1);
+      await vt.transitions[0]!.ready;
+      // No CSS enter under the view transition's enter.
+      expect(getComputedStyle(popup()).opacity).toBe("1");
+      await vt.transitions[0]!.finished;
+      expect(popup().getAttribute("style")).toBe(before);
+
+      screen.getByTestId("close").click();
+      await expect.poll(() => vt.calls.length).toBe(2);
+      await vt.transitions[1]!.ready;
+      // No double image: the closed box is gone from the new snapshot in every engine.
+      expect(getComputedStyle(popup()).display).toBe("none");
+      expect(popup().style.getPropertyValue("transition")).toBe(inline);
+      await vt.transitions[1]!.finished;
+      expect(isOpen()).toBe(false);
+      expect(popup().getAttribute("style")).toBe(before);
+    });
 
     // H1: with `transition` the close commit unmounts the focused Close before `hidePopover()`
     // runs, so the platform (which restores focus only from inside the popover) restores nothing.

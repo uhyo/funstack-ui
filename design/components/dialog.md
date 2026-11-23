@@ -1507,37 +1507,28 @@ mount cost) and the opening row is documented as "CSS only".
 ```css
 ::view-transition-new(.fsui-dialog-in) { animation: 200ms ease-out both fsui-scale-in; }
 ::view-transition-old(.fsui-dialog-out) { animation: 150ms ease-in both fsui-scale-out; }
-/* Keep the CSS exit of 10.1 for dismissals, but not while a view transition runs. */
-html:active-view-transition .dialog { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }
 ```
 
-**The recipe: keep the CSS exit, cut it while a view transition runs.** When `transition` is
-set, the view transition is the animation for every library-driven change, and the CSS exit of
-10.1 stays for dismissals, which happen in the browser before React hears about them. The two
-must not run at the same time: in Chromium a `<dialog>` with the `display` / `overlay`
-transition stays rendered through its fade after `close()`, so a library-driven close's view
-transition captures the fading dialog as a live `::view-transition-new(…)` next to the
-`::view-transition-old(…)` image, and the user sees a double image (reviewer probe P4). The
-rule `html:active-view-transition .dialog { transition: none; }` removes it: the box is
-`display: none` when the new snapshot is taken, and the `old` image alone carries the exit.
-(The first version of this section recommended "at most a CSS exit for dismissals"; that CSS
-runs for library closes too, and the docs then dropped the CSS exit altogether, which left a
-dismissal with no exit animation at all. Review M2.) Per engine (13.3): Chromium 156 shows the
-double image without the rule and the old image only with it; Firefox animates no CSS exit and
-never had a new image; WebKit has the box `display: none` by the transition's `ready` with or
-without the rule, so it never showed a double image either. The selector is deliberately
-**untyped**: `html:active-view-transition-type(fsui-dialog-close)` would miss a controlled
-close, which carries no types (P5), whereas the untyped form covers every kind of close (P6).
-The cost is that an unrelated view transition of the page (a route change while a dismissed
-dialog is still fading) also cuts that fade. Cutting a running CSS transition settles the
-animations the `close` listener holds the content on (`Promise.allSettled`, 4.4), so `held`
-releases at once; for a dismissal the rest of the fade is handed to the notification commit's
-`old` snapshot, which cross-fades out with the root (P5). That combination runs exactly one
-document view transition per dismissal (the notification commit) and one per library-driven
-close, with one image of the dialog each. Popover's recipe needs the same rule (Popover 10.2).
+**The CSS exit of 10.1 stays next to `transition`; the library keeps them apart (#147,
+amendment at the end).** When `transition` is set, the view transition is the animation for
+every library-driven change, and the CSS exit of 10.1 animates dismissals, which happen in the
+browser before React hears about them. The two must not run at the same time: in Chromium a
+`<dialog>` with the `display` / `overlay` transition stays rendered through its fade after
+`close()`, so a library-driven close's view transition would capture the fading dialog as a live
+`::view-transition-new(…)` next to the `::view-transition-old(…)` image (a double image, reviewer
+probe P4), and in every engine the open's `@starting-style` enter would run under the view
+transition's enter. The library therefore cuts the dialog's CSS transitions around its own
+`showModal()` / `show()` / `close()` while `html:active-view-transition` matches (conventions
+5.1): the box is `display: none` when the new snapshot is taken, and the `old` image alone
+carries the exit. Per engine (13.3): Chromium 156 shows the double image without the cut;
+Firefox animates no CSS exit; WebKit has the box `display: none` by the transition's `ready`
+either way. Until #147 this was a consumer rule, `html:active-view-transition .dialog
+{ transition: none; }` (review M2), whose untyped selector also cut a dismissed dialog's fade
+during an unrelated page view transition; the library's cut is scoped to its own calls. A
+dismissal (a fact since #148) starts no view transition and keeps its CSS fade.
 The backdrop deserves one sentence in the docs: with the page's root cross-fade disabled,
 a dialog whose backdrop should fade out with a library-driven close renders an element backdrop
 as the first child of Popup (`position: fixed; inset: 0`; inside the dialog, so clicks on it are
@@ -1968,18 +1959,18 @@ at the start, click in-page outside `act`, await `finished` in `afterEach`), all
   controlled `open={false}`.
 - `transition="pop"`: an Escape runs one view transition only for the notification commit,
   with the dialog already closed at the start.
-- `transition="pop"` plus the CSS exit of 10.1 **and the recipe** (`html:active-view-transition
-  .fade { transition: none }`): an Escape runs one view transition, not two (the `held` release
-  is a normal update), and at `ready` there is no `::view-transition-new` image of the dialog
-  group; a `Dialog.Close` and a controlled `open={false}` each have the dialog `display: none` at
-  `ready` and the old image only. Pseudo-element names come from `document.getAnimations()` at
+- `transition="pop"` plus the CSS exit of 10.1, no consumer rule (#147: the library's cut):
+  an Escape runs no view transition (a fact, #148); a `Dialog.Close`, a `method="dialog"` submit
+  and a controlled `open={false}` each have the dialog `display: none` at `ready`, the old image
+  only and no inline `transition` left; the open has the dialog at opacity 1 at `ready` (no CSS
+  enter under the view transition's); an Escape's CSS fade keeps running through an unrelated
+  view transition. Pseudo-element names come from `document.getAnimations()` at
   `ready` (the dialog's group is `_t_N_`) and are reported in the failure message. In WebKit the
   names are not reliable (it lists the group's animation under `::view-transition-new(_t_N_)`
   while the box has no new image: a mislabel or a stale open animation, worth a look by someone
   with WebKit), so the WebKit branch asserts `display` only.
-- Characterisation: the same CSS **without** the recipe has a live new image of the fading
-  dialog (`display: block`) at `ready` in Chromium and in no other engine (Firefox animates no
-  exit; WebKit has the box `display: none` by `ready`). Pins the artifact the recipe exists for.
+- The characterisation row without the recipe (a live new image in Chromium) was dropped with
+  #147: there is no "without" any more. The rows fail in Chromium with the cut disabled.
 - Without `transition`: no view transition for an open, a Close close or an Escape.
 - `modal={false}`, `transition="pop"`, default mounting: a `Dialog.Close` activated with Enter
   returns focus to the Trigger (the close commit unmounted the focused button before `close()`;
@@ -2237,8 +2228,9 @@ expects it set to the invoker).
 - **Dismissals still animate with CSS only.** In Firefox an Escape closes a dialog instantly,
   as before; only the closes a part asks for get the view transition. The docs say which is
   which, and the `::backdrop` note in 10.3 explains why a backdrop fade needs either the root
-  cross-fade or an element backdrop. The CSS exit is kept next to `transition` and cut while a
-  view transition runs (the 10.3 recipe), so the two never show a double image in Chromium.
+  cross-fade or an element backdrop. The CSS exit is kept next to `transition`; the library cuts it
+  around its own close while a view transition runs (10.3, #147), so the two never show a double
+  image in Chromium.
 - **Not changed:** the Trigger stays open-only (no `toggle` command for dialogs, and a modal
   dialog's Trigger is inert while open); `Dialog.Form` keeps `closedSinceSubmit` rather than the
   open-generation guard (it already covers the re-open case and reads the `close` event the Form
@@ -2721,3 +2713,16 @@ resolved question 45). It overrides every place above that calls a dismissal's
 - Errors: 4.3's "dismissal notification rejects" row is now: a promise `onOpenChange` returns,
   and a throw, go to `reportError`. 4.2's "close notification pending" rows are gone with the
   notification.
+
+## Amendment: the library cuts the CSS transition around its own show / hide (#147, 2026-11-24)
+
+User decision 2026-11-24 (option B of `memo/architect/147-reevaluation.md`). The consumer rule
+`html:active-view-transition .dialog { transition: none; }` of 10.3 is removed from the docs, the
+docs stylesheet and the playground. Instead, when `Dialog.Popup` has `transition` and a view
+transition is running at the moment of the library's own `showModal()` / `show()` /
+`close(returnValue)`, the call runs inside `withCssTransitionCut` (conventions 5.1): inline
+`transition: none !important`, the call, a forced style recalculation, the inline style restored
+exactly. Effects: no double image on a library close (Chromium), no CSS enter under the view
+transition's enter on a library open (every engine), and a dismissal's CSS fade is never cut, not
+even by an unrelated page view transition. The `::backdrop` is not cut: its enter fade runs on
+open, as with the old rule. 13.3's rows changed with it (see there).

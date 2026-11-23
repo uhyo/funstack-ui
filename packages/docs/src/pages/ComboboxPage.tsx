@@ -724,11 +724,12 @@ export function ComboboxPage() {
         <code>fsui-combobox-close</code>.
       </p>
       <p>
-        With both the CSS exit above and <code>transition</code>, turn the CSS exit off while a view
-        transition runs (
-        <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>):
+        Keep the CSS exit above next to <code>transition</code>: it animates the dismissals (focus
+        leaving, Escape, a click outside). The library turns the popup&apos;s CSS transitions off
+        for the moment of its own show and hide while a view transition runs, so the two never
+        overlap and you need no extra rule (
+        <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>).
       </p>
-      <CodeBlock language="css">{`html:active-view-transition .listbox { transition: none; }`}</CodeBlock>
 
       <h3 id="browser-notes">Browser notes</h3>
       <ul>

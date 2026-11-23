@@ -90,7 +90,7 @@ function Row({ id, name }: { id: string; name: string }) {
         <Popover.Trigger className="pop-btn" aria-label={`Actions for ${name}`}>
           {({ pending }) => (pending ? <span className="pop-spinner" aria-hidden /> : "⋯")}
         </Popover.Trigger>
-        <Popover.Popup className="pop pop-vt" align="end" transition="pop">
+        <Popover.Popup className="pop" align="end" transition="pop">
           <Popover.Title>{name}</Popover.Title>
           <RowActions
             id={id}

@@ -436,7 +436,7 @@ function TransitionDemo() {
           {({ pending }) => (pending ? <Spinner className="dlg-spinner" /> : "Open")}
         </Dialog.Trigger>
         <Dialog.Popup
-          className="dlg dlg-vt"
+          className="dlg"
           lightDismiss
           transition={{
             "fsui-dialog-open": "dlg-pop",

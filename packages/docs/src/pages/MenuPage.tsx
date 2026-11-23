@@ -804,11 +804,11 @@ export function MenuPage() {
       </p>
       <CodeBlock>{`<Menu.Popup transition={{ "fsui-menu-open": "menu-in", "fsui-menu-close": "menu-out", default: "none" }}>`}</CodeBlock>
       <p>
-        With both, turn the CSS exit off while a view transition runs, on the whole popup class so
-        that submenus closing with their parent are covered (
-        <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>):
+        Keep the CSS exit next to <code>transition</code>: it animates the dismissals. The library
+        turns the popup&apos;s CSS transitions off for the moment of its own show and hide while a
+        view transition runs, so the two never overlap and you need no extra rule (
+        <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>).
       </p>
-      <CodeBlock language="css">{`html:active-view-transition .menu { transition: none; }`}</CodeBlock>
 
       <h3 id="browser-notes">Browser notes</h3>
       <ul>
