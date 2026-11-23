@@ -485,9 +485,9 @@ describe("Dialog", () => {
       await flushTasks(2);
     });
 
-    it("Root state.pending is true while a re-open waits for a dismissal's notification", async () => {
+    it("Root state.pending is false after a dismissal (a fact) and true while the re-open runs", async () => {
       const user = setupUser();
-      const closing = deferred();
+      const opening = deferred();
       const action = vi.fn<ActionFn>();
       render(
         <Dialog.Root defaultOpen={false} openChangeAction={action}>
@@ -501,13 +501,14 @@ describe("Dialog", () => {
         </Dialog.Root>,
       );
       await openThroughTrigger(user);
-      action.mockImplementationOnce(() => closing.promise);
+      action.mockImplementationOnce(() => opening.promise);
       await act(async () => popup().requestClose());
       await flushTasks(2);
+      expect(screen.getByTestId("root")).toHaveTextContent("open=false pending=false");
       await user.click(trigger());
       expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=true");
       expectPending(trigger());
-      await act(async () => closing.resolve());
+      await act(async () => opening.resolve());
       await flushTasks(2);
       expect(screen.getByTestId("root")).toHaveTextContent("open=true pending=false");
       expect(popup().open).toBe(true);

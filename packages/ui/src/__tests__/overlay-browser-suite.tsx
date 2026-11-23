@@ -121,7 +121,7 @@ interface AwaitedPress<D> extends PressBase<D> {
 
 /**
  * A browser-owned close (light dismiss, or a library hide shaped like one), hidden at once and
- * notified with `"dismiss"`. A browser-owned close with another reason (Popover's foreign
+ * reported to `onOpenChange` with `"dismiss"` (a fact). A browser-owned close with another reason (Popover's foreign
  * invoker, `"activate"`) is a bespoke row.
  */
 interface DismissedPress<D> extends PressBase<D> {
@@ -166,7 +166,7 @@ export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
    * Popover: the Trigger; Menu: Enter on the focused item).
    */
   readonly partClose: () => Promise<void>;
-  /** The event the platform's close fires and a dismissal's notification carries. */
+  /** The event the platform's close fires and a dismissal's `onOpenChange` details carry. */
   readonly dismissEvent: "close" | "toggle";
   /**
    * The Trigger is a `popovertarget` invoker with no `aria-expanded`, whose exposed state the

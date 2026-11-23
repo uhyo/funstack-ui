@@ -486,7 +486,7 @@ describe("Dialog (browser)", () => {
       expect(screen.getByTestId("delete")).toHaveAttribute("data-pending", "");
       await act(async () => d.resolve());
       expect(popup().open).toBe(false);
-      // The close notification (the `close` task, then the openChangeAction) can lag under load.
+      // The Close's request (its own action, then the Root's openChangeAction) can lag under load.
       await settle(() => expect(action).toHaveBeenCalledTimes(2));
       expect(action.mock.calls[1]![1].reason).toBe("activate");
       expect(action.mock.calls[1]![1].returnValue).toBe("deleted");

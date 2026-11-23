@@ -100,3 +100,50 @@ transition for the re-render it causes. The returned promise is the library's to
 (`callUrgentHandler` -> `reportError` on rejection). Matches design 2.10.
 
 **Conclusion: no probe contradicts the design.** Implementation proceeds.
+
+## Step 2: implementation (2026-11-24)
+
+Commits on `feat/148-on-open-change`: 676a5fd (library + tests), ac68dd0 (design docs),
+ea2f351 / ada8796 (docs site, examples, skill), 2b243c5 (playground), then test comment
+clean-up. CI (workflow_dispatch) on 676a5fd: ci, Chromium, Firefox, WebKit all green.
+
+Where things live:
+
+- `internal/call-urgent-handler.ts`: the on* rule (sync, try/catch -> reportError, a thenable's
+  rejection -> reportError). Directive-free: repeats `reportDropped`'s two-line fallback instead
+  of importing the client module.
+- `useControllableAction.adoptFact(next)` + `epoch`. **Deviation from the design sketch**: the
+  sketch put the epoch in an object passthrough (`useOptimistic({ value, epoch })`). That broke
+  `use-popover-hooks.test.tsx` "whileShown is reinstalled when an inline ref re-runs": Maximum
+  update depth. With an inline ref the Popup re-attaches its ref every render, the attach /
+  detach write `shown` (false then true), and React normally bails out of the resulting render
+  because no state changed; with the object passthrough the bailout no longer happens (the
+  optimistic hook's state is an object, and the re-render re-attaches the ref, and so on). The
+  epoch now lives in the optimistic reducer's closure (`patch.epoch < epoch ? prev : ...`):
+  React re-applies pending optimistic updates on every render with that render's reducer, so the
+  urgent `setEpoch` drops stale patches in the fact's commit all the same (jsdom row "close then
+  open requested while shown, then a dismissal" pins it). Recorded in conventions 3.4.
+- `useOverlayRoot`: `onOpenChange` option, mode detection, W1, `notifyClosed` = onDispatch +
+  adoptFact(false) + callUrgentHandler; `epoch` and `hiddenBeforeToggle()` in the value (the
+  latter from a `shownNow` ref next to the `shown` state).
+- `usePopoverPopup`: `libraryHide` marker set before the apply effect's `hidePopover()`,
+  consumed by **every** `toggle` (a coalesced hide+show must not leave it set).
+- `use-popover-trigger.ts` / `combobox-trigger.tsx`: #115 path via `hiddenBeforeToggle()`.
+- `dialog-popup.tsx`: `dismissedWhilePending` removed; every non-echo `close` is a fact.
+- Toast: `callCloseHandlers` replaces `scheduleCloseActions` (no microtask, no transition).
+
+Test notes:
+
+- A row with a never-settling async transition poisons every later row in the same jsdom
+  worker (`isolate: false`): React's entangled action lane is module-wide. The "unrelated
+  action pending" row settles its promise before it ends.
+- Firefox coalesces the hide and the re-show of a refused Escape into one `toggle` whose
+  `newState` a later listener sees as "open": the Menu browser row only checks that a toggle
+  arrived and that the menu is open again.
+- The Menu sibling-item press row: a press on a sibling item closes an open submenu either by
+  light dismiss (a fact) or by the hover close (a request with `"dismiss"`), engine and timing
+  dependent; the row records both channels and checks the last is a `"dismiss"` close.
+
+Not done / left:
+
+- WebKit for the docs-only commits was not re-run separately (CI dispatched on the final head).
