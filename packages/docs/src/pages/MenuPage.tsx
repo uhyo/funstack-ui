@@ -116,10 +116,15 @@ export function MenuPage() {
         <code>transition</code>). A synchronous action closes in the same tick. A rejection leaves
         the menu open and reaches the nearest Error Boundary above the item. A second click, Enter
         or Space while the action is pending is ignored (and cancelled), and the item is{" "}
-        <code>aria-disabled="true"</code> meanwhile. A pending item is an ordinary item for
-        navigation; only the open focus skips items with the <code>disabled</code> prop (
-        <code>data-disabled</code>). For "close now, work in the background" do not return the
-        promise: <code>{"action={() => { void archive(id); }}"}</code>.
+        <code>aria-disabled="true"</code> meanwhile: the first activation already ends in the menu's
+        close. A <code>{"closeOnActivate={false}"}</code> item is different: nothing of the
+        library's follows its action, so it runs every activation (a "Zoom in" item counts each
+        press), with <code>data-pending</code> until the last run settles and no{" "}
+        <code>aria-disabled</code>. <code>whilePending</code> overrides either default. A pending
+        item is an ordinary item for navigation; only the open focus skips items with the{" "}
+        <code>disabled</code> prop (<code>data-disabled</code>). For "close now, work in the
+        background" do not return the promise: <code>{"action={() => { void archive(id); }}"}</code>
+        .
       </p>
       <ul>
         <li>
@@ -355,15 +360,22 @@ export function MenuPage() {
             name: "action",
             type: "Action<[details: MenuItemDetails]>",
             description:
-              'Runs in the item\'s own transition (`data-pending` on the item); the menu closes when it settles. A second activation while it is pending is ignored, and the item is `aria-disabled="true"` meanwhile. May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item.',
+              'Runs in the item\'s own transition (`data-pending` on the item); the menu closes when it settles. A second activation while it is pending is ignored, and the item is `aria-disabled="true"` meanwhile, unless `whilePending` is `"run"` (the default with `closeOnActivate={false}`). May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item.',
           },
           ...itemRows("MenuItemState", "true", "Close the whole menu once `action` settles."),
+          {
+            name: "whilePending",
+            type: '"run" | "ignore"',
+            default: '"ignore", or "run" with closeOnActivate={false}',
+            description:
+              'What a click, Enter or Space does while this item\'s `action` is pending. `"ignore"`: nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); a closing item still closes the menu once, when every run has settled. No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+          },
         ]}
       />
       <PartFacts
         state={"`MenuItemState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-typeahead`."
+          '`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending with `whilePending="ignore"`), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-typeahead`.'
         }
       />
 
@@ -542,7 +554,7 @@ export function MenuPage() {
           [
             "`aria-disabled`",
             "Item, CheckboxItem, RadioItem, SubmenuTrigger",
-            '`"true"` for the `disabled` prop (items are never natively disabled), and on an Item while its `action` is pending.',
+            '`"true"` for the `disabled` prop (items are never natively disabled), and on an Item while its `action` is pending and it ignores a second activation (`whilePending="ignore"`, the default unless `closeOnActivate={false}`).',
           ],
           ["`data-disabled`", "Trigger, items, ContextTrigger", "The `disabled` prop."],
           [
@@ -688,7 +700,7 @@ export function MenuPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the state the browser exposes on the Trigger follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs, and a second activation is ignored."
+          "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the state the browser exposes on the Trigger follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs; a second activation is ignored, or with `closeOnActivate={false}` runs again (`whilePending`)."
         }
       >
         <h4 id="slow-open-change-action">

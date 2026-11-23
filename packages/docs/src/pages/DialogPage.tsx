@@ -314,12 +314,20 @@ export function DialogPage() {
                 button and leaves the dialog open. If the dialog was closed and opened again while
                 the action ran, the close is dropped: it belonged to the previous opening. A second
                 click while it is pending is ignored, and the button is{" "}
-                <code>aria-disabled="true"</code> meanwhile. Without <code>action</code> the button
-                is a native <code>command="request-close"</code> invoker in JS-free mode and goes
-                straight through the Root in library mode. <code>details.returnValue</code> is the{" "}
+                <code>aria-disabled="true"</code> meanwhile, unless <code>whilePending</code> is{" "}
+                <code>"run"</code>. Without <code>action</code> the button is a native{" "}
+                <code>command="request-close"</code> invoker in JS-free mode and goes straight
+                through the Root in library mode. <code>details.returnValue</code> is the{" "}
                 <code>value</code>.
               </>
             ),
+          },
+          {
+            name: "whilePending",
+            type: '"run" | "ignore"',
+            default: '"ignore"',
+            description:
+              'What a click, Enter or Space does while this part\'s `action` is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); the dialog still closes once (in library mode, when every run has settled). No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
           {
             name: "value",
@@ -344,7 +352,7 @@ export function DialogPage() {
           "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
-          'A second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'
+          'By default (`whilePending="ignore"`) a second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'
         }
       />
 
@@ -463,7 +471,7 @@ export function DialogPage() {
           [
             "`aria-disabled`",
             "Close",
-            '`"true"` while `data-pending`: a second click is ignored meanwhile.',
+            '`"true"` while `data-pending` with `whilePending="ignore"` (the default): a second click is ignored meanwhile.',
           ],
           ["`data-disabled`", "Trigger, Close", "The `disabled` prop (both modes)."],
         ]}
@@ -612,7 +620,7 @@ html:active-view-transition .dialog { transition: none; }
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a close notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger) (`data-pending`, `aria-disabled`)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open, a part's close or a close notification is in flight. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger) (`data-pending`; `aria-disabled` while it ignores a second click, the default)."
         }
       >
         <h4>Walkthrough (library mode)</h4>

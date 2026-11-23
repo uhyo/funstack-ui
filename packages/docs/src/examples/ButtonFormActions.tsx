@@ -6,7 +6,8 @@ import { fakeSave } from "./fake-api.js";
 
 // One form, three submitters. Form.Submit runs the form's own action and is pending for every
 // submission of the form (the form channel). Each Button formAction runs its own function instead
-// and is pending for its own submissions only; a second click on a pending one is ignored.
+// and is pending for its own submissions only; with whilePending="ignore" a second click on a
+// pending one is ignored (by default it would submit again).
 export function ButtonFormActions() {
   const [log, setLog] = useState<string[]>([]);
   const record = (line: string) => startTransition(() => setLog((l) => [line, ...l].slice(0, 4)));
@@ -29,6 +30,7 @@ export function ButtonFormActions() {
           </Form.Submit>
           <Button
             className="demo-btn"
+            whilePending="ignore"
             formAction={async (data: FormData) => {
               await fakeSave("the draft", { ms: 1500 });
               record(`Saved a draft of “${String(data.get("title"))}”.`);
@@ -38,6 +40,7 @@ export function ButtonFormActions() {
           </Button>
           <Button
             className="demo-btn"
+            whilePending="ignore"
             formAction={async () => {
               await fakeSave("the discard", { ms: 2500 });
               record("Discarded.");

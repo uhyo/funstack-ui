@@ -5,6 +5,7 @@ import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ButtonCompose } from "../examples/ButtonCompose.js";
+import { ButtonCounter } from "../examples/ButtonCounter.js";
 import { ButtonFormActions } from "../examples/ButtonFormActions.js";
 import { ButtonInvoker } from "../examples/ButtonInvoker.js";
 import { ButtonSave } from "../examples/ButtonSave.js";
@@ -15,14 +16,14 @@ export function ButtonPage() {
   return (
     <DocPage
       title="Button"
-      description="A button whose click is a transition: action in its own transition, data-pending, a second click ignored while pending, formAction with per-submitter pending."
+      description="A button whose click is a transition: action in its own transition, data-pending, whilePending to run or ignore a click while pending, formAction with per-submitter pending."
     >
       <p className="page-intro">
         A button whose click is a transition. Compared with <code>{"<button onClick>"}</code>, a{" "}
         <code>Button</code> runs <code>action</code> in its own transition and shows{" "}
-        <code>data-pending</code> until it settles, ignores a second click while it is pending,
-        sends a rejection to the nearest Error Boundary, and takes a Server Function as{" "}
-        <code>action</code> or <code>formAction</code>.
+        <code>data-pending</code> until it settles, runs or ignores a click that comes while it is
+        pending (<code>whilePending</code>), sends a rejection to the nearest Error Boundary, and
+        takes a Server Function as <code>action</code> or <code>formAction</code>.
       </p>
 
       {/* This page's toast region, fed by the caught-inside example. */}
@@ -32,10 +33,20 @@ export function ButtonPage() {
         <ButtonSave />
       </Example>
       <p>
-        Click Save several times quickly: the action runs once. While it runs the button carries{" "}
+        Click Save several times quickly: the action runs once, because Save has{" "}
+        <code>whilePending="ignore"</code>. While it runs the button carries{" "}
         <code>data-pending</code> and <code>aria-disabled="true"</code> and keeps focus. The second
         button rejects into an Error Boundary; the third catches the error inside its action, which
         the library counts as success, and reports it with a toast.
+      </p>
+      <Example file="ButtonCounter.tsx" css="button.css">
+        <ButtonCounter />
+      </Example>
+      <p>
+        Without the prop every click runs: click +1 several times quickly and each click counts. The
+        button shows <code>data-pending</code> until the last run has settled and is never{" "}
+        <code>aria-disabled</code> meanwhile, since it still acts. React commits the runs' updates
+        together once they have all finished.
       </p>
 
       <BehaviourIndex />
@@ -62,9 +73,9 @@ export function ButtonPage() {
                 Runs inside the Button's own transition on click, Enter or Space. Sync or async; may
                 be a Server Function (<code>details</code> carries only the virtual{" "}
                 <code>event</code>). A rejection reaches the nearest Error Boundary above the
-                Button. While it is pending, further activation is ignored and the Button is{" "}
-                <code>aria-disabled="true"</code>. Not combinable with <code>formAction</code>{" "}
-                (development error).
+                Button. A click while it is pending runs it again, unless <code>whilePending</code>{" "}
+                is <code>"ignore"</code>. Not combinable with <code>formAction</code> (development
+                error).
               </>
             ),
           },
@@ -75,15 +86,34 @@ export function ButtonPage() {
               <>
                 React's <code>formAction</code>: run by React instead of the form's{" "}
                 <code>action</code> when this Button submits the form. With a function the Button is
-                pending for its own submissions only, ignores further activation meanwhile, and
-                defaults to <code>type="submit"</code>. Prefer a stable function (a Server Function,
-                a <code>useActionState</code> dispatch, <code>useCallback</code>) when the form is
-                also submitted from script with <code>requestSubmit(button)</code>; an inline
-                function works for clicks and Enter. The match is by function identity (React
-                reports no submitter), so Buttons that share one function (one dispatch, different{" "}
-                <code>name</code> / <code>value</code>) all show pending while either submits; give
-                each its own function (<code>{'dispatch.bind(null, "draft")'}</code>) to tell them
-                apart.
+                pending for its own submissions only and defaults to <code>type="submit"</code>; a
+                click meanwhile submits again unless <code>whilePending</code> is{" "}
+                <code>"ignore"</code> (see <a href="#forms">Forms</a>). Prefer a stable function (a
+                Server Function, a <code>useActionState</code> dispatch, <code>useCallback</code>)
+                when the form is also submitted from script with <code>requestSubmit(button)</code>;
+                an inline function works for clicks and Enter. The match is by function identity
+                (React reports no submitter), so Buttons that share one function (one dispatch,
+                different <code>name</code> / <code>value</code>) all show pending while either
+                submits; give each its own function (<code>{'dispatch.bind(null, "draft")'}</code>)
+                to tell them apart.
+              </>
+            ),
+          },
+          {
+            name: "whilePending",
+            type: '"run" | "ignore"',
+            default: '"run"',
+            description: (
+              <>
+                What a click, Enter or Space does while this Button's own <code>action</code> (or
+                its own function <code>formAction</code> submission) is pending. <code>"run"</code>:
+                it runs as well; the Button shows <code>data-pending</code> until every run has
+                settled. <code>"ignore"</code>: it starts nothing, its default action is cancelled
+                (no second submission, navigation or command), and the Button is{" "}
+                <code>aria-disabled="true"</code> while pending. Use <code>"ignore"</code> for an
+                action that must not run twice (Save, Pay, Delete). No effect on a Button with
+                neither <code>action</code> nor a function <code>formAction</code>. Type{" "}
+                <code>WhilePending</code>.
               </>
             ),
           },
@@ -139,7 +169,7 @@ export function ButtonPage() {
           ["`data-disabled`", "The `disabled` prop. Not set by pending."],
           [
             "`aria-disabled`",
-            '`"true"` while pending, and while `disabled` with `focusableWhenDisabled`, inside a Toolbar, or on a non-`<button>` `render` element.',
+            '`"true"` while pending with `whilePending="ignore"`, and while `disabled` with `focusableWhenDisabled`, inside a Toolbar, or on a non-`<button>` `render` element. Never set by pending in the default `"run"` mode.',
           ],
         ]}
       />
@@ -154,8 +184,8 @@ export function ButtonPage() {
         rows={[
           [
             "Enter",
-            "Click: runs `action` (unless pending or disabled)",
-            "Click: `action` and navigation; while pending, neither",
+            'Click: runs `action` (unless disabled, or pending with `whilePending="ignore"`)',
+            'Click: `action` and navigation; while pending with `whilePending="ignore"`, neither',
           ],
           [
             "Space",
@@ -185,23 +215,34 @@ export function ButtonPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          'A [pure trigger](/concepts/pending-and-optimistic#pure-trigger): no optimistic state. `data-pending` and `aria-disabled="true"` while its own action (or a submission started by its own function `formAction`) is in flight; a second click, Enter or Space is ignored meanwhile.'
+          'A [pure trigger](/concepts/pending-and-optimistic#pure-trigger): no optimistic state. `data-pending` while its own action (or a submission started by its own function `formAction`) is in flight. A second click, Enter or Space meanwhile runs again by default; with `whilePending="ignore"` it is ignored and the Button is `aria-disabled="true"`.'
         }
       >
-        <h4 id="pending-and-re-entry">Re-entry while pending</h4>
+        <h4 id="pending-and-re-entry">A click while pending</h4>
         <p>
-          While the Button's own action is in flight, a click, Enter or Space (also a programmatic{" "}
-          <code>click()</code> and the click an implicit form submission sends) starts no second run
-          and is <code>preventDefault()</code>ed, so a link does not navigate again, a form does not
-          submit again and a <code>command</code> does not run again. Nothing else is blocked:
-          focus, hover and your own event handlers work as usual, and ancestors still see the click.
+          A Button's action is yours alone, so by default (<code>whilePending="run"</code>) the
+          Button does what React's <code>useTransition</code> does: every click, Enter or Space runs
+          the action, also while an earlier run is pending. The runs overlap; the Button shows{" "}
+          <code>data-pending</code> until the last has settled and is not <code>aria-disabled</code>
+          , because it still acts. When runs overlap, the latest run's rejection reaches the Error
+          Boundary and an older run's goes to <code>reportError</code> (see{" "}
+          <a href="/concepts/action-props#overlapping-actions">Overlapping actions</a>). A double
+          click on a default Save therefore saves twice: give it <code>whilePending="ignore"</code>.
+        </p>
+        <p>
+          With <code>whilePending="ignore"</code>, a click, Enter or Space while the Button's own
+          action is in flight (also a programmatic <code>click()</code> and the click an implicit
+          form submission sends) starts no second run and is <code>preventDefault()</code>ed, so a
+          link does not navigate again, a form does not submit again and a <code>command</code> does
+          not run again. Nothing else is blocked: focus, hover and your own event handlers work as
+          usual, and ancestors still see the click.
         </p>
         <ul>
           <li>
-            The Button is <code>aria-disabled="true"</code> meanwhile, so a screen-reader user who
-            presses again, or comes back to it, hears that it is unavailable. It is never natively{" "}
-            <code>disabled</code>: Chromium and Firefox move focus to the page when a focused button
-            becomes disabled.
+            The ignoring Button is <code>aria-disabled="true"</code> meanwhile, so a screen-reader
+            user who presses again, or comes back to it, hears that it is unavailable. It is never
+            natively <code>disabled</code>: Chromium and Firefox move focus to the page when a
+            focused button becomes disabled.
           </li>
           <li>
             The guard is the Button's own run, not its look. React may hold the commit that ends the
@@ -212,10 +253,6 @@ export function ButtonPage() {
             stays guarded until its submission commits.
           </li>
           <li>
-            Want every click to count (a "+1" button)? Do not await the work:{" "}
-            <code>{"action={() => { void increment(); }}"}</code>. The run is over a moment after
-            the click, so every click runs the action, even while an unrelated action elsewhere
-            holds the Button's commit (then only the pending look lingers until that commit lands).
             An ordered sequence whose steps see each other's results is <code>useActionState</code>{" "}
             (pass its dispatch as <code>formAction</code>, or call it from the action).
           </li>
@@ -286,6 +323,16 @@ import { archive } from "./actions"; // "use server"
         submissions only (React reports the submitter's function through{" "}
         <code>useFormStatus().action</code>).
       </p>
+      <Callout title="Overlapping submissions">
+        <p>
+          By default a second click on a pending <code>Button formAction</code> submits the form
+          again, as React's own <code>{"<button formAction>"}</code> does. Those submissions are
+          React's form channel, and React drops the rejection of an older overlapping submission: it
+          reaches no Error Boundary and no <code>reportError</code>, and the library cannot see it.
+          For a submission that must not overlap, use <code>whilePending="ignore"</code> (as in the
+          example above), or pass a <code>useActionState</code> dispatch, which React runs in order.
+        </p>
+      </Callout>
       <Table
         head={["", "Form.Submit", "Button formAction", 'Button type="submit"']}
         rows={[
@@ -297,9 +344,9 @@ import { archive } from "./actions"; // "use server"
           ],
           ["`pending`", "the form channel: any submitter", "its own submissions only", "none"],
           [
-            "Re-entry while pending",
+            "A click while pending",
             "not blocked (a `useActionState` dispatch queues it, in order)",
-            "ignored",
+            'submits again; ignored with `whilePending="ignore"`',
             "none",
           ],
           [
@@ -317,7 +364,8 @@ import { archive } from "./actions"; // "use server"
         <code>errors</code> are not fed by it; to route field errors, pass the dispatch of the same{" "}
         <code>useActionState</code> as <code>formAction</code>). Implicit submission (Enter in a
         text field) clicks the form's first submit button: if that is a pending{" "}
-        <code>Button formAction</code>, the click is ignored and nothing is submitted twice.
+        <code>Button formAction</code>, it submits again, or with <code>whilePending="ignore"</code>{" "}
+        the click is ignored and nothing is submitted twice.
       </p>
 
       <Callout title="Which button?">
@@ -378,12 +426,15 @@ import { archive } from "./actions"; // "use server"
         (the Trigger already shows <code>data-open</code> and <code>data-pending</code>). For a
         prefetch, do not await it, as above. The same works with <code>Popover.Trigger</code> and{" "}
         <code>Tooltip.Trigger</code>; a Tooltip keeps opening on hover and focus while the Button is
-        pending, because a pending Button is not natively disabled and removes no listeners.
+        pending, because a pending Button is not natively disabled and removes no listeners. A
+        second click on the Trigger runs <code>a</code> again unless the Button has{" "}
+        <code>whilePending="ignore"</code>.
       </p>
       <p>
         <code>commandfor</code> / <code>command</code> pass through: without <code>action</code> the
         browser runs the command, before and after hydration. With both, one click runs the action
-        and the command; while pending, neither runs again. Inside a{" "}
+        and the command; a click while pending runs both again, or with{" "}
+        <code>whilePending="ignore"</code> neither. Inside a{" "}
         <a href="/components/toolbar">Toolbar</a> a disabled Button stays focusable and in the
         arrow-key sequence (<code>aria-disabled</code>, the APG Toolbar rule).
       </p>

@@ -62,7 +62,9 @@
   outline: none;
   background: color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
-.demo-menu [aria-disabled="true"] {
+/* Not while pending: an item that ignores activation while its action runs is aria-disabled too
+   (`whilePending="ignore"`), and its pending look is [data-pending] below. */
+.demo-menu [aria-disabled="true"]:not([data-pending]) {
   opacity: 0.45;
   cursor: default;
 }

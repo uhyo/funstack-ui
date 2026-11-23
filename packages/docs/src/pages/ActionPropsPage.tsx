@@ -186,12 +186,13 @@ type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
         <li>
           <strong>Parts are never natively disabled while pending.</strong> A trigger that changes
           state sets <code>data-pending</code> and takes every click: a second click is a new intent
-          (below). A <a href="/concepts/pending-and-optimistic#pure-trigger">pure trigger</a>{" "}
-          ignores a second activation while its own action is pending and is{" "}
-          <code>aria-disabled="true"</code> meanwhile, so a double click never runs a save twice
-          (see{" "}
-          <a href="/concepts/pending-and-optimistic#second-click">A second click while pending</a>
-          ).
+          (below). What a <a href="/concepts/pending-and-optimistic#pure-trigger">pure trigger</a>{" "}
+          does with a second activation while its own action is pending is its{" "}
+          <code>whilePending</code> prop: <code>"run"</code> runs it again (the default of a{" "}
+          <code>Button</code>), <code>"ignore"</code> drops it and makes the part{" "}
+          <code>aria-disabled="true"</code> meanwhile (the default of a Close part; use it on a Save
+          that must not run twice). See{" "}
+          <a href="/concepts/pending-and-optimistic#second-click">A second click while pending</a>.
         </li>
       </ul>
 

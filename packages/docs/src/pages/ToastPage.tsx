@@ -143,7 +143,10 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <code>Menu.Item</code>. While its action runs the Action and the Root carry{" "}
         <code>data-pending</code> and the toast's timer is paused; when it resolves the toast closes
         with <code>reason: "activate"</code> (unless <code>closeOnSettle={"{false}"}</code>). A
-        rejection keeps the toast and reaches the nearest Error Boundary{" "}
+        second click meanwhile is ignored and the Action is <code>aria-disabled="true"</code>: one
+        Undo, one Retry. With <code>closeOnSettle={"{false}"}</code> the toast stays and the Action
+        is your own trigger, so every click runs (add <code>whilePending="ignore"</code> for a Retry
+        that must not overlap). A rejection keeps the toast and reaches the nearest Error Boundary{" "}
         <strong>above the Viewport</strong>: put one around the list. Not when the Action is gone or
         hidden by the time it rejects: the toast was closed while the action ran, or a{" "}
         <code>toast.update</code> gave it content that is still suspending. The error then goes to
@@ -154,8 +157,8 @@ toast({ title: "Link copied" });`}</CodeBlock>
           A <code>catch</code> inside the action resolves it, and a resolved action closes the
           toast, so a "Could not undo" written with <code>toast.update</code> in the{" "}
           <code>catch</code> is never seen. Rethrow after the update (the toast stays; the boundary
-          above the Viewport gets the error), or use <code>closeOnSettle={"{false}"}</code> and{" "}
-          <code>toast.dismiss(details.id)</code> on success.
+          above the Viewport gets the error), or use <code>closeOnSettle={"{false}"}</code>,{" "}
+          <code>whilePending="ignore"</code> and <code>toast.dismiss(details.id)</code> on success.
         </p>
       </Callout>
       <p>
@@ -400,6 +403,13 @@ toast({ title: "Link copied" });`}</CodeBlock>
             default: "true",
             description: 'Close the toast (`reason: "activate"`) when the action resolves.',
           },
+          {
+            name: "whilePending",
+            type: '"run" | "ignore"',
+            default: '"ignore", or "run" with closeOnSettle={false}',
+            description:
+              'What a click does while this part\'s action is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the Action and the Root stay `data-pending` and the timer paused until every run has settled, and the toast closes once. Set it on the part: `toast({ action })` has no such option. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+          },
           ...functionProps("ToastActionState", "Default: `toast.action.label`."),
           renderProp("button", "ToastActionState"),
         ]}
@@ -408,7 +418,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         state={"`ToastActionState` is `{ pending, toast }`."}
         owned={"`type` (on a `<button>` only), `onClick`, `aria-disabled`, `data-pending`."}
         note={
-          'A second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is `aria-disabled="true"` while it shows `data-pending`, never natively disabled, so it keeps focus.'
+          'By default (`whilePending="ignore"` unless `closeOnSettle={false}`) a second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is then `aria-disabled="true"` while it shows `data-pending`; it is never natively disabled, so it keeps focus.'
         }
       />
 
@@ -435,7 +445,11 @@ toast({ title: "Link copied" });`}</CodeBlock>
             "Root, Action",
             "The toast's promise is unsettled, or its Action's action runs (not set while its content merely suspends)",
           ],
-          ["`aria-disabled`", "Action", '`"true"` while `data-pending`: a second click is ignored'],
+          [
+            "`aria-disabled`",
+            "Action",
+            '`"true"` while `data-pending` with `whilePending="ignore"` (the default unless `closeOnSettle={false}`): a second click is ignored',
+          ],
           [
             "`data-ending`",
             "Root",
