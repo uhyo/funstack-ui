@@ -1649,6 +1649,81 @@ describe("Popover", () => {
   });
 
   describe("focus", () => {
+    // #156: a refused re-open is shown `inert`, so the popover focusing steps focus nothing (the
+    // dialog focusing steps of the default <dialog>, a consumer's `autofocus` in a <div>); a
+    // consumer's own `inert` is not touched.
+    function Refusing({ inert, div }: { inert?: boolean; div?: boolean }) {
+      return (
+        <>
+          <Popover.Root open openChangeAction={() => {}} onOpenChange={() => {}}>
+            <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+            <Popover.Popup
+              data-testid="popup"
+              aria-label="Filters"
+              inert={inert}
+              render={div ? <div /> : undefined}
+            >
+              {/* The consumer's `autofocus` (React drops `autoFocus` on client renders). */}
+              <input
+                data-testid="inner"
+                ref={div ? (el) => el?.setAttribute("autofocus", "") : undefined}
+              />
+            </Popover.Popup>
+          </Popover.Root>
+          <input data-testid="outside" />
+        </>
+      );
+    }
+
+    it("a <div> popup with a consumer's autofocus child: the open focuses it (shim check)", async () => {
+      render(<Refusing div />);
+      await flushTasks(2);
+      expect(screen.getByTestId("popup").tagName).toBe("DIV");
+      expect(screen.getByTestId("inner")).toHaveFocus();
+    });
+
+    it.each([
+      ["the default <dialog>", undefined, false],
+      ["the default <dialog> with the consumer's inert", true, false],
+      ["a <div> with a consumer's autofocus child", undefined, true],
+    ] as const)(
+      "a refused dismissal re-shows %s without moving focus (#156)",
+      async (_, inert, div) => {
+        render(<Refusing inert={inert} div={div} />);
+        await flushTasks(2);
+        const popupEl = screen.getByTestId("popup");
+        expect(popupEl.matches(":popover-open")).toBe(true);
+        const outside = screen.getByTestId("outside");
+        outside.focus();
+        const blur = vi.fn();
+        outside.addEventListener("blur", blur);
+        const inertDuringShow: boolean[] = [];
+        const show = HTMLElement.prototype.showPopover;
+        vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
+          this: HTMLElement,
+          options,
+        ) {
+          inertDuringShow.push(this.hasAttribute("inert"));
+          show.call(this, options);
+        });
+        await act(async () => popupEl.hidePopover());
+        await flushTasks(2);
+        expect(popupEl.matches(":popover-open")).toBe(true);
+        expect(inertDuringShow).toEqual([true]);
+        expect(outside).toHaveFocus();
+        expect(blur).not.toHaveBeenCalled();
+        if (inert === true) {
+          expect(popupEl).toHaveAttribute("inert");
+        } else {
+          // The library removed its `inert` after the call (the assertion above), so the content
+          // is focusable again. jsdom ignores `inert` for focus: the browser row checks that.
+          expect(popupEl).not.toHaveAttribute("inert");
+          screen.getByTestId("inner").focus();
+          expect(screen.getByTestId("inner")).toHaveFocus();
+        }
+      },
+    );
+
     it("initialFocus (ref): autofocus is on the target while showPopover runs, removed after", async () => {
       const user = setupUser();
       let autofocusDuringShow: boolean | undefined;

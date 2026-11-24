@@ -576,16 +576,16 @@ describe("Popover (browser)", () => {
   });
 
   describe("focus", () => {
-    // #155: a parent that keeps `open={true}` after a dismissal gets the popup re-shown in the
-    // fact's commit. A `<div>` popup is re-shown without `initialFocus`: focus stays where the
-    // dismissal put it (the Trigger, after Escape). The default `<dialog>` runs the platform's
-    // dialog focusing steps on every show, so focus moves inside as on any open (not a trap:
-    // Tab leaves an open Popover, which does not close on focus leaving).
+    // #155, #156: a parent that keeps `open={true}` after a dismissal gets the popup re-shown in
+    // the fact's commit, without `initialFocus`: a refused re-open never moves focus. Focus stays
+    // where the dismissal put it (the Trigger, after Escape). The default `<dialog>` would run the
+    // platform's dialog focusing steps on the show; the library shows it `inert` for the call, so
+    // they focus nothing.
     it.each([
       ["a <div> popup", true],
       ["the default <dialog> popup", false],
     ] as const)(
-      "a refused Escape re-opens %s; initial focus only where the platform applies it (#155)",
+      "a refused Escape re-opens %s without moving focus: it stays on the Trigger (#155, #156)",
       async (_, div) => {
         const fact = vi.fn<ActionFn>();
         render(
@@ -613,14 +613,61 @@ describe("Popover (browser)", () => {
         await settle(() => expect(fact).toHaveBeenCalledTimes(1));
         await expect.poll(() => isOpen()).toBe(true);
         await quietPeriod(50, "the re-show's focus settles");
-        if (div) {
-          expect(trigger()).toHaveFocus();
-        } else {
-          // The library still names its target, so the dialog focusing steps pick it.
-          expect(screen.getByTestId("target")).toHaveFocus();
-        }
+        expect(trigger()).toHaveFocus();
+        expect(popup()).not.toHaveAttribute("inert");
       },
     );
+
+    // #156: a click on an outside field light-dismisses the default `<dialog>` popup; the parent
+    // refuses and the library re-shows it. The clicked field keeps focus (no blur, no second
+    // focus) and its selection; the popup is not left inert.
+    it("a refused light dismiss re-opens the default <dialog> popup; the clicked outside field keeps focus (#156)", async () => {
+      const fact = vi.fn<ActionFn>();
+      render(
+        <div style={{ padding: "40px 160px" }}>
+          <Popover.Root open openChangeAction={() => {}} onOpenChange={fact}>
+            <Popover.Trigger data-testid="trigger" style={{ width: 100, height: 30 }}>
+              Filters
+            </Popover.Trigger>
+            <Popover.Popup data-testid="popup" aria-label="Filters" style={box(200, 120)}>
+              <input data-testid="inner" />
+            </Popover.Popup>
+          </Popover.Root>
+          <input
+            data-testid="outside"
+            defaultValue="hello"
+            style={{ display: "block", marginTop: 300 }}
+          />
+        </div>,
+      );
+      await expect.poll(() => isOpen()).toBe(true);
+      const inner = screen.getByTestId<HTMLInputElement>("inner");
+      const outside = screen.getByTestId<HTMLInputElement>("outside");
+      // The open's dialog focusing steps put focus inside.
+      await settle(() => expect(inner).toHaveFocus());
+      const events: string[] = [];
+      for (const type of ["focus", "blur"]) {
+        outside.addEventListener(type, () => events.push(`outside:${type}`));
+        inner.addEventListener(type, () => events.push(`inner:${type}`));
+      }
+      // A selection made at the click, before the popup's `toggle` and the re-show.
+      outside.addEventListener("click", () => outside.setSelectionRange(2, 4), { once: true });
+      await user.click(outside);
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      expect(fact.mock.calls[0]![0]).toBe(false);
+      await expect.poll(() => isOpen()).toBe(true);
+      await quietPeriod(50, "the re-show's focus settles");
+      expect(outside).toHaveFocus();
+      expect(events).toEqual(["inner:blur", "outside:focus"]);
+      expect([outside.selectionStart, outside.selectionEnd]).toEqual([2, 4]);
+      expect(popup()).not.toHaveAttribute("inert");
+      await user.keyboard("X");
+      expect(outside.value).toBe("heXo");
+      expect(inner.value).toBe("");
+      // The popup's content is focusable again.
+      inner.focus();
+      expect(inner).toHaveFocus();
+    });
 
     it("platform probe: what showPopover() on a <dialog> does with focus", async () => {
       // Raw platform, no library: records the engine's popover focusing steps for a <dialog>.

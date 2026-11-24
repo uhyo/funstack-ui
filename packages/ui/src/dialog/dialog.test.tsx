@@ -825,6 +825,70 @@ describe("Dialog", () => {
   });
 
   describe("focus", () => {
+    // #156: a refused re-open of a non-modal Dialog is shown `inert`, so `show()`'s dialog
+    // focusing steps focus nothing; a consumer's own `inert` is not touched; the modal re-open
+    // (`showModal()`) is a normal open and takes focus.
+    function Refusing({ modal, inert }: { modal: boolean; inert?: boolean }) {
+      return (
+        <>
+          <Dialog.Root open modal={modal} openChangeAction={() => {}} onOpenChange={() => {}}>
+            <Dialog.Trigger data-testid="trigger">Open</Dialog.Trigger>
+            <Dialog.Popup
+              data-testid="popup"
+              aria-label="x"
+              inert={inert}
+              initialFocus="[data-testid=inner]"
+            >
+              <input data-testid="inner" />
+            </Dialog.Popup>
+          </Dialog.Root>
+          <input data-testid="outside" />
+        </>
+      );
+    }
+
+    it.each([
+      ["a non-modal Dialog", false, undefined],
+      ["a non-modal Dialog with the consumer's inert", false, true],
+      ["a modal Dialog", true, undefined],
+    ] as const)("a refused dismissal re-opens %s (#156)", async (_, modal, inert) => {
+      render(<Refusing modal={modal} inert={inert} />);
+      await flushTasks(2);
+      const dialog = popup() as HTMLDialogElement;
+      expect(dialog.open).toBe(true);
+      const outside = screen.getByTestId("outside");
+      outside.focus();
+      const blur = vi.fn();
+      outside.addEventListener("blur", blur);
+      const inertDuringShow: boolean[] = [];
+      const method = modal ? "showModal" : "show";
+      const original = HTMLDialogElement.prototype[method];
+      vi.spyOn(HTMLDialogElement.prototype, method).mockImplementation(function (
+        this: HTMLDialogElement,
+      ) {
+        inertDuringShow.push(this.hasAttribute("inert"));
+        original.call(this);
+      });
+      // A browser close (light dismiss, Escape): a fact the parent refuses.
+      await act(async () => dialog.close());
+      await flushTasks(2);
+      expect(dialog.open).toBe(true);
+      if (modal) {
+        // Unchanged: a modal dialog must hold focus.
+        expect(inertDuringShow).toEqual([false]);
+        expect(screen.getByTestId("inner")).toHaveFocus();
+        return;
+      }
+      expect(inertDuringShow).toEqual([true]);
+      expect(outside).toHaveFocus();
+      expect(blur).not.toHaveBeenCalled();
+      if (inert === true) {
+        expect(dialog).toHaveAttribute("inert");
+      } else {
+        expect(dialog).not.toHaveAttribute("inert");
+      }
+    });
+
     it("initialFocus (ref): autofocus is on the target while showModal runs, removed after", async () => {
       const user = setupUser();
       const seen: (string | null)[] = [];

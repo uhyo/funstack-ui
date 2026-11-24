@@ -8,7 +8,7 @@
 // - `show()` / `showModal()`: throw `InvalidStateError` when disconnected or open in the other
 //   mode; dispatch a cancelable `beforetoggle` synchronously; set `open`; mark the element modal
 //   (`matches(":modal")`); queue `toggle`; run a minimal focusing step (`[autofocus]` descendant,
-//   else the first focusable descendant, else the dialog).
+//   else the first focusable descendant, else the dialog; nothing for an `inert` dialog, #156).
 // - `close(v)`: a non-cancelable `beforetoggle` synchronously, removes `open` and the modal mark,
 //   sets `returnValue` when `v` is given, restores focus to the element focused at open (for a
 //   non-modal dialog only when focus is inside), queues `toggle` and `close` as tasks.
@@ -49,6 +49,8 @@ function queue(element: HTMLDialogElement, event: Event): void {
 }
 
 function focusingSteps(dialog: HTMLDialogElement): void {
+  // An inert dialog has no focusable area: the focusing steps do nothing (jsdom ignores `inert`).
+  if (dialog.closest("[inert]") !== null) return;
   const target =
     dialog.querySelector<HTMLElement>("[autofocus]") ??
     dialog.querySelector<HTMLElement>(FOCUSABLE) ??

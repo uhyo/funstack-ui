@@ -227,6 +227,10 @@ export function DialogPopup({
   // close is a fact (overlay-open-change.md 6.3), reported the moment it happens, also while a
   // part's close is in flight: nothing is stored for later.
   const libraryClose = useRef(false);
+  // Set when a fact closed the dialog, cleared once a commit has `committed` false (the fact was
+  // adopted): a show while it is set is the re-open of a dismissal a controlled parent refused
+  // (overlay-open-change.md 2.4).
+  const refusedFact = useRef(false);
   const initialFocusTarget = useInitialFocusTarget("Dialog.Popup", "dialog");
 
   // `held`: children stay mounted while the close animates (design 4.4).
@@ -266,7 +270,15 @@ export function DialogPopup({
   // --- Opening -----------------------------------------------------------------------------
 
   const openDialog = (element: HTMLDialogElement): void => {
-    const target = initialFocusTarget(element, initialFocus);
+    // A refused re-open of a non-modal dialog never moves focus (#156): no initial focus target,
+    // and the dialog is `inert` for the duration of `show()`, so the dialog focusing steps focus
+    // nothing (a consumer's own `inert` is left alone). A modal dialog must hold focus: its
+    // re-open is a normal open.
+    const refused = refusedFact.current && !modal;
+    refusedFact.current = false;
+    const inerted = refused && !element.hasAttribute("inert");
+    if (inerted) element.setAttribute("inert", "");
+    const target = refused ? null : initialFocusTarget(element, initialFocus);
     // The platform's dialog focusing steps honour `autofocus`; React drops `autoFocus` on
     // client-rendered content (react/react#23301). Never `.focus()` (design 6.1).
     const added = target !== null && !target.hasAttribute("autofocus");
@@ -280,6 +292,7 @@ export function DialogPopup({
       });
     } finally {
       if (added) target.removeAttribute("autofocus");
+      if (inerted) element.removeAttribute("inert");
     }
   };
 
@@ -307,6 +320,9 @@ export function DialogPopup({
     if (!isLibrary) return;
     const element = popupRef.current;
     if (element === null || !element.isConnected) return;
+    // The fact was adopted (or anything else closed the dialog in state): a later show is a new
+    // open, with initial focus.
+    if (!ctx.committed) refusedFact.current = false;
     if (!ctx.pending && ctx.latestInFlight() === null) {
       if (ctx.committed && !element.open) {
         // Closed, but its `close` event has not arrived yet: wait for it.
@@ -419,6 +435,7 @@ export function DialogPopup({
     exit.afterClose(element, echo);
 
     if (echo) return;
+    refusedFact.current = true;
     // Closed by the browser: a returnValue a pending part close recorded will never be used.
     ctx.takeCloseReturnValue();
     // A fact, also while a part's close is in flight: it supersedes that request (committed

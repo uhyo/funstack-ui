@@ -367,7 +367,10 @@ in the same task sequence before the timer, and `takeCloseIntent()` already empt
 **A controlled parent that refuses a dismissal.** The dialog is already closed when the action
 runs. If the parent keeps `open={true}`, then after the action settles optimistic reverts to
 `true`, and the Popup's apply effect sees committed `true` with a closed dialog and calls
-`showModal()` again: the dialog re-opens, with focus moved back into it. This is conventions 3.5
+`showModal()` again: the dialog re-opens, with focus moved back into it. A non-modal dialog
+(`modal={false}`) is re-shown with `show()` without moving focus: the Popup writes no
+`autofocus` and is `inert` for the duration of the call (unless the consumer set `inert`), so
+the dialog focusing steps focus nothing (overlay-open-change.md 2.4, #156). This is conventions 3.5
 ("it follows the browser, it does not gate it"), the same behaviour as a refused find-in-page
 reveal in Accordion, and it is **not a veto mechanism**: the user sees the dialog close and come
 back. The docs say so and recommend adopting a dismissal's `false` unconditionally. One case

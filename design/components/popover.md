@@ -851,6 +851,18 @@ false })` right after `showPopover()` instead, so a mouse open does not paint a 
 item (Menu 6.1, review H1). Elsewhere the `autofocus` path runs as before. `initialFocus` itself
 never takes this path.
 
+**A refused re-open never moves focus** (overlay-open-change.md 2.4, #155, #156): the re-show of
+a dismissal the controlled parent refused writes no `autofocus`, and the popup (any element) is
+`inert` for the duration of the `showPopover()` call (written only when the consumer has not set
+`inert`, removed right after), so the popover focusing steps focus nothing (an inert element is
+not a focusable area): neither the dialog focusing steps of the default `<dialog>` nor a
+consumer's own `autofocus` descendant in a `<div>` popup. Focus stays where the dismissal put it: the
+element clicked outside, with no `blur` / `focus` event and its selection kept, or the Trigger
+after Escape. Still no `.focus()`. The brief `inert` is observable during the call: a consumer's
+`beforetoggle` listener on the Popup sees it, and a `MutationObserver` gets its two attribute
+records (`toggle` is a later task and never sees it); an `inert` a consumer's `beforetoggle`
+listener writes imperatively during that call is removed with the library's.
+
 ```tsx
 <Popover.Popup initialFocus="[name=query]">…<input name="query" />…</Popover.Popup>
 <Popover.Popup initialFocus={titleRef}>…<Popover.Title ref={titleRef} tabIndex={-1}>…</Popover.Popup>

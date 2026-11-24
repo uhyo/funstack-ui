@@ -615,14 +615,12 @@ export function PopoverPage() {
             A controlled parent that keeps <code>open</code> after a <strong>part-initiated</strong>{" "}
             close vetoes it: nothing was hidden, the Trigger's <code>data-open</code> snaps back.
             After a <strong>dismissal</strong> the popover is already hidden; a parent that keeps{" "}
-            <code>open</code> gets it re-opened at once, which the user sees as a blink; the default{" "}
-            <code>&lt;dialog&gt;</code> popup gets focus again from the browser&apos;s dialog
-            focusing steps (after a click outside it takes focus back from the element clicked;{" "}
-            <a href="https://github.com/uhyo/funstack-ui/issues/156">#156</a>), a{" "}
-            <code>&lt;div&gt;</code> popup keeps focus where the dismissal put it. Adopt{" "}
-            <code>false</code> in <code>onOpenChange</code>, directly (
-            <code>onOpenChange={"{setOpen}"}</code>), not in <code>startTransition</code> and not
-            after an <code>await</code>.
+            <code>open</code> gets it re-opened at once, which the user sees as a blink. The re-open
+            never moves focus: it stays where the dismissal put it (the Trigger after Escape, the
+            element clicked outside), for the default <code>&lt;dialog&gt;</code> popup as for a{" "}
+            <code>&lt;div&gt;</code> one. Adopt <code>false</code> in <code>onOpenChange</code>,
+            directly (<code>onOpenChange={"{setOpen}"}</code>), not in <code>startTransition</code>{" "}
+            and not after an <code>await</code>.
           </p>
         </Callout>
         <h4 id="slow-open-change-action">
