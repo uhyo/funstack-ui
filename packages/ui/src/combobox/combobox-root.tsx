@@ -2,20 +2,16 @@
 import {
   use,
   useCallback,
-  useDeferredValue,
   useEffect,
   useId,
-  useInsertionEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { flushSync } from "react-dom";
 import { createActionDetails } from "../internal/action-details.js";
 import { announce, canAnnounce } from "../internal/announce.js";
-import { callUrgentHandler } from "../internal/call-urgent-handler.js";
 import { FieldContext } from "../internal/field-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
@@ -34,7 +30,10 @@ import { useLatest } from "../internal/use-latest.js";
 import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
+import { useActiveOption } from "./use-active-option.js";
 import { useComboboxForm } from "./use-combobox-form.js";
+import { useComboboxKeyboard } from "./use-combobox-keyboard.js";
+import { useComboboxText } from "./use-combobox-text.js";
 import { useDeferredLeave } from "./use-deferred-leave.js";
 import { useOptionRegistry } from "./use-option-registry.js";
 import type { ComboboxContextValue } from "./combobox-context.js";
@@ -313,31 +312,11 @@ export function ComboboxRoot(props: ComboboxRootProps) {
 
   // --- Text: the urgent lane (design 4) ------------------------------------------------------
 
-  const [internalText, setInternalText] = useState(() => defaultInputValue ?? inputValueProp ?? "");
-  const text = inputValueProp ?? internalText;
-  const query = useDeferredValue(text);
-  const stale = text !== query;
-  const textRef = useRef(text);
-  useInsertionEffect(() => {
-    textRef.current = text;
+  const { text, query, stale, textRef, writeText } = useComboboxText({
+    inputValue: inputValueProp,
+    defaultInputValue,
+    onInputValueChange: props.onInputValueChange,
   });
-
-  /**
-   * Writes the text (urgent) and calls `onInputValueChange` synchronously (design 2.2), under the
-   * handler rule (`callUrgentHandler`: a throw or a returned promise's rejection goes to
-   * `reportError`, the write above stands).
-   */
-  const writeText = useCallback(
-    (next: string, reason: ChangeReason, event: Event | undefined): void => {
-      const latest = propsRef.current;
-      if (latest.inputValue === undefined) setInternalText(next);
-      textRef.current = next;
-      const handler = latest.onInputValueChange;
-      if (handler === undefined) return;
-      callUrgentHandler(handler, next, createActionDetails(event, { reason }));
-    },
-    [propsRef],
-  );
 
   // --- Labels (design 2.3) -------------------------------------------------------------------
 
@@ -453,52 +432,12 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     orderedOptions,
   } = useOptionRegistry(labels);
 
-  const [activeValue, setActiveValue] = useState<string | null>(null);
-  const activeRef = useRef<string | null>(null);
-  const setActive = useCallback((next: string | null) => {
-    activeRef.current = next;
-    setActiveValue(next);
-  }, []);
-  // The edge to activate once the open has options (ArrowDown / ArrowUp while closed).
-  const pendingEdge = useRef<"first" | "last" | null>(null);
-  // `autoHighlight` (APG automatic selection) highlights once per open and once per edit, when
-  // the results for it settle. Home / End / Left / Right clear the active option without
-  // re-arming it, so the caret keys really return visual focus to the input.
-  const autoArmed = useRef(true);
+  const active = useActiveOption({ popover, orderedOptions, autoHighlight, stale });
+  const { activeValue, activeRef, setActive, pendingEdgeRef, autoArmedRef } = active;
 
   // A Status inside the List is a Suspense fallback: the results are loading (design 6.3).
   const loading = statusCount > 0;
   const empty = optionCount === 0 && !stale && !loading;
-
-  // Revalidation (design 6.5): urgent, in a layout effect after every commit; never dispatches.
-  useLayoutEffect(() => {
-    const current = activeRef.current;
-    if (!popover.committed) {
-      // Keep the edge of an open that is on its way (the optimistic commit comes first).
-      if (!popover.intended()) pendingEdge.current = null;
-      autoArmed.current = true;
-      if (current !== null) setActive(null);
-      return;
-    }
-    const enabled = orderedOptions().filter((option) => !option.disabled);
-    let next = current;
-    if (pendingEdge.current !== null && enabled.length > 0) {
-      next = (pendingEdge.current === "first" ? enabled[0] : enabled.at(-1))!.value;
-      pendingEdge.current = null;
-    } else if (next !== null && !enabled.some((option) => option.value === next)) {
-      next = null;
-    }
-    if (next !== null) {
-      // Something is active (keys, hover): nothing to highlight for these results.
-      autoArmed.current = false;
-    } else if (autoHighlight && autoArmed.current && !stale && enabled.length > 0) {
-      // Only settled results: a stale list's first option is never auto-highlighted, so a fast
-      // Enter commits the typed text or does nothing (design 6.5).
-      next = enabled[0]!.value;
-      autoArmed.current = false;
-    }
-    if (next !== current) setActive(next);
-  });
 
   // The selection did not land (a controlled parent refused it, or the caught-inside variant of
   // a controlled parent): the text goes back to the committed value's label (design 2.2).
@@ -602,7 +541,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     if (entry === undefined || entry.disabled) return;
     const label = entry.label ?? (entry.element.textContent ?? "").trim();
     labels.set(optionValue, label);
-    pendingEdge.current = null;
+    pendingEdgeRef.current = null;
     if (activeRef.current !== optionValue) setActive(optionValue);
     writeText(label, "activate", event);
     // Re-accepting the selected option dispatches nothing and closes (conventions 2.3 item 8).
@@ -647,99 +586,24 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   const typed = (next: string, event: Event): void => {
     if (disabled) return;
     writeText(next, "activate", event);
-    pendingEdge.current = null;
+    pendingEdgeRef.current = null;
     // APG: editing moves visual focus back to the input; `autoHighlight` picks the first option
     // again once the results for the new text settle.
     if (activeRef.current !== null) setActive(null);
-    autoArmed.current = true;
+    autoArmedRef.current = true;
     popover.requestOpen(event, "activate");
   };
 
-  const move = (direction: 1 | -1): void => {
-    const enabled = orderedOptions().filter((option) => !option.disabled);
-    if (enabled.length === 0) return;
-    const last = enabled.length - 1;
-    const index = enabled.findIndex((option) => option.value === activeRef.current);
-    let next: number;
-    if (direction === 1) next = index < 0 ? 0 : index >= last ? (loop ? 0 : last) : index + 1;
-    else next = index < 0 ? last : index <= 0 ? (loop ? last : 0) : index - 1;
-    const target = enabled[next]!;
-    setActive(target.value);
-    if (typeof target.element.scrollIntoView === "function") {
-      target.element.scrollIntoView({ block: "nearest" });
-    }
-  };
-
-  const activeEnabled = (): string | null => {
-    const current = activeRef.current;
-    if (current === null) return null;
-    const entry = registry.get(current);
-    return entry !== undefined && !entry.disabled ? current : null;
-  };
-
-  const keyDown = (event: KeyboardEvent): boolean => {
-    if (disabled || event.ctrlKey || event.metaKey) return false;
-    // IME: the key belongs to the composition (Enter commits it, arrows pick a candidate).
-    if (event.isComposing || event.keyCode === 229) return false;
-    // What the user sees, not what is intended: right after Escape the platform has hidden the
-    // popup but its `toggle` (and the fact it reports) is still queued, and an open that
-    // is still committing shows nothing yet. Enter must submit and arrows must open in both.
-    const isOpen = isPopoverOpen(popover.popupRef.current);
-    switch (event.key) {
-      case "ArrowDown":
-        event.preventDefault();
-        if (event.altKey) {
-          if (!isOpen) popover.requestOpen(event, "activate");
-        } else if (!isOpen) {
-          pendingEdge.current = "first";
-          popover.requestOpen(event, "activate");
-        } else {
-          move(1);
-        }
-        return true;
-      case "ArrowUp":
-        event.preventDefault();
-        if (event.altKey) {
-          if (isOpen) {
-            const active = activeEnabled();
-            if (active !== null) accept(active, event);
-            else popover.requestClose(event, "activate");
-          }
-        } else if (!isOpen) {
-          pendingEdge.current = "last";
-          popover.requestOpen(event, "activate");
-        } else {
-          move(-1);
-        }
-        return true;
-      case "Enter": {
-        if (isOpen) {
-          // An open listbox means the user is choosing: never submit from here.
-          event.preventDefault();
-          const active = activeEnabled();
-          if (active !== null) accept(active, event);
-          else if (allowCustomValue && !commitText(event, true)) {
-            popover.requestClose(event, "activate");
-          }
-          return true;
-        }
-        // Closed: not prevented, so a form still submits. The key's default action (implicit
-        // submission) must see the optimistic hidden value: Firefox submits before React's
-        // scheduled flush of the optimistic render, so it is flushed here (design 5.3).
-        if (allowCustomValue) flushSync(() => commitText(event, false));
-        return false;
-      }
-      case "Home":
-      case "End":
-      case "ArrowLeft":
-      case "ArrowRight":
-        // APG: the caret keys move visual focus to the input (not prevented: the caret moves).
-        if (activeRef.current !== null) setActive(null);
-        return false;
-      default:
-        return false;
-    }
-  };
+  const keyDown = useComboboxKeyboard({
+    disabled,
+    loop,
+    allowCustomValue,
+    popover,
+    options: { registry, orderedOptions },
+    active,
+    accept,
+    commitText,
+  });
 
   /** Focus has left the input and the popup (design 5.4). */
   const leave = (event: Event): void => {
@@ -750,7 +614,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
       popover.recordCloseIntent({ reason: "dismiss", event });
       popup.hidePopover();
     }
-    pendingEdge.current = null;
+    pendingEdgeRef.current = null;
     if (allowCustomValue) {
       commitText(event, false);
       return;

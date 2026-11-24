@@ -121,6 +121,9 @@ const clientFiles = [
   "combobox/combobox-list.mjs",
   "combobox/combobox-option.mjs",
   "combobox/combobox-group.mjs",
+  "combobox/use-combobox-text.mjs",
+  "combobox/use-active-option.mjs",
+  "combobox/use-combobox-keyboard.mjs",
   // Every Toast part and its context are client modules; the manager is not
   // (design/components/toast.md 13 and 17).
   "toast/toast-context.mjs",
