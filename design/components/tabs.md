@@ -1,6 +1,7 @@
 # Tabs
 
-Status: **proposed** (2026-10-15, GitHub issue #7). Follows `design/conventions.md` (accepted);
+Status: **accepted**, implemented. History (reviews, decisions, implementation notes, the
+test plan): `design/CHANGELOG.md`, parts "tabs.md". Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/react-async-apis.md` (sections
@@ -838,151 +839,8 @@ the library handler stops the native navigation; the route change comes from
 
 ## 12. Test plan
 
-`packages/ui/src/tabs/tabs.test.tsx`, jsdom, `user-event`, helpers from `src/__tests__/helpers.tsx`.
-Rows marked (both) run under `describe.each` with the uncontrolled and the "update on success"
-controlled wrapper.
-
-| Area | Tests |
-| --- | --- |
-| Roles and ARIA | Default elements and roles. `aria-selected`, `aria-controls` ↔ `id`, `aria-labelledby` ↔ `id` resolve. `aria-orientation` and `data-orientation` for both orientations. `aria-disabled` on disabled tabs and under `Root disabled`. Unselected panels absent by default. Panel `tabindex="0"` default and override. Ids are stable across re-renders and safe for `value="a b/c"`. |
-| Keyboard | Matrix: `{horizontal, vertical} × {ArrowRight, ArrowLeft, ArrowDown, ArrowUp, Home, End}` asserting focus target, including the ignored axis. `loop` on and off at both ends. RTL swaps horizontal arrows (set `direction: rtl` via style). Disabled tabs are reachable. Enter/Space select in manual mode, no-op in automatic mode. `preventDefault` called for handled keys. Tab key from a tab lands on the selected panel. |
-| Activation | Automatic: arrow press dispatches with `details.event.type === "focusin"` (React's `onFocus`); manual: arrow press does not dispatch, Enter does. Tabbing into a list with `value={null}` focuses the first enabled tab without dispatching in either mode; a following arrow key dispatches in automatic mode. Focus entering from outside onto an unselected tab (`autoFocus`, `tab.focus()` from outside, focus restore) never dispatches in either mode; after a controlled veto, a `focusin` with `relatedTarget` outside the list does not re-dispatch, an arrow key does. |
-| Tab stop | Controlled `value` matching no tab: the List has `tabindex="0"`, Tab from before the list lands on the first tab, a dev warning fires once. `value={null}`: clicking empty list space focuses the first enabled tab without dispatching; Shift+Tab from a tab stops once on the List, then leaves. |
-| `render` element type | `render={<a href />}` yields no `type` attribute; `render={<button />}` keeps `type="button"`. |
-| Sync action (both) | `(next, details)` shape, `details.reason === "activate"`, `details.event` is a native event. Clicking the selected tab, a disabled tab, or any tab under `Root disabled` never dispatches. |
-| Async action (both) | While unresolved: `data-pending` on Root and the clicked Tab only, `aria-selected` moved, old panel still in the DOM, new panel absent. After resolve: pending gone, panels swapped. |
-| Rejection (both) | `ErrorCatcher` receives the error; `aria-selected` reverts; panel unchanged; uncontrolled internal value unchanged. Caught-inside variant resolves and (uncontrolled) commits. |
-| Overlap | Dispatch b then c, resolve b last: optimistic shows c throughout, final committed is c. Section 9.4: dispatch b, then a (the committed one): panel a never leaves, final committed a. |
-| Suspending content (both) | Panel b renders `<Suspender />`. Select b: old panel stays, boundary above shows no fallback, `data-pending` on. Resolve: panel b shown, pending off. Keyed inner boundary variant: fallback shown at once, pending off. |
-| `keepMounted` | `true`: inactive panel present with `display: none`; child state survives a round trip; a suspending hidden panel does not block the visible one. `"until-found"`: inactive panel has `hidden="until-found"` after mount; dispatching `beforematch` on it selects the tab with `reason: "platform"`; after a rejected action the attribute is re-asserted. |
-| Indicator | `hidden` when `value` is `null`; `position-anchor` style names the optimistic tab and moves before the action resolves and reverts on rejection; renders no `view-transition-name`; placed after the tabs. |
-| Function props | `className`, `style`, `children`, `render` on every part receive the documented state; attributes agree (Tab `selected` optimistic, Panel `selected` committed). |
-| `render` element | Tab as `<a>`: role and aria win, `className` concatenated, Space selects, `ref` forwarded. Panel and Indicator with custom elements. |
-| Post-await rule | Controlled wrapper that awaits then `startTransition(setTab)` works end to end. |
-| `transition` prop | `Tab` and `Panel` render with and without `transition` (jsdom has no `startViewTransition`); `Indicator` has no such prop. **Browser:** with `transition` absent, a tab switch (`keepMounted` false and true) calls `document.startViewTransition` zero times; with `transition="none"` on the Panel it is called once per switch (conventions 10.1). |
-| `experimental_focusgroup` | Attribute rendered with the expected tokens for each orientation and `loop`; JS arrows still work in jsdom (no `focusgroup` in prototype). |
-| Directive | Built `dist/tabs/*.mjs` for Root, List, Tab, Panel, Indicator and context begin with `"use client"`; `tabs-ids.mjs` does not. |
-| Dev warnings | Neither `value` nor `defaultValue` given warns once (product-owner decision, resolved question 2); `value` together with `defaultValue`, and switching `value` between `undefined` and a string, warn once each. |
-
-Browser-only checks (example app, not automated in v0): panel cross-fade and slide,
-Indicator CSS slide via anchor positioning in Blink and WebKit (and the jump in Gecko),
-`focusgroup` in Chromium 150+, find-in-page reveal.
+Moved to `design/CHANGELOG.md` (part "tabs.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 13. Implementation notes
 
-### 13.1 Files
-
-```
-packages/ui/src/tabs/
-  index.ts              # no directive; namespace + type re-exports
-  tabs-ids.ts           # no directive; slug(), tabId(), panelId(), anchorName()
-  tabs-context.ts       # "use client"; createContext<TabsContextValue | null>
-  tabs-root.tsx         # "use client"
-  tabs-list.tsx         # "use client"
-  tabs-tab.tsx          # "use client"
-  tabs-panel.tsx        # "use client"
-  tabs-indicator.tsx    # "use client"
-  tabs.test.tsx
-packages/ui/src/internal/
-  use-until-found.ts    # "use client"; shared with Accordion if it adopts the attribute
-```
-
-### 13.2 Context
-
-```ts
-interface TabsContextValue {
-  readonly rootId: string;
-  readonly committed: string | null;
-  readonly optimistic: string | null;
-  readonly pending: boolean;
-  readonly orientation: TabsOrientation;
-  readonly activationMode: TabsActivationMode;
-  readonly loop: boolean;
-  readonly disabled: boolean;
-  /** No-op if `value === optimistic`. Never checks `disabled`; callers do. */
-  select(value: string, event: Event, reason: TabsValueChangeDetails["reason"]): void;
-}
-```
-
-One context; every part re-renders on a dispatch anyway (attributes change).
-`TabsValueChangeDetails.reason` is the shared `ChangeReason` (conventions 2.2), as the type in
-section 3 shows; until #100 the implementation carried a narrower local union, so a consumer
-who annotated that union sees a type change after 0.1.0-alpha.11.
-
-### 13.3 Root
-
-- `useId()` for `rootId`; `useControllableAction` from `internal/` for `committed`, `optimistic`,
-  `pending`, `dispatch`. `select` wraps `dispatch` with the optimistic no-op check and builds
-  `details`.
-- Transition types: the shared hook's `transitionType` option currently returns one string; Tabs
-  needs two (`fsui-tabs` plus a direction). See Conventions feedback, item 2. Direction: look up
-  `ownerDocument.getElementById(tabId(committed))` and the target tab (the dispatching element,
-  passed through `select`), compare with `compareDocumentPosition`; omit the direction type when
-  either is missing.
-- Renders `div` through `use-render` with `TabsRootState`.
-
-### 13.4 List
-
-- `tabIndex={optimistic === null ? 0 : undefined}` and `onFocus` redirect to the first
-  non-disabled tab when the list itself is the target (section 8). `onFocus` is therefore omitted
-  from `TabsListProps` as well as `onKeyDown`.
-- `onKeyDown`: ignore if `event.defaultPrevented` or the target is not a tab in this list;
-  resolve the key against `orientation` and computed `direction` (`resolveArrowKey` in
-  `internal/arrow-keys.ts`, shared with the roving-focus engine); collect tabs by DOM query;
-  compute the index with `loop`; `preventDefault()`; `focus({ focusVisible: true })`.
-- `experimental_focusgroup`: render the attribute (lowercase, typed by the shared augmentation
-  file) with the `nomemory` token; detect the native path with `useNativeFocusgroup(experimental_focusgroup)`
-  (`internal/use-native-focusgroup.ts`, shared with Menu.Popup and ToggleGroup: a
-  `useSyncExternalStore` whose client snapshot is `flag && "focusGroup" in
-  HTMLElement.prototype`, the camel-cased IDL attribute, #43, and whose server snapshot is
-  `false`, so hydration markup is identical) and provide it through a `TabsListContext` so each Tab can drop
-  `tabindex="-1"` and render `focusgroupstart` when selected; the keydown handler returns early
-  for navigation keys when the detected value is true.
-
-### 13.5 Tab
-
-- Reads context; `selected = optimistic === value`; `pending = ctx.pending && selected`;
-  `disabled = ctx.disabled || props.disabled`.
-- `onFocus`: automatic mode and `!disabled` and `!selected` and `list.contains(event.relatedTarget)`
-  and `event.relatedTarget !== list` → `select(value, nativeEvent, "activate")` (4.1: focus from
-  outside the list, and the List's own redirect, never dispatch).
-- `onClick`: `!disabled` → `select(...)` (no-op guard inside).
-- `onKeyDown`: Enter or Space → `preventDefault()`, then as `onClick`.
-- `tabIndex`: `0` when selected, else `-1`. The `value === null` case is handled by `List`
-  (`tabIndex={listIsTabStop ? 0 : undefined}` plus an `onFocus` that, when
-  `event.target === list` and `event.relatedTarget` is not inside the list, focuses the first
-  non-disabled tab). `listIsTabStop` is `optimistic === null`, or a layout-effect DOM check found
-  no tab whose value equals the committed `value` (with a one-time dev warning, §8). No DOM attribute is ever written
-  outside React, so nothing can go stale when a selection later appears.
-- `style`: merge `{ anchorName: anchorName(rootId, value) }` under the consumer's style (consumer
-  wins, per conventions section 1.2).
-- Output: `<button …/>`, wrapped in `<ViewTransition default={transition}>` only when `transition` is given.
-
-### 13.6 Panel
-
-- `selected = committed === value`.
-- `keepMounted === false`: return `null` when not selected; otherwise the ViewTransition-wrapped div.
-- `keepMounted === true`: `<Activity mode={selected ? "visible" : "hidden"}><ViewTransition …><div …/></ViewTransition></Activity>`.
-  The mode flips inside the Root's transition because `committed` only changes there.
-- `keepMounted === "until-found"`: always render the div with `hidden={!selected}`; call
-  `useUntilFound(ref, { active: !selected, onMatch: (event) => select(value, event, "platform") })`.
-  The hook: layout effect without deps that sets the attribute when `active`; `useEffectEvent`
-  for `onMatch`; `addEventListener("beforematch")` with cleanup.
-- `data-selected` from committed state; `tabIndex` default `0`.
-
-### 13.7 Indicator
-
-- `value = optimistic`; `hidden={value === null}`; `style` merges `{ positionAnchor: anchorName(rootId, value) }`.
-- Output: a bare `<span aria-hidden …/>`. No `<ViewTransition>` (section 10.1).
-- Docs: must be a later sibling of the Tabs inside `List` (anchor must precede the positioned
-  element in tree order); `List` needs `position: relative` and the Indicator `position: absolute`
-  plus `anchor()` insets. Ships no CSS.
-
-### 13.8 Attribute typing
-
-`anchorName` and `positionAnchor` are typed in the installed `csstype` 3.2.3 (verified), so the
-inline styles need no augmentation. `focusgroup` is untyped and goes in the platform augmentation
-module per conventions section 7.4. That module must be a `.ts` file imported from the package
-entry, not a `.d.ts`: tsdown does not emit source `.d.ts` files, so a `.d.ts` is typecheck-only
-and never reaches `dist` (the current `platform-attributes.d.ts` has exactly this problem; the
-mechanism is pending the reviewer's confirmation).
+Moved to `design/CHANGELOG.md` (part "tabs.md"). Not part of the contract: the code and the tests are the reference.
