@@ -413,3 +413,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #158 filed + decided (user: apply; native disabled for browser-owned effects on possible buttons; whilePending ignore unchanged; disabled wins over pending).
 - Phase 2/3 running: refactor/157-overlay-shared (#1 + #9, with #6 assessment for user), refactor/157-step-commit (#3; accidental differences to user), refactor/157-pure-trigger (#158 + #4).
 - Remaining A items after: #7 small helpers, #10 dev warnings, #11 overlay hook interfaces, #12 combobox/toast-viewport splits, internal/ reorg last; conventions.md second pass; L7 section-citation check.
+- MERGED refactor/157-step-commit fa39367 (use-step-commit.ts), refactor/157-overlay-shared eab50e5 (overlay-show.ts flags + showWithFocus; dialog-dismiss.ts). CHANGELOG "# Entries" conflict resolved by keeping both.
+- #6 decided (user): share only the apply-open effect (3-member driver); handlers stay separate → developer on refactor/157-apply-open (+ review nits + M3 test). Dialog listeners → callback ref is a separate optional step (not started).
+- refactor/157-pure-trigger (#158 + usePureTrigger) in review. Deviations: <a> JS-free command parts get aria-disabled; commandfor/popoverTarget Buttons count as browser-run.
