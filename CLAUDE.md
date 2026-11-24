@@ -16,7 +16,7 @@ This is a pnpm monorepo managed with Turbo:
 - `packages/example` - Vite + React playground that consumes `@funstack/ui` via `workspace:*`
 - `packages/docs` - The documentation site (package name `docs`), built with FUNSTACK Static
 - `docs/` - Vision, design documents, and research notes (markdown)
-- `design/` - API conventions (`conventions.md`, with parts in `internal-hooks.md`, `placement.md` and `testing.md` under the same section numbers) and per-component designs, written as current rules only. History (amendments, resolved questions, test plans, implementation notes) goes to the append-only `design/CHANGELOG.md`: an amendment edits the rule and adds a changelog entry in the same commit; never edit an existing entry
+- `design/` - API conventions (`conventions.md`, with parts in `internal-hooks.md`, `overlay-open-state.md`, `placement.md` and `testing.md` under the same section numbers) and per-component designs, written as current rules only. History (amendments, resolved questions, test plans, implementation notes) goes to the append-only `design/CHANGELOG.md`: an amendment edits the rule and adds a changelog entry in the same commit; never edit an existing entry
 - `memo/<role>/` - Working notes kept by each agent role (see Conventions)
 
 ## Commands
