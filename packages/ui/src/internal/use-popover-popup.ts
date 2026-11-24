@@ -164,7 +164,8 @@ export function usePopoverPopup(
   ): { readonly target: HTMLElement; readonly quiet: boolean } | null => {
     if (typeof initialFocus === "function") {
       const resolved = initialFocus(element);
-      if (resolved === null) return null;
+      // `== null`: a resolver that returns `undefined` leaves the choice to the platform too.
+      if (resolved == null) return null;
       const target = resolved instanceof HTMLElement ? resolved : resolved.element;
       if (!element.contains(target)) return null;
       // A pointer open asks for no focus ring: `focus({ focusVisible: false })` after the show,

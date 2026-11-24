@@ -244,7 +244,7 @@ export function MenuRoot({
 
   const resolvedDelay = delay ?? 100;
   const resolvedCloseDelay = closeDelay ?? 150;
-  // `popover` is memoised by `useOverlayRoot` and the other members are stable, so this
+  // `popover` is memoised by `usePopoverRoot` and the other members are stable, so this
   // changes only with the open state, pending and the props listed below.
   const value = useMemo<MenuContextValue>(() => {
     const self: MenuContextValue = {

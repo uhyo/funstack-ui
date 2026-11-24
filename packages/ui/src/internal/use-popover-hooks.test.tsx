@@ -170,6 +170,18 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(screen.getByTestId("two")).not.toHaveAttribute("autofocus");
   });
 
+  it("a function initialFocus that returns undefined leaves the choice to the platform", async () => {
+    const user = setupUser();
+    const resolve = vi.fn(() => undefined as unknown as null);
+    render(<Mini resolve={resolve} />);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
+    expect(screen.getByTestId("popup").querySelector("[autofocus]")).toBeNull();
+    expect(screen.getByTestId("trigger")).toHaveFocus();
+  });
+
   it("a <div popover> keeps focus on the Trigger without autofocus", async () => {
     const user = setupUser();
     render(<Mini />);
