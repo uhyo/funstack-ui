@@ -274,6 +274,45 @@ describe("useNativeChecked", () => {
         expect((onPlatformChange.mock.calls[0]![1] as Event).type).toBe("reset");
       }
     });
+
+    // #157 safety net (memo/reviewer/refactor-test-safety.md NC3): a reset whose target equals
+    // what the user intends dispatches nothing, but the DOM still ends on the intended value when
+    // something left it elsewhere between the reset algorithm and the hook's microtask (a script
+    // in the same task, another reset listener's work). Nothing re-renders, so only the reset
+    // path can write it back.
+    it.each([
+      ["controlled, the mount-time default", { checked: true }],
+      [
+        "a pending dispatch, the in-flight value",
+        { checked: false, defaultChecked: true, latestInFlight: () => ({ next: true }) },
+      ],
+    ] as const)(
+      "a reset target equal to the intent (%s) writes checked back, without a dispatch",
+      async (_title, options) => {
+        const onPlatformChange = vi.fn();
+        const { rerender } = render(
+          <form data-testid="form">
+            <Probe {...options} onPlatformChange={onPlatformChange} />
+          </form>,
+        );
+        // A later commit re-applies the intent (the mount commit leaves the DOM alone).
+        rerender(
+          <form data-testid="form">
+            <Probe {...options} onPlatformChange={onPlatformChange} tick={1} />
+          </form>,
+        );
+        expect(probe().checked).toBe(true);
+        expect(probe().defaultChecked).toBe(true);
+        // The stubbed in-flight value has no dispatch behind it, so the mount reconciliation saw
+        // React's `checked={false}` as a difference; that report is not this row's subject.
+        onPlatformChange.mockClear();
+        (screen.getByTestId("form") as HTMLFormElement).reset();
+        probe().checked = false;
+        await flushMicrotasks();
+        expect(onPlatformChange).not.toHaveBeenCalled();
+        expect(probe().checked).toBe(true);
+      },
+    );
   });
 });
 

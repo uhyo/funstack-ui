@@ -2511,6 +2511,49 @@ describe("submenus", () => {
       expect(isOpen(sub())).toBe(true);
     });
 
+    // #157 safety net (memo/reviewer/refactor-test-safety.md UOR8): a fact goes through the
+    // Root's `onDispatch` too, which cancels the hover timers and forgets a recorded open cause.
+    it("a dismissal of the submenu cancels a pending hover open", async () => {
+      const { subAction } = await setup();
+      fireEvent.pointerEnter(item("move"), { pointerType: "mouse" });
+      await advance(110);
+      expect(isOpen(sub())).toBe(true);
+      // Out and back in: the hover open timer runs again while the submenu is shown.
+      fireEvent.pointerLeave(item("move"), { pointerType: "mouse" });
+      fireEvent.pointerEnter(item("move"), { pointerType: "mouse" });
+      await advance(10);
+      // Escape or a light dismiss of the submenu: a fact.
+      act(() => sub().hidePopover());
+      await advance(1);
+      expect(isOpen(sub())).toBe(false);
+      await advance(500);
+      expect(isOpen(sub())).toBe(false);
+      expect(subAction.mock.calls.map(([next]) => next)).toEqual([true]);
+      expect(isOpen()).toBe(true);
+    });
+
+    it("a dismissal forgets an open cause recorded while the submenu was shown", async () => {
+      const { calls } = await setup();
+      fireEvent.pointerEnter(item("move"), { pointerType: "mouse" });
+      await advance(110);
+      expect(isOpen(sub())).toBe(true);
+      // The hover timer fires again while the submenu is shown: it records "no focus" and its
+      // open request is a no-op, so the cause is left over.
+      fireEvent.pointerLeave(item("move"), { pointerType: "mouse" });
+      fireEvent.pointerEnter(item("move"), { pointerType: "mouse" });
+      await advance(110);
+      act(() => sub().hidePopover());
+      await advance(1);
+      expect(isOpen(sub())).toBe(false);
+      // A foreign open (a script's showPopover()) records no cause: the default, first item.
+      act(() => sub().showPopover());
+      await advance(1);
+      await advance(1);
+      expect(isOpen(sub())).toBe(true);
+      expect(calls.at(-1)!.popup).toBe(sub());
+      expect(calls.at(-1)!.autofocus).toBe(item("inbox"));
+    });
+
     it("a keyboard open cancels a pending hover open (one dispatch)", async () => {
       const { subAction } = await setup();
       fireEvent.pointerEnter(item("move"), { pointerType: "mouse" });
