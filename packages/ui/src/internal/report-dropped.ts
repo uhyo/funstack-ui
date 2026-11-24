@@ -16,8 +16,8 @@
  *
  * The library passes them to the global `reportError` instead, as React's standalone
  * `startTransition` does with every rejection: a window `error` event, seen by monitoring tools
- * and by test runners, while the UI stays up. `console.error` where there is no `reportError`. `callUrgentHandler` uses the same fallback for
- * an `on*` handler's throw or rejection.
+ * and by test runners, while the UI stays up. `console.error` where there is no `reportError`.
+ * `callUrgentHandler` routes an `on*` handler's throw or rejection here too.
  */
 export function reportDropped(error: unknown): void {
   if (typeof reportError === "function") reportError(error);
