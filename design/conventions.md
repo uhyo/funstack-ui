@@ -2607,6 +2607,7 @@ packages/ui/src/
     use-overlay-root.ts     # useOverlayRoot, popoverDetails, OverlayRootValue (section 3.9): Popover, Menu, Combobox, Dialog
     use-popover-popup.ts, use-popover-trigger.ts  # the shared Popup and Trigger of Popover, Menu, Combobox
     overlay-popup.tsx       # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
+    overlay-show.ts         # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
     use-overlay-close.ts    # useOverlayClose: the one Close part of Popover and Dialog
     content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
     use-exit-animation.ts   # held content while an exit animates (popover.md 4.4)

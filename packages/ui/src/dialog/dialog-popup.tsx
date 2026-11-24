@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -18,8 +18,8 @@ import {
   useInitialFocusTarget,
   useJsFreePropWarnings,
 } from "../internal/overlay-popup.js";
+import { createPopupFlags, showWithFocus } from "../internal/overlay-show.js";
 import { eventSource } from "../internal/invokers.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -29,6 +29,7 @@ import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import { listenDialogDismiss } from "./dialog-dismiss.js";
 
 /**
  * State of `Dialog.Popup`, passed to the function forms of `className`, `style`, `children` and
@@ -120,59 +121,6 @@ export interface DialogPopupProps extends Omit<
 
 const isDev = process.env.NODE_ENV !== "production";
 
-/** The nearest `<dialog>` around a node (the dialog itself counts). */
-function closestDialog(target: EventTarget | null): Element | null {
-  return target instanceof Element ? target.closest("dialog") : null;
-}
-
-/**
- * An open popover that takes Escape before the dialog: `auto` or `hint` (they have a close
- * watcher). A `manual` popover, or `hint` where the engine maps it to `manual`, does not.
- */
-function isOpenLightPopover(element: Element): boolean {
-  if (!element.hasAttribute("popover")) return false;
-  // The IDL attribute reflects the state the engine applies; jsdom has none.
-  const reflected: unknown = (element as HTMLElement).popover;
-  const state =
-    typeof reflected === "string" ? reflected : element.getAttribute("popover")!.toLowerCase();
-  if (state === "manual") return false;
-  return isPopoverOpen(element);
-}
-
-/**
- * Whether Escape belongs to a layer inside `dialog` that sits above it (design 9: "closes the
- * innermost one only"): the target is inside an open nested `<dialog>` or popover, or an open
- * `auto` / `hint` popover inside the dialog would take the close request (close watchers are
- * per document, not per focus).
- */
-function escapeBelongsToInnerLayer(dialog: HTMLDialogElement, target: EventTarget | null): boolean {
-  for (
-    let node = target instanceof Element ? target : null;
-    node !== null && node !== dialog;
-    node = node.parentElement
-  ) {
-    if (node instanceof HTMLDialogElement && node.open) return true;
-    if (isOpenLightPopover(node)) return true;
-  }
-  for (const element of dialog.querySelectorAll("[popover]")) {
-    if (isOpenLightPopover(element)) return true;
-  }
-  return false;
-}
-
-/** Whether a pointer event on the dialog itself lies outside its border box (the `::backdrop`). */
-function onBackdrop(dialog: HTMLDialogElement, event: Event): boolean {
-  if (event.target !== dialog) return false;
-  const { clientX, clientY } = event as MouseEvent;
-  const rect = dialog.getBoundingClientRect();
-  return !(
-    rect.top <= clientY &&
-    clientY <= rect.bottom &&
-    rect.left <= clientX &&
-    clientX <= rect.right
-  );
-}
-
 /** The submitter's or invoker's `value` (`""` without one, or where the engine gives no source). */
 function valueOf(element: unknown): string {
   if (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) {
@@ -218,19 +166,11 @@ export function DialogPopup({
   const isLibrary = ctx.mode === "library";
   const { modal, ids, popupRef, triggerRef } = ctx;
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
-  // Set by the synchronous `beforetoggle` of a close, cleared by the `close` event a task later:
-  // the dialog is closed but its fact is not reported yet, so the apply effect must not re-open
-  // it from a commit that lands in between.
-  const awaitingClose = useRef(false);
-  // Set right before the library's own `close()` (the apply effect), consumed by the `close`
-  // event it causes: the echo is recognised by its source, not by what is intended. Every other
-  // close is a fact (dialog.md 2.7), reported the moment it happens, also while a
-  // part's close is in flight: nothing is stored for later.
-  const libraryClose = useRef(false);
-  // Set when a fact closed the dialog, cleared once a commit has `committed` false (the fact was
-  // adopted): a show while it is set is the re-open of a dismissal a controlled parent refused
-  // (conventions 3.9.4).
-  const refusedFact = useRef(false);
+  // `awaitingClose` (the `close` event of a close has not arrived), the library echo
+  // `libraryClose` (every other close is a fact, dialog.md 2.7, reported the moment it happens,
+  // also while a part's close is in flight) and `refusedFact` (conventions 3.9.4), as
+  // usePopoverPopup's.
+  const [flags] = useState(createPopupFlags);
   const initialFocusTarget = useInitialFocusTarget("Dialog.Popup", "dialog");
 
   // `held`: children stay mounted while the close animates (design 4.4).
@@ -274,26 +214,19 @@ export function DialogPopup({
     // and the dialog is `inert` for the duration of `show()`, so the dialog focusing steps focus
     // nothing (a consumer's own `inert` is left alone). A modal dialog must hold focus: its
     // re-open is a normal open.
-    const refused = refusedFact.current && !modal;
-    refusedFact.current = false;
-    const inerted = refused && !element.hasAttribute("inert");
-    if (inerted) element.setAttribute("inert", "");
-    const target = refused ? null : initialFocusTarget(element, initialFocus);
-    // The platform's dialog focusing steps honour `autofocus`; React drops `autoFocus` on
-    // client-rendered content (react/react#23301). Never `.focus()` (design 6.1).
-    const added = target !== null && !target.hasAttribute("autofocus");
-    if (added) target.setAttribute("autofocus", "");
-    try {
+    const refused = flags.takeRefused() && !modal;
+    // Otherwise the platform's dialog focusing steps honour `autofocus` (design 6.1).
+    showWithFocus(element, {
+      refused,
+      autofocus: refused ? null : initialFocusTarget(element, initialFocus),
       // A view transition animates the open: the CSS enter does not run next to it (conventions
       // 5.1).
-      withCssTransitionCut(element, transition !== undefined, () => {
-        if (modal) element.showModal();
-        else element.show();
-      });
-    } finally {
-      if (added) target.removeAttribute("autofocus");
-      if (inerted) element.removeAttribute("inert");
-    }
+      show: () =>
+        withCssTransitionCut(element, transition !== undefined, () => {
+          if (modal) element.showModal();
+          else element.show();
+        }),
+    });
   };
 
   // Mount reconciliation (design 2.4): a click before hydration opened the dialog natively.
@@ -322,18 +255,18 @@ export function DialogPopup({
     if (element === null || !element.isConnected) return;
     // The fact was adopted (or anything else closed the dialog in state): a later show is a new
     // open, with initial focus.
-    if (!ctx.committed) refusedFact.current = false;
+    if (!ctx.committed) flags.factAdopted();
     if (!ctx.pending && ctx.latestInFlight() === null) {
       if (ctx.committed && !element.open) {
         // Closed, but its `close` event has not arrived yet: wait for it.
-        if (!awaitingClose.current) openDialog(element);
+        if (!flags.awaitingClose()) openDialog(element);
       } else if (!ctx.committed && element.open) {
-        // The library's own close: the `close` listener recognises it by `libraryClose` and
-        // dispatches nothing. `close()`, not `requestClose()`: the veto point was
-        // `openChangeAction`, not `cancel`. The part's `returnValue` (design 2.3), `""` for a
-        // controlled close.
+        // The library's own close: the `close` listener recognises it by the echo marker
+        // (`libraryClose`) and dispatches nothing. `close()`, not `requestClose()`: the veto
+        // point was `openChangeAction`, not `cancel`. The part's `returnValue` (design 2.3), `""`
+        // for a controlled close.
         ctx.recordCloseIntent(undefined);
-        libraryClose.current = true;
+        flags.markLibraryClose();
         const returnValue = ctx.takeCloseReturnValue();
         withCssTransitionCut(element, transition !== undefined, () => element.close(returnValue));
         // The close commit may have unmounted the focused content before `close()`: a
@@ -349,7 +282,7 @@ export function DialogPopup({
     if (ctx.committed && element.open) contentProbe.forget();
     // A hold the close commit set (or a fact's commit) that no exit animation is going to
     // release: the dialog is closed and its `close` event has been handled.
-    exit.releaseIfIdle(ctx.committed, awaitingClose.current, element.open);
+    exit.releaseIfIdle(ctx.committed, flags.awaitingClose(), element.open);
   });
 
   // JS-free mode: there is no "right before showModal()" (the browser runs the command), so the
@@ -417,7 +350,7 @@ export function DialogPopup({
   const onClose = useEffectEvent((event: Event) => {
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
-    awaitingClose.current = false;
+    flags.endClose();
 
     // Focus return is the platform's; it leaves focus inside the hidden dialog only when the
     // opener is gone (design 6.2).
@@ -427,15 +360,14 @@ export function DialogPopup({
     }
 
     const intent = ctx.takeCloseIntent();
-    const echo = libraryClose.current;
-    libraryClose.current = false;
+    const echo = flags.takeLibraryClose();
     if (!isLibrary) return;
 
     // The library's own `close()` is no fact.
     exit.afterClose(element, echo);
 
     if (echo) return;
-    refusedFact.current = true;
+    flags.markFact();
     // Closed by the browser: a returnValue a pending part close recorded will never be used.
     ctx.takeCloseReturnValue();
     // A fact, also while a part's close is in flight: it supersedes that request (committed
@@ -447,7 +379,8 @@ export function DialogPopup({
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
     const newState = (event as ToggleEvent).newState;
-    awaitingClose.current = newState === "closed";
+    if (newState === "closed") flags.beginClose();
+    else flags.endClose();
     // What already runs inside is not the exit.
     if (newState === "closed") exit.recordBaseline(element);
     // Every native open counts as a new opening (design 3.4, as Popover 14.1): foreign,
@@ -463,7 +396,6 @@ export function DialogPopup({
 
   useEffect(() => {
     if (dialog === null) return;
-    const doc = dialog.ownerDocument;
     // The document, or the shadow root the dialog lives in (`submit` does not cross it).
     const root = dialog.getRootNode();
     // Feature detection only with the flag on, inside an effect (conventions 8).
@@ -477,102 +409,18 @@ export function DialogPopup({
       [dialog, "beforetoggle", onBeforeToggle, false],
     ];
 
-    if (!modal && !nativeClosedBy) {
-      // Non-modal dialogs get no close watcher Escape from the platform (design 2.6).
-      listeners.push([
-        dialog,
-        "keydown",
-        (event) => {
-          const keyboardEvent = event as KeyboardEvent;
-          if (keyboardEvent.key !== "Escape" || keyboardEvent.defaultPrevented) return;
-          if (!dialog.open || closestDialog(keyboardEvent.target) !== dialog) return;
-          // A popover or nested dialog inside takes this Escape (its close watcher); leave the
-          // event alone so that it can.
-          if (escapeBelongsToInnerLayer(dialog, keyboardEvent.target)) return;
-          keyboardEvent.preventDefault();
-          dialog.requestClose();
-        },
-        false,
-      ]);
-    }
-
-    // Light dismiss needs both the press and the click outside, like native `closedby="any"`: a
-    // drag that starts inside (selecting text in an input) and ends on the backdrop or outside
-    // fires `click` on the common ancestor and must not close (it would lose a half-filled form).
-    let pressedOutside = false;
-
-    const isOutside = (target: EventTarget | null): boolean => {
-      // The Trigger counts as outside, as native `closedby="any"` treats it.
-      return !(target instanceof Node) || !dialog.contains(target);
-    };
-    let outsideAttached = false;
-    const onOutsidePointerDown = (event: Event) => {
-      pressedOutside = dialog.open && isOutside(event.target);
-    };
-    const onOutsideClick = (event: Event) => {
-      const pressed = pressedOutside;
-      pressedOutside = false;
-      if (!dialog.open || !pressed || !isOutside(event.target)) return;
-      dialog.requestClose();
-    };
-    const syncOutside = () => {
-      const want = dialog.open;
-      if (want === outsideAttached) return;
-      outsideAttached = want;
-      pressedOutside = false;
-      if (want) {
-        doc.addEventListener("pointerdown", onOutsidePointerDown, true);
-        doc.addEventListener("click", onOutsideClick, true);
-      } else {
-        doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
-        doc.removeEventListener("click", onOutsideClick, true);
-      }
-    };
-
-    if (lightDismiss && !nativeClosedBy) {
-      if (modal) {
-        // A press or click on the ::backdrop targets the dialog itself, outside its border box.
-        listeners.push(
-          [
-            dialog,
-            "pointerdown",
-            (event) => {
-              pressedOutside = dialog.open && onBackdrop(dialog, event);
-            },
-            false,
-          ],
-          [
-            dialog,
-            "click",
-            (event) => {
-              const pressed = pressedOutside;
-              pressedOutside = false;
-              if (!dialog.open || !pressed || !onBackdrop(dialog, event)) return;
-              dialog.requestClose();
-            },
-            false,
-          ],
-        );
-      } else {
-        // A document listener only while open, following the native `toggle` (the React
-        // `onToggle` prop never fires on a hydrated <dialog>); reads `dialog.open`, not
-        // `newState` (coalescing).
-        listeners.push([dialog, "toggle", syncOutside, false]);
-        syncOutside();
-      }
-    }
-
     for (const [target, type, listener, capture] of listeners) {
       target.addEventListener(type, listener, capture);
     }
+    // Escape on a non-modal dialog and light dismiss, where native `closedby` does not do them.
+    const stopDismiss = nativeClosedBy
+      ? null
+      : listenDialogDismiss(dialog, { modal, lightDismiss });
     return () => {
       for (const [target, type, listener, capture] of listeners) {
         target.removeEventListener(type, listener, capture);
       }
-      if (outsideAttached) {
-        doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
-        doc.removeEventListener("click", onOutsideClick, true);
-      }
+      stopDismiss?.();
     };
   }, [dialog, modal, lightDismiss, experimental_closedBy]);
 

@@ -10689,3 +10689,16 @@ Review of `refactor/157-step-commit` (nit 3): the `pointerdown` row of 4.1 wrote
 `gesture = { thumb: index }` and the walkthroughs of section 12 `G={thumb:0}`, after the state
 table had become `gestureThumb: number | null`. Now `gestureThumb = index`, and `G` is
 `gestureThumb` in the walkthrough notation (`G=0`, `G=null`). Docs only.
+
+## 2026-11-24, #157: shared popup flags and show wrapper
+
+Refactoring wave #157, phase 2 (overlay safe steps; user decision 2026-11-24: share the show
+wrapper and the refused-reopen flags first, reassess the full merge afterwards). Internal only,
+no behaviour change.
+
+- `design/conventions.md` 9.1: the `internal/` listing gains `overlay-show.ts`
+  (`createPopupFlags`, `showWithFocus`), which `internal/use-popover-popup.ts` and
+  `dialog/dialog-popup.tsx` now both use for `awaitingClose`, the library echo
+  (`libraryHide` / `libraryClose`) and `refusedFact`, and for the `inert` + `autofocus` +
+  `try/finally` around the show. The rules (3.9.2, 3.9.4, popover.md 2.5, dialog.md 2.3) are
+  unchanged; Dialog still applies the refused re-open to non-modal dialogs only.
