@@ -21,7 +21,7 @@ import { useRegisterCount } from "../internal/use-register-count.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { useStepCommit } from "../internal/use-step-commit.js";
+import { useStepCommit } from "../internal/action/use-step-commit.js";
 import { keyStep, stepValue } from "./number-field-arithmetic.js";
 import type { StepBounds } from "./number-field-arithmetic.js";
 import { NumberFieldContext } from "./number-field-context.js";

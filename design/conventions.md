@@ -441,7 +441,7 @@ cannot be detected on the client. So:
    booleans, `undefined`). Component-specific fields such as `reason` are ordinary own
    properties.
 2. `event` is a **virtual, non-own property** served by a `Proxy` `get`/`has` trap. The internal
-   helper `createActionDetails(event, fields)` (`internal/action-details.ts`, directive-free) is
+   helper `createActionDetails(event, fields)` (`internal/action/action-details.ts`, directive-free) is
    the only way the library builds `details`.
    `details.event` and `"event" in details` work; `Object.keys(details)`, `{ ...details }`,
    `JSON.stringify(details)` and React's serialiser see only the real fields. The
@@ -589,7 +589,7 @@ Contract (implemented per instance by `useControllableAction`, `useActionTrigger
   dispatch of the same hook instance was made after it, whether that one is still pending or has
   already settled.
 - A **superseded** dispatch's rejection is caught by the hook and passed to `reportDropped`
-  (`internal/report-dropped.ts`): the global `reportError` (a window `error` event), or
+  (`internal/action/report-dropped.ts`): the global `reportError` (a window `error` event), or
   `console.error` in an environment without it. Nothing is thrown, no state is written, no
   boundary is involved, and the newer dispatch's outcome is unaffected. **Every** superseded
   rejection of a burst is reported, each once, in the order they arrive, also **after
@@ -597,7 +597,7 @@ Contract (implemented per instance by `useControllableAction`, `useActionTrigger
   routes are independent.
 - **The latest rejection once the owner is gone is reported too.** The hook rethrows a latest
   rejection only while its component's effects are connected (`useConnected` in
-  `internal/use-connected.ts`); otherwise it passes it to `reportDropped`. Effects are
+  `internal/action/use-connected.ts`); otherwise it passes it to `reportDropped`. Effects are
   disconnected when the component is unmounted and when it is **hidden**: by an
   `<Activity mode="hidden">` (the consumer's, or the library's own for a closed overlay with
   `keepMounted`), or by a shown Suspense boundary that re-suspends and shows its fallback
@@ -615,11 +615,11 @@ Contract (implemented per instance by `useControllableAction`, `useActionTrigger
   `reportDropped` and its resolution commits nothing.
 - **A fact handler's errors are not action errors**: an `on*` handler's synchronous throw and
   its returned promise's rejection go to `reportError` (the handler rule of 2.1,
-  `internal/call-urgent-handler.ts`); nothing reaches an Error Boundary, and the library's own
+  `internal/action/call-urgent-handler.ts`); nothing reaches an Error Boundary, and the library's own
   bookkeeping around the call (the committed `false` of a fact, a toast's queue write, a
   Combobox text write) stands.
 - A component with **two transition channels** (Slider and NumberField: steps through
-  `useActionTrigger`, commits through `useControllableAction`; `internal/use-step-commit.ts`)
+  `useActionTrigger`, commits through `useControllableAction`; `internal/action/use-step-commit.ts`)
   needs nothing extra: each channel judges "latest" among its own runs and reports its own
   superseded rejections, also while the other channel's action is pending. There is no
   hook-order constraint and no shared capture.
@@ -720,7 +720,7 @@ export type WhilePending = "run" | "ignore";
 
 This section is the library-wide rule: the prop, the default of every part and what each value
 guarantees. The mechanics (the click handler, the guard, the per-part behaviour) are in
-`design/components/button.md` 5, 16 and 18, and in `internal/use-pure-trigger.ts` /
+`design/components/button.md` 5, 16 and 18, and in `internal/action/use-pure-trigger.ts` /
 `use-action-trigger.ts` (3.4).
 
 A string, not a boolean, so that a later mode can be added without a second prop; the two

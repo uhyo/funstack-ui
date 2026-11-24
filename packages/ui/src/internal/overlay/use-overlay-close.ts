@@ -3,7 +3,7 @@ import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from
 import { dataAttr } from "../data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "../types.js";
 import { useElementCheck } from "../use-element-check.js";
-import { usePureTrigger } from "../use-pure-trigger.js";
+import { usePureTrigger } from "../action/use-pure-trigger.js";
 import { cancelClick, disabledButton, rendersButton, useRender } from "../use-render.js";
 import type { DataAttributes } from "../use-render.js";
 

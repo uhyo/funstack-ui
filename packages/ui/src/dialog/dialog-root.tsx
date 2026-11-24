@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useInsertionEffect, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import type {
   ActionDetails,
   ChangeAction,
@@ -9,7 +9,7 @@ import type {
   StateValue,
   UrgentChangeHandler,
 } from "../internal/types.js";
-import { intendedValue } from "../internal/use-controllable-action.js";
+import { intendedValue } from "../internal/action/use-controllable-action.js";
 import { useOverlayRoot } from "../internal/overlay/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";

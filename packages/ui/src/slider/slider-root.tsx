@@ -20,7 +20,7 @@ import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
-import { useStepCommit } from "../internal/use-step-commit.js";
+import { useStepCommit } from "../internal/action/use-step-commit.js";
 import {
   clampToNeighbours,
   equalValues,

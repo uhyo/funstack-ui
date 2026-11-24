@@ -2,10 +2,10 @@
 import { addTransitionType, useCallback, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createActionDetails } from "./action-details.js";
-import type { ActionDetails, ChangeAction, ChangeReason } from "./types.js";
+import type { ActionDetails, ChangeAction, ChangeReason } from "../types.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import { useControllableAction } from "./use-controllable-action.js";
-import { useLatest } from "./use-latest.js";
+import { useLatest } from "../use-latest.js";
 
 /** A value in a box: `null` is a value for some controls, so "none" is the box's absence. */
 interface Boxed<V> {

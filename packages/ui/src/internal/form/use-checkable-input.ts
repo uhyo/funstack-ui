@@ -1,10 +1,10 @@
 "use client";
 import type { ChangeEvent, ComponentPropsWithRef, Ref } from "react";
-import { createActionDetails } from "../action-details.js";
+import { createActionDetails } from "../action/action-details.js";
 import { dataAttr } from "../data-attr.js";
 import type { DataAttributes } from "../render-element.js";
 import type { ActionDetails, ChangeAction, ChangeReason } from "../types.js";
-import { useControllableAction } from "../use-controllable-action.js";
+import { useControllableAction } from "../action/use-controllable-action.js";
 import { fieldInputProps, useFieldControl, useFieldValueChange } from "./use-field-control.js";
 import { useMergedRefs } from "../use-merged-refs.js";
 import { guardCheckableChange, useNativeChecked } from "./use-native-checked.js";

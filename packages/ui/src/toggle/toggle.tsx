@@ -7,11 +7,11 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
+import { useControllableAction } from "../internal/action/use-controllable-action.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
 /**

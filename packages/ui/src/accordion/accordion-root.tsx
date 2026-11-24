@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffectEvent, useId, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { resolveArrowKey } from "../internal/arrow-keys.js";
 import type { ArrowMove } from "../internal/arrow-keys.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -14,7 +14,10 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
+import {
+  intendedValue,
+  useControllableAction,
+} from "../internal/action/use-controllable-action.js";
 import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";

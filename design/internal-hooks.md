@@ -17,7 +17,7 @@ a section of `design/conventions.md`.
 ## 3.4 The shared hook
 
 All of section 3 lives in one internal hook, `useControllableAction`
-(`internal/use-controllable-action.ts`), so that every component behaves identically. The code
+(`internal/action/use-controllable-action.ts`), so that every component behaves identically. The code
 and its comments are the reference for the algorithm; what the hook guarantees:
 
 ```ts
@@ -35,7 +35,7 @@ const { committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFa
   dispatches, each with the reducer of the render it was dispatched from).
 - Errors follow 2.4: the latest dispatch's rejection is rethrown inside the transition while the
   owner is connected (`useConnected`); a superseded one, or the latest once the owner is gone,
-  goes to `reportDropped` (`internal/report-dropped.ts`). The hook holds no error state, so it
+  goes to `reportDropped` (`internal/action/report-dropped.ts`). The hook holds no error state, so it
   has no ordering constraint against `useTransition` and takes no capture option.
 - `transitionTypes(next, prev, details)` receives `details` so a component can take the
   dispatch's origin into account; `prev` is the committed value at dispatch time, not the
@@ -81,11 +81,11 @@ Library state never lives in `useSyncExternalStore`: a store mutation during a t
 blocking re-render and defeats both fallback avoidance and ViewTransition. Reading
 `matchMedia` for display only is fine.
 
-**Pure-trigger parts share `useActionTrigger`** (`internal/use-action-trigger.ts`): a part with
+**Pure-trigger parts share `useActionTrigger`** (`internal/action/use-action-trigger.ts`): a part with
 a bare `action` and its own transition but no state (`Button`, `Dialog.Close`, `Popover.Close`,
 `Menu.Item`, `Toast.Action`) runs the action through this hook instead of calling
 `useTransition` itself, and so do the steps of the continuous controls (through
-`internal/use-step-commit.ts`):
+`internal/action/use-step-commit.ts`):
 
 ```ts
 const { pending, run } = useActionTrigger({ openGeneration, ignoreWhilePending }); // both optional
@@ -99,7 +99,7 @@ if (!started) event.preventDefault();                        // ignored while pe
   in-flight counter alone, not the last render's `pending` (2.5.1). The option is internal; the
   public surface is the part's `whilePending` prop. The four kinds of part that have the prop
   go through `usePureTrigger({ whilePending, defaultWhilePending, openGeneration? })`
-  (`internal/use-pure-trigger.ts`), which resolves `(whilePending ?? default) === "ignore"`
+  (`internal/action/use-pure-trigger.ts`), which resolves `(whilePending ?? default) === "ignore"`
   per render, cancels an ignored activation (`runActivation`) and returns the owned pending
   keys (`pendingProps`: `aria-disabled` and `data-pending`, 3.6). The continuous controls
   reach `useActionTrigger` without `usePureTrigger` (through `useStepCommit`) and run every

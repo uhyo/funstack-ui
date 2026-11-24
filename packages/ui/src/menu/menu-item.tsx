@@ -1,6 +1,6 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import type {
   Action,
   ActionDetails,
@@ -8,7 +8,7 @@ import type {
   StateValue,
   WhilePending,
 } from "../internal/types.js";
-import { usePureTrigger } from "../internal/use-pure-trigger.js";
+import { usePureTrigger } from "../internal/action/use-pure-trigger.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import { useMenuItem } from "./use-menu-item.js";

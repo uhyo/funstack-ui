@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { announce, canAnnounce } from "../internal/announce.js";
 import { FieldContext } from "../internal/form/field-context.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
@@ -24,7 +24,7 @@ import type {
   UrgentChangeHandler,
 } from "../internal/types.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
+import { useControllableAction } from "../internal/action/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";

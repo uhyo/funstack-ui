@@ -27,8 +27,8 @@ const clientFiles = [
   "tabs/tabs-panel.mjs",
   "tabs/tabs-indicator.mjs",
   "internal/use-until-found.mjs",
-  "internal/use-controllable-action.mjs",
-  "internal/use-connected.mjs",
+  "internal/action/use-controllable-action.mjs",
+  "internal/action/use-connected.mjs",
   "internal/use-dev-warning.mjs",
   "internal/use-render.mjs",
   // Every Tooltip part is a client module (design/components/tooltip.md, 2.4 and 12.1).
@@ -96,7 +96,7 @@ const clientFiles = [
   "menu/menu-radio-item.mjs",
   "menu/menu-group.mjs",
   "menu/menu-submenu-trigger.mjs",
-  "internal/use-action-trigger.mjs",
+  "internal/action/use-action-trigger.mjs",
   // Every Select part, its context and helpers, and the select machinery
   // (design/components/select.md decision 16 and 15.1).
   "select/select-context.mjs",
@@ -215,7 +215,7 @@ const directiveFreeFiles = [
   "toast/toast-timers.mjs",
   "toggle/index.mjs",
   "accordion/index.mjs",
-  "internal/action-details.mjs",
+  "internal/action/action-details.mjs",
   "tabs/index.mjs",
   "tabs/tabs-ids.mjs",
   "tooltip/index.mjs",
@@ -255,8 +255,8 @@ const directiveFreeFiles = [
   "internal/render-element.mjs",
   "internal/dev-warn.mjs",
   // The rejection fallback and the `on*` handler rule (conventions 2.1, 2.4).
-  "internal/report-dropped.mjs",
-  "internal/call-urgent-handler.mjs",
+  "internal/action/report-dropped.mjs",
+  "internal/action/call-urgent-handler.mjs",
   "toggle-group/index.mjs",
   "toolbar/index.mjs",
   "number-field/index.mjs",

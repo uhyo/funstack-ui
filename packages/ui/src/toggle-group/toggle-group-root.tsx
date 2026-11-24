@@ -1,13 +1,13 @@
 "use client";
 import { useCallback, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { compareDocumentOrder } from "../internal/dom-order.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
+import { useControllableAction } from "../internal/action/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { useItemOrder } from "../internal/use-item-order.js";

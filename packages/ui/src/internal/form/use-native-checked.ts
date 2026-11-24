@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefCallback } from "react";
-import { intendedValue } from "../use-controllable-action.js";
+import { intendedValue } from "../action/use-controllable-action.js";
 import { useElementCheck } from "../use-element-check.js";
 import { useFormReset } from "./use-form-reset.js";
 

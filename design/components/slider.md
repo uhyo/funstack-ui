@@ -256,7 +256,7 @@ the gesture's commit resolves, not per step. Consequences, documented on the com
 
 The Root has two internal entry points, `step` and `commit`; every path (pointer, keyboard,
 platform) uses them. They are implemented once for Slider and NumberField, in
-`internal/use-step-commit.ts`; what differs (the array shape, `equalValues`, NumberField's
+`internal/action/use-step-commit.ts`; what differs (the array shape, `equalValues`, NumberField's
 rounding, draft, hidden input and announcement) is passed in as options. Values are arrays
 inside the Root; `fromArray` restores the prop's shape for the actions.
 

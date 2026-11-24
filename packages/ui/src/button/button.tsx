@@ -8,7 +8,7 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useFormStatus } from "react-dom";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
@@ -20,7 +20,7 @@ import type {
   WhilePending,
 } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { usePureTrigger } from "../internal/use-pure-trigger.js";
+import { usePureTrigger } from "../internal/action/use-pure-trigger.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";

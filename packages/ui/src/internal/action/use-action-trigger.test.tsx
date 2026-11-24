@@ -5,7 +5,7 @@
 import { act, render } from "@testing-library/react";
 import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { deferred, ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
+import { deferred, ErrorCatcher, silenceErrors } from "../../__tests__/helpers.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import type { ActionTrigger, ActionTriggerOptions } from "./use-action-trigger.js";
 

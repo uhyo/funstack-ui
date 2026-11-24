@@ -174,7 +174,7 @@ Controlled: the handler is called at once and the parent adopts urgently. If the
 ### 3.9.6 The handler's contract
 
 `onOpenChange` follows the one rule for every `on*` handler (2.1), implemented by
-`internal/call-urgent-handler.ts`: synchronous, not awaited, may return a promise, a rejection
+`internal/action/call-urgent-handler.ts`: synchronous, not awaited, may return a promise, a rejection
 or a throw goes to `reportError`. It is called once per fact with `(false, details)`;
 `details.event` is the platform event or the recorded cause (the `CommandEvent`, the
 `loseinterest` event, the `click`).

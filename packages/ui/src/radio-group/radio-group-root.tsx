@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
@@ -11,7 +11,10 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
+import {
+  intendedValue,
+  useControllableAction,
+} from "../internal/action/use-controllable-action.js";
 import { useFieldValueChange } from "../internal/form/use-field-control.js";
 import { useFieldsetGroup } from "../internal/form/use-fieldset-group.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";

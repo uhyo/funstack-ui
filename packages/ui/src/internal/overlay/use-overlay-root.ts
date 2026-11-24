@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { createActionDetails } from "../action-details.js";
-import { callUrgentHandler } from "../call-urgent-handler.js";
+import { createActionDetails } from "../action/action-details.js";
+import { callUrgentHandler } from "../action/call-urgent-handler.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { transitionTypes } from "../transition-types.js";
 import type { ActionDetails, ChangeAction, ChangeReason, UrgentChangeHandler } from "../types.js";
-import { intendedValue, useControllableAction } from "../use-controllable-action.js";
+import { intendedValue, useControllableAction } from "../action/use-controllable-action.js";
 import { useDevWarning } from "../use-dev-warning.js";
 import { useMountFixed } from "../use-mount-fixed.js";
 import { useLatest } from "../use-latest.js";

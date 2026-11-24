@@ -8,7 +8,7 @@ reviews, the wave 9 and #146 amendments as written, implementation notes, test r
 Inputs: `docs/vision.md`, `design/conventions.md` (1.2, 2.3, 2.5, 2.7, 3.4, 3.6, 4.1, 7.1),
 `docs/research/button.md` (af1993f; probes in `memo/platform-researcher/probes/16-button/`),
 the product owner's decisions on the research (recorded in section 0),
-`packages/ui/src/internal/use-action-trigger.ts`,
+`packages/ui/src/internal/action/use-action-trigger.ts`,
 `form/form-submit.tsx`, `form/form-root.tsx`, `menu/menu-item.tsx`, `menu/menu-dom.ts`,
 `dialog/dialog-close.tsx`, `dialog/dialog-trigger.tsx`, `popover/popover-close.tsx`,
 `design/components/toggle-group.md` 3.4 and 11.5, `design/components/field-form.md`
@@ -830,7 +830,7 @@ by default; a part passes `(whilePending ?? <its default>) === "ignore"`, read p
 `run` returns `false` when the run was ignored. The four pure triggers with a `whilePending`
 prop (Button, the Close parts through `useOverlayClose`, Menu.Item, Toast.Action) do this
 through `usePureTrigger({ whilePending, defaultWhilePending, openGeneration? })`
-(`internal/use-pure-trigger.ts`), which also returns `ignoring`, `runActivation(event, work,
+(`internal/action/use-pure-trigger.ts`), which also returns `ignoring`, `runActivation(event, work,
 then?)` (`run` plus the `preventDefault()` of an ignored activation) and `pendingProps(
 disabledProps, pending?)`, the owned `aria-disabled` (through `pendingAriaDisabled`, 17.2) and
 `data-pending`. Button passes its pending merged with the form channel; Slider and NumberField

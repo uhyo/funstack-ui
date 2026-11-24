@@ -1,4 +1,4 @@
-import type { ActionDetails } from "./types.js";
+import type { ActionDetails } from "../types.js";
 
 function isDev(): boolean {
   return process.env.NODE_ENV !== "production";

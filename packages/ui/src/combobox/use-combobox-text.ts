@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useDeferredValue, useInsertionEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import { createActionDetails } from "../internal/action-details.js";
-import { callUrgentHandler } from "../internal/call-urgent-handler.js";
+import { createActionDetails } from "../internal/action/action-details.js";
+import { callUrgentHandler } from "../internal/action/call-urgent-handler.js";
 import type { ChangeReason, UrgentChangeHandler } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
 import type { ComboboxInputValueChangeDetails } from "./combobox-root.js";

@@ -1,6 +1,6 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type {
   Action,

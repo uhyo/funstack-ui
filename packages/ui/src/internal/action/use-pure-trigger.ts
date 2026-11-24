@@ -1,8 +1,8 @@
 "use client";
-import { dataAttr } from "./data-attr.js";
-import { pendingAriaDisabled } from "./render-element.js";
-import type { DisabledButton } from "./render-element.js";
-import type { WhilePending } from "./types.js";
+import { dataAttr } from "../data-attr.js";
+import { pendingAriaDisabled } from "../render-element.js";
+import type { DisabledButton } from "../render-element.js";
+import type { WhilePending } from "../types.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import type { ActionTrigger } from "./use-action-trigger.js";
 

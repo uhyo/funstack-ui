@@ -3,8 +3,8 @@ import { use, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState
 import type { ComponentPropsWithRef, CSSProperties, FocusEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { DialogContext } from "../dialog/dialog-context.js";
-import { createActionDetails } from "../internal/action-details.js";
-import { callUrgentHandler } from "../internal/call-urgent-handler.js";
+import { createActionDetails } from "../internal/action/action-details.js";
+import { callUrgentHandler } from "../internal/action/call-urgent-handler.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { ChangeReason, RenderProp, StateValue } from "../internal/types.js";

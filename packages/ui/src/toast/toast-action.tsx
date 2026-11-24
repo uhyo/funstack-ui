@@ -1,10 +1,10 @@
 "use client";
 import { useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
+import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
-import { usePureTrigger } from "../internal/use-pure-trigger.js";
+import { usePureTrigger } from "../internal/action/use-pure-trigger.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastActionDetails, ToastItem } from "./toast.js";

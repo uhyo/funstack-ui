@@ -252,7 +252,7 @@ the gesture's commit resolves (Slider 2.3). Consequences, documented on the comp
 ### 2.4 Step, commit, and the `"dismiss"` revert
 
 The Root has two internal entry points, Slider's (slider.md 2.4, the shared
-`internal/use-step-commit.ts`), with these differences passed in as its options:
+`internal/action/use-step-commit.ts`), with these differences passed in as its options:
 
 - `step(next, source, reason, event)` rounds a non-null `next` to what the format shows (5.4)
   **before** the no-op test, which is `Object.is` against the shown value. A step that changes
