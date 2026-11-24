@@ -10935,3 +10935,17 @@ one is still subscribed, so it warned "another Toast.Viewport already renders th
 single Viewport. The warning now reads a `duplicate` state set only when the subscription is
 refused, as the former `console.error` in that branch did; it still fires once per instance.
 Development console only.
+
+## 2026-11-24, #161 follow-up: the production-bundle check follows nested functions
+
+Extends the "#161: Select's position-check texts left out of production builds" entry above
+(`memo/reviewer/review-157-helpers-followup.md` minor 2). The check followed a name in a dev
+argument only to the file's top-level declarations, so a message-building closure inside a
+component (`const message = () => "..."` passed to or called in a warning) leaked unnoticed. It now
+also follows functions declared at any depth in the file (function declarations, and variables
+initialised with an arrow or function expression). Nested variables of other kinds are not
+followed: indexing them pulled runtime strings (CSS selectors, part names, attribute names) that
+a warning merely reads into the dev set, ten false positives. Verified with two planted leaks in
+`Toast.Viewport` (a local arrow and a local function declaration called in `useDevWarning`), both
+reported, then removed. Helpers imported from another module are still not followed (none exist
+today); conventions 7.2 now says so and asks to keep message helpers in the file that warns.
