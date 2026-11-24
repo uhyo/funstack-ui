@@ -766,7 +766,7 @@ owns (it closes the dialog with no user code), so the default is `"ignore"`, als
 that is given an `action` (mixed ownership: the consumer's function, then the library's close):
 a repeated click, Enter or Space while the Close's own action is pending is ignored (the click
 is `preventDefault()`ed) and the button renders `aria-disabled="true"` for as long as it shows
-`data-pending`, which spans the action and the close commit. Without `action` the prop has no
+`data-pending`, which spans the action and the close commit (not while natively disabled, conventions 1.2). Without `action` the prop has no
 effect: a repeated click finds `false` already intended and does nothing. With
 `whilePending="run"` every click runs the action again in the part's transition: `data-pending`
 until every run has settled, **no** `aria-disabled` from pending. The close is requested once,

@@ -4,7 +4,7 @@ import { dataAttr } from "./data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "./types.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import { useElementCheck } from "./use-element-check.js";
-import { disabledButton, rendersButton, useRender } from "./use-render.js";
+import { disabledButton, pendingAriaDisabled, rendersButton, useRender } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -105,8 +105,9 @@ export function useOverlayClose<Details extends ActionDetails>(
     ...options.ownProps,
     ...(installClick && { onClick }),
     // Exactly while `data-pending` when ignoring: a Close that will not act is unavailable to
-    // AT; one that runs again is not. Owned, so an idle Close removes a render element's own.
-    "aria-disabled": (pending && ignoring) || !disabledProps.invoker ? true : undefined,
+    // AT; one that runs again is not; native `disabled` wins. Owned, so an idle Close removes a
+    // render element's own.
+    "aria-disabled": pendingAriaDisabled(disabledProps.props, pending && ignoring),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
   };

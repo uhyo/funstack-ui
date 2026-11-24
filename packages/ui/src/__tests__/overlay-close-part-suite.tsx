@@ -454,6 +454,32 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         expect(isOpen()).toBe(true);
         expect(part()).toHaveAttribute("data-disabled", "");
       });
+
+      // #158: native `disabled` wins over the pending `aria-disabled`.
+      it("pending and then disabled: native disabled, no aria-disabled", async () => {
+        const user = setupUser();
+        const action = vi.fn<Action>();
+        const work = deferred();
+        const closeAction = vi.fn(() => work.promise);
+        const ui = (disabled: boolean) => (
+          <Harness
+            mode={mode}
+            action={action}
+            content={withClose({ action: closeAction, disabled })}
+          />
+        );
+        const { rerender } = render(ui(false));
+        await openThroughTrigger(user);
+        await user.click(part());
+        expect(part()).toHaveAttribute("aria-disabled", "true");
+        rerender(ui(true));
+        expectPending(part());
+        expect(part()).toBeDisabled();
+        expect(part()).not.toHaveAttribute("aria-disabled");
+        await act(async () => work.resolve());
+        await flushTasks(2);
+        expect(closeAction).toHaveBeenCalledTimes(1);
+      });
     });
 
     describe("JS-free mode", () => {

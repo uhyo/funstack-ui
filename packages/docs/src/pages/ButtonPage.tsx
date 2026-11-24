@@ -131,14 +131,14 @@ export function ButtonPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled` and `data-disabled`; never dispatches, and a disabled link does not navigate. With `focusableWhenDisabled`, inside a [Toolbar](/components/toolbar), or when `render` is not a `<button>` (a link, where native `disabled` means nothing), renders `aria-disabled="true"` instead.',
+              'Native `disabled` and `data-disabled`; never dispatches, and a disabled link does not navigate. With `focusableWhenDisabled` or inside a [Toolbar](/components/toolbar), renders `aria-disabled="true"` instead and cancels the click. So does a `render` element of another tag (a link, where native `disabled` means nothing), and a component `render` when the Button has an `action`. A component `render` without `action` whose click the browser runs (`type="submit"` or `"reset"`, the `formAction` default, `commandfor` / `popoverTarget`) keeps native `disabled`, the only thing that stops a submission or a command before hydration. Native `disabled` wins over the pending `aria-disabled`.',
           },
           {
             name: "focusableWhenDisabled",
             type: "boolean",
             default: "false (true inside a Toolbar.Root)",
             description:
-              'Keep a disabled Button focusable: `aria-disabled="true"` instead of native `disabled`, so keyboard and screen-reader users still find it and a Tooltip on it still opens.',
+              'Keep a disabled Button focusable: `aria-disabled="true"` instead of native `disabled`, so keyboard and screen-reader users still find it and a Tooltip on it still opens. Before hydration a focusable disabled submitter still submits: nothing native stops it.',
           },
           {
             name: "transition",
@@ -171,7 +171,7 @@ export function ButtonPage() {
           ["`data-disabled`", "The `disabled` prop. Not set by pending."],
           [
             "`aria-disabled`",
-            '`"true"` while pending with `whilePending="ignore"`, and while `disabled` with `focusableWhenDisabled`, inside a Toolbar, or on a non-`<button>` `render` element. Never set by pending in the default `"run"` mode.',
+            '`"true"` while pending with `whilePending="ignore"` (unless natively disabled), and while `disabled` with `focusableWhenDisabled`, inside a Toolbar, on a `render` element of another tag (a link), or on a component `render` of a Button with `action`. Never set by pending in the default `"run"` mode.',
           ],
         ]}
       />

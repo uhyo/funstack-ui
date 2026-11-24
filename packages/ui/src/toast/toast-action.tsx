@@ -5,7 +5,12 @@ import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
-import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
+import {
+  disabledButton,
+  pendingAriaDisabled,
+  rendersButton,
+  useRender,
+} from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastActionDetails, ToastItem } from "./toast.js";
 import { useToastRootContext } from "./toast-context.js";
@@ -147,8 +152,9 @@ export function ToastAction({
     disabled: disabledProps.disabled,
     onClick,
     // While `data-pending` exactly when ignoring (conventions 3.6), and when disabled on a link
-    // or component `render`. Owned, so an idle Action removes a render element's own.
-    "aria-disabled": (pending && ignoring) || disabledProps["aria-disabled"] ? true : undefined,
+    // or component `render`; native `disabled` wins. Owned, so an idle Action removes a render
+    // element's own.
+    "aria-disabled": pendingAriaDisabled(disabledProps, pending && ignoring),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
   };

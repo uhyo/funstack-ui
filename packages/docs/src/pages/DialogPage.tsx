@@ -227,7 +227,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`: a disabled button is not an invoker and never opens. With a link or component `render` where the Trigger handles the click (library mode, or a non-modal dialog), `aria-disabled="true"` instead (the element stays focusable).',
+              'Native `disabled`: a disabled button is not an invoker and never opens. With a link or component `render` where the Trigger handles the click (library mode, or a non-modal dialog), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode: it cannot be natively disabled.',
           },
           ...functionProps(
             "DialogTriggerState",
@@ -241,7 +241,7 @@ export function DialogPage() {
           "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends, but a request still running when a dismissal superseded it keeps `pending` until that request settles."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a link or component `render` with the click handler installed), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a host link, or a component `render` with the click handler installed), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
         }
       />
 
@@ -361,7 +361,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render` where the Close handles the click (library mode, or with `action`), `aria-disabled="true"` instead (the element stays focusable).',
+              'Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render` where the Close handles the click (library mode, or with `action`), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode: it cannot be natively disabled.',
           },
           ...functionProps("DialogCloseState"),
           renderProp("button", "DialogCloseState"),

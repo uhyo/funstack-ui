@@ -265,7 +265,7 @@ export function PopoverPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`: a disabled button is not an invoker and never dispatches. Owned, so a `render` element cannot re-enable it. In library mode with a link or component `render`, `aria-disabled="true"` instead (the element stays focusable).',
+              'Native `disabled`: a disabled button is not an invoker and never dispatches. Owned, so a `render` element cannot re-enable it. In library mode with a link or component `render`, `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode: it cannot be natively disabled.',
           },
           ...functionProps(
             "PopoverTriggerState",
@@ -279,7 +279,7 @@ export function PopoverPage() {
           "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open or a part's close, never a dismissal (a request still running when a dismissal superseded it keeps `pending` until that request settles)."
         }
         owned={
-          "`type` (only on a `<button>`), `disabled`, `aria-disabled` (library mode, link or component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
+          "`type` (only on a `<button>`), `disabled`, `aria-disabled` (a host link; in library mode also a component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
         }
         note={
           'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode only) is light-dismissed before its click; that close is a fact, `onOpenChange(false)` with `"activate"` and the click. `aria-haspopup` and `aria-controls` pass through.'
@@ -393,7 +393,7 @@ export function PopoverPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render` where the Close handles the click (library mode, or with `action`), `aria-disabled="true"` instead (the element stays focusable).',
+              'Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render` where the Close handles the click (library mode, or with `action`), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode: it cannot be natively disabled.',
           },
           ...functionProps("PopoverCloseState"),
           renderProp("button", "PopoverCloseState"),

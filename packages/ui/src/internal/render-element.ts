@@ -90,11 +90,32 @@ export interface DisabledButton {
 }
 
 /**
- * The disabled rule of a button-like part that accepts an arbitrary `render`
- * (conventions 1.2, design/components/button.md 17): native `disabled` on a host `<button>`, or
- * where the browser handles the click (`handlesClick: false`: a JS-free command, which only
- * native `disabled` stops); `aria-disabled` otherwise. `alwaysFocusable` always takes the
- * `aria-disabled` branch (a menu item stays focusable).
+ * Whether the rendered element certainly cannot be natively disabled: a host element of a tag
+ * other than `<button>` / `<input>` (an `<a>`, a `<div>`). No `render`, the function form and a
+ * component element may render a button.
+ */
+function certainlyNotDisableable<Props, State>(
+  render: RenderProp<Props, State> | undefined,
+): boolean {
+  if (rendersButton(render)) return false;
+  return !(isValidElement(render) && render.type === "input");
+}
+
+/**
+ * The disabled rule of a button-like part that accepts an arbitrary `render` (conventions 1.2,
+ * design/components/button.md 17). Native `disabled` on a host `<button>` (the function form
+ * included), and wherever the element may be a button and the click's effect is the browser's
+ * own (`handlesClick: false`: a submitter, a reset button, a JS-free invoker; only native
+ * `disabled` stops those before hydration). `aria-disabled`, which the part's click handler
+ * honours by cancelling the click, otherwise: on an element that certainly cannot be natively
+ * disabled (a host `<a>`, `<div>`), on a component or other non-button render whose own handler
+ * is the action (`handlesClick: true`, the default), and with `alwaysFocusable` (an opt-in
+ * focusable disabled control: a menu item, a Toolbar or `focusableWhenDisabled` Button). A
+ * JS-free part on a host link has no handler to cancel the click; it is no invoker either, so
+ * `aria-disabled` is only the honest state there.
+ *
+ * When `disabled` and the part's pending `aria-disabled` meet, the native `disabled` wins:
+ * `pendingAriaDisabled` below.
  */
 export function disabledButton<Props, State>(
   render: RenderProp<Props, State> | undefined,
@@ -102,7 +123,8 @@ export function disabledButton<Props, State>(
   options: { readonly handlesClick?: boolean; readonly alwaysFocusable?: boolean } = {},
 ): DisabledButton {
   const { handlesClick = true, alwaysFocusable = false } = options;
-  const focusable = alwaysFocusable || (handlesClick && !isHostButton(render));
+  const focusable =
+    alwaysFocusable || (handlesClick ? !isHostButton(render) : certainlyNotDisableable(render));
   return {
     props: {
       disabled: focusable ? undefined : disabled,
@@ -110,6 +132,21 @@ export function disabledButton<Props, State>(
     },
     invoker: !(focusable && disabled),
   };
+}
+
+/**
+ * The owned `aria-disabled` of a pure trigger that also renders it while pending (conventions
+ * 3.6): the focusable-disabled branch's `true`; nothing while natively disabled (native
+ * `disabled` wins, a second unavailable state on the same element says nothing new); otherwise
+ * `true` while pending exactly when the part ignores activations (`ignoringPending`).
+ */
+export function pendingAriaDisabled(
+  disabledProps: DisabledButton["props"],
+  ignoringPending: boolean,
+): true | undefined {
+  if (disabledProps.disabled === true) return undefined;
+  if (disabledProps["aria-disabled"] === true) return true;
+  return ignoringPending ? true : undefined;
 }
 
 /**

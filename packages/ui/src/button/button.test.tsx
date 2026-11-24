@@ -20,6 +20,8 @@ import {
   ErrorCatcher,
   expectNotPending,
   expectPending,
+  flushMicrotasks,
+  hydrateFromServer,
   setupUser,
   silenceErrors,
   PlainButton,
@@ -1637,6 +1639,240 @@ describe("Button", () => {
       // @ts-expect-error -- no other string
       void (<Button whilePending="queue" />);
       expect(root.Button).toBe(Button);
+    });
+  });
+
+  // #158 (conventions 1.2): where the click's effect is the browser's own (submit, reset, a
+  // JS-free invoker) and the element may be a button, `disabled` is native, also with a component
+  // render: `aria-disabled` stops nothing before hydration.
+  describe("disabled with a browser-run click (#158)", () => {
+    const fn = () => {};
+    const browserRun = [
+      ['type="submit"', { type: "submit" }, "submit"],
+      ['type="reset"', { type: "reset" }, "reset"],
+      ["a function formAction (submit by default)", { formAction: fn }, "submit"],
+      ["a URL formAction (submit by default)", { formAction: "/save" }, "submit"],
+    ] as const satisfies readonly (readonly [string, ButtonProps, string])[];
+
+    /** Records the form's submit / reset events (cancelled, so jsdom does not navigate). */
+    function listen(container: Element): string[] {
+      const events: string[] = [];
+      const form = container.querySelector("form")!;
+      for (const type of ["submit", "reset"]) {
+        form.addEventListener(type, (event) => {
+          events.push(type);
+          event.preventDefault();
+        });
+      }
+      return events;
+    }
+
+    const inForm = (props: ButtonProps): ReactNode => (
+      <form>
+        <Button render={<PlainButton />} {...props}>
+          Go
+        </Button>
+      </form>
+    );
+
+    it.each(browserRun)(
+      "%s, component render: an enabled one submits before hydration (the control)",
+      async (_, props, event) => {
+        const error = silenceErrors();
+        let before: string[] = [];
+        await hydrateFromServer(inForm(props), {
+          mutate: (container) => {
+            const events = listen(container);
+            container.querySelector("button")!.click();
+            before = [...events];
+          },
+        });
+        expect(before).toEqual([event]);
+        expect(error).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(browserRun)(
+      "%s, component render: native disabled before and after hydration, never runs",
+      async (_, props) => {
+        const error = silenceErrors();
+        let before: string[] = [];
+        const { container } = await hydrateFromServer(inForm({ ...props, disabled: true }), {
+          mutate: (container) => {
+            const el = container.querySelector("button")!;
+            expect(el).toBeDisabled();
+            expect(el).not.toHaveAttribute("aria-disabled");
+            expect(el).toHaveAttribute("data-disabled", "");
+            const events = listen(container);
+            el.click();
+            before = [...events];
+          },
+        });
+        expect(before).toEqual([]);
+        const events = listen(container);
+        const el = button("Go");
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+        expect(el).toHaveAttribute("data-disabled", "");
+        await setupUser().click(el);
+        el.click();
+        await flushMicrotasks();
+        expect(events).toEqual([]);
+        expect(error).not.toHaveBeenCalled();
+      },
+    );
+
+    it("a function render and a host <input> render are natively disabled too", () => {
+      render(
+        <form>
+          <Button disabled type="submit" render={(props) => <button {...props} />}>
+            Fn
+          </Button>
+          <Button disabled type="submit" render={<input type="submit" value="Input" />} />
+        </form>,
+      );
+      for (const el of [button("Fn"), button("Input")]) {
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+      }
+    });
+
+    it("a JS-free invoker (commandfor, popoverTarget), component render: native disabled", () => {
+      render(
+        <>
+          <Button disabled commandfor="x" command="show-modal" render={<PlainButton />}>
+            Command
+          </Button>
+          <Button disabled popoverTarget="y" render={<PlainButton />}>
+            Popover
+          </Button>
+        </>,
+      );
+      for (const el of [button("Command"), button("Popover")]) {
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+      }
+    });
+
+    it("unchanged: with action, a plain type=button, a host link: aria-disabled and a cancelled click", () => {
+      const action = vi.fn();
+      render(
+        <>
+          <Button disabled action={action} render={<PlainButton />}>
+            Action
+          </Button>
+          <Button disabled render={<PlainButton />}>
+            Plain
+          </Button>
+          <Button disabled formAction={fn} render={<a href="#x" />}>
+            Link
+          </Button>
+        </>,
+      );
+      for (const el of [button("Action"), button("Plain"), screen.getByText("Link")]) {
+        expect(el).toHaveAttribute("aria-disabled", "true");
+        expect(el).not.toHaveAttribute("disabled");
+        expect(el).toHaveAttribute("data-disabled", "");
+        expect(click(el).defaultPrevented).toBe(true);
+      }
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it.each(browserRun)(
+      "unchanged: %s with focusableWhenDisabled or inside a Toolbar stays focusable (aria-disabled), never runs",
+      async (_, props) => {
+        render(
+          <form>
+            <Button disabled focusableWhenDisabled render={<PlainButton />} {...props}>
+              Focusable
+            </Button>
+            <Toolbar.Root aria-label="Tools">
+              <Button disabled {...props}>
+                Tool
+              </Button>
+            </Toolbar.Root>
+          </form>,
+        );
+        const events = listen(document.body);
+        const user = setupUser();
+        for (const el of [button("Focusable"), button("Tool")]) {
+          expect(el).toHaveAttribute("aria-disabled", "true");
+          expect(el).not.toBeDisabled();
+          expect(el).toHaveAttribute("data-disabled", "");
+          await user.click(el);
+          expect(click(el).defaultPrevented).toBe(true);
+        }
+        await flushMicrotasks();
+        expect(events).toEqual([]);
+      },
+    );
+
+    // Native `disabled` wins over the pending `aria-disabled` (#158 decision).
+    it('pending (whilePending="ignore") and then disabled, a host <button> with action: native disabled, no aria-disabled', async () => {
+      const d = deferred();
+      const action = vi.fn(() => d.promise);
+      const ui = (disabled: boolean) => (
+        <Button action={action} whilePending="ignore" disabled={disabled}>
+          Go
+        </Button>
+      );
+      const { rerender } = render(ui(false));
+      await setupUser().click(button("Go"));
+      expect(button("Go")).toHaveAttribute("aria-disabled", "true");
+      rerender(ui(true));
+      expectPending(button("Go"));
+      expect(button("Go")).toBeDisabled();
+      expect(button("Go")).not.toHaveAttribute("aria-disabled");
+      await act(async () => d.resolve());
+      expectNotPending(button("Go"));
+      expect(button("Go")).toBeDisabled();
+      expect(button("Go")).not.toHaveAttribute("aria-disabled");
+    });
+
+    it('pending (whilePending="ignore") and then disabled, a component-render formAction submitter: native disabled, no aria-disabled', async () => {
+      const d = deferred();
+      const submit = vi.fn<(formData: FormData) => Promise<void>>(() => d.promise);
+      const ui = (disabled: boolean) => (
+        <form action={() => {}}>
+          <Button
+            formAction={submit}
+            whilePending="ignore"
+            disabled={disabled}
+            render={<PlainButton />}
+          >
+            Go
+          </Button>
+        </form>
+      );
+      const { rerender } = render(ui(false));
+      await setupUser().click(button("Go"));
+      expectPending(button("Go"));
+      expect(button("Go")).toHaveAttribute("aria-disabled", "true");
+      rerender(ui(true));
+      expectPending(button("Go"));
+      expect(button("Go")).toBeDisabled();
+      expect(button("Go")).not.toHaveAttribute("aria-disabled");
+      await act(async () => d.resolve());
+      expectNotPending(button("Go"));
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+
+    it("pending and disabled in a focusable branch: aria-disabled stays", async () => {
+      const d = deferred();
+      const action = vi.fn(() => d.promise);
+      const ui = (disabled: boolean) => (
+        <Button action={action} whilePending="ignore" disabled={disabled} focusableWhenDisabled>
+          Go
+        </Button>
+      );
+      const { rerender } = render(ui(false));
+      await setupUser().click(button("Go"));
+      rerender(ui(true));
+      expectPending(button("Go"));
+      expect(button("Go")).not.toBeDisabled();
+      expect(button("Go")).toHaveAttribute("aria-disabled", "true");
+      await act(async () => d.resolve());
+      expect(button("Go")).toHaveAttribute("aria-disabled", "true");
     });
   });
 

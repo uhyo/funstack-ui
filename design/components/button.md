@@ -31,7 +31,7 @@ Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the
 | 5 | Library-wide rule | Every pure trigger has `whilePending`; the default follows who owns the action (conventions 2.5.1): `"run"` for `Button`, `"ignore"` for `Dialog.Close` / `Popover.Close`, `closeOnActivate ? "ignore" : "run"` for `Menu.Item`, `closeOnSettle ? "ignore" : "run"` for `Toast.Action` (sections 16 and 18.4). `Form.Submit` has no guard (section 6.4). |
 | 6 | `type` | Default `"button"`; `"submit"` when `formAction` is given. The Button's own `type` prop wins (`"submit"` / `"reset"` allowed); the computed value is owned on a `<button>` and on a **component** `render` element (assumed to render a `<button>`; library-wide in `rendersButton`), and omitted only for a host element of another tag (`<a href>`). `action` with a submitting `type` warns in development. |
 | 7 | `formAction` | First-class pass-through with **per-submitter pending**: latched once `useFormStatus().pending && status.action === <the function this Button submitted with>` has rendered, held until the form status is idle (6.2, #154). `action` and `formAction` together is a development error. Progressive enhancement is React's (a Server Function submits before hydration). |
-| 8 | `disabled` | Native `disabled` (owned) plus `data-disabled`, like `Dialog.Close` / `Form.Submit`. `focusableWhenDisabled` renders `aria-disabled="true"` instead (Base UI's name); it is implied `true` inside a `Toolbar.Root` (APG Toolbar) and for **any `render` element that is not a host `<button>`** (an `<a href>`, a component: native `disabled` means nothing on a link and would expose an enabled link to AT). Never dispatches either way; a disabled link does not navigate. |
+| 8 | `disabled` | Native `disabled` (owned) plus `data-disabled`, like `Dialog.Close` / `Form.Submit`. `focusableWhenDisabled` renders `aria-disabled="true"` instead (Base UI's name); it is implied `true` inside a `Toolbar.Root` (APG Toolbar). A host element of another tag (`<a href>`) and, when the Button has an `action`, a component `render` take the same `aria-disabled` branch (native `disabled` means nothing on a link and would expose an enabled link to AT). A component `render` **without** `action` whose click the browser runs (a submit or reset `type`, the `formAction` default, `commandfor` / `popoverTarget`) keeps native `disabled`, the only thing that stops it before hydration (conventions 1.2). Never dispatches either way; a disabled link does not navigate. Native `disabled` wins over the pending `aria-disabled`. |
 | 9 | Toolbar | `Button` reads `ToolbarContext`: a Toolbar's command button is `<Button>`, focusable when disabled there (`aria-disabled`, APG Toolbar). The Toolbar has no button part of its own. One implementation, one name. |
 | 10 | Composition | Button does **not** treat a `defaultPrevented` click as a veto (a Trigger-wrapped Button runs its action); its guard cannot stop an outer part's handler that ran first; `command` / `commandfor` pass through untouched (both the action and the command run on one click). |
 | 11 | Announcement | None in v1; the outcome is the consumer's (toast, Field error, `ariaNotify` in the action). `aria-busy` is pass-through. |
@@ -260,17 +260,20 @@ export interface ButtonProps extends Omit<
   type?: "button" | "submit" | "reset";
   /**
    * Native `disabled` (owned; a `render` element cannot re-enable it) and `data-disabled`.
-   * Never dispatches. With `focusableWhenDisabled`, inside a `Toolbar.Root`, or when the
-   * rendered element is not a host `<button>` (`render={<a href />}`, a component), renders
-   * `aria-disabled="true"` instead so the Button stays focusable and a link is not exposed as
-   * an enabled link.
+   * Never dispatches. With `focusableWhenDisabled` or inside a `Toolbar.Root`, renders
+   * `aria-disabled="true"` instead and cancels the click. So does a host element of another tag
+   * (`render={<a href />}`), and a component `render` when the Button has an `action`. A
+   * component `render` without `action` whose click the browser runs (`type="submit"` /
+   * `"reset"`, the `formAction` default, `commandfor` / `popoverTarget`) keeps native
+   * `disabled`: only that stops a submission or command before hydration. Native `disabled`
+   * wins over the pending `aria-disabled`.
    */
   disabled?: boolean;
   /**
    * Keep a disabled Button focusable: `aria-disabled="true"` instead of native `disabled`, so
-   * keyboard and screen-reader users still find it and a Tooltip on it still opens. Default
-   * `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar) and for a `render` element
-   * that is not a host `<button>`.
+   * keyboard and screen-reader users still find it and a Tooltip on it still opens. Before
+   * hydration a focusable disabled submitter still submits (nothing native stops it). Default
+   * `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar).
    */
   focusableWhenDisabled?: boolean;
   /**
@@ -324,9 +327,15 @@ Root entry: `export { Button }` and the three types. Subpath `@funstack/ui/butto
 | `pending` | boolean | `data-pending` | The Button's own `action` transition is in flight (until the resulting commit, including a Suspense wait), or a submission this Button started through its function `formAction` is pending (`useFormStatus().pending` for that function). |
 | `disabled` | boolean | `data-disabled` | The `disabled` prop. **Not** set by pending. |
 
-ARIA state the Button computes: `aria-disabled="true"` while `pending`, and while
-`disabled && focusable`, where `focusable = focusableWhenDisabled || inToolbar || !isHostButton(render)`
-(`isHostButton`: no `render`, the function form, or a host `<button>` element); absent otherwise.
+ARIA state the Button computes: `aria-disabled="true"` while `disabled && focusable`, and while
+pending (under `whilePending="ignore"`) unless natively disabled; absent otherwise. `focusable`
+is `disabledButton(render, disabled, { handlesClick: !browserRun, alwaysFocusable:
+focusableWhenDisabled || inToolbar })` (conventions 1.2), where `browserRun` means no `action`
+and a resolved `type` of `"submit"` / `"reset"` or a `commandfor` / `popoverTarget` prop. So:
+the opt-in (Toolbar, `focusableWhenDisabled`) is always focusable; a host element other than
+`<button>` / `<input>` is always focusable; a component `render` is focusable when the Button's
+handler is the action (`browserRun` false) and natively disabled when the browser runs the
+click; a host `<button>` and the function form are natively disabled.
 
 The two `render` predicates follow one rule, **when the element is unknown, pick the attribute
 that is harmless if the guess is wrong** (review items 1 and 2): `type="button"` on a component
@@ -334,8 +343,12 @@ that turns out to render a link is an ignored attribute, while a missing `type` 
 that renders a `<button>` inside a form is a silent submit; `aria-disabled` on a component that
 turns out to render a `<button>` is a focusable-disabled button that still never dispatches,
 while native `disabled` on a link is an enabled link to assistive technology. So a component
-element gets `type` **and** the `aria-disabled` branch; a host `<a>` gets neither `type` nor
-native `disabled`; a host `<button>` gets both natives.
+element of a Button with `action` gets `type` **and** the `aria-disabled` branch; a host `<a>`
+gets neither `type` nor native `disabled`; a host `<button>` gets both natives. Where the browser
+runs the click (no `action`; submit, reset, an invoker), the harmless guess for a component is
+the other one: an `aria-disabled` component that renders a `<button>` is a live submitter or
+invoker before hydration, while native `disabled` on a component that renders a link costs
+nothing (a link cannot submit or invoke, so the Button fails at its job either way).
 
 Owned keys (conventions 1.2; a `render` element cannot re-introduce them):
 
@@ -343,7 +356,7 @@ Owned keys (conventions 1.2; a `render` element cannot re-introduce them):
 | --- | --- | --- |
 | `type` | the Button's `type` prop, else `"submit"` with `formAction`, else `"button"` | no `render`, the function form, a host `<button>` or a **component** element (`rendersButton(render)` as amended library-wide, conventions 1.2); the key is omitted for a host element of another tag |
 | `disabled` | the prop, unless `focusable` (then `undefined`, which removes it) | always |
-| `aria-disabled` | `true` while pending or focusable-disabled; `undefined` otherwise | always |
+| `aria-disabled` | `true` while focusable-disabled, or while pending (ignoring) and not natively disabled; `undefined` otherwise | always |
 | `onClick` | the library handler (section 5.1) | always (a pass-through / render-element `onClick` runs first) |
 | `data-pending`, `data-disabled` | by presence | always |
 
@@ -656,7 +669,7 @@ set, not closing the menu. `Menu.Item` is the action item; the docs say so.
 | Rendered | Value |
 | --- | --- |
 | element | `<button type="button">` (implicit `button` role); any `render` element keeps its own role |
-| `aria-disabled` | `"true"` while pending, or while `disabled` with `focusableWhenDisabled`, inside a Toolbar, or on a `render` element that is not a host `<button>` (`<a href>`, a component); absent otherwise |
+| `aria-disabled` | `"true"` while pending (`whilePending="ignore"`) and not natively disabled, or while `disabled` with `focusableWhenDisabled`, inside a Toolbar, on a host element of another tag (`<a href>`), or on a component `render` of a Button with `action` (section 4); absent otherwise |
 | `disabled` | the prop, on a host `<button>` (no `render`, the function form, `render={<button />}`) only; never on a link or a component element, where it would mean nothing to the browser and hide the disabled state from AT (review must-fix 1) |
 | name | the consumer's (`children`, `aria-label`, `aria-labelledby`); the Button never touches it, so a `{({ pending }) => pending ? "Saving…" : "Save"}` name change is the consumer's choice and, as every name change on the focused element, is not reliably spoken (field-form.md M2) |
 | `aria-describedby` | token-merged (a Tooltip adds its id) |
@@ -857,15 +870,17 @@ Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the
 
 ## 17. `disabled` on link and component renders, library-wide
 
-Conventions 1.2: a `disabled` part whose rendered element is not a host `<button>` renders
-`aria-disabled="true"`, not native `disabled`. This section applies it to every part that owns
-`disabled` and accepts an arbitrary `render`.
+Conventions 1.2: a `disabled` part renders `aria-disabled="true"`, not native `disabled`, where
+its rendered element certainly cannot be natively disabled, or where the part's own click
+handler is the action and the element is not certainly a host `<button>`; where the browser runs
+the click and the element may be a button, native `disabled`. This section applies it to every
+part that owns `disabled` and accepts an arbitrary `render`.
 
 ### 17.1 The parts
 
 | Part | `disabled` on a host `<button>` | Click handler always installed? | Focusable-disabled branch for other renders |
 | --- | --- | --- | --- |
-| `Dialog.Close` | native `disabled`, owned | library mode or with `action`; JS-free mode without `action` is the browser's `request-close` command | **yes, when a click handler is installed**: `focusable = !isHostButton(render) && installClick`. In JS-free command mode a component render must render a `<button>` anyway (dev warning), and native `disabled` is what stops the command. |
+| `Dialog.Close` | native `disabled`, owned | library mode or with `action`; JS-free mode without `action` is the browser's `request-close` command | **yes, when a click handler is installed** (`handlesClick: installClick`). In JS-free command mode a component render must render a `<button>` anyway (dev warning), and native `disabled` is what stops the command; a host link there is `aria-disabled` (it cannot be natively disabled; it is no invoker and has no handler, so the attribute is only the honest state). |
 | `Popover.Close` | same | same | same |
 | `Dialog.Trigger` | native `disabled`, owned | library mode or non-modal; JS-free modal mode is the `show-modal` command | same condition (`installClick`) |
 | `Popover.Trigger` | native `disabled`, owned | library mode only; JS-free mode is `toggle-popover` | same condition (library mode) |
@@ -875,8 +890,9 @@ Conventions 1.2: a `disabled` part whose rendered element is not a host `<button
 | `Combobox.Trigger`, `Combobox.Clear` | native `disabled`, owned (`tabIndex` owned too) | always | **yes** |
 | `NumberField.Increment` / `Decrement` | native `disabled` (also at bound / `readOnly`), owned | always (`useStepButton`) | **yes**; the at-bound case follows the same branch |
 | `Form.Submit` | native `disabled`, owned | only while `disabled` (it cancels the click; an enabled submitter's click is the browser's) | **no** for anything that may be a submitter: no `render`, a host `<button>` or `<input>`, or a component render. With `aria-disabled` alone it would still submit before hydration and on implicit submission, so native `disabled` is the only correct disabled state for a submitter. A host element of another tag (`<a>`, `<div>`) takes the `aria-disabled` branch with the cancelled click (`field-form.md` 4). |
+| `Button` | native `disabled`, owned | always (it cancels the click while disabled) | **yes** with `action`, inside a Toolbar or with `focusableWhenDisabled`; **no** for a component render without `action` whose click the browser runs (a submit or reset `type`, the `formAction` default, `commandfor` / `popoverTarget`), as `Form.Submit`; a host element of another tag is always `aria-disabled` (section 4) |
 | `Select.Trigger` | native | must stay a `<button>` (conventions 1.2) | no (host button by contract) |
-| `Tabs.Tab`, `Accordion.Trigger`, `Menu.Item`, `Menu.CheckboxItem` / `RadioItem` / `SubmenuTrigger`, `Button` | `aria-disabled` already | | no change |
+| `Tabs.Tab`, `Accordion.Trigger`, `Menu.Item`, `Menu.CheckboxItem` / `RadioItem` / `SubmenuTrigger` | `aria-disabled` already | | no change |
 | `Toast.Action`, `Toast.Close` | see `toast.md` (the library `disabled` rule, #157) | always | see `toast.md` |
 | `Tooltip.Trigger` | renders no `disabled` attribute (`data-disabled` only; the Root's `disabled` switches the tooltip off) | | no change |
 
@@ -888,16 +904,21 @@ so a link does not navigate), exactly as `Button` does.
 ### 17.2 Shared mechanics
 
 - `isHostButton(render)` from `internal/render-element.ts` is the predicate (no `render`, the
-  function form, a host `"button"`), the same one `Button` uses.
+  function form, a host `"button"`) where the part handles the click.
 - `disabledButton(render, disabled, { handlesClick?, alwaysFocusable? })` in the same module is
-  the rule for every part of 17.1: it returns `props`, the owned `disabled` / `aria-disabled`
-  keys of the chosen branch, and `invoker`, whether `commandfor` / `command` may render.
-  `Button` keeps its own expression because `focusableWhenDisabled` and a Toolbar widen its
-  focusable branch.
+  the rule for every part of 17.1, `Button` and `Form.Submit` included: it returns `props`, the
+  owned `disabled` / `aria-disabled` keys of the chosen branch, and `invoker`, whether
+  `commandfor` / `command` may render. `handlesClick: false` (the browser runs the click) is
+  native unless the element is a host element other than `<button>` / `<input>`;
+  `alwaysFocusable` is the opt-in (`Button`'s Toolbar and `focusableWhenDisabled`, a submenu
+  trigger).
+- `pendingAriaDisabled(props, pending && ignoring)` merges the branch with a pure trigger's
+  pending `aria-disabled` (Button, the Close parts, Toast.Action): `true` in the focusable
+  branch, nothing while natively disabled (native `disabled` wins), else the pending rule.
 - In the focusable branch the part passes `disabled: undefined` (owned removal) and
   `"aria-disabled": disabled ? true : undefined`; `data-disabled` and `state.disabled` are
   unchanged. Parts that already own `aria-disabled` for another reason (the Close parts, for
-  pending) merge the conditions.
+  pending) merge the conditions through `pendingAriaDisabled`.
 - **`aria-disabled` is owned only where the part computes it**:
   in the focusable branch, and always on the parts that render it for pending. A
   host-button Toggle / Trigger outside the branch does not own the key, so a consumer's own
@@ -963,7 +984,7 @@ The cost is stated plainly: **a double click on an unguarded Save runs the save 
 | Second click, Enter, Space while pending | runs `action` again, in the same transition hook | starts nothing |
 | The click's default action (link navigation, `command`, the `formAction` submission) | not touched by the Button | `preventDefault()`ed |
 | `data-pending`, `state.pending` | from the first run until the last has settled and committed | while the one run is pending |
-| `aria-disabled="true"` from pending | **never** | exactly while `data-pending` |
+| `aria-disabled="true"` from pending | **never** | exactly while `data-pending`, unless natively disabled (native `disabled` wins) |
 | `data-disabled`, `state.disabled` | the `disabled` prop only | the `disabled` prop only |
 | Two runs in flight | yes | never |
 | An older run rejects | `reportError`, once (conventions 2.4) | unreachable |
@@ -971,7 +992,8 @@ The cost is stated plainly: **a double click on an unguarded Save runs the save 
 | Guard source | none | the in-flight counter (5.2), or `formPending` for a function `formAction` |
 
 The click handler is 5.1; `aria-disabled` is
-`(pending && ignoring) || (disabled && focusable) ? true : undefined`. Under `"ignore"` the
+`pendingAriaDisabled(disabledProps, pending && ignoring)` (17.2): `true` when
+`disabled && focusable`, absent while natively disabled, else `pending && ignoring`. Under `"ignore"` the
 counter-only guard and the settled-but-held window (5.2) and `aria-disabled`, never native
 `disabled` (5.3), apply.
 

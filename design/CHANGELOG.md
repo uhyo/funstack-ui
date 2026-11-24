@@ -10643,3 +10643,41 @@ where this document and the conventions disagree, the conventions win.
 
 Status: **proposed** (2026-10-15, GitHub issue #9). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win.
+
+---
+
+# 2026-11-24, #158: `disabled` follows who runs the click
+
+Decided by the user (2026-11-24, GitHub issue #158), from the ruling in
+`memo/reviewer/review-157-align.md`. Sections changed: conventions 1.2 (the `disabled` rule, the
+helper paragraph) and 3.6 (the last paragraph, and the file listing in 9.1); button.md decisions
+row 8, sections 3 (`disabled`, `focusableWhenDisabled` JSDoc), 4, 8.1, 17 (intro), 17.1 (the
+Close rows and a new `Button` row), 17.2, 18.2; one sentence each in popover.md, dialog.md and
+toast.md on the pending `aria-disabled`.
+
+- **The rule.** Native `disabled` where the click's effect is the browser's own (a submit, a
+  reset, a JS-free invoker command) and the element may be a button (a host `<button>` /
+  `<input>`, or a component / function render). `aria-disabled` with a cancelled click only
+  where the element certainly cannot be natively disabled (`<a>`, `<div>`), where the part's own
+  handler is the action, or where the consumer opts in (Toolbar, `focusableWhenDisabled`, a
+  submenu trigger). Before: `Button` took the `aria-disabled` branch for every component
+  render, so a disabled `Button type="submit"` (or `"reset"`, or the `formAction` default)
+  rendered through a component submitted before hydration; with a Server Function `formAction`
+  that sends the request. `Form.Submit` already kept native `disabled` for this reason (#83).
+- **Why native is the harmless guess here.** For a submitter or an invoker the action is the
+  browser's activation behaviour, which `aria-disabled` does not stop before hydration. A
+  component that renders a link cannot submit or invoke, so native `disabled` on it costs
+  nothing the part had not already lost.
+- **`Button` without `action`** counts as browser-run when its resolved `type` is `"submit"` /
+  `"reset"` or it carries `commandfor` / `popoverTarget` (the rule's "JS-free invoker"; the
+  issue named submit and reset, the user's wording covers invokers too).
+- **Pending and disabled at once.** Native `disabled` wins: a natively disabled pure trigger
+  renders no `aria-disabled` from pending (Button, Dialog.Close / Popover.Close, Toast.Action;
+  `pendingAriaDisabled`). Before, both attributes rendered. `whilePending="ignore"` alone is
+  unchanged (`aria-disabled`, focus kept).
+- **One helper.** `disabledButton`'s `handlesClick: false` now means "native unless the element
+  is a host element other than `<button>` / `<input>`" (Form.Submit's expression, moved into the
+  helper). Side effect on the JS-free command parts (Dialog / Popover Trigger and Close without
+  a handler): a host link render there renders `aria-disabled` instead of a meaningless
+  `disabled` attribute; nothing cancels its click (no handler installed), and it is no invoker,
+  as before. `Button` now calls the helper instead of its own expression.

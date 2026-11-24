@@ -1,11 +1,10 @@
 "use client";
-import { isValidElement } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -83,15 +82,11 @@ export function FormSubmit({
       }),
   );
   const state: FormSubmitState = { pending, disabled };
-  // Native `disabled` where the element is a submitter: no `render`, a host `<button>` or
-  // `<input>`, or a component (assumed to render a `<button>`, `rendersButton`): it is the only
-  // thing that stops a submitter before hydration and blocks implicit submission. A host element
-  // of another tag (`<a>`, `<div>`) cannot be natively disabled: `aria-disabled` and a cancelled
-  // click instead (conventions 1.2).
-  const submitter = rendersButton(render) || (isValidElement(render) && render.type === "input");
-  const disabledProps = submitter
-    ? { disabled }
-    : { disabled: undefined, "aria-disabled": disabled ? (true as const) : undefined };
+  // The browser submits (`handlesClick: false`): native `disabled` wherever the element may be a
+  // submitter (no `render`, a host `<button>` or `<input>`, a component), the only thing that
+  // stops it before hydration and blocks implicit submission; `aria-disabled` and the cancelled
+  // click below on a host element of another tag (`<a>`, `<div>`; conventions 1.2).
+  const disabledProps = disabledButton(render, disabled, { handlesClick: false }).props;
   return useRender<ComponentPropsWithRef<"button">, FormSubmitState>({
     defaultElement: "button",
     render,

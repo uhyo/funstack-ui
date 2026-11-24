@@ -225,7 +225,8 @@ library's. So the default follows `closeOnSettle`: `"ignore"` while the toast cl
 (the default: one Undo, one Retry, then the toast leaves), `"run"` with `closeOnSettle={false}`
 (the toast stays and the button is a user-owned trigger; add `whilePending="ignore"` for a
 Retry that must not overlap). Under `"ignore"` the second click is `preventDefault()`ed and the
-Action renders `aria-disabled="true"` while it shows `data-pending`. Under `"run"`:
+Action renders `aria-disabled="true"` while it shows `data-pending` (not while natively
+disabled: native `disabled` wins, conventions 1.2). Under `"run"`:
 `data-pending` on the Action and the Root and the paused timer last until every run has
 settled, no `aria-disabled` from pending; with `closeOnSettle` the toast closes once, when the
 last run in flight settles, and only if the latest run resolved; an older run's rejection goes

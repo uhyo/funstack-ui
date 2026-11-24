@@ -291,6 +291,22 @@ export function describeOverlayDisabledRenders<D, P extends object>(
       }
     });
 
+    // #158: a host link cannot be natively disabled, so even the browser-run parts take
+    // `aria-disabled` there (a link is no invoker anyway).
+    it("JS-free mode, link renders: aria-disabled on the Trigger and an action-less Close, no invoker", () => {
+      render(
+        <Harness
+          mode="static"
+          trigger={{ disabled: true, render: <a href="#x" /> }}
+          {...close.props({ disabled: true, render: <a href="#x" /> })}
+        />,
+      );
+      for (const el of [trigger(), closePart()]) {
+        expectAriaDisabled(el);
+        expectNoInvoker(el);
+      }
+    });
+
     // Review M1 of #83.
     it("JS-free mode with action, a disabled component-render Close is no invoker", async () => {
       const user = setupUser();
