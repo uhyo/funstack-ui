@@ -2369,7 +2369,9 @@ noop`, so a production render runs no warning hook at all. A dev check fires **o
 instance** (`useDevWarning`: the first time its condition holds; the element and name checks:
 the first failing check). `src/__tests__/production-bundle.test.ts` bundles `src/index.ts` as a
 consumer would (`NODE_ENV` `"production"`, minified) and fails on any string from those call
-sites that survives, naming the file and the text. A message starts with the public name of
+sites that survives, naming the file and the text; it also reads the module-level functions and
+constants those call sites name, so a message-building helper is passed as `isDev ? helper :
+undefined`. A message starts with the public name of
 the part that warns and a colon (`Tooltip.Trigger: the trigger is not focusable; ...`), or the
 name of the function that warns (`toast(): ...`, `toast.update: ...`).
 

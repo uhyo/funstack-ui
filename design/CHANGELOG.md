@@ -10907,3 +10907,20 @@ for two sites; the code now matches the rule, which is unchanged:
   so its two warnings always start with the public part name.
 
 Development console only.
+
+## 2026-11-24, #161: Select's position-check texts left out of production builds
+
+GitHub issue #161 (`memo/reviewer/review-157-helpers.md` finding 7, pre-existing).
+`Select.Trigger`'s `firstChildOfSelect` and `Select.GroupLabel`'s `firstChildOfGroup` are
+module-level functions returning development warning texts. They were passed to
+`useSelectPartRef` unguarded: the check is a no-op in production, but the functions stayed
+referenced, so their texts ("must be the first child of Select.Root's <select> ...") shipped in a
+production bundle. Both are now passed as `isDev ? fn : undefined`.
+
+`src/__tests__/production-bundle.test.ts` missed it because the texts were not inside a warning
+call's arguments. It now collects `useSelectPartRef`'s `position` argument (the part-name
+argument is a production string) and follows any name in the collected arguments to the module's
+top-level function or constant of that name; it also asserts that the two Select texts are
+collected, so the collector cannot silently stop seeing this class. Without the guard it fails on
+three pieces (both files). Sections changed: conventions 7.2 states that the check reads the
+named module-level helpers and how to pass one.

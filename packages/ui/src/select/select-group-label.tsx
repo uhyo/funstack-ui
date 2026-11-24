@@ -25,6 +25,9 @@ export interface SelectGroupLabelProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"legend">, SelectRootState>;
 }
 
+const isDev = process.env.NODE_ENV !== "production";
+
+/** Development only: passed behind `isDev`, so the text folds away in production (#161). */
 function firstChildOfGroup(el: HTMLLegendElement): string | null {
   const parent = el.parentElement;
   if (parent?.tagName === "OPTGROUP" && parent.firstElementChild === el) return null;
@@ -54,7 +57,7 @@ export function SelectGroupLabel({
   const { ref } = useSelectPartRef<HTMLLegendElement>(
     "Select.GroupLabel",
     "legend",
-    firstChildOfGroup,
+    isDev ? firstChildOfGroup : undefined,
   );
   return useRender<ComponentPropsWithRef<"legend">, SelectRootState>({
     defaultElement: "legend",

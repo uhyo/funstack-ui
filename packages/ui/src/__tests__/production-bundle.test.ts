@@ -15,7 +15,10 @@ import { describe, expect, it } from "vitest";
  * The bundle is `src/index.ts` (every public part) built the way a consumer's bundler would:
  * `NODE_ENV` defined as `"production"`, minified, React external. The dev texts are collected
  * from the source: every string in the arguments of `console.error` / `console.warn` and of the
- * dev-warning hooks, and of the dev-only arguments of other calls (`DEV_ARGUMENTS`).
+ * dev-warning hooks, and of the dev-only arguments of other calls (`DEV_ARGUMENTS`). A name in
+ * those arguments that the module declares at its top level (a message-building function such
+ * as Select.Trigger's `firstChildOfSelect`, #161) is followed into its declaration: the texts
+ * there are dev texts too, and must fold away with the call.
  */
 const src = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -65,19 +68,62 @@ function calleeName(node: AstNode): string | null {
   return null;
 }
 
-/** The static text pieces (string literals, template chunks) under `node`. */
-function texts(node: AstNode, out: Set<string>): void {
+/** The module's top-level functions and constants by name (exported or not). */
+function topLevelDeclarations(program: AstNode): Map<string, AstNode> {
+  const declarations = new Map<string, AstNode>();
+  for (const statement of program.body as AstNode[]) {
+    const declaration =
+      statement.type === "ExportNamedDeclaration" && isNode(statement.declaration)
+        ? statement.declaration
+        : statement;
+    if (declaration.type === "FunctionDeclaration" && isNode(declaration.id)) {
+      declarations.set(declaration.id.name as string, declaration);
+    }
+    if (declaration.type === "VariableDeclaration") {
+      for (const declarator of declaration.declarations as AstNode[]) {
+        if (
+          isNode(declarator.id) &&
+          declarator.id.type === "Identifier" &&
+          isNode(declarator.init)
+        ) {
+          declarations.set(declarator.id.name as string, declarator.init);
+        }
+      }
+    }
+  }
+  return declarations;
+}
+
+/**
+ * The static text pieces (string literals, template chunks) under `node`, following names of
+ * the module's top-level declarations (each once).
+ */
+function texts(
+  node: AstNode,
+  out: Set<string>,
+  declarations: ReadonlyMap<string, AstNode>,
+  followed: Set<string>,
+): void {
   if (node.type === "Literal" && typeof node.value === "string") out.add(node.value);
   if (node.type === "TemplateElement") {
     const cooked = (node.value as { cooked: string | null }).cooked;
     if (cooked !== null) out.add(cooked);
   }
-  for (const child of children(node)) texts(child, out);
+  if (node.type === "Identifier") {
+    const name = node.name as string;
+    const declaration = declarations.get(name);
+    if (declaration !== undefined && !followed.has(name)) {
+      followed.add(name);
+      texts(declaration, out, declarations, followed);
+    }
+  }
+  for (const child of children(node)) texts(child, out, declarations, followed);
 }
 
 /** Dev-warning texts of one file: string pieces long enough to be distinctive. */
 function devTexts(path: string): Map<string, string> {
   const program = parseAst(readFileSync(path, "utf8"), { lang: path.endsWith("x") ? "tsx" : "ts" });
+  const declarations = topLevelDeclarations(program as unknown as AstNode);
   const found = new Map<string, string>();
   const visit = (node: AstNode): void => {
     if (node.type === "CallExpression" && isNode(node.callee)) {
@@ -91,7 +137,7 @@ function devTexts(path: string): Map<string, string> {
             : (DEV_ARGUMENTS.get(name) ?? []).flatMap((i) => args[i] ?? []);
       if (devArgs.length > 0) {
         const pieces = new Set<string>();
-        for (const argument of devArgs) texts(argument, pieces);
+        for (const argument of devArgs) texts(argument, pieces, declarations, new Set());
         for (const piece of pieces) {
           if (piece.trim().length >= 16) found.set(piece, `${relative(src, path)} (${name})`);
         }
@@ -121,8 +167,19 @@ describe("production bundle", () => {
     for (const file of sourceFiles(src)) {
       for (const [text, where] of devTexts(file)) dev.set(text, where);
     }
-    // The collector works: the library has well over a hundred dev messages.
+    // The collector works: the library has well over a hundred dev messages, including texts
+    // returned by a module-level function passed to a check (#161).
     expect(dev.size).toBeGreaterThan(100);
+    const collected = [...dev.keys()];
+    for (const fragment of [
+      "must be the first child of Select.Root's <select>",
+      "must be the first child of a Select.Group's <optgroup>",
+    ]) {
+      expect(
+        collected.some((text) => text.includes(fragment)),
+        fragment,
+      ).toBe(true);
+    }
 
     const code = await productionBundle();
     // The bundle is real: production errors (a part outside its Root) stay.

@@ -29,6 +29,9 @@ export interface SelectTriggerProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"button">, SelectRootState>;
 }
 
+const isDev = process.env.NODE_ENV !== "production";
+
+/** Development only: passed behind `isDev`, so the text folds away in production (#161). */
 function firstChildOfSelect(el: HTMLButtonElement): string | null {
   const parent = el.parentElement;
   if (parent?.tagName === "SELECT" && parent.firstElementChild === el) return null;
@@ -58,7 +61,7 @@ export function SelectTrigger({ className, style, children, render, ...rest }: S
   const { ref } = useSelectPartRef<HTMLButtonElement>(
     "Select.Trigger",
     "button",
-    firstChildOfSelect,
+    isDev ? firstChildOfSelect : undefined,
   );
   return useRender<ComponentPropsWithRef<"button">, SelectRootState>({
     defaultElement: "button",
