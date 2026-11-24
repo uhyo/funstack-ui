@@ -10849,3 +10849,28 @@ development-console text change). Tooltip's three development warnings started w
 is unchanged (an effect in `Tooltip.Root`, once per Root each). Sections changed: conventions 7.2
 states the message form and lists `useMountFixed` with the hooks that take `isDev && message`
 (an omission of the `useMountFixed` entry above).
+
+## 2026-11-24, #157: hand-rolled dev warnings through the shared helpers
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 10). Development console only;
+the texts are unchanged.
+
+- `useControllableAction`'s two warnings ("both `value` and `defaultValue`", "changed from
+  controlled to uncontrolled") and `useTransitionBoundary`'s "`transition` changed between
+  undefined and a value" are `useDevWarning` calls (the mount value is kept in `useState`).
+- `Select.Value`'s "rendered outside the Select.Root's `<select>`" is the `position` check of
+  `useSelectPartRef` (`useElementCheck`) instead of a `console.error` in its layout effect.
+- `Dialog.Trigger`'s "no Dialog.Popup is rendered" is a `useElementCheck` run from the Trigger's
+  ref instead of a mount effect. The commit's DOM is complete when refs attach, so it sees the
+  same Popup.
+- The last two used to warn on every mount of the effect (twice under StrictMode). They now warn
+  once per instance like every other check (conventions 7.2).
+
+Not converted, because their timing fits none of `useDevWarning` (a condition known at render),
+`useElementCheck` (a check of the part's own element) and `warnOnce` (once per key, for
+directive-free parts): the sites that warn from a registration callback or an event handler
+(`Field.Root`'s two-controls and two-Errors warnings, Slider's duplicate-index, mixed-form and
+no-Track warnings, Combobox's duplicate option value, RadioGroup's partial hydration,
+`Menu.ContextTrigger`'s missing Popup, `useInitialFocusTarget`), the ones that read the DOM or a
+ref in an effect (`Field.Root`'s "no form control", `useItemOrder`'s duplicate values, Tooltip's
+three checks), and the two in `toast/toast-viewport.tsx` (left for the branch that splits it).

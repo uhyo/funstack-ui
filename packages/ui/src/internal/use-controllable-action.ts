@@ -3,7 +3,6 @@ import {
   addTransitionType,
   startTransition,
   useCallback,
-  useEffect,
   useMemo,
   useOptimistic,
   useRef,
@@ -14,6 +13,7 @@ import type { ActionDetails, ChangeAction } from "./types.js";
 import { useLatest } from "./use-latest.js";
 import { reportDropped } from "./report-dropped.js";
 import { useConnected } from "./use-connected.js";
+import { useDevWarning } from "./use-dev-warning.js";
 
 export interface UseControllableActionOptions<T, Details extends ActionDetails> {
   /** The controlled prop (`x`). `undefined` means uncontrolled. */
@@ -276,32 +276,22 @@ function useDevWarnings(
   hasDefault: boolean,
   warn: { readonly component: string; readonly prop: string } | undefined,
 ): void {
-  const initialMode = useRef(isControlled);
-  const warnedBoth = useRef(false);
-  const warnedSwitch = useRef(false);
+  const [initialMode] = useState(isControlled);
   const component = warn?.component ?? "A component";
   const prop = warn?.prop ?? "value";
+  const defaultProp = isDev && `default${capitalize(prop)}`;
 
-  useEffect(() => {
-    if (!isDev) return;
-    const defaultProp = `default${capitalize(prop)}`;
-
-    if (isControlled && hasDefault && !warnedBoth.current) {
-      warnedBoth.current = true;
-      console.error(
-        `${component}: both \`${prop}\` and \`${defaultProp}\` are set. ` +
-          `Use \`${prop}\` for controlled mode or \`${defaultProp}\` for uncontrolled mode, not both.`,
-      );
-    }
-
-    if (initialMode.current !== isControlled && !warnedSwitch.current) {
-      warnedSwitch.current = true;
-      const from = initialMode.current ? "controlled" : "uncontrolled";
-      const to = isControlled ? "controlled" : "uncontrolled";
-      console.error(
-        `${component}: \`${prop}\` changed from ${from} to ${to}. Switching modes after mount ` +
-          `is not supported; keep \`${prop}\` either always defined or always undefined.`,
-      );
-    }
-  }, [component, prop, isControlled, hasDefault]);
+  useDevWarning(
+    isControlled && hasDefault,
+    isDev &&
+      `${component}: both \`${prop}\` and \`${defaultProp}\` are set. ` +
+        `Use \`${prop}\` for controlled mode or \`${defaultProp}\` for uncontrolled mode, not both.`,
+  );
+  useDevWarning(
+    initialMode !== isControlled,
+    isDev &&
+      `${component}: \`${prop}\` changed from ${initialMode ? "controlled" : "uncontrolled"} to ` +
+        `${isControlled ? "controlled" : "uncontrolled"}. Switching modes after mount ` +
+        `is not supported; keep \`${prop}\` either always defined or always undefined.`,
+  );
 }

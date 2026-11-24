@@ -28,7 +28,7 @@
 // dialog-close.test.tsx) pin it. With `whilePending="run"` they are required and are the shared
 // suite's "whilePending" rows (D7, #146).
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { startTransition, use, useRef, useState } from "react";
+import { startTransition, StrictMode, use, useRef, useState } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { dispatchCommand, isModal } from "../__tests__/dialog-shim.js";
@@ -1278,6 +1278,19 @@ describe("Dialog", () => {
         </Dialog.Root>,
       );
       expect(error).toHaveBeenCalledWith(expect.stringContaining("no Dialog.Popup"));
+    });
+
+    it("does not warn for a Trigger whose Popup comes after it in the tree", () => {
+      const error = silenceErrors();
+      render(
+        <StrictMode>
+          <Dialog.Root>
+            <Dialog.Trigger>Open</Dialog.Trigger>
+            <Dialog.Popup aria-label="Settings" />
+          </Dialog.Root>
+        </StrictMode>,
+      );
+      expect(error.mock.calls.filter(([m]) => String(m).includes("no Dialog.Popup"))).toEqual([]);
     });
 
     it("throws for a part outside a Root", () => {

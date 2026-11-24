@@ -71,21 +71,24 @@ function refresh(select: HTMLSelectElement): void {
  */
 export function SelectValue({ className, style, render, ...rest }: SelectValueProps) {
   const ctx = useSelectContext("Select.Value");
-  const { ref, node } = useSelectPartRef<HTMLElement>("Select.Value", "selectedcontent");
+  const { ref, node } = useSelectPartRef<HTMLElement>(
+    "Select.Value",
+    "selectedcontent",
+    isDev
+      ? (el) =>
+          el.closest("select") === null
+            ? "rendered outside the Select.Root's <select>; put it inside Select.Trigger, the " +
+              "select's first child."
+            : null
+      : undefined,
+  );
 
   useLayoutEffect(() => {
     const el = node.current;
     if (el === null) return;
     const select = el.closest("select");
-    if (select === null) {
-      if (isDev) {
-        console.error(
-          "Select.Value: rendered outside the Select.Root's <select>; put it inside " +
-            "Select.Trigger, the select's first child.",
-        );
-      }
-      return;
-    }
+    // Outside a <select> (the ref's position check warns in development): nothing to refresh.
+    if (select === null) return;
     if (!supportsSelectedContent()) return;
     const observer = new MutationObserver((records) => {
       const selected = select.options[select.selectedIndex];
