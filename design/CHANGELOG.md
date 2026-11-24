@@ -6472,3 +6472,180 @@ choice the developer made; none is corrected here. The Field items (M4) are note
 | Open: WebKit CI | After 330ba8c the WebKit job fails the rollback-animation browser row: `expected [] to include '--slider-value'`, no `transitionstart` at all at release (8fffbca was green on all three engines; Chromium and Firefox pass 330ba8c). The row's move is new since M2 / L3 / `stepHeld`: with no step transition, the release now clears `data-dragging` (which switches `transition: none` off) and lands the return value in the same style change, where before the pending step transition kept `held` and the two changes landed in separate commits. Hypothesis for the developer, unverified: WebKit does not start a transition for a property whose `transition` was `none` in the before-change style. If so, the recipe needs no change for consumers (keyboard steps and the mounted rollback of walkthrough 4 still animate), but the row needs a second commit between the drag end and the return, or WebKit asserts the final position only. The Chromium double-`transitionstart` seen once under load is a separate symptom, also unreproduced. **Not fixed in this fold-in; the developer owns it.** | 14.2 |
 
 ---
+
+---
+
+# switch.md: test plan, implementation notes, review corrections, decisions
+
+## 11. Test plan (`src/switch/switch.test.tsx`, `switch.browser.test.tsx`)
+
+Rows marked (both) run under `describe.each` over the uncontrolled wrapper and the controlled
+"update on success" wrapper from `renderBoth`. Interactions go through `user-event`; assertions
+are on the DOM only. jsdom unless the Env column says browser; jsdom implements label activation,
+`form.reset()`, the `reset` event, `:checked` in `matches()`, and the event order the research
+verified (probe 04), so most rows stay there.
+
+| # | Area | Env | Test |
+| --- | --- | --- | --- |
+| 1 | Roles and ARIA | jsdom | Renders `<input type="checkbox" role="switch">`, `checked` false; `defaultChecked` renders `checked` true; `aria-checked` is never present, including when passed through props or a `render` element (`toHaveAttribute("aria-checked")` false). |
+| 2 | Roles and ARIA | jsdom | `data-checked`, `data-pending`, `data-disabled` absent when false and `""` when true; `disabled` renders the native attribute; `name`, `value`, `required`, `form`, `id`, `aria-label`, `onBlur` pass through; `type="radio"` through props/render is overridden. |
+| 3 | Roles and ARIA | jsdom | `<label htmlFor>` and a wrapping `<label>` name the input (`getByLabelText`) and clicking the label dispatches once. |
+| 4 | Keyboard | jsdom | Focus, Space: dispatches `(true, details)` with `details.event.type === "click"` and `details.reason === "activate"`; Enter does not dispatch. |
+| 4b | Keyboard | browser | Same Space row in Chromium, Firefox and WebKit with the engine's real activation (jsdom and user-event both synthesise it). |
+| 5 | Keyboard | jsdom | Disabled input is not focusable and Space does not dispatch. |
+| 6 | Sync action (both) | jsdom | Click calls `checkedChangeAction` once with `(true, details)`; `details.event instanceof window.Event` asserted via `details.event`, never `toEqual`; `details.reason === "activate"`; after `act`, `checked` true, no `data-pending`. Second click dispatches `false`. |
+| 7 | Sync action (both) | jsdom | `disabled` never dispatches, even when clicked programmatically through `ref`. |
+| 8 | Async action (both) | jsdom | With `deferred`: immediately after click `el.checked === true`, `data-checked=""`, `expectPending`; a sibling reading the wrapper's committed value still shows the old value. After `resolve()`: `expectNotPending`, `checked` true, sibling updated. |
+| 9 | Rejection (both) | jsdom | `reject(err)` inside `<ErrorCatcher>`: the catcher records `err`; the wrapper's committed value is unchanged. Variant with the boundary above the wrapper's sibling display: the sibling still shows the old value. |
+| 9b | Rejection, DOM rollback | jsdom | DOM rollback is asserted only where the Switch stays mounted (an uncaught rejection replaces it with the boundary's fallback, row 9): controlled wrapper that catches inside the action and does not update → after `reject`, `el.checked === false`, `data-checked` absent, no `data-pending`; controlled veto (parent ignores the change) → same; refused hydration dispatch (row 22) → same. |
+| 10 | Rejection (both) | jsdom | Caught-inside variant: uncontrolled commits `true`; controlled veto wrapper ends with `checked` false. |
+| 11 | Overlap | jsdom | Two clicks, two deferreds: action receives `true` then `false`; during flight `el.checked === false` and pending. Resolve 2 then 1, and 1 then 2: final `false`, not pending. |
+| 12 | Overlap | jsdom | After resolving only the second deferred, `data-pending` is still present. |
+| 12a | Superseded rejection (both) | jsdom | `reportError` stubbed. Resolve 2, then reject 1: reported once, `<ErrorCatcher>` records nothing; committed value `false`. |
+| 12b | Superseded rejection (both) | jsdom | Reject 1 while 2 is pending: reported once, nothing caught; resolving 2 afterwards reports nothing more. |
+| 13 | Suspending content (both) | jsdom | Wrapper renders `<Suspender key={value}>` under a `<Suspense fallback>` above the Switch. Click: old content stays, no fallback, `data-pending` on. Resolve: new content, pending gone. |
+| 14 | Function props | jsdom | `className`, `style`, `render` receive `{ checked, pending, disabled }`; while pending they see `checked: true, pending: true` and the attributes agree. |
+| 15 | `render` element | jsdom | `render={<MyInput className="x" style={{…}} />}` renders MyInput's input, merges class, keeps the element's style, forwards `ref`, keeps `type="checkbox"` and `role="switch"`, and clicking still dispatches. A `render` element with `checked`, `defaultChecked` or `aria-checked` has them removed. |
+| 16 | `render` function | jsdom | Function form receives `(props, state)`; rendering `<><input {...props}/><span/></>` works and the sibling can read `state.pending`. Rendering a `<button>` logs the dev warning. |
+| 17 | Post-await rule | jsdom | Controlled parent that `await`s then `startTransition(() => setChecked(next))`: `checked` and `data-pending` converge in one state. |
+| 18 | `transition` prop | jsdom | Renders identically with `transition` unset, `"fsui-fade"`, and a type map (wiring only). Browser row: a Switch mounted in a `startTransition` with `transition` absent calls `document.startViewTransition` zero times; with `"none"` once. |
+| 19 | Dev warnings | jsdom | `checked` with `defaultChecked` warns once; mode switch warns once; `preventDefault()` in the action's sync prefix warns once and leaves `el.checked === false` while pending (documents the desync), in sync after settle; a pass-through `onClick` that cancels the click neither dispatches nor warns (row 26). |
+| 20 | Platform: form reset (both) | jsdom | Inside `<form>` with `<button type="reset">`: after a click (committed `true`), reset → action called with `(false, { reason: "platform" })`, `details.event.type === "reset"`; uncontrolled: `el.checked` false after settle; controlled parent that refuses: `el.checked` true again after settle; parent that accepts: false. A listener that cancels `reset` → no dispatch, DOM unchanged. |
+| 21 | Platform: React automatic reset | jsdom | `<form action={async () => {}}>` containing an uncontrolled Switch with no action: click (true), submit; after the action resolves the DOM and `data-checked` are back to `defaultChecked` (false) with no desync. Variant: the parent re-renders with `defaultChecked={true}` inside the action's transition → the Switch ends `checked` true (reset target follows the latest prop). |
+| 21b | Platform: React automatic reset | browser | Row 21's first variant in all three engines (`requestFormReset` goes through the engine's `form.reset()`). |
+| 22 | Platform: pre-hydration click | jsdom | `renderToString` markup, flip `el.checked` before `hydrateRoot`: one dispatch `(true, { reason: "platform" })` with `details.event === undefined`, no hydration warning (console spy), uncontrolled commits `true`; controlled parent that refuses → `el.checked` false after settle. `createRoot` variant never dispatches on mount. |
+| 23 | `details.event` is virtual | jsdom | Toggle row 21 verbatim, plus `JSON.stringify(details) === '{"reason":"activate"}'`. |
+| 24 | Forms | jsdom | `new FormData(form)` has `name=on` when checked and nothing when unchecked; `value="weekly"` posts `weekly`; `required` unchecked → `form.checkValidity()` false and `:invalid` matches. |
+| 25 | Directive | build | `dist/switch/switch.mjs`, `dist/internal/use-native-checked.mjs` and `dist/internal/use-form-reset.mjs` start with `"use client"`; `dist/switch/index.mjs` does not. |
+| 26 | Sync action (both) | jsdom | A pass-through `onClick` that calls `preventDefault()`: no dispatch, `el.checked` back to the old value after the click, no warning about the action (conventions 2.3 item 3). |
+
+Not automated, covered by the research's probes and the example app: the accessibility-tree role
+(`switch`, probe 06), Firefox form-state restoration on reload, `appearance: none` rendering,
+ViewTransition behaviour.
+
+---
+
+## 12. Implementation notes
+
+### 12.1 Files
+
+```
+packages/ui/src/internal/
+  use-form-reset.ts            # "use client" (conventions 3.8); stable reset subscription on a form owner
+  use-native-checked.ts        # "use client" (section 7); per input, shared with Checkbox and RadioGroup.Item
+  use-checkable-input.ts       # "use client" (conventions 3.8): the Field wiring, controllable action, useNativeChecked and owned input layer shared with Checkbox
+packages/ui/src/switch/
+  index.ts                     # no directive: export { Switch } and the three types
+  switch.tsx                   # "use client"
+  switch.test.tsx
+  switch.browser.test.tsx      # rows 4b, 21b
+```
+
+`index.ts` imports `../internal/platform-attributes.js` for side effects like the other
+subpaths, exports `Switch`, `SwitchProps`, `SwitchState`, `SwitchCheckedChangeDetails`. The root
+`src/index.ts` re-exports the same; `tsdown.config.ts` gains `"src/switch/index.ts"`.
+
+### 12.2 Component sketch
+
+The sketch inlines what `useCheckableInput` (`internal/use-checkable-input.ts`, conventions 3.8)
+does for Switch and Checkbox: `useFieldControl`, `useControllableAction`, `useFieldValueChange`,
+`useNativeChecked`, `useMergedRefs` and the owned layer. `switch.tsx` calls the hook with
+`role: "switch"` and renders its `libraryProps` through `useRender`.
+
+```tsx
+"use client";
+import { ViewTransition } from "react";
+import type { ChangeEvent, ComponentPropsWithRef } from "react";
+import { createActionDetails } from "../internal/action-details.js";
+import { dataAttr } from "../internal/data-attr.js";
+import { transitionTypes } from "../internal/transition-types.js";
+import { useControllableAction } from "../internal/use-controllable-action.js";
+import { guardCheckableChange, useNativeChecked } from "../internal/use-native-checked.js";
+import { useRender } from "../internal/use-render.js";
+
+export function Switch({
+  checked, defaultChecked, checkedChangeAction, disabled = false, transition,
+  className, style, render, ...rest
+}: SwitchProps) {
+  const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
+    boolean, SwitchCheckedChangeDetails
+  >({
+    controlled: checked,
+    defaultValue: defaultChecked,
+    initialValue: false,
+    action: checkedChangeAction,
+    transitionTypes: (next) => transitionTypes("switch", next ? "on" : "off"),
+    warn: { component: "Switch", prop: "checked" },
+  });
+
+  const inputRef = useNativeChecked({
+    type: "checkbox",
+    component: "Switch",
+    checked: optimistic,
+    defaultChecked: checked === undefined ? (defaultChecked ?? false) : undefined,
+    latestInFlight,
+    onPlatformChange: (next, event) =>
+      dispatch(next, createActionDetails(event, { reason: "platform" })),
+  });
+
+  const state: SwitchState = { checked: optimistic, pending, disabled };
+
+  const element = useRender<ComponentPropsWithRef<"input">, SwitchState>({
+    defaultElement: "input",
+    render, state, className, style, children: undefined,
+    ref: inputRef,
+    // Pass-through layer: a `render` element's own props win over these.
+    props: { ...rest, disabled },
+    // Library-controlled layer (owned keys, conventions 1.2).
+    libraryProps: {
+      type: "checkbox",
+      role: "switch",
+      checked: optimistic,
+      defaultChecked: undefined,
+      "aria-checked": undefined,
+      "data-checked": dataAttr(optimistic),
+      "data-pending": dataAttr(pending),
+      "data-disabled": dataAttr(disabled),
+      onChange: (event: ChangeEvent<HTMLInputElement>) => {
+        if (disabled) return;
+        guardCheckableChange(event.nativeEvent, () =>
+          dispatch(!optimistic, createActionDetails(event.nativeEvent, { reason: "activate" })),
+        "Switch"); // already-cancelled click: no dispatch, no warning; preventDefault() in the action: dev warning (6.7)
+      },
+    },
+  });
+
+  return transition === undefined ? element : <ViewTransition default={transition}>{element}</ViewTransition>;
+}
+Switch.displayName = "Switch";
+```
+
+- **Owned keys** (documented per conventions 1.2): `type`, `role`, `checked`, `defaultChecked`,
+  `aria-checked`, `onChange`, `disabled`, `data-checked`, `data-pending`, `data-disabled`.
+  `disabled` is owned because every part that takes a `disabled` prop owns it (conventions 1.2; the
+  same holds for Toggle): a `render` element can neither re-enable nor disable the Switch. `name`
+  stays pass-through (a `render` element may set it), unlike Accordion's `name`, because here it
+  is the consumer's form wiring, not library state.
+- **`onChange`, not `onClick`.** React warns when `checked` is given without `onChange`, and
+  `onChange` on a checkable input is React's `click`-driven change event, so `details.event` is
+  the click. The consumer's `onClick` passes through and runs first.
+- **`children: undefined`** is passed to `useRender`; `SwitchProps` has no `children`.
+- **No `useId`, no context, no key handling.** Label association is the consumer's `<label>`.
+- **Transition types** come from the shared `transitionTypes("switch", …)` helper.
+- **The click guard** (`guardCheckableChange`, conventions 3.8 rule 9) is shared with Checkbox
+  and RadioGroup: a click already cancelled by a pass-through `onClick` never dispatches; a
+  `preventDefault()` inside the action warns once per instance.
+- **`defaultChecked` for the hook** is `undefined` in controlled mode so React's mount-time value
+  stays (6.6); in uncontrolled mode it is the latest prop so the reset target follows re-renders.
+- Nothing else: Switch is `useControllableAction` + `useNativeChecked` + `useRender`. Checkbox is
+  the same three calls plus `indeterminate`; the duplication of the ten `libraryProps` lines
+  between the two files is accepted over a factory, so each component stays readable on its own.
+
+### 12.3 Example app and docs site
+
+A Switch page exercising: autosave with a fake 800 ms action and a rejecting variant inside an
+Error Boundary; a settings `<form action>` with a reset button (both residual paths visible);
+the headless CSS of 2.7 and the wrapper recipe of section 1; a controlled veto. The docs page
+documents `defaultChecked` as the reset target and `preventDefault()` as unsupported.
+
+---
