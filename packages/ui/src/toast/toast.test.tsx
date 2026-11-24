@@ -1717,6 +1717,24 @@ describe("Toast", () => {
       expect(queryRoot(id)).toBeNull();
     });
 
+    // #160 M1: the mount reads the visibility; no `visibilitychange` fires for a hidden start.
+    it("starts paused when mounted while the document is hidden", async () => {
+      const state = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      render(<Harness manager={manager} />);
+      expect(region()).toHaveAttribute("data-paused", "");
+      const id = await call(() => manager({ title: "A", duration: 1000 }));
+      await advance(5000);
+      expect(queryRoot(id)).not.toBeNull();
+      state.mockReturnValue("visible");
+      act(() => {
+        document.dispatchEvent(new Event("visibilitychange"));
+      });
+      expect(region()).not.toHaveAttribute("data-paused");
+      await advance(1000);
+      expect(queryRoot(id)).toBeNull();
+      state.mockRestore();
+    });
+
     it("pauses while the window is blurred", async () => {
       render(<Harness manager={manager} />);
       const id = await call(() => manager({ title: "A", duration: 1000 }));
@@ -2255,6 +2273,24 @@ describe("Toast", () => {
       });
       await flushMicrotasks(2);
       expect(ariaNotify).toHaveBeenCalledWith("Shown Waiting in line", { priority: "normal" });
+    });
+
+    // #160 M4: a queued toast has no DOM, so its text comes from `announceQueued`.
+    it("applies the Viewport's announce to a toast queued beyond limit", async () => {
+      render(
+        <Harness manager={manager} limit={1} announce={(t) => `Viewport: ${String(t.title)}`} />,
+      );
+      await call(() => {
+        manager({ title: "Shown" });
+        manager({ title: "Waiting", description: "in line" });
+      });
+      await flushMicrotasks(2);
+      // Only "Shown" is mounted: "Waiting" is queued.
+      expect(roots()).toHaveLength(1);
+      expect(ariaNotify).toHaveBeenCalledTimes(1);
+      expect(ariaNotify).toHaveBeenCalledWith("Viewport: Shown Viewport: Waiting", {
+        priority: "normal",
+      });
     });
 
     it("does not throw without ariaNotify", async () => {

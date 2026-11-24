@@ -1398,6 +1398,31 @@ describe("Combobox", () => {
       await flushTasks(2);
     });
 
+    // #160 M3: `writeText` updates the latest text synchronously, so a read later in the same
+    // event (here an Enter dispatched from `onInputValueChange`, before any render) sees it.
+    it("Enter dispatched while the text is being written commits the new text", async () => {
+      const action = vi.fn<ValueAction>();
+      const texts = vi.fn<TextAction>((next) => {
+        if (next === "Oz") fireEvent.keyDown(input(), { key: "Enter" });
+      });
+      render(
+        <Harness
+          root={{
+            allowCustomValue: true,
+            valueChangeAction: action,
+            onInputValueChange: texts,
+            name: "tag",
+          }}
+        />,
+      );
+      fireEvent.change(input(), { target: { value: "Oz" } });
+      await flushTasks(2);
+      expect(texts).toHaveBeenCalledWith("Oz", expect.anything());
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(action).toHaveBeenCalledWith("Oz", expect.objectContaining({ custom: true }));
+      expect(hidden()!.value).toBe("Oz");
+    });
+
     it("focus leaving with changed text dispatches with the focusout event", async () => {
       const action = vi.fn<ValueAction>();
       const user = setupUser();
