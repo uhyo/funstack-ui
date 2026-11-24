@@ -332,8 +332,7 @@ committed tells the library that a consumer boundary is showing its fallback (a 
 mounted looks the same as a toast without one), and the alternative, a render-phase "Title
 rendered but not committed" flag, can be left set by a discarded render and freeze a toast
 forever. The docs say so next to the skeleton recipe; section 21's `fallback` prop on the Root lets
-the skeleton live in the library's own boundary, which does see it (GitHub issue #63; accepted
-and implemented 2026-10-18, ada1cba).
+the skeleton live in the library's own boundary, which does see it.
 
 The reveal is a Suspense retry, which commits while unrelated async actions are pending: verified
 on React 19.3.1 (`memo/architect/probes/toast-suspense-reveal.mjs`): a toast pushed urgently while

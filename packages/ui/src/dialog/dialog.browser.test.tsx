@@ -3,7 +3,7 @@
 // steps and focus return through a deferred `showModal()`, nested dialogs, native `closedby`
 // light dismiss (with the JS fallback where the engine lacks it) and its press-and-click rule
 // under a real drag, Escape left to a popover inside a non-modal dialog, the nested-confirm
-// pattern (design 11.10 / 12.5 as reworked after the review), `<form method="dialog">`, exit
+// pattern (design 11, walkthrough 10, and 12.5), `<form method="dialog">`, exit
 // animations and the deferred unmount (branching on whether the engine animates the exit;
 // Firefox does not), `<ViewTransition>` around a `showModal()` dialog for the library-owned
 // closes of #46 (design 13.3), and the CSS scroll-lock recipe. Real keyboard and pointer input
