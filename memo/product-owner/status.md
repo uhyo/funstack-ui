@@ -422,3 +422,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - MERGED split d313c54, #160 4ba75d0 (PO self-review; small), helpers f0a7fac (8/10 helpers; focusable selector not unified — reviewer: not worth asking user, comment instead). #161 filed (Select dev text in prod bundle).
 - Running: refactor/157-helpers-followup (skipped sites, StrictMode counts, 7.2 message rule, nits, Menu open-cause jsdom test, #161), refactor/157-overlay-interfaces (#11).
 - Then: #159 (after #11), internal/ reorg, conventions.md second pass, section-citation check. Consider release after this batch.
+- MERGED helpers-followup dfd46b5 (#161 closed; Toast.Viewport false-warning regression fixed before merge), overlay-interfaces 92fe01d (usePopoverRoot; OverlayRootValue grouped 20→17).
+- Running: fix/159-remount-mid-close (incl. Popover check + M3 rows decision), docs/157-spec-slim-2 (conventions second pass + section-citation check L7).
+- Last: internal/ reorg (after #159). Then propose alpha.19 release (behaviour changes: B items, #158, dev warning texts).
+- Lesson: CHANGELOG is append-only — never ask agents to edit old entries.
