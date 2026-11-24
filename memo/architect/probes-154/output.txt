@@ -1,0 +1,105 @@
+ RUN  v5.0.5 /home/uhyo/repos/funstack-ui/memo/architect/probes-154
+=== 1. raw React useFormStatus, resolve a-first ===
+initial: idle
+  [a called]
+click A: pending action=a
+  [b called]
+click B: pending action=b
+resolve a: pending action=b
+resolve b: idle
+=== 1. raw React useFormStatus, resolve b-first ===
+initial: idle
+  [a called]
+click A: pending action=a
+  [b called]
+click B: pending action=b
+resolve b: pending action=b
+resolve a: idle
+=== 2. current Button data-pending, resolve a-first ===
+click A      A=PENDING  B=-
+click B      A=-        B=PENDING
+resolve a    A=-        B=PENDING
+resolve b    A=-        B=-
+=== 2. current Button data-pending, resolve b-first ===
+click A      A=PENDING  B=-
+click B      A=-        B=PENDING
+resolve b    A=-        B=PENDING
+resolve a    A=-        B=-
+=== 3. current Button, whilePending="ignore" guard after another submitter ===
+click A: a calls=1, A=PENDING
+click B: a calls=1, A=-
+click A again (a's first run still in flight): a calls=2, A=PENDING
+=== 4. current Button, form action submitted while A runs ===
+click A:       A=PENDING
+click Publish: A=-   (a still in flight)
+=== 5. baseline: two `action` Buttons (React entangles async actions) ===
+click A      A=PENDING  B=-        committed=""
+click B      A=PENDING  B=PENDING  committed=""
+resolve a    A=PENDING  B=PENDING  committed=""
+resolve b    A=-        B=-        committed="ab"
+=== 6. raw React: when a formAction's own state update commits ===
+click A, B   committed=""
+resolve a    committed=""
+resolve b    committed="ab"
+=== 7. raw React: older (a) rejects ===
+a rejected: boundary=none
+both settled: boundary=none
+reported elsewhere: []
+=== 7. raw React: latest (b) rejects ===
+b rejected: boundary=none
+both settled: boundary=Error: b failed
+reported elsewhere: []
+=== 8. candidate L, resolve a-first ===
+click A      A=PENDING  B=-
+click B      A=PENDING  B=PENDING
+resolve a    A=PENDING  B=PENDING
+resolve b    A=-        B=-
+=== 8. candidate L, resolve b-first ===
+click A      A=PENDING  B=-
+click B      A=PENDING  B=PENDING
+resolve b    A=PENDING  B=PENDING
+resolve a    A=-        B=-
+=== 9. candidate L: cancelled submission, then another submitter ===
+click A (invalid form): a calls=0, A=-, A flashed=[]
+click B:                A=-  (A never submitted)
+=== 8. candidate T, resolve a-first ===
+click A      A=PENDING  B=-
+click B      A=PENDING  B=PENDING
+resolve a    A=PENDING  B=PENDING
+resolve b    A=-        B=-
+=== 8. candidate T, resolve b-first ===
+click A      A=PENDING  B=-
+click B      A=PENDING  B=PENDING
+resolve b    A=PENDING  B=PENDING
+resolve a    A=-        B=-
+=== 9. candidate T: cancelled submission, then another submitter ===
+click A (invalid form): a calls=0, A=-, A flashed=["PENDING","-"]
+click B:                A=-  (A never submitted)
+=== 8. candidate W, resolve a-first ===
+click A      A=PENDING  B=-
+click B      A=PENDING  B=PENDING
+resolve a    A=PENDING  B=PENDING
+resolve b    A=-        B=-
+=== 8. candidate W, resolve b-first ===
+click A      A=PENDING  B=-
+click B      A=PENDING  B=PENDING
+resolve b    A=PENDING  B=PENDING
+resolve a    A=-        B=-
+=== 9. candidate W: cancelled submission, then another submitter ===
+click A (invalid form): a calls=0, A=-, A flashed=[]
+click B:                A=-  (A never submitted)
+=== 10. useActionState dispatches (candidate L buttons) ===
+  [a reducer called]
+click A      pending action=dispatchA     A=PENDING  B=-
+  [b reducer called]
+click B      pending action=dispatchB     A=PENDING  B=PENDING
+click A again pending action=dispatchA     A=PENDING  B=PENDING
+  [a reducer called]
+resolve a    pending action=dispatchA     A=PENDING  B=PENDING
+resolve b    idle                         A=-        B=-
+=== 11. candidate L: two script submissions in one task ===
+both submitted in one task: A=- B=PENDING
+ Test Files  1 passed (1)
+      Tests  21 passed (21)
+   Start at  09:57:31
+   Duration  1.24s (environment 46%, tests 38%, import 9%, transform 6%)
