@@ -1,7 +1,6 @@
 "use client";
-import { addTransitionType, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -13,8 +12,6 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
 import { useLatest } from "../internal/use-latest.js";
@@ -22,6 +19,7 @@ import { useNativeGroupReconciliation } from "../internal/use-native-group-recon
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
+import { useStepCommit } from "../internal/use-step-commit.js";
 import {
   clampToNeighbours,
   equalValues,
@@ -214,6 +212,11 @@ const isDev = process.env.NODE_ENV !== "production";
 const STEP_TYPES = transitionTypes("slider", "change");
 const COMMIT_TYPES = transitionTypes("slider", "commit");
 
+/** The `details` fields of both actions. */
+function sliderDetails(reason: ChangeReason, thumb: number | null) {
+  return { reason, thumb };
+}
+
 function replaceAt(values: readonly number[], index: number, value: number): readonly number[] {
   return values.map((v, i) => (i === index ? value : v));
 }
@@ -292,62 +295,38 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   // --- State (design 2) ----------------------------------------------------------------------
 
-  const [live, setLive] = useState<readonly number[] | null>(null);
   const [gestureThumb, setGestureThumb] = useState<number | null>(null);
-  /**
-   * A step was taken and its gesture's commit has not been dispatched yet. Holds `live` on
-   * screen between a key's native `input` and `change` when no step transition runs (no
-   * `valueChangeAction`): otherwise react-dom restores the controlled input to the old value
-   * after `input`, and Firefox then fires no `change`.
-   */
-  const [stepHeld, setStepHeld] = useState(false);
-  const [pendingThumb, setPendingThumb] = useState<number | null>(null);
-
-  /** The value of the latest step, read by the commit in the same or a later event. */
-  const liveRef = useRef<readonly number[] | null>(null);
-  /** The shown value when the open gesture began; `null` when no gesture is open. */
-  const gestureStart = useRef<readonly number[] | null>(null);
   const activeGesture = useRef<ActiveGesture | null>(null);
-  const commitSeq = useRef(0);
   const trackRef = useRef<HTMLElement | null>(null);
 
-  const runCommit = async (next: T, details: SliderValueCommitDetails): Promise<void> => {
-    const seq = ++commitSeq.current;
-    try {
-      await valueCommitAction?.(next, details);
-    } catch (error) {
-      // Design 2.4: in uncontrolled mode, tell the preview channel about the rollback, for the
-      // latest commit only. Yield once to leave the commit's transition (conventions 2.6).
-      if (value === undefined && seq === commitSeq.current) {
-        await undefined;
-        // `stepTo` and `committedRef` are declared below; this runs long after the render.
-        stepTo(toArray(committedRef.current), null, "dismiss", undefined);
-      }
-      throw error;
-    }
-  };
-
-  const commitState = useControllableAction<T, SliderValueCommitDetails>({
+  // The step and commit core (design 2.4), shared with NumberField; values are arrays inside.
+  const {
+    shown,
+    shownRef,
+    optimisticShown: optimisticValues,
+    pending,
+    pendingSource: pendingThumb,
+    step: stepTo,
+    commit: commitGesture,
+    openGesture,
+    captureGesture,
+    markGestureStart,
+    takeEdit,
+  } = useStepCommit<T, readonly number[], number, ReturnType<typeof sliderDetails>>({
     controlled: value,
     defaultValue,
     initialValue: platformDefault(min, max, step) as T,
-    action: runCommit,
-    transitionTypes: () => COMMIT_TYPES,
+    stepAction: valueChangeAction,
+    commitAction: valueCommitAction,
+    stepTypes: STEP_TYPES,
+    commitTypes: COMMIT_TYPES,
     warn: { component: "Slider.Root", prop: "value" },
+    toShown: toArray,
+    fromShown: fromArray,
+    equals: equalValues,
+    details: sliderDetails,
+    captured: gestureThumb !== null,
   });
-  const { optimistic, committed, dispatch } = commitState;
-  const committedRef = useLatest(committed);
-
-  // A step is not a re-entry: a continuous control dispatches one step per key press or pointer
-  // move and every step must run (design/components/button.md 16.1), so no in-flight guard.
-  const { pending: stepPending, run: runStep } = useActionTrigger({
-    ignoreWhilePending: false,
-  });
-
-  const optimisticValues = useMemo(() => toArray(optimistic), [optimistic]);
-  const held = gestureThumb !== null || stepHeld || stepPending || commitState.pending;
-  const shown = held && live !== null ? live : optimisticValues;
-  const pending = stepPending || commitState.pending;
 
   // --- Inside a Field.Root (design 9.4) ------------------------------------------------------
 
@@ -375,18 +354,10 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       "Slider.Root: a range is never empty, so `required` on the enclosing Field.Root has no " +
         "effect on the slider.",
   );
-  /**
-   * The reason of the latest change the user or the platform made, consumed by the Field
-   * notification below: `"activate"` dismisses a shown server error, a rollback does not.
-   */
-  const lastReason = useRef<ChangeReason | null>(null);
   // A pointer gesture and the JS-normalised keys fire no `input` / `change` the Field hears:
-  // tell it at the commit, when the optimistic value changes (design 9.4.4).
-  useFieldValueChange(optimisticValues.join("\u0000"), () => {
-    const edit = lastReason.current === "activate";
-    lastReason.current = null;
-    return edit;
-  });
+  // tell it at the commit, when the optimistic value changes (design 9.4.4). `"activate"`
+  // dismisses a shown server error, a rollback does not.
+  useFieldValueChange(optimisticValues.join("\u0000"), takeEdit);
   const {
     "aria-labelledby": fieldLabelledBy,
     "aria-describedby": fieldDescribedBy,
@@ -407,13 +378,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     };
   }, [inField, fieldRef, thumbCount, fieldDescribedBy, fieldInvalid, fieldDataInvalid, fieldName]);
 
-  /** What the thumbs show, for handlers; also written by `stepTo` ahead of the render. */
-  const shownRef = useLatest(shown);
-
   const latest = useLatest({
-    valueChangeAction,
-    fromArray,
-    runStep,
     min,
     max,
     step,
@@ -421,54 +386,6 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     orientation,
     disabled,
   });
-
-  // --- Step and commit (design 2.4) ---------------------------------------------------------
-
-  const stepTo = useCallback(
-    (
-      next: readonly number[],
-      thumb: number | null,
-      reason: ChangeReason,
-      event: Event | undefined,
-    ): boolean => {
-      // No-op against what the user sees (conventions 2.3 item 8).
-      if (equalValues(next, shownRef.current)) return false;
-      liveRef.current = next;
-      shownRef.current = next;
-      // A controlled parent that adopts steps changes the optimistic value per step.
-      lastReason.current = reason;
-      setLive(next);
-      setPendingThumb(thumb);
-      // A revert has no commit after it: the optimistic value already shows the committed one.
-      if (reason !== "dismiss") setStepHeld(true);
-      const { valueChangeAction: action, fromArray: toValue, runStep: run } = latest.current;
-      // Without a step action there is nothing to run and no consumer update to keep
-      // interruptible: no transition, so `data-pending` does not blink on every pointer move.
-      if (action === undefined) return true;
-      run(() => {
-        for (const type of STEP_TYPES) addTransitionType(type);
-        return action?.(toValue(next), createActionDetails(event, { reason, thumb }));
-      });
-      return true;
-    },
-    [latest, shownRef],
-  );
-
-  const commitGesture = useCallback(
-    (thumb: number | null, reason: ChangeReason, event: Event | undefined): void => {
-      const start = gestureStart.current;
-      gestureStart.current = null;
-      // The commit's own pending state holds `live` from here (set in this same batch).
-      setStepHeld(false);
-      const next = liveRef.current;
-      // Nothing changed since the gesture began (a drag out and back, a trailing `change`).
-      if (start === null || next === null || equalValues(next, start)) return;
-      lastReason.current = reason;
-      setPendingThumb(thumb);
-      dispatch(latest.current.fromArray(next), createActionDetails(event, { reason, thumb }));
-    },
-    [dispatch, latest],
-  );
 
   // --- Thumb registry ------------------------------------------------------------------------
 
@@ -515,9 +432,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     },
     onPlatformChange: (next, event) => {
       if (next.length !== shownRef.current.length) return;
-      const before = shownRef.current;
-      gestureStart.current = before;
-      liveRef.current = before;
+      openGesture();
       stepTo(next, null, "platform", event);
       commitGesture(null, "platform", event);
     },
@@ -537,10 +452,10 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       if (index >= before.length) return;
       // A key press is a one-step gesture: it starts at the value shown before it.
       if (stepTo(replaceAt(before, index, raw), index, "activate", event)) {
-        if (gestureStart.current === null) gestureStart.current = before;
+        markGestureStart(before);
       }
     },
-    [shownRef, stepTo],
+    [markGestureStart, shownRef, stepTo],
   );
 
   const inputCommit = useCallback(
@@ -591,12 +506,11 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
         stepTo(next, index, "activate", event);
         return;
       }
-      gestureStart.current = before;
-      liveRef.current = before;
+      openGesture();
       stepTo(next, index, "activate", event);
       commitGesture(index, "activate", event);
     },
-    [commitGesture, latest, shownRef, stepTo],
+    [commitGesture, latest, openGesture, shownRef, stepTo],
   );
 
   // --- Pointer (design 4.1) ------------------------------------------------------------------
@@ -699,16 +613,14 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
       activeGesture.current = { pointerId, detach };
       setGestureThumb(thumb);
-      gestureStart.current = shownRef.current;
-      liveRef.current = shownRef.current;
-      // A capture alone holds `live` on screen: start it from what is shown, not from the value
-      // an earlier gesture left behind (a press exactly on the current value steps nothing).
-      setLive(shownRef.current);
+      // A capture alone holds `live` on screen, from what is shown (a press exactly on the
+      // current value steps nothing).
+      captureGesture();
       // `:focus-visible` does not match after a pointer press, as on a native range.
       registry.get(thumb)?.focus({ focusVisible: false } as FocusOptions);
       if (decided !== null) moveTo(thumb, start, event);
     },
-    [commitGesture, latest, registry, shownRef, stepTo],
+    [captureGesture, commitGesture, latest, registry, shownRef, stepTo],
   );
 
   // An unmount mid-gesture leaves no listener behind.

@@ -254,7 +254,10 @@ the gesture's commit resolves, not per step. Consequences, documented on the com
 
 ### 2.4 Step, commit, and the "dismiss" revert
 
-The Root has two internal entry points; every path (pointer, keyboard, platform) uses them:
+The Root has two internal entry points; every path (pointer, keyboard, platform) uses them.
+They are implemented once for Slider and NumberField, in `internal/use-step-commit.ts`; what
+differs (the array shape, `equalValues`, NumberField's rounding, draft and hidden input) is
+passed in as options:
 
 ```ts
 // Inside Slider.Root. `values` are always arrays internally; `fromArray` restores the prop shape.

@@ -10643,3 +10643,23 @@ where this document and the conventions disagree, the conventions win.
 
 Status: **proposed** (2026-10-15, GitHub issue #9). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win.
+
+---
+
+# Entries
+
+## 2026-11-24: one step / commit core for Slider and NumberField (#157)
+
+Refactoring wave #157, candidate 3 of `memo/architect/refactor-audit.md` (user decision: the
+wave). Internal only, no behaviour change. The step and commit logic that `Slider.Root` and
+`NumberField.Root` carried twice (`live`, `stepHeld`, the gesture start, the commit sequence with
+the `"dismiss"` revert, the two channels through `useControllableAction` and `useActionTrigger`,
+the pending source, the reason consumed by the Field notification) moved to
+`internal/use-step-commit.ts`. What differs is passed in as options: the internal value shape
+(`toShown` / `fromShown`: Slider's arrays), the no-op test (`equalValues` / `Object.is`),
+NumberField's rounding before the no-op test (`normalize`), its draft clearing and hidden-input
+write per step (`onStep`) and its announcement per commit (`onCommit`).
+
+Sections changed: conventions 9.1 (the `internal/` listing names the new module); slider.md 2.4
+and number-field.md 2.4 say where the two entry points are implemented. Developer notes:
+`memo/developer/issue-157-step-commit.md`.
