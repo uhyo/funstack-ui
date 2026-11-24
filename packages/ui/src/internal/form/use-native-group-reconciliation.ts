@@ -3,7 +3,7 @@ import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefObject } from "react";
 import { useFormReset } from "./use-form-reset.js";
 import type { FormAssociatedElement } from "./use-form-owner-event.js";
-import { useLatest } from "./use-latest.js";
+import { useLatest } from "../use-latest.js";
 
 /** Which residual path found the change: mount reconciliation (Root or late member) or form reset. */
 export type NativeGroupPath = "mount" | "reset";

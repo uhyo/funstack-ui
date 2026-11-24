@@ -1,6 +1,6 @@
 // Directive-free: the module-level first-invalid collector (design/components/field-form.md 2.5).
-import { announce } from "./announce.js";
-import { sortByDocumentOrder } from "./dom-order.js";
+import { announce } from "../announce.js";
+import { sortByDocumentOrder } from "../dom-order.js";
 
 interface Batch {
   /** The elements whose `invalid` event was collected (a group's members, not its target). */

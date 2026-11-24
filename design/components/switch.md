@@ -34,7 +34,7 @@ form reset). Read this document before the Checkbox one.
 | 10 | ARIA | `role="switch"` on the input; the native `checked` state is the ARIA state. `aria-checked` is **owned and always removed** (forbidden on native inputs by ARIA in HTML). No key handling: native Space. |
 | 11 | `render` | Must keep an `<input type="checkbox">`; `type`, `checked`, `role`, `onChange` and the state attributes are owned. Dev warning when the mounted node is anything else. |
 | 12 | `switch` attribute | Not used (WebKit-only). Reserved as `experimental_switch` for when Chromium ships it. |
-| 13 | Files | `src/switch/{index.ts,switch.tsx,switch.test.tsx,switch.browser.test.tsx}`, `src/internal/use-native-checked.ts`, `src/internal/use-form-reset.ts` (conventions 3.8). `switch.tsx` and both hooks are `"use client"`. Exports `Switch`, `SwitchProps`, `SwitchState`, `SwitchCheckedChangeDetails`. |
+| 13 | Files | `src/switch/{index.ts,switch.tsx,switch.test.tsx,switch.browser.test.tsx}`, `src/internal/form/use-native-checked.ts`, `src/internal/form/use-form-reset.ts` (conventions 3.8). `switch.tsx` and both hooks are `"use client"`. Exports `Switch`, `SwitchProps`, `SwitchState`, `SwitchCheckedChangeDetails`. |
 
 ---
 
@@ -622,7 +622,7 @@ the per-element hook's options and the behaviour Switch relies on; the rules the
 are conventions 3.8 rules 1 to 9 and are not restated.
 
 ```ts
-// packages/ui/src/internal/use-native-checked.ts
+// packages/ui/src/internal/form/use-native-checked.ts
 "use client";
 import type { RefCallback } from "react";
 

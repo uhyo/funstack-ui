@@ -44,8 +44,8 @@ const clientFiles = [
   // checkbox.md C10, conventions 3.8).
   "switch/switch.mjs",
   "checkbox/checkbox.mjs",
-  "internal/use-form-reset.mjs",
-  "internal/use-native-checked.mjs",
+  "internal/form/use-form-reset.mjs",
+  "internal/form/use-native-checked.mjs",
   // Every Dialog part and its context are client modules (design/components/dialog.md, 14).
   "dialog/dialog-context.mjs",
   "dialog/dialog-root.mjs",
@@ -55,7 +55,7 @@ const clientFiles = [
   "dialog/dialog-form.mjs",
   "dialog/dialog-title.mjs",
   "dialog/dialog-description.mjs",
-  "internal/use-native-group-reconciliation.mjs",
+  "internal/form/use-native-group-reconciliation.mjs",
   // Every RadioGroup part and its context are client modules (design/components/radio-group.md,
   // decision 12 and 13.1).
   "radio-group/radio-group-context.mjs",
@@ -108,7 +108,7 @@ const clientFiles = [
   "select/select-group.mjs",
   "select/select-group-label.mjs",
   "select/select-separator.mjs",
-  "internal/use-native-select-value.mjs",
+  "internal/form/use-native-select-value.mjs",
   "internal/use-hydrated-mount.mjs",
   "internal/use-delayed-pair.mjs",
   // Every Combobox part and its context are client modules (design/components/combobox.md,
@@ -157,10 +157,10 @@ const clientFiles = [
   "field/field-error.mjs",
   "form/form-root.mjs",
   "form/form-submit.mjs",
-  "internal/field-context.mjs",
-  "internal/use-field-control.mjs",
-  "internal/use-form-owner-event.mjs",
-  "internal/form-status-watcher.mjs",
+  "internal/form/field-context.mjs",
+  "internal/form/use-field-control.mjs",
+  "internal/form/use-form-owner-event.mjs",
+  "internal/form/form-status-watcher.mjs",
   // Progress and Meter: the contexts and the four parts that read them are client modules; the
   // Roots are not (design/components/progress.md 8.1 and 12.1 "Directive").
   "progress/progress-context.mjs",
@@ -224,7 +224,7 @@ const directiveFreeFiles = [
   "dialog/index.mjs",
   "radio-group/index.mjs",
   "checkbox-group/index.mjs",
-  "internal/sync-presence.mjs",
+  "internal/form/sync-presence.mjs",
   "popover/index.mjs",
   "menu/index.mjs",
   "select/index.mjs",
@@ -240,8 +240,8 @@ const directiveFreeFiles = [
   "slider/slider-arithmetic.mjs",
   "field/index.mjs",
   "form/index.mjs",
-  "internal/validity.mjs",
-  "internal/focus-first-invalid.mjs",
+  "internal/form/validity.mjs",
+  "internal/form/focus-first-invalid.mjs",
   // The announcer: `ariaNotify()` only (number-field.md 8.3).
   "internal/announce.mjs",
   // Directive-free Roots that render their client context's provider, and the pure modules they

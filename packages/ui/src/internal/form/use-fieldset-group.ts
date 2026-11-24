@@ -3,8 +3,8 @@ import { useCallback, useId, useRef } from "react";
 import type { Ref, RefObject } from "react";
 import type { FieldControlBinding } from "./use-field-control.js";
 import { useFieldControl } from "./use-field-control.js";
-import { useElementCheck } from "./use-element-check.js";
-import { useMergedRefs } from "./use-merged-refs.js";
+import { useElementCheck } from "../use-element-check.js";
+import { useMergedRefs } from "../use-merged-refs.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 

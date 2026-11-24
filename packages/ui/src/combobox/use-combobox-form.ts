@@ -2,8 +2,8 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { ChangeReason } from "../internal/types.js";
-import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
-import { useFormReset, useResetTarget } from "../internal/use-form-reset.js";
+import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
+import { useFormReset, useResetTarget } from "../internal/form/use-form-reset.js";
 
 export interface ComboboxFormOptions {
   /** The Root's props, for the reset targets. */

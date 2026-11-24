@@ -1,10 +1,10 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
-import { groupMemberProps } from "../internal/group-member.js";
+import { groupMemberProps } from "../internal/form/group-member.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
-import { syncPresences } from "../internal/sync-presence.js";
+import { syncPresences } from "../internal/form/sync-presence.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useNativeChecked } from "../internal/use-native-checked.js";
+import { useNativeChecked } from "../internal/form/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
 import { useRadioGroupContext } from "./radio-group-context.js";
 

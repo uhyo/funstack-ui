@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { guardCheckableChange, useNativeChecked } from "./use-native-checked.js";
 import type { UseNativeCheckedOptions } from "./use-native-checked.js";
-import { flushMicrotasks, hydrateFromServer, silenceErrors } from "../__tests__/helpers.js";
+import { flushMicrotasks, hydrateFromServer, silenceErrors } from "../../__tests__/helpers.js";
 
 type ProbeProps = Partial<UseNativeCheckedOptions> & {
   as?: "input" | "button";

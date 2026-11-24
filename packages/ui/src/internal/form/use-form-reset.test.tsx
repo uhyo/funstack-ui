@@ -1,7 +1,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { StrictMode, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { deferred, setupUser, flushMicrotasks } from "../__tests__/helpers.js";
+import { deferred, setupUser, flushMicrotasks } from "../../__tests__/helpers.js";
 import { useFormReset, useResetTarget } from "./use-form-reset.js";
 
 interface Seen {

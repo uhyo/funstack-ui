@@ -16,10 +16,10 @@ import {
   fieldInputProps,
   useFieldControl,
   useFieldValueChange,
-} from "../internal/use-field-control.js";
-import { useResetTarget } from "../internal/use-form-reset.js";
+} from "../internal/form/use-field-control.js";
+import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { useNativeSelectValue } from "../internal/use-native-select-value.js";
+import { useNativeSelectValue } from "../internal/form/use-native-select-value.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
 import type { SelectContextValue } from "./select-context.js";

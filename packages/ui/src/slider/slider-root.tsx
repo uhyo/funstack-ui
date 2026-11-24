@@ -13,10 +13,10 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
+import { useFieldControl, useFieldValueChange } from "../internal/form/use-field-control.js";
 import { useLatest } from "../internal/use-latest.js";
-import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
-import { useResetTarget } from "../internal/use-form-reset.js";
+import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
+import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";

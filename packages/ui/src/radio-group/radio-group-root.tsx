@@ -12,9 +12,9 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
-import { useFieldValueChange } from "../internal/use-field-control.js";
-import { useFieldsetGroup } from "../internal/use-fieldset-group.js";
-import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useFieldValueChange } from "../internal/form/use-field-control.js";
+import { useFieldsetGroup } from "../internal/form/use-fieldset-group.js";
+import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
 import { RadioGroupContext } from "./radio-group-context.js";
 import type { RadioGroupContextValue } from "./radio-group-context.js";

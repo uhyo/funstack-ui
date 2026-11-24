@@ -3,7 +3,7 @@ import { useState } from "react";
 import type { RefObject } from "react";
 import { useFormOwnerEvent } from "./use-form-owner-event.js";
 import type { FormAssociatedElement } from "./use-form-owner-event.js";
-import { useLatest } from "./use-latest.js";
+import { useLatest } from "../use-latest.js";
 
 /**
  * Stable `reset` subscription on the form owner of `ref.current` (conventions 3.8).

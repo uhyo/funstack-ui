@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
-import { useLatest } from "./use-latest.js";
+import { useLatest } from "../use-latest.js";
 import { useNativeGroupReconciliation } from "./use-native-group-reconciliation.js";
 
 export interface UseNativeSelectValueOptions {

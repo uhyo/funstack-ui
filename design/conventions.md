@@ -1724,7 +1724,7 @@ DOM reads, prop builders and listener installers (`internal/overlay/popover-open
 `menu-hover.ts`, `menu-gestures.ts`, `menu-outside.ts`, `menu-point.ts`) and the Toast
 Viewport's queue, hotkey and timer models (`toast/toast-queue.ts`, `toast-hotkey.ts`,
 `toast-timers.ts`); `directives.test.ts` lists them. A context shared
-by **several component folders** lives in `internal/` (`internal/field-context.ts`, read by the
+by **several component folders** lives in `internal/` (`internal/form/field-context.ts`, read by the
 Field parts, `Form.Root` and `useFieldControl` from every form control's folder; `internal/toolbar-context.ts`, read by
 `ToggleGroup.Root`, `Toolbar.Separator` and `Menu.Trigger` to find an enclosing Toolbar); the one-way
 rule above is unchanged, and `internal/` stays unexported.

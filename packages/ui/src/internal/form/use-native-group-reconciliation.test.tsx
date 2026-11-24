@@ -19,11 +19,11 @@ import {
   silenceErrors,
   fulfilledPromise,
   Gate,
-} from "../__tests__/helpers.js";
-import type { ControlMode } from "../__tests__/helpers.js";
-import { createActionDetails } from "./action-details.js";
-import type { ChangeReason } from "./types.js";
-import { useControllableAction } from "./use-controllable-action.js";
+} from "../../__tests__/helpers.js";
+import type { ControlMode } from "../../__tests__/helpers.js";
+import { createActionDetails } from "../action-details.js";
+import type { ChangeReason } from "../types.js";
+import { useControllableAction } from "../use-controllable-action.js";
 import { useNativeChecked } from "./use-native-checked.js";
 import { useNativeGroupReconciliation } from "./use-native-group-reconciliation.js";
 import type { NativeGroupPath } from "./use-native-group-reconciliation.js";

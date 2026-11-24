@@ -2,7 +2,7 @@
 import { useLayoutEffect, useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useFormReset } from "../internal/use-form-reset.js";
+import { useFormReset } from "../internal/form/use-form-reset.js";
 import { useRender } from "../internal/use-render.js";
 import { useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";

@@ -1,8 +1,8 @@
 "use client";
 import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { fieldDataAttributes, useFieldContext } from "../internal/field-context.js";
-import type { FieldState } from "../internal/field-context.js";
+import { fieldDataAttributes, useFieldContext } from "../internal/form/field-context.js";
+import type { FieldState } from "../internal/form/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
 

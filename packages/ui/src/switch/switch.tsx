@@ -9,7 +9,7 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useCheckableInput } from "../internal/use-checkable-input.js";
+import { useCheckableInput } from "../internal/form/use-checkable-input.js";
 import { useRender } from "../internal/use-render.js";
 
 /** State of `Switch`, passed to the function forms of `className`, `style` and `render`. */

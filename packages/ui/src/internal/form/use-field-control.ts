@@ -1,10 +1,10 @@
 "use client";
 import { use, useCallback, useLayoutEffect, useRef } from "react";
 import type { RefCallback } from "react";
-import { dataAttr } from "./data-attr.js";
+import { dataAttr } from "../data-attr.js";
 import { FieldContext } from "./field-context.js";
 import type { FieldContextValue, FieldState } from "./field-context.js";
-import { useDevWarning } from "./use-dev-warning.js";
+import { useDevWarning } from "../use-dev-warning.js";
 import type { ValidatableElement } from "./validity.js";
 
 const isDev = process.env.NODE_ENV !== "production";

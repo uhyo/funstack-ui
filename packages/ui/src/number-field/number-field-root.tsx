@@ -3,7 +3,7 @@ import { use, useCallback, useEffect, useId, useMemo, useRef, useState } from "r
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { announce as speak } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
-import { FieldContext } from "../internal/field-context.js";
+import { FieldContext } from "../internal/form/field-context.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
@@ -13,12 +13,12 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
-import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
+import { resolveFieldDefaults, useFieldValueChange } from "../internal/form/use-field-control.js";
+import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
-import { useResetTarget } from "../internal/use-form-reset.js";
+import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
-import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useStepCommit } from "../internal/use-step-commit.js";

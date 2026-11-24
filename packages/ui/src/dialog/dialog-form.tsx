@@ -1,12 +1,12 @@
 "use client";
 import { use, useCallback, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { FormContext } from "../internal/field-context.js";
-import { FormStatusWatcher } from "../internal/form-status-watcher.js";
+import { FormContext } from "../internal/form/field-context.js";
+import { FormStatusWatcher } from "../internal/form/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
-import { hasAnyError } from "../internal/validity.js";
+import { hasAnyError } from "../internal/form/validity.js";
 import { useDialogContext } from "./dialog-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";

@@ -891,7 +891,7 @@ control. Outside a Field it returns nothing to merge; inside, it returns the own
 registers the element:
 
 ```ts
-// packages/ui/src/internal/use-field-control.ts  ("use client")
+// packages/ui/src/internal/form/use-field-control.ts  ("use client")
 export function useFieldControl(options: {
   /** `<label for>` can target the element (input, select, textarea, the Combobox Input, a single Slider thumb's input). Groups pass `false`. */
   labelable: boolean;

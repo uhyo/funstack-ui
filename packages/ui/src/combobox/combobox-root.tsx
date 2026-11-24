@@ -12,10 +12,10 @@ import {
 import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { announce, canAnnounce } from "../internal/announce.js";
-import { FieldContext } from "../internal/field-context.js";
+import { FieldContext } from "../internal/form/field-context.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
-import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
+import { resolveFieldDefaults, useFieldValueChange } from "../internal/form/use-field-control.js";
 import type {
   ActionDetails,
   ChangeAction,

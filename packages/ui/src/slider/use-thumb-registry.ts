@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
-import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
+import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 

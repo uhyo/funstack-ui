@@ -1,7 +1,7 @@
 "use client";
 import type { ChangeEvent, ComponentPropsWithRef } from "react";
-import { dataAttr } from "./data-attr.js";
-import type { DataAttributes } from "./render-element.js";
+import { dataAttr } from "../data-attr.js";
+import type { DataAttributes } from "../render-element.js";
 import { guardCheckableChange } from "./use-native-checked.js";
 
 export interface GroupMemberPropsOptions {

@@ -3,22 +3,22 @@ import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import type { ComponentPropsWithRef, CSSProperties, FormEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import { sortByDocumentOrder } from "../internal/dom-order.js";
-import { FormContext } from "../internal/field-context.js";
-import type { FormContextValue, FormFieldRegistration } from "../internal/field-context.js";
+import { FormContext } from "../internal/form/field-context.js";
+import type { FormContextValue, FormFieldRegistration } from "../internal/form/field-context.js";
 import { announce } from "../internal/announce.js";
-import { FormStatusWatcher } from "../internal/form-status-watcher.js";
+import { FormStatusWatcher } from "../internal/form/form-status-watcher.js";
 import { reportDropped } from "../internal/report-dropped.js";
 import { useConnected } from "../internal/use-connected.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
-import { hasAnyError } from "../internal/validity.js";
-import type { FormErrors } from "../internal/validity.js";
+import { hasAnyError } from "../internal/form/validity.js";
+import type { FormErrors } from "../internal/form/validity.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-export type { FieldErrorValue, FormErrors } from "../internal/validity.js";
+export type { FieldErrorValue, FormErrors } from "../internal/form/validity.js";
 
 /**
  * State of `Form.Root`, passed to the function forms of `className`, `style`, `children` and

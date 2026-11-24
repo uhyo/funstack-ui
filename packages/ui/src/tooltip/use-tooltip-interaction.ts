@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useEffectEvent } from "react";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
-import { syncPresence } from "../internal/sync-presence.js";
+import { syncPresence } from "../internal/form/sync-presence.js";
 import { createDelayedPair } from "../internal/use-delayed-pair.js";
 
 export interface TooltipInteractionOptions {

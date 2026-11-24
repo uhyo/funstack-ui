@@ -11,17 +11,17 @@ import {
 } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { useFormStatus } from "react-dom";
-import { FieldContext, fieldDataAttributes, FormContext } from "../internal/field-context.js";
+import { FieldContext, fieldDataAttributes, FormContext } from "../internal/form/field-context.js";
 import type {
   FieldContextValue,
   FieldControlRegistration,
   FieldState,
   FormFieldRegistration,
-} from "../internal/field-context.js";
-import { collectInvalid } from "../internal/focus-first-invalid.js";
+} from "../internal/form/field-context.js";
+import { collectInvalid } from "../internal/form/focus-first-invalid.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useFormOwnerEvent } from "../internal/use-form-owner-event.js";
+import { useFormOwnerEvent } from "../internal/form/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import { useServerErrorVisibility } from "./use-server-error-visibility.js";
@@ -33,12 +33,16 @@ import {
   VALID,
   validityElementOf,
   validityEquals,
-} from "../internal/validity.js";
-import type { FieldErrorValue, FieldValidity, ValidatableElement } from "../internal/validity.js";
+} from "../internal/form/validity.js";
+import type {
+  FieldErrorValue,
+  FieldValidity,
+  ValidatableElement,
+} from "../internal/form/validity.js";
 import { arraysEqual } from "../internal/value-set.js";
 
-export type { FieldState } from "../internal/field-context.js";
-export type { FieldValidity } from "../internal/validity.js";
+export type { FieldState } from "../internal/form/field-context.js";
+export type { FieldValidity } from "../internal/form/validity.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
