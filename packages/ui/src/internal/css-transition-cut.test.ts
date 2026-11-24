@@ -118,6 +118,38 @@ describe("withCssTransitionCut", () => {
     });
   });
 
+  // #157 safety net (memo/reviewer/refactor-test-safety.md CTC7): the element leaves the
+  // "cutting" set once the call returns, so a later show or hide of the same popup is cut again.
+  it("two cuts of the same element in sequence both cut", () => {
+    activeViewTransition(true);
+    const element = popup("transition: opacity 1s;");
+    const seen: string[] = [];
+    const record = () => {
+      seen.push(
+        `${element.style.getPropertyValue("transition")} ${element.style.getPropertyPriority("transition")}`,
+      );
+    };
+    withCssTransitionCut(element, true, record);
+    withCssTransitionCut(element, true, record);
+    expect(seen).toEqual(["none important", "none important"]);
+    expect(element.getAttribute("style")).toBe("transition: opacity 1s;");
+  });
+
+  it("a cut after a throwing cut still cuts", () => {
+    activeViewTransition(true);
+    const element = popup();
+    expect(() =>
+      withCssTransitionCut(element, true, () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    let seen = "";
+    withCssTransitionCut(element, true, () => {
+      seen = element.style.getPropertyValue("transition");
+    });
+    expect(seen).toBe("none");
+  });
+
   it("a nested call runs inside the outer cut and the outer one restores", () => {
     activeViewTransition(true);
     const element = popup("transition: opacity 1s;");

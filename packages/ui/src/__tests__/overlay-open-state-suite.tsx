@@ -1548,5 +1548,69 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         });
       }
     });
+
+    // #157 safety net (memo/reviewer/refactor-test-safety.md 2.4, UOR6 / UOR9 / PT1): the
+    // popover-like overlays share these rules through useOverlayRoot and usePopoverTrigger, and
+    // only Popover had a row for them.
+    if (config.popoverTarget) {
+      renderBoth("the cause of a fact", (mode) => {
+        // #125: the `command` listener records its intent before the close's `beforetoggle`,
+        // which must not replace it with the `popovertarget` one.
+        it("a commandfor toggle-popover close keeps the CommandEvent though its toggle names the button", async () => {
+          const user = setupUser();
+          const fact = vi.fn<Action>();
+          render(<Harness mode={mode} fact={fact} />);
+          await openThroughTrigger(user);
+          const foreign = screen.getByTestId("elsewhere");
+          foreign.setAttribute("popovertarget", popup().id);
+          foreign.setAttribute("commandfor", popup().id);
+          foreign.setAttribute("command", "toggle-popover");
+          await user.click(foreign);
+          await flushTasks(2);
+          expect(isOpen()).toBe(false);
+          expect(fact).toHaveBeenCalledTimes(1);
+          const [next, details] = fact.mock.calls[0]!;
+          expect(next).toBe(false);
+          expect(details.reason).toBe("activate");
+          expect(details.event!.type).toBe("command");
+        });
+      });
+
+      // #115: light dismiss hid the popup at the press, its `toggle` is still queued, and the
+      // click lands on a non-button Trigger: no close request for a hidden popup, the fact is
+      // `"activate"` with the click.
+      it("a non-button Trigger pressed while open: the light dismiss is a fact, 'activate' with the click", async () => {
+        silenceErrors();
+        const user = setupUser();
+        const action = vi.fn<Action>();
+        const fact = vi.fn<Action>();
+        render(
+          <Harness
+            mode="uncontrolled"
+            action={action}
+            fact={fact}
+            trigger={{ render: <a href="#x" /> }}
+          />,
+        );
+        await openThroughTrigger(user);
+        await act(async () => {
+          popup().hidePopover();
+          trigger().click();
+        });
+        await flushTasks(2);
+        expect(isOpen()).toBe(false);
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(fact).toHaveBeenCalledTimes(1);
+        const [next, details] = fact.mock.calls[0]!;
+        expect(next).toBe(false);
+        expect(details.reason).toBe("activate");
+        expect(details.event!.type).toBe("click");
+        expect(committedText()).toBe("false");
+        await user.click(trigger());
+        await flushTasks(2);
+        expect(isOpen()).toBe(true);
+        expect(action.mock.calls.map(([n]) => n)).toEqual([true, true]);
+      });
+    }
   });
 }

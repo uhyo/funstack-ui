@@ -3,10 +3,14 @@
 // `<div popover>` popup (no dialog focusing steps), `renderContent` with a Menu-style
 // `requestClose`, and `whileShown` (Menu and Combobox). Popover's own behaviour is covered by
 // src/popover/popover.test.tsx.
-import { render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { startTransition, useState } from "react";
 import type { ComponentPropsWithRef, Ref, ViewTransitionClass } from "react";
 import { describe, expect, it, vi } from "vitest";
+import { onCleanup } from "../__tests__/cleanups.js";
 import { setupUser, flushTasks } from "../__tests__/helpers.js";
+import { resetFocusVisibleOption } from "./focus-visible.js";
+import type { QuietFocusTarget } from "./focus-visible.js";
 import type { ChangeReason } from "./types.js";
 import { usePopoverPopup } from "./use-popover-popup.js";
 import { popoverDetails, useOverlayRoot } from "./use-overlay-root.js";
@@ -14,6 +18,8 @@ import type { OverlayDetails, PopoverRootValue } from "./use-overlay-root.js";
 import { usePopoverTrigger } from "./use-popover-trigger.js";
 
 function Mini({
+  open,
+  onOpenChange,
   onDispatch,
   resolve,
   transition,
@@ -21,8 +27,11 @@ function Mini({
   inlineRef = false,
   link = false,
 }: {
+  /** Controlled open state (with `onOpenChange`); default uncontrolled. */
+  open?: boolean;
+  onOpenChange?: (next: boolean, details: OverlayDetails) => void;
   onDispatch?: (next: boolean, details: OverlayDetails) => void;
-  resolve?: (popup: HTMLElement) => HTMLElement | null;
+  resolve?: (popup: HTMLElement) => HTMLElement | QuietFocusTarget | null;
   transition?: ViewTransitionClass;
   whileShown?: (popup: HTMLElement) => () => void;
   /** Pass the Popup a fresh callback ref every render (an inline consumer `ref`). */
@@ -34,10 +43,10 @@ function Mini({
     component: "menu",
     part: "Mini.Root",
     mode: "library",
-    open: undefined,
+    open,
     defaultOpen: undefined,
     openChangeAction: undefined,
-    onOpenChange: undefined,
+    onOpenChange,
     details: popoverDetails,
     onDispatch,
   });
@@ -280,4 +289,123 @@ describe("shared popover hooks: Menu's extension points", () => {
       expect(screen.getByTestId("trigger")).toHaveFocus();
     },
   );
+
+  // #157 safety net (memo/reviewer/refactor-test-safety.md UOR8): a fact goes through
+  // `onDispatch` (Menu cancels its hover timers and forgets the open cause there), before
+  // `onOpenChange`.
+  it("a dismissal calls onDispatch(false, details) before onOpenChange", async () => {
+    const user = setupUser();
+    const order: string[] = [];
+    const facts: OverlayDetails[] = [];
+    const dispatched: OverlayDetails[] = [];
+    function Controlled() {
+      const [open, setOpen] = useState(false);
+      return (
+        <Mini
+          open={open}
+          onOpenChange={(next, details) => {
+            order.push(`fact ${String(next)} ${details.reason}`);
+            facts.push(details);
+            setOpen(next);
+          }}
+          onDispatch={(next, details) => {
+            order.push(`dispatch ${String(next)} ${details.reason}`);
+            dispatched.push(details);
+            // No `openChangeAction`: the parent adopts a requested open itself.
+            if (next) startTransition(() => setOpen(true));
+          }}
+        />
+      );
+    }
+    render(<Controlled />);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
+    await act(async () => screen.getByTestId("popup").hidePopover());
+    await flushTasks();
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
+    expect(order).toEqual([
+      "dispatch true activate",
+      "dispatch false dismiss",
+      "fact false dismiss",
+    ]);
+    // The same cause reaches both: the dismissal's reason and its `toggle` event.
+    expect(dispatched[1]!.reason).toBe(facts[0]!.reason);
+    expect(dispatched[1]!.event).toBe(facts[0]!.event);
+    expect(facts[0]!.event!.type).toBe("toggle");
+  });
+
+  // #157 safety net (UPP2, #155): a refused re-open resolves no initial focus, not even a quiet
+  // one (`focus({ focusVisible: false })` after the show, Menu's pointer open), which the `inert`
+  // window around `showPopover()` does not cover.
+  it("a refused re-open with a quiet initial focus target leaves focus where the dismissal put it", async () => {
+    // jsdom does not read `focusVisible`: make the probe see an engine that does.
+    const focus = HTMLElement.prototype.focus;
+    /** The connected elements focused with `focusVisible: false` (the quiet path). */
+    const quietFocused: HTMLElement[] = [];
+    vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (
+      this: HTMLElement,
+      options?: FocusOptions,
+    ) {
+      const visible = (options as { focusVisible?: boolean } | undefined)?.focusVisible;
+      if (visible === false && this.isConnected) quietFocused.push(this);
+      focus.call(this, options);
+    });
+    resetFocusVisibleOption();
+    onCleanup(resetFocusVisibleOption);
+    const quiet = (popup: HTMLElement): QuietFocusTarget => ({
+      element: popup.querySelector<HTMLElement>("[data-testid=two]")!,
+      focusVisible: false,
+    });
+    render(
+      <>
+        <button type="button" data-testid="elsewhere">
+          Elsewhere
+        </button>
+        {/* A parent that keeps `open={true}`: every dismissal is refused. */}
+        <Mini open onOpenChange={() => {}} resolve={quiet} />
+      </>,
+    );
+    await flushTasks();
+    const popup = screen.getByTestId("popup");
+    expect(popup.matches(":popover-open")).toBe(true);
+    // The first open took the quiet path (guard: without it the row below would be vacuous,
+    // since the `inert` window alone keeps an `autofocus` target from taking focus).
+    expect(quietFocused).toEqual([screen.getByTestId("two")]);
+    expect(screen.getByTestId("two")).toHaveFocus();
+    // The dismissal moved focus out (a click outside, as the platform's light dismiss).
+    screen.getByTestId("elsewhere").focus();
+    await act(async () => popup.hidePopover());
+    await flushTasks(2);
+    expect(popup.matches(":popover-open")).toBe(true);
+    expect(screen.getByTestId("elsewhere")).toHaveFocus();
+  });
+
+  // #157 safety net (UPP6): after the library's own hide, focus that the close commit dropped
+  // with the content is returned at once, in the same commit, not a task later at `toggle`.
+  it("a library close with transition returns focus before the close's toggle task", async () => {
+    // Only the timers are faked: the shim's `toggle` task waits, promises still run.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    onCleanup(() => vi.useRealTimers());
+    render(<Mini transition="pop" resolve={(popup) => popup.querySelector("button")} />);
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("trigger"));
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
+    act(() => screen.getByTestId("one").focus());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("one"));
+    });
+    // Hidden, the content unmounted with focus in it, and the `toggle` task not run yet.
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(false);
+    expect(screen.queryByTestId("one")).toBeNull();
+    expect(screen.getByTestId("trigger")).toHaveFocus();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(screen.getByTestId("trigger")).toHaveFocus();
+  });
 });

@@ -285,6 +285,74 @@ describe("useNativeGroupReconciliation", () => {
       expect(radio("l").checked).toBe(true);
     });
 
+    // #157 safety net (memo/reviewer/refactor-test-safety.md NGR9): the late-member queue is
+    // free again after its microtask, so a second boundary that hydrates in a later commit is
+    // reconciled too.
+    it("two late boundaries hydrating in separate commits: each pre-hydration click dispatches", async () => {
+      silenceErrors();
+      const action = vi.fn<ActionFn>();
+      function TwoLate({ m, l }: { m: Promise<void>; l: Promise<void> }) {
+        const [value, setValue] = useState<string | null>("s");
+        const groupAction: ActionFn = async (next, details) => {
+          await action(next, details);
+          startTransition(() => setValue(next));
+        };
+        return (
+          <form>
+            <Group
+              {...(mode === "controlled" ? { value } : { defaultValue: "s" })}
+              action={groupAction}
+            >
+              <Item value="s" />
+              <Suspense fallback={null}>
+                <Gate promise={m}>
+                  <Item value="m" />
+                </Gate>
+              </Suspense>
+              <Suspense fallback={null}>
+                <Gate promise={l}>
+                  <Item value="l" />
+                </Gate>
+              </Suspense>
+            </Group>
+          </form>
+        );
+      }
+      const gateM = hydrationGate();
+      const gateL = hydrationGate();
+      const { container } = await hydrateFromServer(
+        <TwoLate m={fulfilledPromise()} l={fulfilledPromise()} />,
+        { client: <TwoLate m={gateM.promise} l={gateL.promise} /> },
+      );
+      expect(action).not.toHaveBeenCalled();
+
+      // First boundary: a click on "m" before it hydrates.
+      await act(async () => {
+        serverRadio(container, "m").click();
+      });
+      await act(async () => {
+        gateM.open();
+      });
+      await flushMicrotasks();
+      expect(action.mock.calls.map(([v, d]) => [v, d.reason])).toEqual([["m", "platform"]]);
+      expect(radio("m").checked).toBe(true);
+
+      // Second boundary, a later commit: a click on "l" before it hydrates.
+      await act(async () => {
+        serverRadio(container, "l").click();
+      });
+      await act(async () => {
+        gateL.open();
+      });
+      await flushMicrotasks();
+      expect(action.mock.calls.map(([v, d]) => [v, d.reason])).toEqual([
+        ["m", "platform"],
+        ["l", "platform"],
+      ]);
+      expect(radio("l").checked).toBe(true);
+      expect(radio("m").checked).toBe(false);
+    });
+
     it("does not dispatch when the late members hydrate unchanged", async () => {
       const action = vi.fn<ActionFn>();
       const release = await hydrateLate(action, () => {});

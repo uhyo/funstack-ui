@@ -402,6 +402,43 @@ describe("Dialog", () => {
       }
     });
 
+    // #157 safety net (memo/reviewer/refactor-test-safety.md DP6): the same opt-out for a plain
+    // `<form method="dialog">` in a controlled Root: no close request, a fact the parent adopts.
+    it("a same-node stopPropagation opts a plain method='dialog' form out (controlled)", async () => {
+      const user = setupUser();
+      silenceErrors(); // jsdom: "Not implemented: requestSubmit()" for the uncancelled submit
+      const stop = (event: Event) => event.stopPropagation();
+      document.addEventListener("submit", stop);
+      try {
+        const action = vi.fn<ActionFn>();
+        const fact = vi.fn<ActionFn>();
+        render(
+          <Harness
+            mode="controlled"
+            action={action}
+            fact={fact}
+            content={
+              <form method="dialog">
+                <button type="submit" value="done">
+                  Done
+                </button>
+              </form>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        await user.click(screen.getByRole("button", { name: "Done" }));
+        expect(popup().open).toBe(false);
+        await flushTasks(2);
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true]);
+        expect(fact).toHaveBeenCalledTimes(1);
+        expect(fact.mock.calls[0]![1]).toMatchObject({ reason: "dismiss", returnValue: "done" });
+        expect(popup().open).toBe(false);
+      } finally {
+        document.removeEventListener("submit", stop);
+      }
+    });
+
     it("a method='dialog' submit inside a shadow root goes through the Root", async () => {
       const host = document.createElement("div");
       document.body.append(host);

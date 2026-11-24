@@ -1273,6 +1273,37 @@ describe("Menu (browser)", () => {
       },
     );
 
+    // #157 safety net (memo/reviewer/refactor-test-safety.md UPP2): the pointer path of #155. A
+    // pointer open focuses the first item quietly (`focus({ focusVisible: false })` after the
+    // show, outside the `inert` window); the refused re-open must not repeat that.
+    it("a pointer-opened menu whose parent refuses Escape re-opens with focus left on the Trigger (#155)", async () => {
+      const fact = vi.fn<OpenAction>();
+      function Refusing() {
+        const [open, setOpen] = useState(false);
+        return (
+          <Basic
+            root={{
+              open,
+              // Adopts opens only: every close is refused.
+              openChangeAction: (next) => {
+                if (next) setOpen(true);
+              },
+              onOpenChange: fact,
+            }}
+          />
+        );
+      }
+      render(<Refusing />);
+      await user.click(trigger());
+      await expect.poll(() => document.activeElement).toBe(screen.getByTestId("rename"));
+      await user.keyboard("{Escape}");
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      await expect.poll(() => isOpen()).toBe(true);
+      await quietPeriod(50, "no initial focus may move focus back into the menu");
+      expect(document.activeElement).toBe(trigger());
+      expect(popup().contains(document.activeElement)).toBe(false);
+    });
+
     it("an adopted Escape, then a keyboard open: the first item gets initial focus again (#155)", async () => {
       function Adopting() {
         const [open, setOpen] = useState(false);

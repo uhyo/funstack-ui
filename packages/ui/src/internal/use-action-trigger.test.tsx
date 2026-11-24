@@ -122,6 +122,62 @@ describe("useActionTrigger: runs overlap (the default since #146; the continuous
     expect(thens[3]).not.toHaveBeenCalled();
   });
 
+  // #157 safety net (memo/reviewer/refactor-test-safety.md UAT6): a new run clears the
+  // continuation an earlier latest run left waiting, so it cannot run when the new latest run
+  // rejects and an older one settles last.
+  it("three overlapping runs: a resolved continuation does not survive a newer run that rejects", async () => {
+    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const caught = vi.fn();
+    const { hook } = setup(undefined, caught);
+    const slow = deferred();
+    const a = deferred();
+    const b = deferred();
+    const thens = { slow: vi.fn(), a: vi.fn(), b: vi.fn() };
+    act(() => {
+      hook().run(() => slow.promise, thens.slow);
+      hook().run(() => a.promise, thens.a);
+    });
+    // A, the latest, resolves while the slow run is in flight: its `then` waits.
+    await act(async () => a.resolve());
+    expect(thens.a).not.toHaveBeenCalled();
+    // B starts (the latest now) and rejects.
+    act(() => {
+      hook().run(() => b.promise, thens.b);
+    });
+    const failure = new Error("latest failed");
+    await act(async () => b.reject(failure));
+    // The slow run settles last: the latest run rejected, so no continuation runs.
+    await act(async () => slow.resolve());
+    expect(thens.a).not.toHaveBeenCalled();
+    expect(thens.b).not.toHaveBeenCalled();
+    expect(thens.slow).not.toHaveBeenCalled();
+    expect(caught).toHaveBeenCalledExactlyOnceWith(failure);
+  });
+
+  it("three overlapping runs: the newest's continuation runs when it resolves and an older one settles last", async () => {
+    const { hook } = setup();
+    const slow = deferred();
+    const a = deferred();
+    const b = deferred();
+    const thens = { slow: vi.fn(), a: vi.fn(), b: vi.fn() };
+    act(() => {
+      hook().run(() => slow.promise, thens.slow);
+      hook().run(() => a.promise, thens.a);
+    });
+    await act(async () => a.resolve());
+    act(() => {
+      hook().run(() => b.promise, thens.b);
+    });
+    await act(async () => b.resolve());
+    expect(thens.b).not.toHaveBeenCalled();
+    await act(async () => slow.resolve());
+    expect(thens.a).not.toHaveBeenCalled();
+    expect(thens.b).toHaveBeenCalledTimes(1);
+    expect(thens.slow).not.toHaveBeenCalled();
+  });
+
   // moved from the Close / Item rows, #81
   it.each([
     ["while the newer run is pending", false],
