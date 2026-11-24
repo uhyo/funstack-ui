@@ -416,3 +416,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - MERGED refactor/157-step-commit fa39367 (use-step-commit.ts), refactor/157-overlay-shared eab50e5 (overlay-show.ts flags + showWithFocus; dialog-dismiss.ts). CHANGELOG "# Entries" conflict resolved by keeping both.
 - #6 decided (user): share only the apply-open effect (3-member driver); handlers stay separate → developer on refactor/157-apply-open (+ review nits + M3 test). Dialog listeners → callback ref is a separate optional step (not started).
 - refactor/157-pure-trigger (#158 + usePureTrigger) in review. Deviations: <a> JS-free command parts get aria-disabled; commandfor/popoverTarget Buttons count as browser-run.
+- MERGED refactor/157-pure-trigger c9e106e (#158 closed, incl. L2 user decision: action Buttons too; L4 input type), refactor/157-apply-open bce647a (use-apply-open-state.ts). #159 filed (Dialog remount mid-close stuck awaitingClose; Popover may share; M3 rows depend on it).
+- Running: refactor/157-split-combobox-toast (#12), refactor/157-helpers (#7 + #10; skips combobox-root/toast-viewport until split merges).
+- Left: #11 overlay hook interfaces (after split), internal/ reorg (last), conventions.md second pass, section-citation check (L7), #159, Dialog listeners → callback ref (optional), helpers in combobox/toast after split.
