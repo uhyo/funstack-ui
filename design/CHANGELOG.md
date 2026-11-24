@@ -12331,3 +12331,15 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
 | `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending` (`useActionTrigger`). The general one is the single-element `Button` (`@funstack/ui/button`): `type="button"` by default (`"submit"` with `formAction`), runs every activation by default and, with `whilePending="ignore"`, ignores activation while its own action is pending (`aria-disabled="true"` meanwhile; 2.5.1), and reads `ToolbarContext` so that inside a Toolbar `disabled` renders `aria-disabled` and keeps the button focusable, as the APG Toolbar example wants. A Toolbar's command button is a `Button`; the Toolbar has no button part. | `button` |
 | `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role); inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's (`Toolbar.Separator`). | as named |
+
+### conventions.md: small edits of the second pass (not moved, listed)
+
+- 2.2 and 7.2: the code of `createActionDetails` and the `tsdown` configuration are no longer
+  quoted; the sections name `internal/action-details.ts` and `packages/ui/tsdown.config.ts`.
+  The quoted configuration was out of date (five entries; the real `entry` lists every
+  component).
+- Inline history removed where the sentence reads without it: "Menu #45" (2.2), "#154" (2.7),
+  "#67" (3.6, 8), "wave 9, 5fc05d5", "product-owner decision" and "#20" (4.1), "verified by the
+  reviewer" and "tooltip.md's #93 amendment" (7.4; now `tooltip.md` 6), "#113 A1" and the
+  "former `role="status"` fallback region" of `internal/announce.ts` (8), "since #148" and
+  "review M1" (10.1), "as before" / "(new)" / "now mirrored" / "unchanged" (13.1).
