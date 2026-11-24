@@ -16,7 +16,7 @@ This is a pnpm monorepo managed with Turbo:
 - `packages/example` - Vite + React playground that consumes `@funstack/ui` via `workspace:*`
 - `packages/docs` - The documentation site (package name `docs`), built with FUNSTACK Static
 - `docs/` - Vision, design documents, and research notes (markdown)
-- `design/` - API conventions (`conventions.md`) and per-component designs, written as current rules only. History (amendments, resolved questions, test plans, implementation notes) goes to the append-only `design/CHANGELOG.md`: an amendment edits the rule and adds a changelog entry in the same commit
+- `design/` - API conventions (`conventions.md`, with parts in `internal-hooks.md`, `placement.md` and `testing.md` under the same section numbers) and per-component designs, written as current rules only. History (amendments, resolved questions, test plans, implementation notes) goes to the append-only `design/CHANGELOG.md`: an amendment edits the rule and adds a changelog entry in the same commit; never edit an existing entry
 - `memo/<role>/` - Working notes kept by each agent role (see Conventions)
 
 ## Commands
@@ -28,7 +28,7 @@ This is a pnpm monorepo managed with Turbo:
 - `pnpm test:jsdom` - Run only the jsdom tests
 - `pnpm test:browser` - Run only the browser tests (headless Chromium, Firefox and WebKit via Playwright; see Browser tests)
 - `pnpm typecheck` - Type check all packages
-- `pnpm lint` - Lint code with oxlint, then `scripts/check-design-refs.mjs` (fails when a `design/` doc names a source file that does not exist)
+- `pnpm lint` - Lint code with oxlint, then `scripts/check-design-refs.mjs` (fails when a `design/` doc names a source file that does not exist, or a source comment cites a design section that does not resolve)
 - `pnpm format` - Format code with oxfmt
 - `pnpm format:check` - Check formatting
 
