@@ -10,7 +10,7 @@
     "test:jsdom": "turbo run test:jsdom",
     "test:browser": "turbo run test:browser",
     "typecheck": "turbo run typecheck",
-    "lint": "oxlint",
+    "lint": "oxlint && node scripts/check-design-refs.mjs",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
