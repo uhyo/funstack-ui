@@ -388,6 +388,20 @@ describe("Accordion", () => {
       expect(trigger("b")).toHaveFocus();
     });
 
+    it("ArrowLeft / ArrowRight are not navigation keys (vertical only, also in RTL)", async () => {
+      render(
+        <div dir="rtl">
+          <Harness mode="uncontrolled" />
+        </div>,
+      );
+      const user = setupUser();
+      trigger("b").focus();
+      for (const key of ["[ArrowLeft]", "[ArrowRight]"]) {
+        await user.keyboard(key);
+        expect(trigger("b")).toHaveFocus();
+      }
+    });
+
     it("Home / End focus the first / last enabled trigger", async () => {
       render(<Harness mode="uncontrolled" />);
       const user = setupUser();

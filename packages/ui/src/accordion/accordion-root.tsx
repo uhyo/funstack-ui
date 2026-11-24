@@ -2,6 +2,8 @@
 import { useCallback, useEffectEvent, useId, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
+import { resolveArrowKey } from "../internal/arrow-keys.js";
+import type { ArrowMove } from "../internal/arrow-keys.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { compareDocumentOrder, sortByDocumentOrder } from "../internal/dom-order.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -170,8 +172,6 @@ function reduce(set: OpenSet, item: string, open: boolean, exclusive: boolean): 
   return set.has(item) ? set : new Set(set).add(item);
 }
 
-const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
-
 /** Writes `open` to the DOM; it fires `toggle`, whose handler sees DOM === committed and returns. */
 function applyOpen(element: HTMLDetailsElement, open: boolean): void {
   if (element.open !== open) element.open = open;
@@ -182,21 +182,22 @@ function isEnabledTrigger(el: HTMLElement): boolean {
 }
 
 /**
- * Picks the trigger to focus for an arrow/Home/End key: `sorted` is every registered trigger in
- * document order; disabled ones are skipped; arrows wrap. Works when `current` is itself disabled
- * (disabled triggers stay focusable).
+ * Picks the trigger to focus for a move (ArrowDown / ArrowUp / Home / End, `resolveArrowKey` on
+ * the vertical axis): `sorted` is every registered trigger in document order; disabled ones are
+ * skipped; arrows wrap. Works when `current` is itself disabled (disabled triggers stay
+ * focusable), which is why this is not the roving engine's index arithmetic.
  */
 function nextTrigger(
   sorted: readonly HTMLElement[],
   current: HTMLElement,
-  key: string,
+  move: ArrowMove,
 ): HTMLElement | undefined {
   const enabled = sorted.filter(isEnabledTrigger);
   if (enabled.length === 0) return undefined;
-  if (key === "Home") return enabled[0];
-  if (key === "End") return enabled[enabled.length - 1];
+  if (move === "first") return enabled[0];
+  if (move === "last") return enabled[enabled.length - 1];
   const position = sorted.indexOf(current);
-  if (key === "ArrowDown") {
+  if (move === "next") {
     return enabled.find((el) => sorted.indexOf(el) > position) ?? enabled[0];
   }
   return enabled.findLast((el) => sorted.indexOf(el) < position) ?? enabled[enabled.length - 1];
@@ -383,11 +384,13 @@ export function AccordionRoot(props: AccordionRootProps) {
   }, [isLibrary, pending, committed, latestInFlight]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    if (!NAV_KEYS.has(event.key)) return;
+    // Vertical only, so no RTL mirroring: ArrowLeft / ArrowRight are not navigation keys.
+    const move = resolveArrowKey(event.key, "vertical", false);
+    if (move === null) return;
     const target = event.target;
     if (!(target instanceof HTMLElement) || !triggers.current.has(target)) return;
     const sorted = [...triggers.current].sort(compareDocumentOrder);
-    const next = nextTrigger(sorted, target, event.key);
+    const next = nextTrigger(sorted, target, move);
     if (next === undefined) return;
     event.preventDefault();
     // A nested Root handles its own triggers; the outer one must not move focus again.

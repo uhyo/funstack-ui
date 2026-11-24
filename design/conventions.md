@@ -2623,7 +2623,7 @@ packages/ui/src/
     validity.ts, focus-first-invalid.ts  # Field helpers; directive-free
     toolbar-context.ts      # section 7.1: ToolbarContext, read across folders
     use-roving-focus.ts     # section 7.4: DOM-written roving tabindex
-    arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine); directive-free
+    arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine; Accordion.Root uses resolveArrowKey); directive-free
     use-native-focusgroup.ts  # useNativeFocusgroup(flag): the native `focusgroup` detection (section 8)
     use-overlay-root.ts     # useOverlayRoot, popoverDetails, OverlayRootValue (section 3.9): Popover, Menu, Combobox, Dialog
     use-popover-popup.ts, use-popover-trigger.ts  # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger

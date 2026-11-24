@@ -10827,3 +10827,13 @@ written in `usePopoverTrigger` and again in Combobox.Trigger, is `toggleFromTrig
 beforeOpen?)` in `internal/use-popover-trigger.ts`. Each Trigger keeps its own `preventDefault()`,
 `disabled` check and what follows (Combobox focuses its input). Sections changed: the conventions
 9.1 file listing.
+
+## 2026-11-24, #157: Accordion's key table is `resolveArrowKey`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 9). Internal only, no
+behaviour change. Accordion.Root's own `NAV_KEYS` set and key strings are
+`resolveArrowKey(key, "vertical", false)`; its `nextTrigger` keeps its own arithmetic (it works
+from a disabled current trigger, which the roving engine and Tabs.List never see, because their
+item lists leave disabled items out), now over `ArrowMove`. A new Accordion test pins that
+ArrowLeft / ArrowRight are not navigation keys, also in RTL. Sections changed: the conventions 9.1
+file listing.
