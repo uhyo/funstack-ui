@@ -1280,6 +1280,23 @@ describe("Dialog", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("no Dialog.Popup"));
     });
 
+    it("warns once per Trigger without a Popup under StrictMode", () => {
+      const error = silenceErrors();
+      render(
+        <StrictMode>
+          <Dialog.Root>
+            <Dialog.Trigger>Open</Dialog.Trigger>
+          </Dialog.Root>
+          <Dialog.Root>
+            <Dialog.Trigger>Open</Dialog.Trigger>
+          </Dialog.Root>
+        </StrictMode>,
+      );
+      expect(error.mock.calls.filter(([m]) => String(m).includes("no Dialog.Popup"))).toHaveLength(
+        2,
+      );
+    });
+
     it("does not warn for a Trigger whose Popup comes after it in the tree", () => {
       const error = silenceErrors();
       render(
