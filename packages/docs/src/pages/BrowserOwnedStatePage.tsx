@@ -207,12 +207,13 @@ export function BrowserOwnedStatePage() {
         A parent that keeps <code>open={"{true}"}</code> after a dismissal on purpose gets the same
         re-open. This is not a veto: the user sees the element close and come back, possibly for a
         frame. A popup that must not be dismissed is set up on the platform side instead, where the
-        component offers it. The re-open of a popover never moves focus: a Menu, a Combobox or a
-        Popover (its default <code>&lt;dialog&gt;</code> as well as a <code>&lt;div&gt;</code>)
-        shown again this way leaves focus where the dismissal put it (the Trigger after Escape, the
-        field the user clicked, the next field after Tab), so a parent that never adopts{" "}
-        <code>false</code> cannot trap the keyboard or the pointer in it. A modal Dialog still gets
-        the browser&apos;s dialog focusing steps on the re-show, as on any open.
+        component offers it. The re-open never moves focus: a Menu, a Combobox, a Popover (its
+        default <code>&lt;dialog&gt;</code> as well as a <code>&lt;div&gt;</code>) or a non-modal
+        Dialog shown again this way leaves focus where the dismissal put it (the Trigger after
+        Escape, the field the user clicked, the next field after Tab). So a parent that never adopts{" "}
+        <code>false</code> cannot trap the keyboard in the popup, and the re-open does not take
+        focus away from the field the user just clicked. A modal Dialog (the default) is the
+        exception: it must hold focus, so its re-open moves focus inside as on any open.
       </p>
       <p>
         <strong>Uncontrolled, pass what you need.</strong> <code>openChangeAction</code> for work an

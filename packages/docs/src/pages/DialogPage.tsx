@@ -691,8 +691,9 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
             (for example "the save failed, keep editing", checked through{" "}
             <code>details.returnValue</code>). A dismissal is already done when{" "}
             <code>onOpenChange</code> runs: a parent that does not adopt <code>false</code> gets the
-            dialog re-opened at once, and the user sees it close and come back. Adopt a dismissal's{" "}
-            <code>false</code> directly in <code>onOpenChange</code> (not in{" "}
+            dialog re-opened at once, and the user sees it close and come back (a modal dialog takes
+            focus back; a non-modal one leaves focus where the dismissal put it). Adopt a
+            dismissal's <code>false</code> directly in <code>onOpenChange</code> (not in{" "}
             <code>startTransition</code>, not after an <code>await</code>). If the user dismisses
             the dialog while a part's close is still running, <code>onOpenChange</code> hears it at
             once and that close is superseded: a later veto of it changes nothing. Neither is a way

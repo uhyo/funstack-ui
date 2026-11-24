@@ -209,10 +209,14 @@ the DOM after every commit, shows it again (`showPopover({ source })` / `showMod
   `<dialog popover>` (Popover's default) or a consumer's own `autofocus` in a `<div>` popup:
   the element the user clicked outside keeps focus with no `blur` / `focus` event and its
   selection, and after a refused Escape focus stays on the Trigger (#156, user decision
-  2026-11-24, option (d) of `memo/architect/156-refused-reopen-focus.md`). Dialog is not
-  covered: `showModal()` must hold focus, and outside content is inert there anyway. With a
-  CSS exit in flight the browser reverses it. The children were never unmounted (committed
-  never left `true`), so their state is kept.
+  2026-11-24, option (d) of `memo/architect/156-refused-reopen-focus.md`). If the popup's CSS
+  exit transition is still running, the browser reverses that transition on the re-show. A
+  non-modal Dialog (`modal={false}`, re-shown with `show()`, which runs the same dialog focusing
+  steps) follows the same rule: `Dialog.Popup` keeps its own `refusedFact` flag and is `inert`
+  for the duration of `show()` (#156 review L1). The modal Dialog is not covered: its re-open
+  with `showModal()` is a normal open with initial focus, because a modal dialog must hold focus
+  (and the content outside it is inert while it is open anyway). The children were never
+  unmounted (committed never left `true`), so their state is kept.
 - No callback is called for the re-open: the parent was told `false` and chose `true`.
 - No view transition (the commit is urgent).
 - While a request is in flight the apply effect waits, as it does today, and re-opens when it

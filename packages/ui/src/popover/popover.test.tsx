@@ -1715,8 +1715,9 @@ describe("Popover", () => {
         if (inert === true) {
           expect(popupEl).toHaveAttribute("inert");
         } else {
+          // The library removed its `inert` after the call (the assertion above), so the content
+          // is focusable again. jsdom ignores `inert` for focus: the browser row checks that.
           expect(popupEl).not.toHaveAttribute("inert");
-          // A later show (not a re-open of a refused fact) is not inert.
           screen.getByTestId("inner").focus();
           expect(screen.getByTestId("inner")).toHaveFocus();
         }

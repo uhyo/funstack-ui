@@ -16,6 +16,13 @@ Option (d) of `memo/architect/156-refused-reopen-focus.md`, chosen by the user. 
 - jsdom popover shim: the focusing steps return early when the popover is inside `[inert]`
   (jsdom ignores `inert`).
 
+- Review 156 L1 (memo/reviewer/review-156.md): non-modal Dialog. `dialog-popup.tsx` now has its
+  own `refusedFact` (set in `onClose` for a fact, cleared by a `committed` false commit), and
+  `openDialog` for `!modal` skips initial focus and wraps `show()` in the same `inert` write.
+  Modal (`showModal`) unchanged. jsdom dialog shim's focusing steps honour `inert`. jsdom rows
+  in `dialog.test.tsx` focus (non-modal, non-modal + consumer inert, modal unchanged); the
+  non-modal row fails with the write disabled.
+
 ## Tests
 
 - jsdom `popover.test.tsx` focus: refused dismissal re-shows the dialog with `inert` during the
