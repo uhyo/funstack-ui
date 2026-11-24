@@ -22,6 +22,7 @@
 // - `popover="hint"` (`supportsPopoverHint`): the Tooltip row expects the same either way.
 import { act, render, screen } from "@testing-library/react";
 import { userEvent } from "vitest/browser";
+import { useState } from "react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { expectInvokerExpanded } from "../__tests__/ax-tree.js";
@@ -1248,6 +1249,45 @@ describe("Menu (browser)", () => {
       expect(toggles.length).toBeGreaterThan(0);
       expect(trigger()).not.toHaveAttribute("data-pending");
       await expectInvokerExpanded(trigger(), popup(), true);
+    });
+
+    // #155: the re-open of a refused fact applies no initial focus, so a parent that keeps
+    // `open={true}` (pre-#148 controlled code without `onOpenChange`) does not trap the keyboard.
+    it.each([
+      ["Escape", () => user.keyboard("{Escape}"), () => trigger()],
+      ["Tab out", () => user.tab(), () => screen.getByTestId("next")],
+    ] as const)(
+      "a refused %s re-opens the menu with focus left where the dismissal put it (#155)",
+      async (_, dismiss, focusAfter) => {
+        const fact = vi.fn<OpenAction>();
+        render(<Basic root={{ open: true, openChangeAction: () => {}, onOpenChange: fact }} />);
+        await expect.poll(() => isOpen()).toBe(true);
+        screen.getByTestId("delete").focus();
+        expect(screen.getByTestId("delete")).toHaveFocus();
+        await dismiss();
+        await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+        await expect.poll(() => isOpen()).toBe(true);
+        await quietPeriod(50, "no initial focus may move focus back into the menu");
+        expect(document.activeElement).toBe(focusAfter());
+        expect(popup().contains(document.activeElement)).toBe(false);
+      },
+    );
+
+    it("an adopted Escape, then a keyboard open: the first item gets initial focus again (#155)", async () => {
+      function Adopting() {
+        const [open, setOpen] = useState(false);
+        return <Basic root={{ open, openChangeAction: setOpen, onOpenChange: setOpen }} />;
+      }
+      render(<Adopting />);
+      trigger().focus();
+      await user.keyboard("{Enter}");
+      await expect.poll(() => document.activeElement).toBe(screen.getByTestId("rename"));
+      await user.keyboard("{Escape}");
+      await expect.poll(() => isOpen()).toBe(false);
+      expect(trigger()).toHaveFocus();
+      await user.keyboard("{Enter}");
+      await expect.poll(() => isOpen()).toBe(true);
+      await expect.poll(() => document.activeElement).toBe(screen.getByTestId("rename"));
     });
   });
 });

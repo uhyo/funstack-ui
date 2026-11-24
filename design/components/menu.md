@@ -1667,3 +1667,12 @@ and `html:active-view-transition .menu { transition: none; }` are removed from `
 transition apart. Mechanism: Popover's #147 amendment (`usePopoverPopup`, conventions 5.1). 13.2's
 "a CSS exit (recipe=%s)" rows became "plus a CSS exit" rows without a recipe, plus the open and
 unrelated-view-transition rows.
+
+## Amendment: no initial focus on the re-open of a refused fact (#155, 2026-11-24)
+
+User decision 2026-11-24 (review-148 L3): when a controlled parent keeps `open={true}` after a
+dismissal (Escape, Tab out, a click outside), the menu is shown again in the fact's commit
+(overlay-open-change.md 2.4) **without initial focus**: focus stays on the Trigger (Escape) or on
+the next tab stop (Tab). Mechanism in `usePopoverPopup` (shared with Popover's `<div>` popups and
+Combobox, which never moves focus anyway). A later real open (the Trigger, keys) focuses the first
+item as before. Browser rows in `menu.browser.test.tsx`.

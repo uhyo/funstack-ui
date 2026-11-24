@@ -207,7 +207,11 @@ export function BrowserOwnedStatePage() {
         A parent that keeps <code>open={"{true}"}</code> after a dismissal on purpose gets the same
         re-open. This is not a veto: the user sees the element close and come back, possibly for a
         frame. A popup that must not be dismissed is set up on the platform side instead, where the
-        component offers it.
+        component offers it. The re-open applies no initial focus of its own: a Menu or a Combobox
+        shown again this way leaves focus where the dismissal put it (the Trigger after Escape, the
+        next field after Tab), so a parent that never adopts <code>false</code> cannot trap the
+        keyboard in it. A Popover or a Dialog, a <code>&lt;dialog&gt;</code>, still gets the
+        browser&apos;s dialog focusing steps on the re-show, as on any open.
       </p>
       <p>
         <strong>Uncontrolled, pass what you need.</strong> <code>openChangeAction</code> for work an

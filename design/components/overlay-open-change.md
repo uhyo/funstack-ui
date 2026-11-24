@@ -196,8 +196,16 @@ the DOM after every commit, shows it again (`showPopover({ source })` / `showMod
 - It happens in the task of the `toggle` / `close` event: the popup was hidden for the time
   between the browser's hide and that event (about one task; a frame may paint). Today it stays
   hidden until the notification action settles; the re-open is now immediate.
-- It is a fresh show: a new open generation, initial focus applied again (`initialFocus`, the
-  dialog focusing steps), the CSS enter (`@starting-style`) runs; with a CSS exit in flight the
+- It is a fresh show: a new open generation, the CSS enter (`@starting-style`) runs, but **no
+  initial focus of the library's own** (#155, user decision 2026-11-24): focus stays where the
+  dismissal put it (the Trigger after Escape, the next tab stop after a Tab-out), so an
+  un-migrated controlled Menu cannot trap the keyboard (review-148 L3). `usePopoverPopup` keeps a
+  `refusedFact` flag: set when a fact hides the popup, cleared by any commit with `committed`
+  false (the fact adopted), consumed by the next show. Not for a `<dialog>` popup (Popover's
+  default, Dialog): the browser's dialog focusing steps run on every `showPopover()` /
+  `show()` / `showModal()` whatever the library does, so the library still names its
+  `initialFocus` target there (a modal dialog must hold focus; a Popover does not close on Tab,
+  so it is no trap); with a CSS exit in flight the
   browser reverses it. The children were never unmounted (committed never left `true`), so
   their state is kept.
 - No callback is called for the re-open: the parent was told `false` and chose `true`.

@@ -125,6 +125,11 @@ export function usePopoverPopup(
   const libraryHide = useRef(false);
   // Whether focus was inside the popup when its last close began (design 6.2 rule 1).
   const focusWasInside = useRef(false);
+  // Set when a fact hid the popup, cleared once a commit has `committed` false (the fact was
+  // adopted): a show while it is set is the re-open of a dismissal a controlled parent refused,
+  // which leaves focus where the dismissal put it (no initial focus; #155: otherwise Tab and
+  // Escape could never leave a menu whose parent keeps `open={true}`).
+  const refusedFact = useRef(false);
   const initialFocusTarget = useInitialFocusTarget(part, "popup");
   // `interestfor` (library mode, popover.md lost-interest amendment).
   const interest = useInterestDismiss(ctx);
@@ -175,7 +180,12 @@ export function usePopoverPopup(
   };
 
   const showPopup = (element: HTMLElement): void => {
-    const focus = resolveFocusTarget(element);
+    // A `<dialog>` (Popover's default) runs the dialog focusing steps on every show whatever the
+    // library does, so the skip applies where the platform focuses nothing itself (Menu, a
+    // `<div>` Popover; Combobox never moves focus).
+    const refused = refusedFact.current && element.tagName !== "DIALOG";
+    refusedFact.current = false;
+    const focus = refused ? null : resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps
     // for a <dialog>, in every engine); React drops `autoFocus` on client-rendered content.
     // Never `.focus()` (6.1) except for the quiet target above.
@@ -251,6 +261,9 @@ export function usePopoverPopup(
     if (!isLibrary) return;
     const element = popupRef.current;
     if (element === null || !element.isConnected) return;
+    // The fact was adopted (or anything else closed the popup in state): a later show is a new
+    // open, with initial focus.
+    if (!ctx.committed) refusedFact.current = false;
     if (!ctx.pending && ctx.latestInFlight() === null) {
       const shown = isPopoverOpen(element);
       if (ctx.committed && !shown) {
@@ -337,7 +350,10 @@ export function usePopoverPopup(
         exit.afterClose(element, echo);
         // Anything but the library's own hide is a fact: committed `false` now (urgent, this
         // event's commit) and `onOpenChange(false)` (overlay-open-change.md 2.3).
-        if (!echo) ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
+        if (!echo) {
+          refusedFact.current = true;
+          ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
+        }
       }
     }
     const { newState } = event as ToggleEvent;
