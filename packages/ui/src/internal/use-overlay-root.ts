@@ -41,9 +41,9 @@ export interface OverlayDetails extends ActionDetails {
 
 /**
  * The Root's state and machinery, shared by Popover, Menu, Combobox (design 14) and Dialog. The
- * component puts it in its own context; `usePopoverTrigger` and `usePopoverPopup` take it as their
- * first argument. `Popup` is the popup element's type; `CloseArgs` are the extra arguments of a
- * close (Dialog's `returnValue`), passed on to the `details` builder.
+ * component puts it in its own context (the popover-like ones extend it, `PopoverRootValue`).
+ * `Popup` is the popup element's type; `CloseArgs` are the extra arguments of a close (Dialog's
+ * `returnValue`), passed on to the `details` builder.
  */
 export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends unknown[]> {
   readonly mode: OverlayMode;
@@ -53,15 +53,6 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   readonly committed: boolean;
   /** Optimistic open state (library mode); `false` in JS-free mode. */
   readonly optimistic: boolean;
-  /**
-   * The popup is in the top layer, mirrored from its `toggle` (urgent, conventions 3.5): what
-   * `aria-expanded` renders on a non-button Trigger and the Combobox Input (a `<button>`
-   * Trigger renders none). Written by a popover Popup in library mode; Dialog does not
-   * maintain it, and its context omits it.
-   */
-  readonly shown: boolean;
-  /** Writes `shown` from the DOM (`:popover-open`); the Popup's `toggle`, ref attach and detach. */
-  readonly setShown: (shown: boolean) => void;
   /** The Root's transition is pending (library mode). */
   readonly pending: boolean;
   /**
@@ -113,13 +104,6 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   ) => void;
   /** From `useControllableAction`: the latest in-flight intent, or `null`. */
   readonly latestInFlight: () => { readonly next: boolean } | null;
-  /**
-   * The popup was shown at its last `toggle` and the DOM has it hidden now: the browser hid it
-   * and its `toggle` has not arrived yet. A non-button Trigger's click lands in that window after
-   * light dismiss hid the popup at `pointerup` (#115): it records an `"activate"` intent for the
-   * fact instead of requesting a close. Handlers only.
-   */
-  readonly hiddenBeforeToggle: () => boolean;
   /** The registered Trigger: `showPopover({ source })` and the focus-return fallback. */
   readonly triggerRef: RefObject<HTMLElement | null>;
   /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()` / `close()`. */
@@ -137,8 +121,28 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   readonly takeCloseIntent: () => OverlayCloseIntent | undefined;
 }
 
-/** The root value of the popover-like components (Popover, Menu, Combobox). */
-export type PopoverRootValue = OverlayRootValue<HTMLElement, []>;
+/**
+ * The root value of the popover-like components (Popover, Menu, Combobox), from `usePopoverRoot`:
+ * the overlay Root plus the `shown` mirror that their Popup (`usePopoverPopup`) writes and their
+ * Triggers (`usePopoverTrigger`, Combobox.Trigger) and the Combobox Input read. Dialog has none.
+ */
+export interface PopoverRootValue extends OverlayRootValue<HTMLElement, []> {
+  /**
+   * The popup is in the top layer, mirrored from its `toggle` (urgent, conventions 3.5): what
+   * `aria-expanded` renders on a non-button Trigger and the Combobox Input (a `<button>`
+   * Trigger renders none). Written by the Popup in library mode.
+   */
+  readonly shown: boolean;
+  /** Writes `shown` from the DOM (`:popover-open`); the Popup's `toggle`, ref attach and detach. */
+  readonly setShown: (shown: boolean) => void;
+  /**
+   * The popup was shown at its last `toggle` and the DOM has it hidden now: the browser hid it
+   * and its `toggle` has not arrived yet. A non-button Trigger's click lands in that window after
+   * light dismiss hid the popup at `pointerup` (#115): it records an `"activate"` intent for the
+   * fact instead of requesting a close. Handlers only.
+   */
+  readonly hiddenBeforeToggle: () => boolean;
+}
 
 export interface UseOverlayRootOptions<
   Details extends ActionDetails,
@@ -171,8 +175,11 @@ export interface UseOverlayRootOptions<
     reason: ChangeReason,
     ...args: CloseArgs | []
   ) => Details;
-  /** Whether the popup is shown, for a stale close intent. Default: `:popover-open`. */
-  readonly isShown?: (popup: Popup) => boolean;
+  /**
+   * Whether the popup is shown, for a stale close intent: `:popover-open` (`usePopoverRoot`), a
+   * `<dialog>`'s `open` (Dialog).
+   */
+  readonly isShown: (popup: Popup) => boolean;
 }
 
 /** How long a recorded close intent survives when the popup did not close (design 2.3). */
@@ -283,7 +290,7 @@ export function useOverlayRoot<
       if (options?.unlessRecorded === true && closeIntent.current !== undefined) return;
       closeIntent.current = intent;
       if (intent !== undefined) {
-        clearLater(closeIntent, intent, popupRef, callbacks.current.isShown ?? isPopoverOpen);
+        clearLater(closeIntent, intent, popupRef, callbacks.current.isShown);
       }
     },
     [callbacks],
@@ -329,20 +336,6 @@ export function useOverlayRoot<
     [isLibrary, intended, send],
   );
 
-  const [shown, setShownState] = useState(false);
-  // The last value written, for handlers (`hiddenBeforeToggle`).
-  const shownNow = useRef(false);
-  const setShown = useCallback((next: boolean) => {
-    shownNow.current = next;
-    setShownState(next);
-  }, []);
-  const hiddenBeforeToggle = useCallback((): boolean => {
-    const popup = popupRef.current;
-    return (
-      shownNow.current && popup !== null && !(callbacks.current.isShown ?? isPopoverOpen)(popup)
-    );
-  }, [callbacks]);
-
   const notifyClosed = useCallback(
     (event: Event | undefined, reason: ChangeReason, ...args: CloseArgs): void => {
       if (!isLibrary) return;
@@ -370,8 +363,6 @@ export function useOverlayRoot<
       ids,
       committed: isLibrary && committed,
       optimistic: isLibrary && optimistic,
-      shown,
-      setShown,
       pending: isLibrary && pending,
       epoch,
       intended,
@@ -381,7 +372,6 @@ export function useOverlayRoot<
       requestClose,
       notifyClosed,
       latestInFlight,
-      hiddenBeforeToggle,
       triggerRef,
       popupRef,
       recordCloseIntent,
@@ -393,8 +383,6 @@ export function useOverlayRoot<
       isLibrary,
       committed,
       optimistic,
-      shown,
-      setShown,
       pending,
       epoch,
       intended,
@@ -404,9 +392,37 @@ export function useOverlayRoot<
       requestClose,
       notifyClosed,
       latestInFlight,
-      hiddenBeforeToggle,
       recordCloseIntent,
       takeCloseIntent,
     ],
+  );
+}
+
+/**
+ * The Root of a popover-like component (Popover, Menu, Combobox): `useOverlayRoot` over a
+ * `popover` element (`:popover-open`), plus the `shown` mirror and `hiddenBeforeToggle`.
+ */
+export function usePopoverRoot<Details extends ActionDetails>(
+  options: Omit<UseOverlayRootOptions<Details>, "isShown">,
+): PopoverRootValue {
+  const root = useOverlayRoot<Details>({ ...options, isShown: isPopoverOpen });
+  const { popupRef } = root;
+
+  const [shown, setShownState] = useState(false);
+  // The last value written, for handlers (`hiddenBeforeToggle`).
+  const shownNow = useRef(false);
+  const setShown = useCallback((next: boolean) => {
+    shownNow.current = next;
+    setShownState(next);
+  }, []);
+  const hiddenBeforeToggle = useCallback((): boolean => {
+    const popup = popupRef.current;
+    return shownNow.current && popup !== null && !isPopoverOpen(popup);
+  }, [popupRef]);
+
+  // Changes only with `root` and `shown`, so as rarely as `root` itself does.
+  return useMemo(
+    () => ({ ...root, shown, setShown, hiddenBeforeToggle }),
+    [root, shown, setShown, hiddenBeforeToggle],
   );
 }

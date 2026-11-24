@@ -1447,7 +1447,7 @@ Moved to `design/CHANGELOG.md` (part "popover.md"). Not part of the contract: th
 
 Reused as is, through the internal hooks (`internal/use-overlay-root.ts`, `use-popover-popup.ts`, `use-popover-trigger.ts`):
 
-- The two modes and the Root state (`useOverlayRoot` with `component: "menu"`), including
+- The two modes and the Root state (`usePopoverRoot` with `component: "menu"`), including
   `intended()`, `requestOpen` / `requestClose`, the fact route (`adoptFact`), close intents, and the
   `"activate"` / `"dismiss"` / `"platform"` reasons.
 - The Popup machinery (`usePopoverPopup`): apply effect with `showPopover({ source })` and the

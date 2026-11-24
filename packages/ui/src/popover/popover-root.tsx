@@ -7,7 +7,7 @@ import type {
   StateValue,
   UrgentChangeHandler,
 } from "../internal/types.js";
-import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
+import { popoverDetails, usePopoverRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { PopoverContext } from "./popover-context.js";
 
@@ -98,7 +98,7 @@ export function PopoverRoot({
   onOpenChange,
   children,
 }: PopoverRootProps) {
-  const context = useOverlayRoot<PopoverOpenChangeDetails>({
+  const context = usePopoverRoot<PopoverOpenChangeDetails>({
     component: "popover",
     part: "Popover.Root",
     open,

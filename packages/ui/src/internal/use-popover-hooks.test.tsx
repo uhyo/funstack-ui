@@ -13,7 +13,7 @@ import { resetFocusVisibleOption } from "./focus-visible.js";
 import type { QuietFocusTarget } from "./focus-visible.js";
 import type { ChangeReason } from "./types.js";
 import { usePopoverPopup } from "./use-popover-popup.js";
-import { popoverDetails, useOverlayRoot } from "./use-overlay-root.js";
+import { popoverDetails, usePopoverRoot } from "./use-overlay-root.js";
 import type { OverlayDetails, PopoverRootValue } from "./use-overlay-root.js";
 import { usePopoverTrigger } from "./use-popover-trigger.js";
 
@@ -39,7 +39,7 @@ function Mini({
   /** Render the Trigger as a link (no invoker) instead of a `<button>`. */
   link?: boolean;
 }) {
-  const ctx = useOverlayRoot<OverlayDetails>({
+  const ctx = usePopoverRoot<OverlayDetails>({
     component: "menu",
     part: "Mini.Root",
     mode: "library",
@@ -231,13 +231,13 @@ describe("shared popover hooks: Menu's extension points", () => {
   });
 
   // #48
-  it("useOverlayRoot returns the same value across re-renders with unchanged state", async () => {
+  it("usePopoverRoot returns the same value across re-renders with unchanged state", async () => {
     const user = setupUser();
     const values: PopoverRootValue[] = [];
     const first = vi.fn();
     const second = vi.fn();
     function Root({ onDispatch }: { onDispatch: () => void }) {
-      const ctx = useOverlayRoot<OverlayDetails>({
+      const ctx = usePopoverRoot<OverlayDetails>({
         component: "menu",
         part: "Stable.Root",
         mode: "library",

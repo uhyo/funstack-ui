@@ -10874,3 +10874,17 @@ no-Track warnings, Combobox's duplicate option value, RadioGroup's partial hydra
 `Menu.ContextTrigger`'s missing Popup, `useInitialFocusTarget`), the ones that read the DOM or a
 ref in an effect (`Field.Root`'s "no form control", `useItemOrder`'s duplicate values, Tooltip's
 three checks), and the two in `toast/toast-viewport.tsx` (left for the branch that splits it).
+
+## 2026-11-24, #157: the popover `shown` mirror is `usePopoverRoot`'s
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 11, rule map row 6). Internal
+only. `useOverlayRoot` returned the popover `shown` mirror (`shown`, `setShown`) and
+`hiddenBeforeToggle` to Dialog too, whose context type omitted the first two and never called
+the third. They now come from `usePopoverRoot` (same module), which Popover, Menu and Combobox
+call: `useOverlayRoot` with `isShown: isPopoverOpen` plus the mirror. `PopoverRootValue` is an
+interface extending `OverlayRootValue<HTMLElement, []>` with the three members;
+`DialogContextValue` extends `OverlayRootValue` without an `Omit`. `isShown` is a required
+option of `useOverlayRoot` (it defaulted to `:popover-open`, which only `usePopoverRoot` needs).
+The popover value still changes only with the open state, pending and `shown`. Sections
+changed: conventions 3.2's `shown` row and the 9.1 file listing, menu.md (intro, 1, 2.1),
+combobox.md (intro, decisions table, 1, 2, 5.1), popover.md 15 (hook names only).

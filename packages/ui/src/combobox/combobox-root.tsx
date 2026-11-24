@@ -27,7 +27,7 @@ import { transitionTypes } from "../internal/transition-types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
-import { popoverDetails, useOverlayRoot } from "../internal/use-overlay-root.js";
+import { popoverDetails, usePopoverRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import { useActiveOption } from "./use-active-option.js";
@@ -290,7 +290,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     [id, fieldControlId],
   );
 
-  const popover = useOverlayRoot<ComboboxOpenChangeDetails>({
+  const popover = usePopoverRoot<ComboboxOpenChangeDetails>({
     component: "combobox",
     part: "Combobox.Root",
     mode: "library",

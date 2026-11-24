@@ -1035,7 +1035,7 @@ The state owner (`Root` or the single component) holds:
 | `pending` | `useTransition()` | sync | `data-pending` on the owner and on the trigger that initiated the change |
 | urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event; reported through an `on<State>Change` handler, not an action (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
 | urgent, internal (the value a slider gesture has reached, `live`; NumberField's draft text and the value under its held button) | `useState`, written from the pointer or `input` event; no consumer-facing urgent action | sync, urgent | the thumbs, while a pointer is captured or a step or commit is in flight (`held`); otherwise they render `optimistic` (Slider 2.2) |
-| urgent, internal (`shown`: the popup is in the top layer) | `useState` in `useOverlayRoot`, written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on a non-button overlay Trigger render and on the Combobox Input (library mode; a `<button>` Trigger is a `popovertarget` invoker and renders none); `false` on the server and at hydration |
+| urgent, internal (`shown`: the popup is in the top layer) | `useState` in `usePopoverRoot` (Popover, Menu, Combobox; Dialog has none), written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on a non-button overlay Trigger render and on the Combobox Input (library mode; a `<button>` Trigger is a `popovertarget` invoker and renders none); `false` on the server and at hydration |
 
 **Virtual focus is urgent library state.** Where a pattern keeps DOM focus on one element and
 moves focus virtually with `aria-activedescendant` (Combobox), the active item is a plain
@@ -2628,7 +2628,7 @@ packages/ui/src/
     use-roving-focus.ts     # section 7.4: DOM-written roving tabindex
     arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine; Accordion.Root uses resolveArrowKey); directive-free
     use-native-focusgroup.ts  # useNativeFocusgroup(flag): the native `focusgroup` detection (section 8)
-    use-overlay-root.ts     # useOverlayRoot, popoverDetails, OverlayRootValue (section 3.9): Popover, Menu, Combobox, Dialog
+    use-overlay-root.ts     # useOverlayRoot, OverlayRootValue (section 3.9; Dialog), usePopoverRoot, PopoverRootValue (plus the `shown` mirror; Popover, Menu, Combobox), popoverDetails
     use-popover-popup.ts, use-popover-trigger.ts  # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger
     overlay-popup.tsx       # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
     overlay-show.ts         # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
