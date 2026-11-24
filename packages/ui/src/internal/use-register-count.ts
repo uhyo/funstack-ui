@@ -11,7 +11,10 @@ export interface RegisterCount {
   readonly countRef: RefObject<number>;
 }
 
-/** Counts the mounted instances of an optional part (Slider's and NumberField's Labels). */
+/**
+ * Counts the mounted instances of an optional part: the Labels of Slider, NumberField and Combobox,
+ * Combobox's Statuses.
+ */
 export function useRegisterCount(): RegisterCount {
   const [count, setCount] = useState(0);
   const countRef = useRef(0);
