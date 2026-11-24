@@ -103,6 +103,71 @@ describe("Dialog", () => {
       expect(popup().open).toBe(true);
       expect(close).not.toHaveBeenCalled();
     });
+
+    // #157 safety net (memo/reviewer/refactor-test-safety.md DP11): the same rule for a
+    // non-modal dialog closed by script and re-opened with `show()`. Every native open counts as
+    // a new opening at its synchronous `beforetoggle`.
+    it("JS-free non-modal: action pending, closed by script and re-shown: the dialog stays open", async () => {
+      const user = setupUser();
+      const work = deferred();
+      const close = spyClose();
+      render(
+        <Harness
+          mode="static"
+          modal={false}
+          content={
+            <Dialog.Close data-testid="delete" action={() => work.promise}>
+              Delete
+            </Dialog.Close>
+          }
+        />,
+      );
+      await act(async () => popup().show());
+      await user.click(screen.getByTestId("delete"));
+      await act(async () => popup().close());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      close.mockClear();
+      // As above: only the synchronous `beforetoggle` may count the re-open.
+      const holdToggle = (event: Event) => event.stopImmediatePropagation();
+      window.addEventListener("toggle", holdToggle, true);
+      try {
+        await act(async () => popup().show());
+        await act(async () => work.resolve());
+        await flushTasks(2);
+      } finally {
+        window.removeEventListener("toggle", holdToggle, true);
+      }
+      expect(popup().open).toBe(true);
+      expect(close).not.toHaveBeenCalled();
+    });
+  });
+
+  // #157 safety net (DP5): a non-modal dialog restores focus only from inside; a close commit
+  // that unmounted the focused content (here a controlled close with `transition`) leaves the
+  // library to return it.
+  it("non-modal, transition: a controlled close with focus in the content returns focus to the Trigger", async () => {
+    const user = setupUser();
+    let setOpen!: (open: boolean) => void;
+    render(
+      <Harness
+        mode="controlled"
+        modal={false}
+        popup={{ transition: "pop" }}
+        content={<input data-testid="field" />}
+        outside={(set) => {
+          setOpen = set;
+          return null;
+        }}
+      />,
+    );
+    await openThroughTrigger(user);
+    screen.getByTestId("field").focus();
+    await act(async () => setOpen(false));
+    await flushTasks(2);
+    expect(popup().open).toBe(false);
+    expect(screen.queryByTestId("field")).toBeNull();
+    expect(trigger()).toHaveFocus();
   });
 
   describe("library-owned closes", () => {

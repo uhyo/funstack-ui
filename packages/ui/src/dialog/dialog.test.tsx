@@ -40,6 +40,7 @@ import {
   flushTasks,
   silenceErrors,
 } from "../__tests__/helpers.js";
+import { Menu } from "../menu/index.js";
 import { DialogContext } from "./dialog-context.js";
 import { Dialog } from "./index.js";
 import type {
@@ -52,6 +53,7 @@ import type {
 } from "./index.js";
 
 import {
+  committedText,
   content,
   Harness,
   openThroughTrigger,
@@ -321,6 +323,41 @@ describe("Dialog", () => {
       await user.click(trigger());
       screen.getByTestId("close").focus();
       await user.keyboard("{Escape}");
+      expect(popup().open).toBe(false);
+    });
+
+    // #157 safety net (memo/reviewer/refactor-test-safety.md DP8): the same rule with the
+    // library's own Menu inside a non-modal Dialog, focus on the menu's Trigger (in the dialog,
+    // outside the menu's popup).
+    it("non-modal: Escape with a Menu open inside is the menu's, not the dialog's", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          mode="uncontrolled"
+          modal={false}
+          content={
+            <Menu.Root>
+              <Menu.Trigger data-testid="menu-trigger">Actions</Menu.Trigger>
+              <Menu.Popup data-testid="menu">
+                <Menu.Item data-testid="item">Rename</Menu.Item>
+              </Menu.Popup>
+            </Menu.Root>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      await user.click(screen.getByTestId("menu-trigger"));
+      await flushTasks(2);
+      const menu = screen.getByTestId("menu");
+      expect(menu.matches(":popover-open")).toBe(true);
+      // An Escape that reaches the dialog from outside the menu's popup (moving focus there
+      // would close the menu: focus leaving it is a dismissal).
+      expect(fireEvent.keyDown(screen.getByTestId("menu-trigger"), { key: "Escape" })).toBe(true);
+      expect(popup().open).toBe(true);
+      // Once the menu is closed, Escape is the dialog's again.
+      await act(async () => menu.hidePopover());
+      await flushTasks(2);
+      expect(fireEvent.keyDown(screen.getByTestId("menu-trigger"), { key: "Escape" })).toBe(false);
       expect(popup().open).toBe(false);
     });
 
@@ -811,6 +848,27 @@ describe("Dialog", () => {
       expect(popup().open).toBe(false);
     });
 
+    // #157 safety net (DP10): the press half of the modal backdrop rule on its own, with the
+    // library's own `requestClose` path observed through the fact.
+    it("modal: a backdrop click with no press before it (keyboard, synthetic) is no dismissal", async () => {
+      const user = setupUser();
+      const fact = vi.fn<ActionFn>();
+      render(<Harness mode="uncontrolled" fact={fact} popup={{ lightDismiss: true }} />);
+      await openThroughTrigger(user);
+      mockRect(popup());
+      fireEvent.click(popup(), { clientX: 10, clientY: 10 });
+      fireEvent.click(popup(), { clientX: 290, clientY: 310 });
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      expect(fact).not.toHaveBeenCalled();
+      // A press on the backdrop is consumed by its click: the next bare click does nothing.
+      pressAndClick(popup(), { clientX: 150, clientY: 150 });
+      fireEvent.click(popup(), { clientX: 10, clientY: 10 });
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      expect(fact).not.toHaveBeenCalled();
+    });
+
     it("non-modal: a drag from inside that ends outside does not close", async () => {
       const user = setupUser();
       render(<Harness mode="uncontrolled" modal={false} popup={{ lightDismiss: true }} />);
@@ -886,6 +944,29 @@ describe("Dialog", () => {
         expect(dialog).toHaveAttribute("inert");
       } else {
         expect(dialog).not.toHaveAttribute("inert");
+      }
+    });
+
+    // #157 safety net (memo/reviewer/refactor-test-safety.md DP1, DP14): the same rule through
+    // the parity harness and an Escape (`requestClose()`), with focus moved out by the dismissal.
+    it.each([
+      ["a non-modal Dialog: focus stays outside", false],
+      ["a modal Dialog: focus goes back inside", true],
+    ] as const)("a refused Escape re-opens %s", async (_, modal) => {
+      const user = setupUser();
+      render(<Harness mode="controlled" modal={modal} refuseClose />);
+      await openThroughTrigger(user);
+      expect(popup().open).toBe(true);
+      screen.getByTestId("elsewhere").focus();
+      await act(async () => popup().requestClose());
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      expect(committedText()).toBe("true");
+      if (modal) {
+        expect(popup().contains(document.activeElement)).toBe(true);
+      } else {
+        expect(screen.getByTestId("elsewhere")).toHaveFocus();
+        expect(popup()).not.toHaveAttribute("inert");
       }
     });
 
