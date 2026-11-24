@@ -36,7 +36,8 @@ export interface UseControllableActionOptions<T, Details extends ActionDetails> 
    * With a reducer, uncontrolled state is also committed through it: once every overlapping
    * dispatch has settled, the dispatches that resolved are folded onto the committed value in
    * dispatch order, and a rejected one leaves no trace (#150). Without one, the latest dispatch's
-   * `next` is committed when it resolves (the latest-dispatch guard).
+   * `next` is committed when it resolves (the latest-dispatch guard). A dispatch made with
+   * `{ whole: true }` bypasses the reducer: its `next` replaces the value in both places.
    */
   reducer?: (prev: T, next: T, details: Details) => T;
   /** Names used in development warnings. */
@@ -50,8 +51,14 @@ export interface ControllableAction<T, Details extends ActionDetails> {
   readonly optimistic: T;
   /** An action dispatched through this hook is in flight. */
   readonly pending: boolean;
-  /** Runs the action inside the hook's transition with optimistic feedback. */
-  readonly dispatch: (next: T, details: Details) => void;
+  /**
+   * Runs the action inside the hook's transition with optimistic feedback. `options.whole`
+   * (internal, never part of a public details type): `next` replaces the value instead of going
+   * through `reducer`, in the optimistic step and in the uncontrolled replay of the burst. For a
+   * dispatch whose `next` is absolute rather than a per-item step (CheckboxGroup's form reset,
+   * Accordion's mount reconciliation). Without a `reducer` every dispatch is already whole.
+   */
+  readonly dispatch: (next: T, details: Details, options?: DispatchOptions) => void;
   /**
    * The `next` of the most recent dispatch while any dispatch's action is still unsettled, else
    * `null`. Lets a component with a browser-owned path (Accordion's find-in-page reveal) build on
@@ -84,6 +91,12 @@ export interface ControllableAction<T, Details extends ActionDetails> {
   readonly epoch: number;
 }
 
+/** Per-dispatch options of `ControllableAction.dispatch`. Internal. */
+export interface DispatchOptions {
+  /** Adopt `next` whole instead of applying `reducer` (see `dispatch`). Default `false`. */
+  readonly whole?: boolean | undefined;
+}
+
 const isDev = process.env.NODE_ENV !== "production";
 
 /** One uncontrolled reducer-mode dispatch of a burst; `resolved` once its action resolved. */
@@ -91,6 +104,8 @@ interface BurstEntry<T, Details> {
   readonly next: T;
   readonly details: Details;
   readonly reducer: (prev: T, next: T, details: Details) => T;
+  /** `next` is adopted whole (`DispatchOptions.whole`), not reduced. */
+  readonly whole: boolean;
   resolved: boolean;
 }
 
@@ -140,8 +155,12 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const epochRef = useRef(0);
   const [optimistic, setOptimistic] = useOptimistic(
     committed,
-    (prev: T, patch: { next: T; details: Details; epoch: number }) =>
-      patch.epoch < epoch ? prev : reducer ? reducer(prev, patch.next, patch.details) : patch.next,
+    (prev: T, patch: { next: T; details: Details; epoch: number; whole: boolean }) =>
+      patch.epoch < epoch
+        ? prev
+        : reducer && !patch.whole
+          ? reducer(prev, patch.next, patch.details)
+          : patch.next,
   );
   const [pending, startOwnTransition] = useTransition();
   const latest = useRef(0);
@@ -171,13 +190,18 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
     if (resolved.length === 0) return;
     startTransition(() =>
       setInternal((prev) =>
-        resolved.reduce((value, entry) => entry.reducer(value, entry.next, entry.details), prev),
+        resolved.reduce(
+          (value, entry) =>
+            entry.whole ? entry.next : entry.reducer(value, entry.next, entry.details),
+          prev,
+        ),
       ),
     );
   }, []);
 
   const dispatch = useCallback(
-    (next: T, details: Details): void => {
+    (next: T, details: Details, options?: DispatchOptions): void => {
+      const whole = options?.whole ?? false;
       // Read once, at the call, as the per-render closure did: the action, the mode and the
       // previous value belong to the UI the user acted on, even after the `await`.
       const { committed: prev, isControlled, action, transitionTypes, reducer } = props.current;
@@ -187,11 +211,11 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
       inFlight.current.next = next;
       // Uncontrolled with a reducer: committed from the burst once every dispatch settled.
       const entry: BurstEntry<T, Details> | null =
-        !isControlled && reducer ? { next, details, reducer, resolved: false } : null;
+        !isControlled && reducer ? { next, details, reducer, whole, resolved: false } : null;
       if (entry) burst.current.push(entry);
       startOwnTransition(async () => {
         for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
-        setOptimistic({ next, details, epoch: dispatchEpoch });
+        setOptimistic({ next, details, epoch: dispatchEpoch, whole });
         try {
           await action?.(next, details);
         } catch (error) {

@@ -1148,6 +1148,33 @@ describe("Accordion", () => {
       });
     });
 
+    // #153: the mount dispatch is adopted whole (the `whole` dispatch option), not replayed as the
+    // one item its details name: as a patch, "a closed" would commit nothing open and lose b.
+    it("uncontrolled: a close and an open before hydration commit as one whole value", async () => {
+      silenceErrors();
+      const action = vi.fn<ActionFn>();
+      await act(async () => {
+        await hydrateFromServer(<Harness mode="uncontrolled" initial={["a"]} action={action} />, {
+          mutate: async (container) => {
+            container.querySelector('[data-testid="item-a"]')!.removeAttribute("open");
+            container.querySelector('[data-testid="item-b"]')!.setAttribute("open", "");
+            await new Promise((resolve) => setImmediate(resolve));
+          },
+          flush: null,
+        });
+      });
+      expect(action).toHaveBeenCalledTimes(1);
+      const [next, details] = action.mock.calls[0]!;
+      expect(next).toEqual(["b"]);
+      expect(details.item).toBe("a");
+      expect(details.open).toBe(false);
+      expect(item("a").open).toBe(false);
+      expect(item("b").open).toBe(true);
+      expect(trigger("b")).toHaveAttribute("data-open");
+      expect(trigger("a")).not.toHaveAttribute("data-open");
+      expectNotPending(root());
+    });
+
     it("exclusive: the first pre-opened item in document order wins", async () => {
       silenceErrors();
       const action = vi.fn<ActionFn>();
@@ -1317,6 +1344,42 @@ describe("Accordion", () => {
       );
       expect(consoleError).toHaveBeenCalledTimes(1);
       expect(consoleError.mock.calls[0]?.[0]).toMatch(/mode changed after mount/);
+    });
+
+    // #153: like ToggleGroup, the exclusive/multiple mode is fixed at mount.
+    it("warns when `exclusive` changes after mount and keeps the mounted mode", async () => {
+      const consoleError = silenceErrors();
+      const action = vi.fn<ActionFn>();
+      const ui = (exclusive: boolean) => (
+        <Accordion.Root
+          // A mode switch the types forbid on purpose: the value shape follows `exclusive`.
+          {...({
+            exclusive,
+            defaultValue: [],
+            valueChangeAction: action,
+          } as unknown as ComponentPropsWithRef<typeof Accordion.Root>)}
+          data-testid="root"
+        >
+          {DEFAULT_ITEMS.map(({ value }) => (
+            <Accordion.Item key={value} value={value} data-testid={`item-${value}`}>
+              <Accordion.Trigger data-testid={`trigger-${value}`}>{value}</Accordion.Trigger>
+            </Accordion.Item>
+          ))}
+        </Accordion.Root>
+      );
+      const { rerender } = render(ui(false));
+      expect(consoleError).not.toHaveBeenCalled();
+      rerender(ui(true));
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(consoleError.mock.calls[0]?.[0]).toMatch(/`exclusive` changed after mount/);
+      const user = setupUser();
+      await user.click(trigger("a"));
+      await user.click(trigger("b"));
+      // Still multiple: arrays, and both stay open.
+      expect(action.mock.calls.map(([next]) => next)).toEqual([["a"], ["a", "b"]]);
+      expect(item("a").open).toBe(true);
+      expect(item("b").open).toBe(true);
+      expect(consoleError).toHaveBeenCalledTimes(1);
     });
 
     it("does not warn in normal use of either mode", async () => {

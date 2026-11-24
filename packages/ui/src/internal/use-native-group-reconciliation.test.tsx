@@ -26,6 +26,10 @@ import type { ChangeReason } from "./types.js";
 import { useControllableAction } from "./use-controllable-action.js";
 import { useNativeChecked } from "./use-native-checked.js";
 import { useNativeGroupReconciliation } from "./use-native-group-reconciliation.js";
+import type { NativeGroupPath } from "./use-native-group-reconciliation.js";
+
+/** The `path` argument of every `onPlatformChange` call of the `Group` harness, in order. */
+const platformPaths: NativeGroupPath[] = [];
 
 interface Details {
   readonly event: Event | undefined;
@@ -75,8 +79,10 @@ function Group({
       const inFlight = latestInFlight();
       return inFlight === null ? optimistic : inFlight.next;
     },
-    onPlatformChange: (next, event) =>
-      dispatch(next, createActionDetails(event, { reason: "platform" as const })),
+    onPlatformChange: (next, event, path) => {
+      platformPaths.push(path);
+      dispatch(next, createActionDetails(event, { reason: "platform" as const }));
+    },
   });
   const context: GroupContextValue = {
     name,
@@ -235,6 +241,7 @@ describe("useNativeGroupReconciliation", () => {
 
     it("a click on a member before it hydrates is reconciled with one platform dispatch", async () => {
       const consoleError = silenceErrors();
+      platformPaths.length = 0;
       const action = vi.fn<ActionFn>();
       const release = await hydrateLate(action, (c) => {
         serverRadio(c, "m").click();
@@ -247,6 +254,8 @@ describe("useNativeGroupReconciliation", () => {
       expect(action.mock.calls[0]?.[0]).toBe("m");
       expect(action.mock.calls[0]?.[1].reason).toBe("platform");
       expect(action.mock.calls[0]?.[1].event).toBeUndefined();
+      // #153: the late-member path is named "mount", never "reset".
+      expect(platformPaths).toEqual(["mount"]);
       expect(radio("m").checked).toBe(true);
       expect(radio("s").checked).toBe(false);
       expect(screen.getByTestId("value")).toHaveTextContent("m");
@@ -311,7 +320,11 @@ describe("equals option", () => {
     onPlatformChange,
   }: {
     equals?: (a: ReadonlySet<string>, b: ReadonlySet<string>) => boolean;
-    onPlatformChange: (next: ReadonlySet<string>, event: Event | undefined) => void;
+    onPlatformChange: (
+      next: ReadonlySet<string>,
+      event: Event | undefined,
+      path: NativeGroupPath,
+    ) => void;
   }) {
     const fieldset = useRef<HTMLFieldSetElement>(null);
     const base: ReadonlySet<string> = new Set(["a", "b"]);
@@ -348,11 +361,13 @@ describe("equals option", () => {
     expect(onPlatformChange).toHaveBeenCalledTimes(1);
     expect([...onPlatformChange.mock.calls[0]![0]]).toEqual(["b", "a"]);
     expect(onPlatformChange.mock.calls[0]![1]).toBeUndefined();
+    expect(onPlatformChange.mock.calls[0]![2]).toBe("mount");
     await act(async () => {
       (screen.getByTestId("set-form") as HTMLFormElement).reset();
     });
     await flushMicrotasks();
     expect(onPlatformChange).toHaveBeenCalledTimes(2);
     expect(onPlatformChange.mock.calls[1]![1]).toBeInstanceOf(Event);
+    expect(onPlatformChange.mock.calls[1]![2]).toBe("reset");
   });
 });

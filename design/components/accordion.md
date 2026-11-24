@@ -87,7 +87,8 @@ chosen by the Root's props:
 | Works before hydration | yes | yes, natively; the library reconciles on mount (2.3) |
 | Transition / ViewTransition | none (browser performs the toggle) | yes |
 
-Switching modes after mount is unsupported (dev warning), like controlled/uncontrolled.
+Switching modes after mount is unsupported (dev warning), like controlled/uncontrolled. So is
+changing `exclusive` after mount (dev warning; the Root keeps the mode it mounted with).
 
 ### 2.1 JS-free mode
 
@@ -440,10 +441,11 @@ function reduce(set: ReadonlySet<string>, patch: Patch, exclusive: boolean): Rea
 }
 
 // Root, multiple mode only
-reducer: (prev, next, details) =>
-  details.reason === "platform" && details.event === undefined
-    ? next                                             // mount reconciliation: adopted whole
-    : reduce(prev, { value: details.item, open: details.open }, false),
+reducer: (prev, _next, details) =>
+  reduce(prev, { value: details.item, open: details.open }, false),
+
+// mount reconciliation (2.3): adopted whole, bypassing the reducer
+dispatch(next, details, { whole: true });
 ```
 
 The reducer does two jobs (conventions 3.3, #150):
@@ -457,8 +459,11 @@ The reducer does two jobs (conventions 3.3, #150):
   open (hidden then by the Error Boundary that a superseded rejection used to reach).
 
 The **mount reconciliation** dispatch (2.3: `reason: "platform"`, no event) carries all
-pre-hydration clicks as one `next` and names only one of the items in `details`, so the reducer
-adopts its `next` whole. It cannot sit in a burst behind a click whose action later rejects: it
+pre-hydration clicks as one `next` and names only one of the items in `details`, so it is
+dispatched with the internal `whole` option of `useControllableAction`'s `dispatch`: its `next`
+bypasses the reducer, in the optimistic step and in the uncontrolled replay (#153; before, the
+reducer recognised it as "`reason: "platform"` without an event", which rested on which platform
+paths happen to pass an event). It cannot sit in a burst behind a click whose action later rejects: it
 runs from the Root's mount layout effect, the Root's first possible dispatch, and again only when
 an `<Activity>` re-shows the Root, where a pending click's item already has DOM `open` equal to
 the intended value and nothing is dispatched. A find-in-page reveal (`reason: "platform"` with
@@ -469,8 +474,10 @@ dispatched `next` (which `reduce(..., exclusive = true)` computed at dispatch ti
 intended set), and the latest dispatch commits it, exactly like Tabs. A patch reducer would be
 wrong here: open B (rejects), then close B (resolves) would replay "remove B" onto the committed
 `{a}` and re-open A, although the user's last intent, and the value the resolved action was
-called with, is `null` (review finding 1 of #150). The Root follows the live `exclusive` prop;
-changing it while actions are in flight is not supported (it changes the value's type).
+called with, is `null` (review finding 1 of #150). **`exclusive` is fixed at mount**, like
+ToggleGroup's mode (#153): the Root keeps the value of its first render (`useState`), for the
+reducer, the value shape handed to `valueChangeAction` and the static `name`; a later change
+warns in development and is ignored (it would change the value's type).
 
 The order problem one might expect in multiple mode (A then
 B dispatched, B commits first, A's older patch re-applies on top of B's commit) does not occur:
@@ -881,7 +888,7 @@ and controlled wrappers (controlled follows update-on-success). Library mode unl
 | Post-await rule | Controlled parent updating after `await` inside `startTransition`. |
 | Directive | Every file under `src/accordion/` except `index.ts` begins with `"use client"` (there is no directive-free part; see Conventions feedback). |
 | Platform path | `details.setAttribute("open", "")` (jsdom fires `toggle`) dispatches with `reason: "platform"`; controlled parent that ignores it → attribute removed after settle; parent that accepts → stays open; walkthrough 9.6; disabled item re-closes without dispatching. |
-| Mode guard | Changing Root from JS-free to library mode after mount warns. |
+| Mode guard | Changing Root from JS-free to library mode after mount warns. Changing `exclusive` after mount warns and keeps the mounted mode (value shape, reducer). |
 | `transition` smoke | Item, Trigger and Panel render with and without `transition`; JS-free mode warns and renders no boundary. Animation itself is an example-app check (jsdom has no `startViewTransition`). **Browser:** expanding an item with `transition` absent calls `document.startViewTransition` zero times; with `transition="none"` on the Panel it is called (conventions 10.1). |
 
 jsdom facts the tests rely on (verified against jsdom 29.1.1, the version `packages/ui` resolves
@@ -960,7 +967,7 @@ packages/ui/src/accordion/
 - **`reason`.** `AccordionValueChangeDetails.reason` is the shared `ChangeReason` (conventions
   2.2); until #100 the implementation carried a narrower local union, a type change after
   0.1.0-alpha.11 for a consumer who annotated it.
-- **Dev warnings:** mode change after mount; `defaultOpen` in library mode; `transition` in static
+- **Dev warnings:** mode change after mount; `exclusive` change after mount (#153); `defaultOpen` in library mode; `transition` in static
   mode; wrong `tagName` behind `render`; Item without Root (Item works standalone as a disclosure
   in static mode, so this one is informational only if the consumer passed `transition` or
   expected `exclusive`).
