@@ -10817,3 +10817,13 @@ with `useMountFixed` each mode detection is one call whose only other content is
 own prop list and message, so a second helper would only move those. `production-bundle.test.ts`
 collects the texts passed to `useMountFixed` too. Sections changed: the conventions 9.1 file
 listing.
+
+## 2026-11-24, #157: `toggleFromTrigger`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 7). Internal only, no
+behaviour change. The Trigger click rule (toggle against `intended()`; the #115 "hidden before
+its `toggle`" branch records an `"activate"` close intent; `beforeOpen` before `requestOpen`),
+written in `usePopoverTrigger` and again in Combobox.Trigger, is `toggleFromTrigger(ctx, event,
+beforeOpen?)` in `internal/use-popover-trigger.ts`. Each Trigger keeps its own `preventDefault()`,
+`disabled` check and what follows (Combobox focuses its input). Sections changed: the conventions
+9.1 file listing.
