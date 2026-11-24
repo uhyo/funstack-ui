@@ -16,7 +16,7 @@ const isDev = process.env.NODE_ENV !== "production";
  * "static": JS-free mode, the browser owns open and close through Invoker Commands. "library":
  * opening and part-initiated closing are library-owned requests (transitions keyed on committed
  * state, `openChangeAction`); dismissals are the browser's facts, adopted urgently and reported to
- * `onOpenChange` (design/components/popover.md section 2, overlay-open-change.md).
+ * `onOpenChange` (design/components/popover.md section 2, conventions 3.9).
  */
 export type OverlayMode = "static" | "library";
 
@@ -99,7 +99,7 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
     ...args: CloseArgs
   ) => void;
   /**
-   * A fact (#148, overlay-open-change.md 2.2): the browser hid the popup and the library did not
+   * A fact (#148, conventions 3.9.2): the browser hid the popup and the library did not
    * hide it (the caller has already excluded the library's own hide). Supersedes every request in
    * flight, writes committed `false` urgently (uncontrolled), and calls `onOpenChange(false,
    * details)` synchronously through the handler rule (`callUrgentHandler`). Call it from the
@@ -235,7 +235,7 @@ export function useOverlayRoot<
         "and `onOpenChange` were all absent on one render and present on another). Switching " +
         "between JS-free and library mode is not supported.",
   );
-  // W1 (overlay-open-change.md 9): React's `value` without `onChange`. Static only: a handler
+  // W1 (conventions 3.9.13): React's `value` without `onChange`. Static only: a handler
   // that adopts late (in a transition, after an `await`) cannot be told from an intentional
   // re-open, so nothing at runtime warns.
   const noun = nouns[component] ?? component;

@@ -1176,7 +1176,7 @@ describe("Popover", () => {
       await flushTasks(3);
       expect(isOpen()).toBe(false);
       // Lost interest while the interest open is still pending (nothing shown): a request that
-      // supersedes the open, with `reason: "dismiss"` (overlay-open-change.md 2.2, crossover).
+      // supersedes the open, with `reason: "dismiss"` (conventions 3.9.2, crossover).
       expect(action).toHaveBeenCalledTimes(3);
       expect(action.mock.calls[2]![0]).toBe(false);
       expect(action.mock.calls[2]![1].reason).toBe("dismiss");
@@ -1406,7 +1406,7 @@ describe("Popover", () => {
       expect(warning).toContain("no view transition");
     });
 
-    // #115, overlay-open-change.md 3.2: light dismiss hides the popup at `pointerup`, before the
+    // #115, popover.md 2.8: light dismiss hides the popup at `pointerup`, before the
     // click; the click names the cause of the fact the `toggle` reports.
     // #148 review L2: the marker of the library's own hide is consumed by every `toggle`. A hide
     // the platform coalesced with a show (one `open` -> `open` toggle) must not leave it set, or
@@ -2196,7 +2196,7 @@ describe("Popover", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("`onOpenChange`"));
     });
 
-    // #148, overlay-open-change.md 2.11
+    // #148, conventions 3.9.11
     it("onOpenChange alone selects library mode (uncontrolled), and hears a dismissal", async () => {
       const user = setupUser();
       const onOpenChange = vi.fn();

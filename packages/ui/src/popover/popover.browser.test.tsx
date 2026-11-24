@@ -1422,7 +1422,7 @@ describe("Popover (browser)", () => {
         await mouse.up(x, y);
       });
       await flushFor();
-      // Hidden by the light dismiss before the click: a fact (overlay-open-change.md 3.2), its
+      // Hidden by the light dismiss before the click: a fact (popover.md 2.8), its
       // cause named by the click; no request for an already hidden popup.
       expect(clicks).toEqual([false]);
       expect(isOpen()).toBe(false);

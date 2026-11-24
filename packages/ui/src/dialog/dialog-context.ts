@@ -8,7 +8,7 @@ import type { OverlayRootValue } from "../internal/use-overlay-root.js";
  * and a close's `returnValue`. `mode` "static" is JS-free mode, where the browser owns open and
  * close through Invoker Commands; in "library" mode opening and the closes a part asks for are
  * library-owned requests, dismissals browser-owned facts reported to `onOpenChange` (design
- * section 2, overlay-open-change.md).
+ * section 2, conventions 3.9).
  */
 export interface DialogContextValue extends Omit<
   OverlayRootValue<HTMLDialogElement, [returnValue: string]>,

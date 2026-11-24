@@ -359,6 +359,54 @@ question 2): it follows `closeOnActivate`.
 The alternative, a fixed `"ignore"` whatever `closeOnActivate` says, is one line simpler in the
 props table and makes the keep-open counter item need `whilePending="run"`.
 
+### 2.4 Requests and facts: which cause goes where
+
+The rule is conventions 3.9, applied to each `Menu.Root` independently: the top-level one, a
+context-menu Root and each submenu Root have the same `openChangeAction` / `onOpenChange` pair.
+
+| Cause | Channel | `next` | `reason` |
+| --- | --- | --- | --- |
+| Trigger click, Enter / Space / ArrowDown / ArrowUp on the Trigger, while closed | `openChangeAction` | `true` | `"activate"` |
+| `ContextTrigger`: `contextmenu`, long-press, Shift+F10 / the Menu key (`context-menu.md` 2) | `openChangeAction` | `true` | `"activate"` |
+| `SubmenuTrigger`: click, ArrowRight, Enter, hover after `delay` | `openChangeAction` (the submenu's Root) | `true` | `"activate"` |
+| A foreign open (invoker button, script) | `openChangeAction` | `true` | `"activate"` |
+| Found open at hydration | `openChangeAction` | `true` | `"platform"` |
+| Item activation with `closeOnActivate`, after the item's `action` | `openChangeAction` (the **root** Root) | `false` | `"activate"` |
+| Trigger click while open | `openChangeAction` | `false` | `"activate"` |
+| ArrowLeft in a submenu | `openChangeAction` (that submenu's Root) | `false` | `"activate"` |
+| The pointer leaving a hover-opened submenu, after `closeDelay` (held by the library) | `openChangeAction` (that submenu's Root) | `false` | `"dismiss"` |
+| Escape (the innermost menu) | **`onOpenChange`** | `false` | `"dismiss"` |
+| Light dismiss; another `auto` popover or modal dialog opening outside | **`onOpenChange`** (every Root of the stack) | `false` | `"dismiss"` |
+| Tab / Shift+Tab, focus leaving the menu tree (the library's immediate `hidePopover()`) | **`onOpenChange`** | `false` | `"dismiss"` |
+| Right-click or middle-button press outside the tree | **`onOpenChange`** | `false` | `"dismiss"` |
+| Context menu placed at a point: scroll of the document or an ancestor; captured-pointer release outside (`context-menu.md` 5) | **`onOpenChange`** | `false` | `"dismiss"` |
+| A submenu hidden because its parent menu closed, whatever closed the parent (also a request on the root: item activation) | **`onOpenChange`** (the submenu's Root) | `false` | `"dismiss"` |
+| A foreign invoker button closing the root popup | **`onOpenChange`** | `false` | `"activate"` |
+| Script `hidePopover()` | **`onOpenChange`** | `false` | `"dismiss"` |
+| A context-menu **move** (right-click inside the region while open, `context-menu.md` 4.3); controlled prop change; re-open of a refused fact | none | | |
+
+Menu-specific:
+
+- **An item's action is pending and the user presses Escape.** The fact closes the menu at
+  once. Uncontrolled: committed `false`; the items unmount (after the CSS exit, `held`). The
+  item's action keeps running in the item's own transition; its continuation finds the menu
+  closed (open-generation guard) and requests nothing; its rejection follows the "owner left"
+  rule (`reportError`, conventions 2.4).
+- **Item activation closes a root with open submenus.** One request on the root Root
+  (`openChangeAction(false, "activate")`); when the root popup hides in its commit, each submenu
+  Root gets `onOpenChange(false, { reason: "dismiss" })` from its own `toggle`. A controlled
+  submenu Root needs `onOpenChange` like any other controlled Root (the library would otherwise
+  try to show it again under a hidden parent); the development warning covers it.
+- `ContextTrigger` and `SubmenuTrigger` render optimistic `data-open` and the Root's
+  `data-pending` like the Trigger. `data-context` on the Popup keeps its own rule (until the
+  popup is hidden and its exit is over).
+- `aria-expanded` on a `SubmenuTrigger` (a `menuitem`, not an invoker button) is the `shown`
+  mirror.
+- `CheckboxItem` / `RadioItem` state (`checkedChangeAction`, `valueChangeAction`) is not open
+  state: actions.
+- **A refused re-open runs no initial focus** (conventions 3.9.4): focus stays where the
+  dismissal put it, so a controlled Menu without `onOpenChange` cannot trap the keyboard.
+
 ---
 
 ## 3. Props and types
@@ -1606,29 +1654,6 @@ shared overlay browser suite already asserts it for Menu on CI (13.2). Required:
 class (submenus close with their parent, section 9); MenuPage's Styling section carries the one
 line and the reason, or a link to the general statement if the writer moves it to the
 Transitions page. ContextMenu inherits the fix through `menu.css`.
-## Amendment: requests and facts, `onOpenChange` (#148, 2026-11-24, user decision; implemented 2026-11-24)
-
-Design: `design/components/overlay-open-change.md` (section 4 is Menu's; conventions resolved
-question 45). It overrides every place above that calls a dismissal's `openChangeAction(false)`
-a "notification" (2.2, 3.1, 10, 12):
-
-- Every `Menu.Root` (top level, context menu, submenu) gains **`onOpenChange?:
-  UrgentChangeHandler<boolean, MenuOpenChangeDetails>`**. `openChangeAction` hears **requests
-  only**: Trigger / ContextTrigger / SubmenuTrigger opens (click, keys, long-press, hover after
-  `delay`), foreign opens, a menu found open at hydration (`"platform"`), an item's close after
-  its action (on the root Root), a Trigger click while open (#110), ArrowLeft in a submenu, and
-  the pointer leaving a hover-opened submenu (`"dismiss"`: held by the library, so a request).
-- **Facts** (`onOpenChange(false)`): Escape, light dismiss, another top-layer element, Tab /
-  focus leaving the tree, a right- or middle-click outside, a scroll or a captured-pointer
-  release outside under a context menu, a submenu hidden because its parent closed (whatever
-  closed the parent, an item's request included), a foreign invoker (`"activate"`), script.
-  Synchronous in the `toggle` listener; committed `false` urgently; no `data-pending`, no view
-  transition. A context-menu **move** is neither.
-- An item's action pending and Escape: the menu closes at once (the fact); the item's
-  continuation finds a new open generation and requests nothing; its rejection follows the
-  "owner left" rule (`reportError`).
-- A controlled submenu Root needs `onOpenChange` like any controlled Root (the W1 warning says
-  so); a parent that keeps `open={true}` gets the menu re-shown at once.
 
 ## Amendment: no CSS exit recipe; the library cuts the transition (#147, 2026-11-24)
 
@@ -1643,7 +1668,7 @@ unrelated-view-transition rows.
 
 User decision 2026-11-24 (review-148 L3): when a controlled parent keeps `open={true}` after a
 dismissal (Escape, Tab out, a click outside), the menu is shown again in the fact's commit
-(overlay-open-change.md 2.4) **without initial focus**: focus stays on the Trigger (Escape) or on
+(conventions 3.9.4) **without initial focus**: focus stays on the Trigger (Escape) or on
 the next tab stop (Tab). Mechanism in `usePopoverPopup` (shared with Popover's `<div>` popups and
 Combobox, which never moves focus anyway). A later real open (the Trigger, keys) focuses the first
 item as before. Browser rows in `menu.browser.test.tsx`.

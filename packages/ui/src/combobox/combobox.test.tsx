@@ -2371,7 +2371,7 @@ describe("Combobox", () => {
       expect(input()).toHaveAttribute("aria-expanded", "false");
     });
 
-    // #148, overlay-open-change.md 5.3
+    // #148, combobox.md 5.6
     it("a controlled parent that keeps open={true} re-opens the listbox at once after Escape", async () => {
       const fact = vi.fn<OpenAction>();
       render(<Harness root={{ open: true, onOpenChange: fact }} />);

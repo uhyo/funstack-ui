@@ -792,6 +792,39 @@ that ends the action, which is the commit that closes; deferring the close until
 knows would split it from that commit and from its view transition. Only a rejection keeps the
 listbox open (deviation 4, accepted at review).
 
+### 5.6 Requests and facts: which cause goes where
+
+The Root has three states in three shapes, each for a stated reason: `value` (requests only,
+`valueChangeAction`: nothing but the library changes it), `inputValue` (facts only,
+`onInputValueChange`: the browser writes every keystroke), `open` (both: parts ask, the browser
+dismisses; conventions 3.9).
+
+| Cause | Channel | `next` | `reason` |
+| --- | --- | --- | --- |
+| Typing; ArrowDown / ArrowUp / Alt+ArrowDown while closed; Trigger click while closed; a pointer click in the input with `openOnClick`; a foreign open | `openChangeAction` | `true` | `"activate"` |
+| Found open at mount (only script can cause it here) | `openChangeAction` | `true` | `"platform"` |
+| The close after an accepted option (after `valueChangeAction` settled); re-accepting the selected option; Trigger click while open; Alt+ArrowUp | `openChangeAction` | `false` | `"activate"` |
+| Escape while open | **`onOpenChange`** | `false` | `"dismiss"` |
+| Focus leaving the input to outside the popup (the library's immediate `hidePopover()`) | **`onOpenChange`** | `false` | `"dismiss"` |
+| Light dismiss; another `auto` popover or modal dialog opening outside; a `Clear` click while open (the button is outside the popup) | **`onOpenChange`** | `false` | `"dismiss"` |
+| A foreign invoker button closing the listbox | **`onOpenChange`** | `false` | `"activate"` |
+| Script `hidePopover()` | **`onOpenChange`** | `false` | `"dismiss"` |
+
+- What a close *also does* stays on its own channel: the text revert or the custom-value commit
+  after focus leaves (`valueChangeAction`, 5.3), the `Clear` dispatch of `null`.
+- **An accepted option's `valueChangeAction` is pending and the user presses Escape.** The fact
+  closes the listbox at once. The value action is a different state: it is not superseded,
+  keeps `data-pending` and commits or rolls back; its continuation requests no close (nothing
+  is open; open-generation guard).
+- `aria-expanded` on the Input is the `shown` mirror; `data-open` on Input and Trigger is
+  optimistic (conventions 3.9.7).
+- Controlled `open` with a refusing parent: the listbox re-opens at once after Escape, with the
+  input still focused. Controlled `open` on a Combobox is rare; it needs
+  `onOpenChange={setOpen}` (development warns without it).
+- `onInputValueChange` follows the handler rule (conventions 2.1): it may return a promise,
+  which is not awaited and not warned about; a rejection and a synchronous throw go to
+  `reportError`, and the text write and everything after it still happen.
+
 ---
 
 ## 6. Results: deferred query, Suspense, Empty, announcements
@@ -2247,30 +2280,6 @@ listbox light-dismisses it (`(false, "dismiss")`, input keeps focus), on all thr
 `BrowserOwnedStatePage.tsx`'s "a disabled Trigger that stays focusable is no invoker either"
 becomes true as written; ComboboxPage's Trigger owned-keys note gains "(while enabled, or
 natively disabled; not while `aria-disabled`)" next to `popoverTarget`.
-
-## Amendment: requests and facts (#148, 2026-11-24, user decision; implemented 2026-11-24)
-
-Design: `design/components/overlay-open-change.md` (section 5 is Combobox's; conventions
-resolved question 45). What it changes here:
-
-| | Before | After |
-| --- | --- | --- |
-| `onInputValueChange` returning a promise | dev warning once; a rejection is unhandled; a throw propagates out of the `input` listener | **allowed, no warning**; the promise is not awaited; a rejection and a synchronous throw go to `reportError`; the text write and everything after it still happen (the handler rule, conventions 2.1) |
-| `openChangeAction` | every open-state change, dismissals as a "notification" | **requests only**: typing and arrow opens, Trigger, `openOnClick`, foreign opens, a popup found open at mount (`"platform"`), the close after an accepted option, Alt+ArrowUp |
-| `onOpenChange` | (none) | **new**, `UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>`, always `false`: Escape, focus leaving the input, light dismiss, another top-layer element, a `Clear` click while open, script `hidePopover()` (`"dismiss"`); a foreign invoker button (`"activate"`) |
-| After a dismissal | optimistic `false`, the action awaited in the Root's transition, `data-pending` on Input and Trigger, committed `false` when it settled | committed `false` in the event's urgent commit; no `data-pending`; no view transition |
-| Controlled `open`, parent keeps `true` after a dismissal (5.5) | re-opens after the action settles | re-opens at once; needs `onOpenChange={setOpen}` not to (development warns for `open` without `onOpenChange`) |
-
-The Root's three states now have three shapes, each for a reason: `value` (requests only:
-`valueChangeAction`), `inputValue` (facts only: `onInputValueChange`), `open` (both).
-Unchanged: the text revert and the custom-value commit after focus leaves (`valueChangeAction`),
-`Clear`'s `null` dispatch, `aria-expanded` from the `shown` mirror, the accept flow (a pending
-`valueChangeAction` is not superseded by an Escape; its continuation requests no close).
-
-Sections 3.1 (Root props), 5.4 (the Closing table's "notification" rows), 5.5 and the
-walkthroughs of 10 are rewritten with the implementation. Developer: the "returned a promise"
-warning text and its test row (amendment #96, implementation checklist) are deleted;
-`onInputValueChange` is called through `callUrgentHandler` (overlay-open-change.md 11).
 
 ## Amendment: the library cuts the CSS transition (#147, 2026-11-24)
 
