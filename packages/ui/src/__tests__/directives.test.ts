@@ -133,6 +133,9 @@ const clientFiles = [
   "toast/toast-description.mjs",
   "toast/toast-action.mjs",
   "toast/toast-close.mjs",
+  "toast/use-toast-pauses.mjs",
+  "toast/use-toast-focus.mjs",
+  "toast/use-toast-announcements.mjs",
   "internal/use-modal-registration.mjs",
   // Every Slider part and its context are client modules (design/components/slider.md,
   // decision 12 and 14.1 "Directive").

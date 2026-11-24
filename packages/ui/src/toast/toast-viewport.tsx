@@ -4,7 +4,6 @@ import type { ComponentPropsWithRef, CSSProperties, FocusEvent, ReactNode } from
 import { createPortal } from "react-dom";
 import { DialogContext } from "../dialog/dialog-context.js";
 import { createActionDetails } from "../internal/action-details.js";
-import { announce as speak } from "../internal/announce.js";
 import { callUrgentHandler } from "../internal/call-urgent-handler.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
@@ -21,16 +20,18 @@ import type {
   ToastItem,
   ToastListener,
   ToastManager,
-  ToastPriority,
 } from "./toast.js";
 import { ToastViewportContext } from "./toast-context.js";
 import type { ToastViewportContextValue } from "./toast-context.js";
-import { DEFAULT_HOTKEY, matchesHotkey, regionLabel } from "./toast-hotkey.js";
+import { DEFAULT_HOTKEY, regionLabel } from "./toast-hotkey.js";
 import { clearToastTimers, syncToastTimers } from "./toast-timers.js";
 import type { ToastTimer } from "./toast-timers.js";
-import { useModalPortalHost } from "./use-modal-portal-host.js";
-import { applyCommands, makeEntry, partition, plainText, withFlags } from "./toast-queue.js";
+import { applyCommands, makeEntry, partition, withFlags } from "./toast-queue.js";
 import type { Entry } from "./toast-queue.js";
+import { useModalPortalHost } from "./use-modal-portal-host.js";
+import { useToastAnnouncements } from "./use-toast-announcements.js";
+import { useToastFocus, useToastHotkey } from "./use-toast-focus.js";
+import { useToastPauses } from "./use-toast-pauses.js";
 
 /**
  * State of `Toast.Viewport`, passed to the function forms of `className`, `style`, `children` and
@@ -107,23 +108,6 @@ export interface ToastViewportProps extends Omit<
 
 const isDev = process.env.NODE_ENV !== "production";
 
-/** Document order. */
-function byDocumentPosition(a: Element, b: Element): number {
-  if (a === b) return 0;
-  return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-}
-
-interface PauseSources {
-  hover: boolean;
-  focus: boolean;
-  hidden: boolean;
-  blurred: boolean;
-}
-
-function anyPause(sources: PauseSources): boolean {
-  return sources.hover || sources.focus || sources.hidden || sources.blurred;
-}
-
 /**
  * The toast region: a `<section popover="manual">` named "Notifications (F8)", shown in the top
  * layer while it has toasts. Owns the queue (urgent state fed by `toast()`), the timers and their
@@ -168,19 +152,16 @@ export function ToastViewport({
   const roots = useRef(new Map<string, HTMLElement>());
   const suspended = useRef(new Set<string>());
   const timers = useRef(new Map<string, ToastTimer>());
-  const pauses = useRef<PauseSources>({
-    hover: false,
-    focus: false,
-    hidden: false,
-    blurred: false,
-  });
-  const [paused, setPaused] = useState(false);
-  /** Where focus goes back to once the last toast holding it leaves (design 7). */
-  const returnTarget = useRef<HTMLElement | null>(null);
-  const lastAnnounced = useRef(new Map<string, string | null>());
+
+  // --- Pause sources, focus, announcements (design 5, 6, 7) ---------------------------------
+  const pauses = useToastPauses(() => syncTimers());
+  const { paused, setPause, watch } = pauses;
+  const focus = useToastFocus({ entriesRef, roots, regionRef });
+  const { returnTargetRef, sortedRoots, moveFocusOut } = focus;
+  const { lastAnnouncedRef, queueAnnouncement, announceQueued } = useToastAnnouncements(regionRef);
+
   /** Per closing toast: the animations already running before `data-ending` applied. */
   const exitBaselines = useRef(new Map<string, ReadonlySet<Animation>>());
-  const announceBatch = useRef<{ text: string; priority: ToastPriority }[]>([]);
   const addedSinceEffect = useRef(false);
   const mounted = useRef(false);
 
@@ -195,61 +176,11 @@ export function ToastViewport({
 
   const syncTimers = (): void => {
     syncToastTimers(timers.current, partition(entriesRef.current, latest.current.limit).visible, {
-      halted: !mounted.current || anyPause(pauses.current),
+      halted: !mounted.current || pauses.anyHeld(),
       suspended: suspended.current,
       defaultDuration: latest.current.duration,
       expire: (id) => close([id], "timeout", undefined),
     });
-  };
-
-  const setPause = (source: keyof PauseSources, value: boolean): void => {
-    if (pauses.current[source] === value) return;
-    pauses.current[source] = value;
-    // Applied synchronously in the event, before any timer callback can run (design 14 item 9).
-    syncTimers();
-    setPaused(anyPause(pauses.current));
-  };
-
-  // --- Focus ----------------------------------------------------------------------------------
-
-  /** Open toasts' Root elements in document order. */
-  const sortedRoots = (exclude?: ReadonlySet<string>): { id: string; element: HTMLElement }[] => {
-    const open = new Set(entriesRef.current.filter((e) => !e.ending).map((e) => e.options.id));
-    const list: { id: string; element: HTMLElement }[] = [];
-    for (const [id, element] of roots.current) {
-      if (!open.has(id) || exclude?.has(id) || !element.isConnected) continue;
-      list.push({ id, element });
-    }
-    return list.sort((a, b) => byDocumentPosition(a.element, b.element));
-  };
-
-  /**
-   * Before toasts close: if focus is inside one of them, move it to the next toast, else the
-   * previous one, else where it was before the region was entered, else the body (design 7).
-   */
-  const moveFocusOut = (closing: ReadonlySet<string>): void => {
-    const doc = regionRef.current?.ownerDocument ?? document;
-    const active = doc.activeElement;
-    if (!(active instanceof HTMLElement)) return;
-    const all = sortedRoots();
-    const index = all.findIndex(({ element }) => element.contains(active));
-    if (index === -1 || !closing.has(all[index]!.id)) return;
-    const after = all.slice(index + 1).find(({ id }) => !closing.has(id));
-    const before = all
-      .slice(0, index)
-      .reverse()
-      .find(({ id }) => !closing.has(id));
-    const target = after ?? before;
-    if (target !== undefined) {
-      target.element.focus();
-      return;
-    }
-    const stored = returnTarget.current;
-    if (stored !== null && stored.isConnected && !regionRef.current?.contains(stored)) {
-      stored.focus();
-      if (doc.activeElement === stored) return;
-    }
-    active.blur();
   };
 
   // --- Queue writes ---------------------------------------------------------------------------
@@ -303,7 +234,7 @@ export function ToastViewport({
   const drop = (id: string): void => {
     const next = entriesRef.current.filter((e) => !(e.ending && e.options.id === id));
     if (next.length === entriesRef.current.length) return;
-    lastAnnounced.current.delete(id);
+    lastAnnouncedRef.current.delete(id);
     exitBaselines.current.delete(id);
     write(next);
   };
@@ -312,7 +243,7 @@ export function ToastViewport({
     const result = applyCommands(entriesRef.current, commands, (id) => roots.current.has(id));
     for (const id of result.replaced) clearToastTimers(timers.current, id);
     for (const id of result.forgotten) {
-      lastAnnounced.current.delete(id);
+      lastAnnouncedRef.current.delete(id);
       exitBaselines.current.delete(id);
     }
     if (result.added) addedSinceEffect.current = true;
@@ -342,35 +273,12 @@ export function ToastViewport({
     write(next);
   };
 
-  // --- Announcements (design 5) ---------------------------------------------------------------
-
-  const flushAnnouncements = (): void => {
-    const batch = announceBatch.current;
-    announceBatch.current = [];
-    if (batch.length === 0) return;
-    const priority = batch.some((a) => a.priority === "high") ? "high" : "normal";
-    speak(
-      regionRef.current?.ownerDocument ?? document,
-      batch.map((a) => a.text).join(" "),
-      priority,
-    );
-  };
-
-  const queueAnnouncement = (id: string, text: string | null, priority: ToastPriority): void => {
-    const map = lastAnnounced.current;
-    if (map.has(id) && map.get(id) === text) return;
-    map.set(id, text);
-    if (text === null || text.trim() === "") return;
-    if (announceBatch.current.length === 0) queueMicrotask(flushAnnouncements);
-    announceBatch.current.push({ text, priority });
-  };
-
   // The callbacks below read only refs, so one context value serves the Viewport's whole life.
   const restore = (toasts: readonly RetainedToast[]): void => {
     if (entriesRef.current.length > 0) return;
     // Already announced by the previous Viewport: not again on every remount.
     for (const t of toasts) {
-      if (t.announced !== undefined) lastAnnounced.current.set(t.options.id, t.announced);
+      if (t.announced !== undefined) lastAnnouncedRef.current.set(t.options.id, t.announced);
     }
     write(
       toasts.map((t) =>
@@ -381,7 +289,7 @@ export function ToastViewport({
   };
 
   const retain = (): readonly RetainedToast[] => {
-    const announced = lastAnnounced.current;
+    const announced = lastAnnouncedRef.current;
     return entriesRef.current
       .filter((e) => !e.ending)
       .map((e) => ({
@@ -395,7 +303,7 @@ export function ToastViewport({
   const reset = (): void => {
     moveFocusOut(new Set(entriesRef.current.filter((e) => !e.ending).map((e) => e.options.id)));
     clearToastTimers(timers.current);
-    lastAnnounced.current.clear();
+    lastAnnouncedRef.current.clear();
     exitBaselines.current.clear();
     write([]);
   };
@@ -409,7 +317,6 @@ export function ToastViewport({
     drop,
     setActionPending,
     queueAnnouncement,
-    setPause,
     syncTimers,
   });
 
@@ -474,54 +381,18 @@ export function ToastViewport({
     if (rejected) return;
     mounted.current = true;
     const doc = regionRef.current?.ownerDocument ?? document;
-    const view = doc.defaultView ?? window;
-    pauses.current.hidden = doc.visibilityState === "hidden";
-    const onVisibility = (): void =>
-      handlers.current.setPause("hidden", doc.visibilityState === "hidden");
-    // The window's own focus and blur; an element's (which do not bubble) never reach here.
-    const onWindowBlur = (event: Event): void => {
-      if (!(event.target instanceof Node)) handlers.current.setPause("blurred", true);
-    };
-    const onWindowFocus = (event: Event): void => {
-      if (!(event.target instanceof Node)) handlers.current.setPause("blurred", false);
-    };
-    doc.addEventListener("visibilitychange", onVisibility);
-    view.addEventListener("blur", onWindowBlur);
-    view.addEventListener("focus", onWindowFocus);
+    const unwatch = watch(doc);
     handlers.current.syncTimers();
-    setPaused(anyPause(pauses.current));
     const map = timers.current;
     return () => {
       mounted.current = false;
-      doc.removeEventListener("visibilitychange", onVisibility);
-      view.removeEventListener("blur", onWindowBlur);
-      view.removeEventListener("focus", onWindowFocus);
+      unwatch();
       // Unmounting stops the timers; the queue itself is retained by the manager.
       clearToastTimers(map);
     };
-  }, [handlers, rejected]);
+  }, [handlers, rejected, watch]);
 
-  const hotkeyKey = hotkey === null ? null : hotkey.join("\u0000");
-  useEffect(() => {
-    if (hotkeyKey === null || rejected) return;
-    const keys = hotkeyKey.split("\u0000");
-    const doc = regionRef.current?.ownerDocument ?? document;
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.defaultPrevented || !matchesHotkey(keys, event)) return;
-      const all = sortedRoots();
-      const newest = all.at(-1);
-      if (newest === undefined) return;
-      event.preventDefault();
-      const active = doc.activeElement;
-      if (active instanceof HTMLElement && !regionRef.current?.contains(active)) {
-        returnTarget.current = active;
-      }
-      newest.element.focus();
-    };
-    doc.addEventListener("keydown", onKeyDown);
-    return () => doc.removeEventListener("keydown", onKeyDown);
-    // oxlint-disable-next-line react-hooks/exhaustive-deps -- `sortedRoots` reads refs only
-  }, [hotkeyKey, rejected]);
+  useToastHotkey({ hotkey, rejected, regionRef, focus });
 
   // --- The portal host (design 4.3) ------------------------------------------------------------
 
@@ -537,10 +408,10 @@ export function ToastViewport({
     const current = entriesRef.current;
     // Focus that left with a remount (a move into or out of a dialog) fires no `focusout`.
     if (
-      pauses.current.focus &&
+      pauses.holding("focus") &&
       (region === null || !region.contains(region.ownerDocument.activeElement))
     ) {
-      returnTarget.current = null;
+      returnTargetRef.current = null;
       setPause("focus", false);
     }
     if (region !== null && region.isConnected && region.hasAttribute("popover")) {
@@ -563,23 +434,13 @@ export function ToastViewport({
     }
     // An emptied region is hidden, often right under the pointer (its last toast's Close), and
     // a hidden element gets no `pointerleave`: the next toast must not start paused.
-    if (current.length === 0 && pauses.current.hover) setPause("hover", false);
+    if (current.length === 0 && pauses.holding("hover")) setPause("hover", false);
     addedSinceEffect.current = false;
 
     const { visible, queued } = partition(current, latest.current.limit);
-    // Queued toasts are announced on add (design 5): from their plain-text fields, since they
-    // have no DOM yet. Visible ones announce from their Root once their content committed.
-    for (const entry of queued) {
-      const id = entry.options.id;
-      if (lastAnnounced.current.has(id)) continue;
-      const resolver = entry.options.announce ?? latest.current.announce;
-      const text = resolver
-        ? resolver(entry.item)
-        : [plainText(entry.options.title), plainText(entry.options.description)]
-            .filter((t) => t !== "")
-            .join(" ");
-      queueAnnouncement(id, text, entry.options.priority ?? "normal");
-    }
+    // Queued toasts are announced on add (design 5); visible ones announce from their Root
+    // once their content committed.
+    announceQueued(queued, latest.current.announce);
     // An ending toast without a Root (the consumer did not render one) has nothing to animate.
     for (const entry of visible) {
       if (entry.ending && !roots.current.has(entry.options.id)) drop(entry.options.id);
@@ -621,14 +482,14 @@ export function ToastViewport({
     const region = event.currentTarget;
     const from = event.relatedTarget;
     if (!(from instanceof Node) || !region.contains(from)) {
-      returnTarget.current ??= from instanceof HTMLElement ? from : null;
+      returnTargetRef.current ??= from instanceof HTMLElement ? from : null;
     }
     setPause("focus", true);
   };
   const onBlur = (event: FocusEvent<HTMLElement>): void => {
     const to = event.relatedTarget;
     if (to instanceof Node && event.currentTarget.contains(to)) return;
-    returnTarget.current = null;
+    returnTargetRef.current = null;
     setPause("focus", false);
   };
 
