@@ -32,7 +32,7 @@ import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import { useActiveOption } from "./use-active-option.js";
 import { useComboboxForm } from "./use-combobox-form.js";
-import { useComboboxKeyboard } from "./use-combobox-keyboard.js";
+import { createComboboxKeyDown } from "./combobox-keyboard.js";
 import { useComboboxText } from "./use-combobox-text.js";
 import { useDeferredLeave } from "./use-deferred-leave.js";
 import { useOptionRegistry } from "./use-option-registry.js";
@@ -594,7 +594,7 @@ export function ComboboxRoot(props: ComboboxRootProps) {
     popover.requestOpen(event, "activate");
   };
 
-  const keyDown = useComboboxKeyboard({
+  const keyDown = createComboboxKeyDown({
     disabled,
     loop,
     allowCustomValue,

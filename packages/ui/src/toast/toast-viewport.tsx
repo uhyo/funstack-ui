@@ -154,6 +154,7 @@ export function ToastViewport({
   const timers = useRef(new Map<string, ToastTimer>());
 
   // --- Pause sources, focus, announcements (design 5, 6, 7) ---------------------------------
+  // `syncTimers` is declared below; the callback only runs from events and effects, after render.
   const pauses = useToastPauses(() => syncTimers());
   const { paused, setPause, watch } = pauses;
   const focus = useToastFocus({ entriesRef, roots, regionRef });

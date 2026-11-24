@@ -21,10 +21,10 @@ export interface ComboboxKeyboardOptions {
 
 /**
  * The keyboard model of the Combobox Input (design/components/combobox.md 8), the counterpart of
- * `menu/use-menu-keyboard.ts`. Returns the Input's `keydown` handler, which tells whether it
- * handled the key.
+ * `menu/use-menu-keyboard.ts`. A plain factory, not a hook (it calls none): the Root calls it on
+ * every render. Returns the Input's `keydown` handler, which tells whether it handled the key.
  */
-export function useComboboxKeyboard({
+export function createComboboxKeyDown({
   disabled,
   loop,
   allowCustomValue,
