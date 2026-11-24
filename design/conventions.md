@@ -66,37 +66,38 @@ import { Toggle } from "@funstack/ui/toggle";
 <Toggle pressedChangeAction={setFavorite}>Favorite</Toggle>
 ```
 
-Part vocabulary (reuse these names; invent a new one only when none fits):
+Part vocabulary (reuse these names; invent a new one only when none fits). Each component's
+anatomy section says what the part renders there; this table fixes what the name means.
 
 | Part | Meaning | Default element |
 | --- | --- | --- |
-| `Root` | Owns state, context and the transition. May render no DOM (overlays) or a wrapper; a Root that owns a form value but no visible element may render exactly one `<input type="hidden">` when `name` is given (Combobox); a Form's Root is the `<form>` itself; NumberField's is a `div[role=group]`. | `div` / `form` or none |
-| `List` | Groups triggers; owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (the Popup is the container, because a listbox may contain only options and groups). | `div` |
-| `Item` | One entry in a multi-item component (Accordion, Menu). Menu's is a `button[role=menuitem]` with an `action`; ToggleGroup's is a `button[aria-pressed]`, the Toggle element, whose pressed state is the Root's. | `div` / `details` / `button` |
+| `Root` | Owns state, context and the transition. May render no DOM (overlays), a wrapper, the `<form>` itself (Form) or a `div[role=group]` (NumberField); a Root that owns a form value but no visible form element renders exactly one `<input type="hidden">` when `name` is given (Combobox). | `div` / `form` or none |
+| `List` | Groups triggers and owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (a listbox may contain only options and groups, so the Popup is the container). | `div` |
+| `Item` | One entry in a multi-item component: Accordion's `details`, Menu's `button[role=menuitem]` with an `action`, ToggleGroup's `button[aria-pressed]` whose pressed state is the Root's. | `div` / `details` / `button` |
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
-| `ContextTrigger` | A region whose `contextmenu` (right-click, Ctrl+click, Shift+F10 / the ContextMenu key at a focused descendant, a library long-press for touch) opens the owner's `Popup` at the pointer (Menu). A plain element with **no role and no ARIA** (`aria-haspopup` is not allowed on generic roles and ARIA has no attribute for "has a context menu"); `data-open` / `data-pending` / `data-disabled`. May share a Root with a `Trigger` (a "More" button and a right-click region opening one popup). | `div` |
+| `ContextTrigger` | A region whose `contextmenu` (right-click, the keyboard's context-menu keys, a library long-press for touch) opens the owner's `Popup` at the pointer (Menu). A plain element with **no role and no ARIA**; may share a Root with a `Trigger`. | `div` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
-| `Popup` | Content that lives in the top layer (Tooltip, Popover, Menu). | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
-| `Indicator` | Purely visual element that tracks state (active tab marker; the fill of a Slider, placed by the consumer's CSS from the Root's `--slider-start` / `--slider-end`; the fill of a Progress / Meter, sized by the consumer's CSS from the Root's `--progress-value` / `--meter-value`). | `span` |
-| `Label` | Names the owner. For `<fieldset>`-based groups (RadioGroup, CheckboxGroup) it renders `<legend>` and must be the Root's first child; for a component whose owner surface is an `Input` part (Combobox) it renders `<label for>`; for Slider it renders `label[for]` naming the only Thumb's input, or `label[id]` naming a multi-thumb Root (`role="group"`); for Field it renders `label[for]` naming the field's control, or `label[id]` that a group control (a `<fieldset>` Root) is `aria-labelledby` (the `for` is dropped once such a control registers); for NumberField it renders `label[for]` naming the visible input and its id names the Root group; for an output role that is not labelable (Progress, Meter) it renders `span[id]` and the Root references the id through `aria-labelledby` unconditionally, dangling when no Label is rendered. | `label` / `legend` / `span` |
-| `Input` | The text field of a combobox-like component: `input[role=combobox]`, the owner's surface for `data-pending`, with the urgent `inputValue` state (section 2.6); or the visible text field of a NumberField (`input[type=text][inputmode]`, the owner surface for `data-pending`, with the urgent draft text), which renders the hidden native number input right after it. | `input` |
-| `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its checked/mixed state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
-| `Option` | One choice in a native `<select>` (Select; renders optimistic `data-selected`, equal to the platform's `:checked`) or in a listbox (Combobox: `div[role=option]`, never focused, `data-active` for virtual focus). | `option` / `div` |
+| `Popup` | Content that lives in the top layer. | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
+| `Indicator` | Purely visual element that tracks state: the active tab marker; the fill of a Slider, Progress or Meter, sized by the consumer's CSS from the Root's custom properties. | `span` |
+| `Label` | Names the owner, in the form the owner's element needs: `<legend>` as the first child of a `<fieldset>` Root (RadioGroup, CheckboxGroup); `label[for]` for an input surface (Combobox, NumberField, a one-thumb Slider, Field's control); `label[id]` or `span[id]` referenced through `aria-labelledby` where the owner is a group or is not labelable (a multi-thumb Slider, a Field's group control, Progress, Meter). | `label` / `legend` / `span` |
+| `Input` | A text field that is the owner's surface for `data-pending` and holds an urgent state (2.6): Combobox's `input[role=combobox]` (`inputValue`), NumberField's visible `input[type=text][inputmode]` (the draft text), which renders the hidden native number input right after it. | `input` |
+| `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
+| `Option` | One choice: in a native `<select>` (optimistic `data-selected`, equal to the platform's `:checked`) or in a listbox (Combobox: `div[role=option]`, never focused, `data-active` for virtual focus). | `option` / `div` |
 | `Clear` | A `tabindex="-1"` button that empties a text field and dispatches the empty selection (Combobox). | `button` |
 | `Empty` | Content the **library** shows only when a list has no mounted options and its results are neither stale nor loading (Combobox). | `div` |
-| `Status` | A loading fallback or hint inside a popup (Combobox). Outside the `List` it is `role="status"`; **inside** the `List` it is the Suspense fallback, renders `role="none"` (a listbox may own only options and groups) and marks the list as loading: `aria-busy="true"` on the listbox, `Empty` hidden, nothing announced. | `div` |
-| `Value` | The element that shows the current value. Select: the element the browser fills with the selected option's content; it has **no `children` prop**, since the parser and the browser write its content, so the part renders it with the hydration pattern of section 7.4. Slider: a `span` rendering the shown value (`children(state)`, or one thumb's value by `index`). Progress / Meter: a `span`, `aria-hidden` by default (the same text is in `aria-valuetext`), showing `formattedValue`. | `selectedcontent` / `span` |
-| `Track` | The rail a slider's thumbs move along; owns pointer interaction (a press moves the nearest thumb) and is the geometry reference for pointer math. For Progress / Meter: the rail of the bar, with no interaction. | `div` |
+| `Status` | A loading fallback or hint inside a popup (Combobox). Outside the `List` it is `role="status"`; **inside** the `List` it is the Suspense fallback, renders `role="none"` and marks the list as loading (`aria-busy="true"`, `Empty` hidden, nothing announced). | `div` |
+| `Value` | The element that shows the current value. Select: the `<selectedcontent>` the browser fills, with **no `children` prop** (7.4). Slider, Progress, Meter: a `span` (Progress / Meter: `aria-hidden` by default, the same text is in `aria-valuetext`). | `selectedcontent` / `span` |
+| `Track` | The rail of a Slider (owns pointer interaction and is the geometry reference for pointer math) or of a Progress / Meter bar (no interaction). | `div` |
 | `Thumb` | A draggable value handle (Slider, one per value, explicit `index`): a styled element **containing** a visually hidden native `<input type="range">`, which is the focusable, labelled, form-participating `slider`. | `span` + `input[type=range]` |
-| `Increment` / `Decrement` | `button[type=button][tabindex=-1]` that steps a numeric value, with press-and-hold (NumberField); `aria-controls` → the field's input; natively `disabled` when the next step would change nothing. | `button` |
+| `Increment` / `Decrement` | `button[type=button][tabindex=-1]` that steps a numeric value, with press-and-hold (NumberField); natively `disabled` when the next step would change nothing. | `button` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
-| `Control` | The native form control a Field labels and describes: an `input`, or a `textarea` / `select` through `render`; must stay a native control. Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (section 3.8). | `input` |
-| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the control (Field) or the `<dialog>` (Dialog) always references, mounted or not (a dangling reference is skipped). | `p` |
-| `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown, referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
+| `Control` | The native form control a Field labels and describes (`input`, or `textarea` / `select` through `render`). Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (3.8). | `input` |
+| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the control (Field) or the `<dialog>` (Dialog) always references, mounted or not. | `p` |
+| `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown and referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
-| `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu): an element with an id the group references through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
-| `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending` (`useActionTrigger`). The general one is the single-element `Button` (`@funstack/ui/button`): `type="button"` by default (`"submit"` with `formAction`), runs every activation by default and, with `whilePending="ignore"`, ignores activation while its own action is pending (`aria-disabled="true"` meanwhile; 2.5.1), and reads `ToolbarContext` so that inside a Toolbar `disabled` renders `aria-disabled` and keeps the button focusable, as the APG Toolbar example wants. A Toolbar's command button is a `Button`; the Toolbar has no button part. | `button` |
-| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default (implicit `separator` role); inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's (`Toolbar.Separator`). | as named |
+| `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
+| `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending`. The general one is the single-element `Button` (`@funstack/ui/button`; `whilePending`, 2.5.1), which is also a Toolbar's command button: the Toolbar has no button part, and `Button` reads `ToolbarContext` so that a disabled one stays focusable there (3.6). | `button` |
+| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default; inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
 top layer and CSS Anchor Positioning places it, so the platform does both jobs (see
@@ -156,55 +157,52 @@ Rules for the element passed to `render` (same as Base UI):
 - `className`: the library's and the element's are concatenated. `style`: merged, element wins.
 - Event handlers the library installs (for example `onClick` on a `Tab`): both run, the element's
   first, then the library's. v0 provides no way to cancel the library's handler from there.
-- Element-type-specific attributes are set only when they apply to the rendered element:
-  `type="button"` is emitted for a `<button>` and omitted for `render={<a href />}` or any other
-  **host** element, rather than landing as a meaningless attribute on an anchor. A **component**
-  `render` element (`render={<MyButton />}`) receives `type` too: the part
-  cannot see what it renders, a missing `type` on a component that renders a `<button>` inside a
-  form is a silent submit, and an ignored `type` on one that renders a link is harmless. The
-  shared predicate is `rendersButton(render)` (`internal/render-element.ts`): `true` for no
-  `render`, the function form, a host `"button"` and any component element. For `disabled`
-  the choice depends on who acts on the click. **Native `disabled`** on a host `<button>` (no
-  `render`, the function form), and wherever the click's effect is the **browser's own** (a
-  submit, a reset, a JS-free invoker command) and the element **may be a button** (a host
-  `<button>` / `<input>`, or a component): only native `disabled` stops a submission or a
-  command before hydration and blocks implicit submission, and if a component turns out to
-  render a link the part fails at its job either way. **`aria-disabled="true"` with a cancelled
-  click** only in three cases: the element certainly cannot be natively disabled (a host `<a>`,
-  `<div>`; native `disabled` means nothing there and would expose an enabled link to assistive
-  technology); the part's **own click handler is the action** and the element is not certainly
-  a host `<button>` (a link or component render); or the consumer **opts into** a focusable
-  disabled control (APG: a `Button` inside a Toolbar or with `focusableWhenDisabled`, a menu
-  item). The handler is what makes `aria-disabled` safe (it returns before dispatch and
-  `preventDefault()`s), so the browser-run parts (`Form.Submit`; a JS-free command Trigger /
-  Close; a `Button` whose `type` is `"submit"` / `"reset"`, by default with `formAction`, or
-  that carries `commandfor` / `popoverTarget`, with or without `action`: the browser acts on
-  that click too) keep native `disabled` on any element that may be a button. The parts whose
-  handler is all the click does (`Button` with `action` and none of those, Toggle,
-  ToggleGroup.Item, Menu.Trigger, Combobox.Trigger / Clear, NumberField.Increment / Decrement,
-  Toast.Action / Close, and the Close and Trigger parts of Dialog and Popover in the modes
-  where they handle the click; `design/components/button.md` 17.1) take the `aria-disabled`
-  branch on a link or component render. A part with no click handler of its own (`Form.Submit`,
-  a JS-free command Trigger / Close) that lands in the `aria-disabled` branch on a host link
-  installs one while disabled that only cancels the click (`cancelClick`), so a disabled link
-  never navigates after hydration; before hydration nothing stops a link. When `disabled` and a pending pure trigger's
-  `aria-disabled` (3.6) meet on a natively disabled element, native `disabled` wins and no
-  `aria-disabled` is rendered. In that `aria-disabled` branch an **invoker also
-  owns its invoker attributes (`popoverTarget`, `commandfor`, `command`) as `undefined`**: `aria-disabled` has no
-  behaviour, and a disabled component render spreading onto a real `<button commandfor
-  command>` would otherwise be a live invoker in the server HTML before hydration. The part owns
-  `aria-disabled` only where it computes it (that branch, or a pending pure trigger); on a host
-  button outside it the consumer's own `aria-disabled` passes through. When the element is
-  unknown, each attribute takes the choice that is harmless if the guess is wrong.
-  One helper implements the rule for every such part, `Button` and `Form.Submit` included:
-  `disabledButton(render, disabled, { handlesClick?, alwaysFocusable? })` in
-  `internal/render-element.ts` returns `props`, the owned `disabled` / `aria-disabled` keys of
-  the branch it chose, and `invoker`, whether `commandfor` / `command` may render;
-  `handlesClick: false` is the browser-run case above (native unless the element certainly
-  cannot be disabled) and `alwaysFocusable` the opt-in focusable case (`SubmenuTrigger` through
-  `usePopoverTrigger`'s `submenuItem`, `Button`'s Toolbar and `focusableWhenDisabled`).
-  `pendingAriaDisabled` in the same module merges the branch with a pure trigger's pending
-  `aria-disabled`.
+- **`type`** is set only where it applies: `type="button"` is emitted for a `<button>` and
+  omitted for `render={<a href />}` or any other **host** element. A **component** `render`
+  element (`render={<MyButton />}`) receives `type` too: the part cannot see what it renders, a
+  missing `type` on a component that renders a `<button>` inside a form is a silent submit, and
+  an ignored `type` on one that renders a link is harmless. The predicate is
+  `rendersButton(render)` (`internal/render-element.ts`): `true` for no `render`, the function
+  form, a host `"button"` and any component element.
+- **`disabled` on a button-like part** depends on who acts on the click. One helper decides it
+  for every such part, `Button` and `Form.Submit` included: `disabledButton(render, disabled,
+  { handlesClick?, alwaysFocusable? })` in `internal/render-element.ts`, which returns the
+  owned `disabled` / `aria-disabled` keys of the branch it chose (`props`) and whether invoker
+  attributes may render (`invoker`). When the element is unknown, each attribute takes the
+  choice that is harmless if the guess is wrong. The rule
+  (`design/components/button.md` 17 lists the parts):
+  - **Native `disabled`** on a host `<button>` (no `render`, the function form), and wherever
+    the click's effect is the **browser's own** (`handlesClick: false`: a submit, a reset, a
+    JS-free invoker command) and the element **may be a button** (a host `<button>` /
+    `<input>`, or a component). Only native `disabled` stops a submission or a command before
+    hydration and blocks implicit submission. The browser-run parts are `Form.Submit`, a
+    JS-free command Trigger / Close, and a `Button` whose `type` is `"submit"` / `"reset"` (by
+    default with `formAction`) or that carries `commandfor` / `popoverTarget`, with or without
+    `action`.
+  - **`aria-disabled="true"` with a cancelled click** in three cases only: the element
+    certainly cannot be natively disabled (a host `<a>`, `<div>`: native `disabled` means
+    nothing there and would expose an enabled link to assistive technology); the part's **own
+    click handler is the action** and the element is not certainly a host `<button>` (a link
+    or component render of `Button` with `action`, Toggle, ToggleGroup.Item, Menu.Trigger,
+    Combobox.Trigger / Clear, NumberField.Increment / Decrement, Toast.Action / Close, and the
+    Close and Trigger parts of Dialog and Popover in the modes where they handle the click); or
+    the consumer **opts into** a focusable disabled control (`alwaysFocusable`: a `Button`
+    inside a Toolbar or with `focusableWhenDisabled`, a menu item, `SubmenuTrigger` through
+    `usePopoverTrigger`'s `submenuItem`). The handler is what makes `aria-disabled` safe: it
+    returns before dispatch and `preventDefault()`s.
+  - A part with no click handler of its own (`Form.Submit`, a JS-free command Trigger / Close)
+    that lands in the `aria-disabled` branch on a host link installs one while disabled that
+    only cancels the click (`cancelClick`), so a disabled link never navigates after hydration;
+    before hydration nothing stops a link.
+  - In the `aria-disabled` branch a disabled **invoker also owns its invoker attributes
+    (`popoverTarget`, `commandfor`, `command`) as `undefined`**: `aria-disabled` has no
+    behaviour, and a disabled component render spreading onto a real `<button commandfor
+    command>` would otherwise be a live invoker in the server HTML before hydration.
+  - The part owns `aria-disabled` only where it computes it (that branch, or a pending pure
+    trigger); on a host button outside it the consumer's own `aria-disabled` passes through.
+  - When `disabled` and a pending pure trigger's `aria-disabled` (3.6) meet on a natively
+    disabled element, native `disabled` wins and no `aria-disabled` is rendered
+    (`pendingAriaDisabled` in the same module).
 - Library-controlled attributes (`role`, `aria-*` *state* the part computes such as
   `aria-pressed` / `aria-selected`, `id` wiring, `data-*` state) win over the element's, with one
   carve-out: ARIA id-reference lists (`aria-labelledby`, `aria-describedby`, `aria-controls`,
@@ -565,81 +563,67 @@ component that owns the transition** (the `Root`, or the component itself), with
 both rejections React itself would drop, which are passed to the global `reportError` instead:
 the rejection of a **superseded** action (an older one, when a newer action of the same owner was
 dispatched before it settled), and the rejection of the latest action when its **owner is gone**
-(unmounted, or hidden by `<Activity>`) by the time it arrives. The library never swallows
-an error. There is no `errorAction` prop in v0.
+(unmounted, or hidden) by the time it arrives. The library never swallows an error. There is no
+`errorAction` prop in v0.
 
-Why the exception. `useTransition` stores one thenable per `startTransition` call as a state
-update and only the newest is ever unwrapped, so React drops an older action's rejection
-entirely: no boundary, no `reportError`, no `unhandledrejection` (verified on 19.3.1, both
-resolution orders, both modes; `memo/architect/143-design-questions.md`). Throwing it from
-render instead would replace the whole UI because of an intent the user had already replaced,
-a behaviour React does not have for the same code written by hand. So the library does what
-React's standalone `startTransition` does with a rejection it has no boundary for: it reports
-it. The UI stays up and shows the latest intent; the failure reaches `window.onerror`,
-monitoring tools and test runners.
+Why the exceptions: `useTransition` keeps one thenable per `startTransition` call and only the
+newest is ever unwrapped, and it routes a rejection only through a render of the component that
+owns it; an older action's rejection, or one whose owner no longer renders, reaches no
+boundary, no `reportError` and no `unhandledrejection`. Throwing a superseded rejection from
+render instead would replace the whole UI because of an intent the user had already replaced.
+So the library does what React's standalone `startTransition` does with a rejection it has no
+boundary for: it reports it. The UI stays up and shows the latest intent; the failure reaches
+`window.onerror`, monitoring tools and test runners.
 
-Contract:
+Contract (implemented per instance by `useControllableAction`, `useActionTrigger` and
+`Form.Root` for the submissions it runs in its own transition):
 
 - The **latest** dispatch's rejection propagates through React's own path while its owner is
-  mounted and visible (not hidden by `<Activity>`, `keepMounted` or a Suspense fallback): the
-  hook rethrows it inside the transition. It reaches the boundary only **after every older
-  overlapping dispatch has settled**: React holds the boundary's commit while the entangled
-  action lane is still pending (section 2.3 item 5). React behaviour, documented so a test that
-  rejects the newest of two dispatches does not expect the fallback before the older one
-  resolves.
+  mounted and visible: the hook rethrows it inside the transition. It reaches the boundary only
+  **after every older overlapping dispatch has settled**, because React holds the boundary's
+  commit while the entangled action lane is still pending (2.3 item 5); a test that rejects
+  the newest of two dispatches must not expect the fallback before the older one resolves.
 - "Latest" is judged **when the rejection arrives**: a dispatch is superseded when another
   dispatch of the same hook instance was made after it, whether that one is still pending or has
   already settled.
 - A **superseded** dispatch's rejection is caught by the hook and passed to `reportDropped`
   (`internal/report-dropped.ts`): the global `reportError` (a window `error` event), or
   `console.error` in an environment without it. Nothing is thrown, no state is written, no
-  boundary is involved, and the newer dispatch's outcome is unaffected.
-- **Every** superseded rejection of a burst is reported, each once, in the order they arrive.
-  When the latest dispatch rejects as well, it still goes to the boundary; the two routes are
-  independent.
-- Reports **continue after unmount**: a superseded action that rejects after its component left
-  is still reported.
-- **The latest rejection once the owner is gone is reported too**. The hook rethrows a
-  latest rejection only while its component's effects are connected (`useConnected` in
-  `use-connected.ts`: set in a mount layout effect, cleared by its cleanup); otherwise it passes
-  it to `reportDropped` and returns. Why: React routes a transition's rejection only through a
-  render of the component that owns it; with that component unmounted nothing reads it (probed
-  on 19.3.1 with `useActionTrigger`: no boundary, no `reportError`, no
-  `unhandledrejection`). Effect cleanup also runs when the component is **hidden**: by an
-  `<Activity mode="hidden">` (the consumer's, or the library's own: a closed overlay with
-  `keepMounted`, `internal/overlay-popup.tsx`), or by a shown Suspense boundary that re-suspends
-  and shows its fallback (probed; Toast's Suspense guard around the Root's content is one). A
-  rejection that arrives while hidden is reported as well and does **not** reach the boundary
-  when the component is shown again, where React would deliver it: a deliberate deviation from
-  React. Each rejection goes one route, exactly
-  once. Reachable: a `Toast.Action` whose toast is closed while its action runs (toast.md
-  walkthrough 6) or whose content an urgent `toast.update` made suspend; a `Menu.Item`, menu
-  checkable item or Close part whose overlay is dismissed meanwhile, unmounting it or (with
-  `keepMounted`) hiding it (menu.md walkthrough 4); any state owner removed while its action is
-  pending. Not covered, React behaviour: a latest rejection that arrives while the owner is
-  connected is rethrown, and if the owner unmounts in the same commit, before React renders it
-  again, React still drops it (a tiny window; not handled).
-- A consumer who catches inside the action is unaffected, as before.
-- **A request superseded by a fact**: a fact on an overlay Root (`adoptFact`, 3.4)
-  makes every dispatch in flight superseded at once, so a later rejection of one of them is
-  passed to `reportDropped`, as for any superseded dispatch, and its resolution commits
-  nothing.
+  boundary is involved, and the newer dispatch's outcome is unaffected. **Every** superseded
+  rejection of a burst is reported, each once, in the order they arrive, also **after
+  unmount**. When the latest dispatch rejects as well, it still goes to the boundary; the two
+  routes are independent.
+- **The latest rejection once the owner is gone is reported too.** The hook rethrows a latest
+  rejection only while its component's effects are connected (`useConnected` in
+  `internal/use-connected.ts`); otherwise it passes it to `reportDropped`. Effects are
+  disconnected when the component is unmounted and when it is **hidden**: by an
+  `<Activity mode="hidden">` (the consumer's, or the library's own for a closed overlay with
+  `keepMounted`), or by a shown Suspense boundary that re-suspends and shows its fallback
+  (Toast's Suspense guard is one). A rejection that arrives while hidden does **not** reach the
+  boundary when the component is shown again, where React would deliver it: a deliberate
+  deviation from React. Each rejection goes one route, exactly once. Reachable: a
+  `Toast.Action` whose toast is closed while its action runs (toast.md walkthrough 6) or whose
+  content an urgent `toast.update` made suspend; a `Menu.Item`, menu checkable item or Close
+  part whose overlay is dismissed meanwhile (menu.md walkthrough 4); any state owner removed
+  while its action is pending. Not handled (React behaviour): a latest rejection that arrives
+  while the owner is connected is rethrown, and if the owner unmounts in that same commit React
+  still drops it.
+- **A request superseded by a fact**: a fact on an overlay Root (`adoptFact`, 3.4) makes every
+  dispatch in flight superseded at once, so a later rejection of one of them is passed to
+  `reportDropped` and its resolution commits nothing.
 - **A fact handler's errors are not action errors**: an `on*` handler's synchronous throw and
   its returned promise's rejection go to `reportError` (the handler rule of 2.1,
   `internal/call-urgent-handler.ts`); nothing reaches an Error Boundary, and the library's own
   bookkeeping around the call (the committed `false` of a fact, a toast's queue write, a
   Combobox text write) stands.
-- Both hooks (`useControllableAction`, `useActionTrigger`) do this themselves, per instance, and
-  so does `Form.Root` for the submissions it runs in its own transition. A
-  component with **two transition channels** (Slider and NumberField: steps through
-  `useActionTrigger`, commits through `useControllableAction`) needs nothing extra: each channel
-  judges "latest" among its own runs and reports its own superseded rejections, also while the
-  other channel's action is pending. There is no hook-order constraint and no shared capture
-  (`captureSuperseded` is removed).
+- A component with **two transition channels** (Slider and NumberField: steps through
+  `useActionTrigger`, commits through `useControllableAction`; `internal/use-step-commit.ts`)
+  needs nothing extra: each channel judges "latest" among its own runs and reports its own
+  superseded rejections, also while the other channel's action is pending. There is no
+  hook-order constraint and no shared capture.
 - For a **pure trigger** the superseded path is reachable exactly when its `whilePending` is
-  `"run"` (section 2.5.1; the default of `Button`): its runs overlap and the rules above
-  apply to them as to any owner. With `"ignore"` it never has two runs in flight, so every
-  rejection is a latest one.
+  `"run"` (2.5.1; the default of `Button`). With `"ignore"` it never has two runs in flight, so
+  every rejection is a latest one.
 
 Consequence for tests: in a real browser `reportError` dispatches a window `error` event, which
 vitest browser mode counts as an unhandled error, and vitest's jsdom environment has no
@@ -732,15 +716,19 @@ export type WhilePending = "run" | "ignore";
 <Dialog.Close action={log} whilePending="run">Close</Dialog.Close>         // every click runs
 ```
 
-A string, not a boolean, so that a later mode can be added without a second prop (`"queue"`:
-ordered runs, `useActionState` semantics; **not offered**). The two values
-name what happens to the new activation: it is *run*, or it is *ignored*. `"run"` was chosen
-over `"allow"` (allow what?) and `"overlap"` / `"concurrent"` (they describe the result, and a
-future `"queue"` also runs every activation): `ignore` / `run` / `queue` read as one series.
-Every pure trigger accepts both values, so the prop can be computed
-(`whilePending={saving ? "ignore" : "run"}`) and a default can be spelled out.
+This section is the library-wide rule: the prop, the default of every part and what each value
+guarantees. The mechanics (the click handler, the guard, the per-part behaviour) are in
+`design/components/button.md` 5, 16 and 18, and in `internal/use-pure-trigger.ts` /
+`use-action-trigger.ts` (3.4).
 
-**The default follows who owns the action** (the user's rule):
+A string, not a boolean, so that a later mode can be added without a second prop; the two
+values name what happens to the new activation. Every pure trigger accepts both, so the prop
+can be computed (`whilePending={saving ? "ignore" : "run"}`). **Not offered: `"queue"`.**
+Ordered, result-threaded runs are `useActionState`, passed as `formAction` or called from the
+action (also the answer for a set-valued action whose `next` may contain still-pending
+changes, 2.5).
+
+**The default follows who owns the action:**
 
 - **The user owns it**: the library does nothing on activation but run the consumer's function.
   Default **`"run"`**. Whether two overlapping runs are a bug (Save) or the point (a counter) is
@@ -749,66 +737,58 @@ Every pure trigger accepts both values, so the prop can be computed
 - **The library owns it**: activation does something of the library's own, with no user code
   needed (a Close part closes its dialog). Default **`"ignore"`**: the activation consumes the
   part, there is nothing to count, and a second run can only repeat a side effect.
-- **Mixed** (the consumer's `action`, then a library-owned step), **accepted**:
-  `"ignore"` exactly when a resolved run makes the library act on the part's container (close
-  it), `"run"` when the library-owned step is switched off (`closeOnActivate={false}`,
-  `closeOnSettle={false}`), because the part is then a user-owned trigger that happens to live
-  in a menu or a toast.
+- **Mixed** (the consumer's `action`, then a library-owned step): `"ignore"` exactly when a
+  resolved run makes the library act on the part's container (close it), `"run"` when the
+  library-owned step is switched off (`closeOnActivate={false}`, `closeOnSettle={false}`),
+  because the part is then a user-owned trigger that happens to live in a menu or a toast.
 
-| Part | What one activation does | Owner | Default | Status |
-| --- | --- | --- | --- | --- |
-| `Button` with `action` | runs the consumer's `action` | user | `"run"` | **accepted** |
-| `Button` with a function `formAction` | React submits the form with the consumer's function | user (React runs it) | `"run"` | **accepted** (question 4: the dropped rejection of an older submission is documented) |
-| `Button` with neither (plain, URL `formAction`, `command`, link) | the native default action | – | nothing is ever pending: the prop has no effect | – |
-| `Dialog.Close`, `Popover.Close` without `action` | the library closes the overlay | library | nothing pends in the part (the close is the Root's dispatch, and a repeat is a no-op, 2.3 item 8): the prop has no effect | – |
-| `Dialog.Close`, `Popover.Close` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` | – |
-| `Menu.Item` with `action`, `closeOnActivate` (default `true`) | the consumer's `action`, then the library closes the menu | mixed | `"ignore"` | – |
-| `Menu.Item` with `action`, `closeOnActivate={false}` | the consumer's `action`; the menu stays | user | `"run"` | – |
-| `Menu.Item` without `action` | the library closes the menu, synchronously | library | nothing pends: no effect | – |
-| `Toast.Action`, `closeOnSettle` (default `true`) | the consumer's `action` (the part's or the toast's), then the library closes the toast; the timer is paused meanwhile | mixed | `"ignore"` | – |
-| `Toast.Action`, `closeOnSettle={false}` | the consumer's `action`; the toast stays | user | `"run"` | – |
-| `Menu.CheckboxItem`, `Menu.RadioItem` | a state change (`useControllableAction`) | state owner | no prop: latest intent wins | – |
-| `Slider.Root`, `NumberField.Root` steps (`valueChangeAction`; `NumberField.Increment` / `Decrement` request them) | a state change, one step of a gesture | state owner's second channel | no prop: every step runs | – |
-| `Form.Submit`, `Dialog.Form` | the form channel (2.7) | React's form | no prop, never guarded | – |
-| a toast's `onClose` | a handler, not an action (2.1): runs once when the toast leaves, by construction | – | no prop | – |
+| Part | What one activation does | Owner | Default |
+| --- | --- | --- | --- |
+| `Button` with `action` | runs the consumer's `action` | user | `"run"` |
+| `Button` with a function `formAction` | React submits the form with the consumer's function | user (React runs it) | `"run"` |
+| `Button` with neither (plain, URL `formAction`, `command`, link) | the native default action | – | nothing is ever pending: the prop has no effect |
+| `Dialog.Close`, `Popover.Close` without `action` | the library closes the overlay | library | nothing pends in the part (the close is the Root's dispatch, and a repeat is a no-op, 2.3 item 8): the prop has no effect |
+| `Dialog.Close`, `Popover.Close` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` |
+| `Menu.Item` with `action`, `closeOnActivate` (default `true`) | the consumer's `action`, then the library closes the menu | mixed | `"ignore"` |
+| `Menu.Item` with `action`, `closeOnActivate={false}` | the consumer's `action`; the menu stays | user | `"run"` |
+| `Menu.Item` without `action` | the library closes the menu, synchronously | library | nothing pends: no effect |
+| `Toast.Action`, `closeOnSettle` (default `true`) | the consumer's `action` (the part's or the toast's), then the library closes the toast; the timer is paused meanwhile | mixed | `"ignore"` |
+| `Toast.Action`, `closeOnSettle={false}` | the consumer's `action`; the toast stays | user | `"run"` |
+| `Menu.CheckboxItem`, `Menu.RadioItem` | a state change (`useControllableAction`) | state owner | no prop: latest intent wins |
+| `Slider.Root`, `NumberField.Root` steps (`valueChangeAction`; `NumberField.Increment` / `Decrement` request them) | a state change, one step of a gesture | state owner's second channel | no prop: every step runs |
+| `Form.Submit`, `Dialog.Form` | the form channel (2.7) | React's form | no prop, never guarded |
+| a toast's `onClose` | a handler, not an action (2.1): runs once when the toast leaves, by construction | – | no prop |
 
-A default that depends on another prop (`closeOnActivate`, `closeOnSettle`) is a cost: each
-page's props table has to spell it ("`"ignore"`, or `"run"` with `closeOnActivate={false}`").
-The alternative, a fixed `"ignore"` for every part of an overlay, keeps the tables simple and
-leaves the counter case (a "Zoom in" item that stays open) needing the prop; the dependent
-default was chosen. `toast({ action: { label,
-action } })` (`ToastActionOptions`) carries no `whilePending`: it has no `closeOnSettle` either
-(the behaviour props live on the part), so the field would not fit its shape; the consumer sets
-it on `<Toast.Action>`.
+A default that depends on another prop (`closeOnActivate`, `closeOnSettle`) is a cost each
+page's props table has to spell out; it was chosen over a fixed `"ignore"` for every part of an
+overlay, which would leave the counter case (a "Zoom in" item that stays open) needing the
+prop. `toast({ action: { label, action } })` (`ToastActionOptions`) carries no `whilePending`:
+the behaviour props live on the part, so the consumer sets it on `<Toast.Action>`.
 
 **The effective value** is `whilePending ?? <the part's default>`, read when the activation
 arrives (a change while a run is in flight applies to the next activation; the rendered
 `aria-disabled` follows the current render). At runtime only the string `"ignore"` ignores; any
 other value runs. No development warning for a part on which the prop has no effect.
 
-**`"ignore"`.** While the part's own run is in
-flight, a click, Enter or Space:
+**`"ignore"`.** While the part's own run is in flight, a click, Enter or Space:
 
 - starts nothing: no second run, no continuation;
-- is `preventDefault()`ed, which is what cancels the click's **default action**: a
-  `render`ed link does not navigate again, a function-`formAction` Button does not submit the
-  form again (the implicit-submission click on the default button included), a `command` /
-  `popoverTarget` does not run again. It is not `stopPropagation()`ed, and other listeners
-  (focus, hover, the consumer's pass-through handlers) are untouched;
+- is `preventDefault()`ed, which cancels the click's **default action**: a `render`ed link does
+  not navigate again, a function-`formAction` Button does not submit the form again (the
+  implicit-submission click on the default button included), a `command` / `popoverTarget`
+  does not run again. It is not `stopPropagation()`ed, and other listeners (focus, hover, the
+  consumer's pass-through handlers) are untouched;
 - finds the part rendering **`aria-disabled="true"`** for as long as it renders `data-pending`
-  (section 3.6).
+  (3.6).
 
-The guard reads **only** a synchronous in-flight counter in `useActionTrigger` (so two
+The guard reads **only** the synchronous in-flight counter of `useActionTrigger` (so two
 activations in one task are caught), never the last render's `pending`: after the action
-settled, React may hold the commit that clears `pending` for as long as any other async action
-is pending (entanglement, 2.3 item 5) or while the resulting render suspends, and a click in
-that window starts a new run rather than being dropped (the review's probe showed a
-rendered-`pending` guard losing two of three clicks on a non-awaiting action;
-`design/components/button.md` 5.2). So `aria-disabled` may outlast the guard by the held window.
-The one exception stays `Button`'s function `formAction`, whose only source is React's form
-status, a render value (`button.md` 5.2).
+settled React may hold the commit that clears `pending` (entanglement, 2.3 item 5; a suspended
+render), and a click in that window starts a new run rather than being dropped. So
+`aria-disabled` may outlast the guard by the held window (`button.md` 5.2). The one exception
+is `Button`'s function `formAction`, whose only source is React's form status, a render value.
 
-**`"run"`**. Every activation starts a run in the part's own transition:
+**`"run"`.** Every activation starts a run in the part's own transition:
 
 - the guard cancels nothing: each click also performs its default action (a link navigates, a
   `formAction` Button submits again, a command runs again). A part that cancels the click as
@@ -817,36 +797,24 @@ status, a render value (`button.md` 5.2).
   acts, and telling assistive technology it is unavailable would be false. `pending` stays true
   until every run has settled and the result has committed;
 - **the continuation (a Close part's close, an item's menu close, a toast's close on settle)
-  runs once, when the last run in flight settles, and only if the latest run resolved**: it is the latest run's continuation, still
+  runs once, when the last run in flight settles, and only if the latest run resolved**, still
   under that run's open-generation guard (3.4). So "a rejection leaves the overlay / menu /
-  toast open" holds in both modes, and the part stays (pending) until its last run is done:
-  library-mode and JS-free Close parts, a closing `Menu.Item` and a `Toast.Action` with
-  `closeOnSettle` alike. An older run that resolves runs nothing; an older run that rejects
-  after the latest resolved is reported and the close still runs when it settles.
-  Implemented in `useActionTrigger` (3.4), so it applies to every part that passes `then`; the
-  steps of the continuous controls pass none;
-- errors follow 2.4 as for any owner: the **latest** run's
-  rejection reaches the Error Boundary above the part, after every older run has settled; an
-  **older** run's rejection is passed to `reportError`, each once. Since the part does not
-  leave before its last run (the bullet above), the owner-left route (a rejection after the part left)
-  is reached in `"run"` mode only when something else removes the part meanwhile (a dismissal,
-  `toast.dismiss`), as in `"ignore"` mode. An ignored activation, by contrast, is not a run and
-  reports nothing;
+  toast open" holds in both modes, and the part stays (pending) until its last run is done. An
+  older run that resolves runs nothing; an older run that rejects after the latest resolved is
+  reported and the close still runs when it settles;
+- errors follow 2.4 as for any owner: the **latest** run's rejection reaches the Error Boundary
+  above the part, after every older run has settled; an **older** run's rejection is passed to
+  `reportError`, each once. The owner-gone route is reached only when something else removes
+  the part meanwhile (a dismissal, `toast.dismiss`), as in `"ignore"` mode. An ignored
+  activation is not a run and reports nothing;
 - a `Button` with a function `formAction` is React's form channel, not the library's
   transition: overlapping submissions behave as React's own submitter does, which includes
-  React **dropping** the rejection of an older overlapping submission (verified on 19.3.1,
-  `memo/architect/143-design-questions.md`). The library cannot observe that rejection and does
-  not report it; the Button page says so and points to `whilePending="ignore"` and to
-  `useActionState`.
-
-**Not offered**: `"queue"`. Ordered, result-threaded runs are `useActionState`,
-passed as `formAction` or called from the action. The related accepted point from the same
-discussion: a set-valued action's `next` may contain still-pending changes (the set-valued
-bullet above); documented, and `useActionState` is the answer there too.
+  React **dropping** the rejection of an older overlapping submission. The library cannot
+  observe that rejection and does not report it; the Button page says so and points to
+  `whilePending="ignore"` and to `useActionState`.
 
 "Await nothing" (`action={() => { void inc(); }}`) stays valid for "the UI must not wait" (2.3
-item 5); it is not needed to make every click count, since a `Button` runs every activation by
-default and a counter that wants pending state and error routing simply awaits.
+item 5); it is not needed to make every click count.
 
 ### 2.6 The "no handlers" rule and urgent updates
 
@@ -861,12 +829,12 @@ What is still reachable, and why it is not a contradiction:
 - `ref` gives the element for `addEventListener` when a component needs an event React does not
   synthesize (`command`, `beforematch`).
 
-**Urgent (non-transition) updates: the urgent lane** (the vision's documented opt-out).
-A state that React requires to be urgent, which today means the text of a controlled text input
-("Transition updates can't be used to control text inputs"), keeps `x` / `defaultX` and takes
-a **handler** instead of an action: `inputValue` / `defaultInputValue` / `onInputValueChange`.
-The handler is named with the ordinary React `on<State>Change` form, and the type says the same
-thing:
+**The urgent lane** (the vision's documented opt-out). A state that React requires to be
+urgent, which today means the text of a controlled text input ("Transition updates can't be
+used to control text inputs"), keeps `x` / `defaultX` and takes a **handler** instead of an
+action: `inputValue` / `defaultInputValue` / `onInputValueChange`. The name is the ordinary
+React `on<State>Change` form because `Action` is the library's promise of a transition, an
+await and pending state, and this prop is none of those. The type says the same:
 
 ```ts
 /** Called synchronously, outside any Transition, and not awaited: the urgent lane. Not an action.
@@ -876,66 +844,58 @@ export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails
 export type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: Details) => void;
 ```
 
-(`void` as the return type accepts a function that returns a promise.)
+(`void` as the return type accepts a function that returns a promise.) The form has three
+users (2.1): the text of a Combobox, the dismissal of an overlay, a toast that left. A new one
+passes the gate of 2.1 and the type guard (10.1, "Action naming").
 
-Why a handler name and not `inputValueChangeAction: UrgentChangeAction` (the v1 shape):
-`Action` is the library's promise that the component wraps the prop in a transition, awaits it
-and exposes pending state. A prop that does none of that and carries the suffix anyway makes
-the suffix mean "some callback", and the one thing the vision's principle 3 cannot afford is a
-reader having to open the type to learn whether an action is a transition. The urgent lane is
-exactly the thing an action is not, so it gets exactly the name an action does not: the `on*`
-form the rest of the library reserves. The cost, one `on*` prop in the whole API that a
-consumer might copy, is bounded by the gate of 2.1 (the design doc shows the library cannot
-hold the change) and by the type guard (10.1, "Action naming"). The form has three
-users (2.1): the text of a Combobox, the dismissal of an overlay, a toast that left.
+Rules for an urgent state:
 
-Rules: the library sets its own `useState` for the value and calls the handler synchronously
-from the DOM event (and from its own documented writes), never inside `startTransition`, so a
-controlled parent's `setState` in the body is an urgent update; nothing is awaited, pending or
-optimistic for it (the DOM already holds the value); a returned promise is allowed and not
-warned about, and its rejection, like a synchronous throw, goes to `reportError` (the handler
-rule of 2.1);
-a controlled urgent prop follows the DOM and does not gate it; everything the urgent value
-drives (a deferred query through `useDeferredValue`, an open, a selection) leaves the urgent
-lane at once and is a transition or a deferred render. A library write to an urgent state that
-follows a **rejected transition action** (Combobox's text rollback) leaves the transition before
-writing: an action that throws *synchronously* makes the wrapper's `catch` run inside the
-`startTransition` callback, so the wrapper yields once (`await undefined`) before the write and
-the rethrow (Combobox review, M2). The library uses the lane only where React requires it;
-"transition by default" is unchanged for every other state. Component docs name each urgent
-state. Consumers who need an urgent update from an interaction that has no urgent handler still
-use pass-through or `ref`, unsupported as before.
+- The library sets its own `useState` for the value and calls the handler synchronously from
+  the DOM event (and from its own documented writes), never inside `startTransition`, so a
+  controlled parent's `setState` in the body is an urgent update.
+- Nothing is awaited, pending or optimistic for it (the DOM already holds the value); the
+  handler rule of 2.1 covers a returned promise and a throw.
+- A controlled urgent prop follows the DOM and does not gate it.
+- Everything the urgent value drives (a deferred query through `useDeferredValue`, an open, a
+  selection) leaves the urgent lane at once and is a transition or a deferred render.
+- A library write to an urgent state that follows a **rejected transition action** (Combobox's
+  text rollback) leaves the transition before writing: an action that throws *synchronously*
+  makes the wrapper's `catch` run inside the `startTransition` callback, so the wrapper yields
+  once (`await undefined`) before the write and the rethrow.
+- The library uses the lane only where React requires it; "transition by default" is unchanged
+  for every other state. Component docs name each urgent state. Consumers who need an urgent
+  update from an interaction that has no urgent handler still use pass-through or `ref`,
+  unsupported as before.
 
-**A state that is urgent by design: the Toast queue.** A toast
-reports on an action that is pending elsewhere; a transition push would be held by that very
-action (2.3 item 5), so every queue mutation (add, update, dismiss, drop after exit) is a normal
-update. Its input is not a prop at all: the imperative `toast()` builds a command and dispatches
-it from a `queueMicrotask` callback, so a call made inside a `startTransition` scope (an action's
-sync prefix) escapes the scope while order is preserved; the Viewport applies the command with
-`useState`. What the toast *drives* through a request (its Action part's action) is a
-transition as usual; the report that it left is a handler, `onClose` (2.1). Such a state has no `UrgentChangeHandler` prop and no `x` / `defaultX`
-pair, and its commits never run a view transition (5.1).
+Other urgent states, none of which has an `UrgentChangeHandler` prop or an `x` / `defaultX`
+pair:
 
-The same rule holds for **consumer state that reports on a pending action** (a progress value,
-Progress): it is written with a plain `setState`, which after an `await` inside the action is
-urgent anyway; wrapping it in `startTransition` holds it until the very action it reports on
-settles (2.3 item 5), so the bar would sit at 0% and jump to 100%. It is the one place the
-library's "wrap it in `startTransition`" advice inverts, and component docs that display such a
-value (Progress) say so.
-
-**A mirror of a browser-owned validity fact.** `Field.Root`
-reads `:user-invalid`, `validity` and `validationMessage` from its control on `input`, `change`,
-`focusout`, `invalid` and after `reset`, and writes them with `useState` from the DOM event,
-never inside `startTransition`: the DOM already holds the fact, nothing is awaited or optimistic,
-and the error element and its `aria-describedby` token must be in the DOM when the library
-focuses the first invalid control a microtask later (a transition commit would land after the
-focus move, and later still while any async action is pending). No consumer-facing urgent
-action, no `x` / `defaultX` triple, no `transition` prop (`design/components/field-form.md` 2.4).
-
-**The draft text of a NumberField** (fifth urgent state) is internal: written from the
-`input` event with `useState`, with no `UrgentChangeHandler` and no `x` / `defaultX` pair,
-because the text is not a value until it is parsed at commit (blur, Enter, or before a step).
-The value under a held `Increment` / `Decrement` button follows Slider's `live` rule (3.2).
+- **A state that is urgent by design: the Toast queue.** A toast reports on an action that is
+  pending elsewhere; a transition push would be held by that very action (2.3 item 5), so every
+  queue mutation (add, update, dismiss, drop after exit) is a normal update. Its input is not a
+  prop at all: the imperative `toast()` builds a command and dispatches it from a
+  `queueMicrotask` callback, so a call made inside a `startTransition` scope (an action's sync
+  prefix) escapes the scope while order is preserved; the Viewport applies the command with
+  `useState`. What the toast *drives* through a request (its Action part's action) is a
+  transition as usual; the report that it left is a handler, `onClose` (2.1). Its commits never
+  run a view transition (5.1).
+- **Consumer state that reports on a pending action** (a progress value, Progress) is written
+  with a plain `setState`, which after an `await` inside the action is urgent anyway; wrapping
+  it in `startTransition` holds it until the very action it reports on settles (2.3 item 5), so
+  the bar would sit at 0% and jump to 100%. It is the one place the library's "wrap it in
+  `startTransition`" advice inverts, and component docs that display such a value say so.
+- **A mirror of a browser-owned validity fact.** `Field.Root` reads `:user-invalid`, `validity`
+  and `validationMessage` from its control on `input`, `change`, `focusout`, `invalid` and
+  after `reset`, and writes them with `useState` from the DOM event, never inside
+  `startTransition`: the DOM already holds the fact, nothing is awaited or optimistic, and the
+  error element and its `aria-describedby` token must be in the DOM when the library focuses
+  the first invalid control a microtask later (a transition commit would land after the focus
+  move, and later still while any async action is pending). No `transition` prop
+  (`design/components/field-form.md` 2.4).
+- **The draft text of a NumberField** is internal: written from the `input` event with
+  `useState`, because the text is not a value until it is parsed at commit (blur, Enter, or
+  before a step). The value under a held `Increment` / `Decrement` button follows Slider's
+  `live` rule (3.2).
 
 ### 2.7 Form-level actions are a separate channel
 
@@ -1164,131 +1124,75 @@ Matches implication #4 of `docs/research/react-async-apis.md` (probes in
 
 ### 3.4 The shared hook
 
-All of section 3 lives in one internal hook so that every component behaves identically. Sketch
-(final signature belongs to the implementation):
+All of section 3 lives in one internal hook, `useControllableAction`
+(`internal/use-controllable-action.ts`), so that every component behaves identically. The code
+and its comments are the reference for the algorithm; what the hook guarantees:
 
 ```ts
-"use client";
-import { addTransitionType, startTransition, useOptimistic, useRef, useState, useTransition } from "react";
-
-export function useControllableAction<T>(options: {
-  controlled: T | undefined;
-  defaultValue: T;
-  action: ChangeAction<T> | undefined;
-  transitionTypes?: (next: T, prev: T, details: ActionDetails) => readonly string[];
-  /** Set-valued state only. Optimistic re-base, and the replay of the uncontrolled commit (3.3). */
-  reducer?: (prev: T, next: T, details: ActionDetails) => T;
-}) {
-  const { reducer } = options;
-  const [internal, setInternal] = useState(options.defaultValue);
-  const isControlled = options.controlled !== undefined;
-  const committed = isControlled ? (options.controlled as T) : internal;
-  const [optimistic, setOptimistic] = useOptimistic(
-    committed,
-    (prev: T, patch: { next: T; details: ActionDetails }) =>
-      reducer ? reducer(prev, patch.next, patch.details) : patch.next,
-  );
-  const [pending, startOwnTransition] = useTransition();
-  const latest = useRef(0);
-  const inFlight = useRef(0);
-  const burst = useRef<{ next: T; details: ActionDetails; resolved: boolean }[]>([]);
-
-  // Called once per dispatch, resolved or rejected. The last one of a burst commits the replay.
-  function settle(): void {
-    if (--inFlight.current > 0) return;
-    const resolved = burst.current.filter((entry) => entry.resolved);
-    burst.current = [];
-    if (resolved.length === 0) return;
-    startTransition(() =>
-      setInternal((prev) => resolved.reduce((v, e) => reducer!(v, e.next, e.details), prev)),
-    );
-  }
-
-  function dispatch(next: T, details: ActionDetails): void {
-    const prev = committed;
-    const id = ++latest.current;
-    inFlight.current++;
-    const entry = !isControlled && reducer ? { next, details, resolved: false } : null;
-    if (entry) burst.current.push(entry);
-    startOwnTransition(async () => {
-      for (const type of options.transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
-      setOptimistic({ next, details });
-      try {
-        await options.action?.(next, details);
-      } catch (error) {
-        settle();
-        if (id === latest.current) throw error; // React routes the latest dispatch's error
-        reportError(error);                     // React would drop this one (section 2.4)
-        return;
-      }
-      if (entry) entry.resolved = true;
-      settle();
-      if (!isControlled && !entry && id === latest.current) {
-        startTransition(() => setInternal(next)); // no reducer: the latest dispatch commits `next`
-      }
-    });
-  }
-
-  return { committed, optimistic, pending, dispatch };
-}
+const { committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFact, epoch } =
+  useControllableAction({ controlled, defaultValue, initialValue, action, transitionTypes, reducer, warn });
 ```
 
-`transitionTypes` receives `details` so a component can take the dispatch's origin into account.
-Note that `details.event.currentTarget` is **not** the dispatching element (for a native event it
-is React's root container by the time the action runs); Tabs derives `fsui-tabs-next` /
-`fsui-tabs-prev` by looking the committed and target tabs up **by id** under the root and
-comparing their DOM order. `prev` is the committed value at dispatch time, not the optimistic
-one.
+- `committed` is `controlled ?? internal`; `optimistic` is `useOptimistic(committed, …)`,
+  always in its reducer form so that stacked optimistic updates are re-based onto a changed
+  `committed`; `pending` is the hook's own `useTransition`.
+- `dispatch(next, details)` is the execution contract of 2.3 in the owner's transition: the
+  transition types, the optimistic update, the awaited action, then the uncontrolled commit of
+  3.3 (the latest dispatch's `next`, or with a `reducer` the replay of the burst's resolved
+  dispatches, each with the reducer of the render it was dispatched from).
+- Errors follow 2.4: the latest dispatch's rejection is rethrown inside the transition while the
+  owner is connected (`useConnected`); a superseded one, or the latest once the owner is gone,
+  goes to `reportDropped` (`internal/report-dropped.ts`). The hook holds no error state, so it
+  has no ordering constraint against `useTransition` and takes no capture option.
+- `transitionTypes(next, prev, details)` receives `details` so a component can take the
+  dispatch's origin into account; `prev` is the committed value at dispatch time, not the
+  optimistic one. `details.event.currentTarget` is **not** the dispatching element (for a
+  native event it is React's root container by the time the action runs): Tabs derives
+  `fsui-tabs-next` / `fsui-tabs-prev` by looking the committed and target tabs up **by id**
+  under the root and comparing their DOM order.
+- `latestInFlight()` is the base of the residual paths (3.8 rule 1, `intendedValue`);
+  `adopt(next)` takes a browser default without a dispatch (uncontrolled Select, 3.8).
 
-In the implementation `reportError(error)` is `reportDropped(error)`
-(`internal/report-dropped.ts`: `console.error` where the global is missing), the latest
-dispatch's rethrow is also routed there when the owner is gone (`if (id === latest.current &&
-connected.current) throw error`, section 2.4), and each burst entry keeps the reducer of the
-render it was dispatched from. The hook holds no error state, so
-it has no ordering constraint against `useTransition` and takes no capture option.
+**The `reducer` option.** A component passes **no `reducer`** for single-valued state (the
+optimistic value is the dispatched `next`, the uncontrolled commit is the latest dispatch's
+`next`): Toggle, Tabs, Select, RadioGroup, overlay `open`, and the `exclusive` modes of
+ToggleGroup and Accordion. It passes one for set-valued state: CheckboxGroup, and ToggleGroup
+and Accordion without `exclusive`. Passing one changes two things at once: the optimistic value
+is re-based change by change, and the uncontrolled commit becomes the replay of 3.3. A reducer:
 
-`useOptimistic` is always used in its reducer form, so that stacked optimistic updates are
-re-based onto a changed `committed` value. A component passes **no `reducer`** for single-valued
-state (the optimistic value is the dispatched `next`, the uncontrolled commit is the latest
-dispatch's `next`): Toggle, Tabs, Select, RadioGroup, overlay `open`, and the `exclusive` modes
-of ToggleGroup and Accordion. It passes a `reducer` for set-valued state: CheckboxGroup, and
-ToggleGroup and Accordion without `exclusive`. Passing one changes two things at once: the
-optimistic value is re-based change by change, and the uncontrolled commit becomes the replay of
-section 3.3. Rules for a reducer:
+- reads the change from `details` (a patch's `added` / `removed`, or `item` and `open`), not
+  from `next`. It has no exception to make: an absolute dispatch is made with
+  `{ whole: true }` and never reaches the reducer (3.3);
+- is pure and does not depend on the optimistic value at dispatch time: it runs again, later,
+  against a different base;
+- is `undefined` for a mode that is single-valued, never a "replace" reducer: with a reducer
+  the dispatch would enter the replay.
 
-- It reads the change from `details` (a patch's `added` / `removed`, or `item` and `open`), not
-  from `next`. It has no exception to make: an absolute dispatch is made with `{ whole: true }`
-  and never reaches the reducer (3.3).
-- It is pure and does not depend on the optimistic value at dispatch time: it runs again, later,
-  against a different base.
-- A mode that is single-valued passes `undefined`, not a "replace" reducer; with a reducer the
-  dispatch would enter the replay.
+**`adoptFact(next)`** (3.9.5) is the one way a state owner takes a change it could not hold.
+It is called from the platform event's listener (an overlay's `toggle` / `close`), never inside
+a transition, and never calls the action. It:
 
-**`adoptFact(next)`** (3.9.5): the one
-way a state owner takes a change it could not hold. Called from the platform event's listener
-(an overlay's `toggle` / `close`), never inside a transition; it never calls the action. It
-advances the latest-dispatch counter (no dispatch in flight commits uncontrolled state any more,
-and a later rejection of one is reported, 2.4), makes `next` the in-flight intent (so
-`intended()` and the next Trigger click see it), drops the optimistic patches of those
-dispatches, writes the committed value urgently in uncontrolled mode, and advances `epoch`. The
-patch drop: every patch carries the epoch of its dispatch, and the reducer of the render ignores
-a patch older than the render's epoch; React re-applies pending optimistic updates on every
-render with that render's reducer, so the urgent `setEpoch` drops them in the fact's own commit.
-(The design sketched an object passthrough `{ value, epoch }`; it defeats React's bailout of a
-render whose state did not change, which an inline ref re-run on every render turned into an
-update loop, so the epoch lives in the reducer's closure instead; issue-148 memo.) `epoch` is
-part of the returned value, so a memoised context built on it re-renders its parts in the
-fact's commit even when a controlled parent keeps its value, which is how a refused dismissal
-is re-shown at once. Only the overlay Roots call it.
+- advances the latest-dispatch counter, so no dispatch in flight commits uncontrolled state any
+  more and a later rejection of one is reported (2.4);
+- makes `next` the in-flight intent, so `intended()` and the next Trigger click see it;
+- drops the optimistic patches of those dispatches, in the fact's own commit (each patch
+  carries the `epoch` of its dispatch and the render's reducer ignores older ones);
+- writes the committed value urgently in uncontrolled mode;
+- advances `epoch`, which is part of the returned value, so a memoised context built on it
+  re-renders its parts in the fact's commit even when a controlled parent keeps its value.
+  That is how a refused dismissal is re-shown at once.
+
+Only the overlay Roots call it.
 
 Library state never lives in `useSyncExternalStore`: a store mutation during a transition forces a
 blocking re-render and defeats both fallback avoidance and ViewTransition. Reading
 `matchMedia` for display only is fine.
 
-**Pure-trigger parts share `useActionTrigger`**
-(`packages/ui/src/internal/use-action-trigger.ts`): a part with a bare `action` and its own
-transition but no state (`Dialog.Close`, `Popover.Close`, `Menu.Item`) runs the action through
-this hook instead of calling `useTransition` itself:
+**Pure-trigger parts share `useActionTrigger`** (`internal/use-action-trigger.ts`): a part with
+a bare `action` and its own transition but no state (`Button`, `Dialog.Close`, `Popover.Close`,
+`Menu.Item`, `Toast.Action`) runs the action through this hook instead of calling
+`useTransition` itself, and so do the steps of the continuous controls (through
+`internal/use-step-commit.ts`):
 
 ```ts
 const { pending, run } = useActionTrigger({ openGeneration, ignoreWhilePending }); // both optional
@@ -1297,33 +1201,24 @@ if (!started) event.preventDefault();                        // ignored while pe
 ```
 
 - `pending` is the part's own transition (`data-pending` on the button or item).
-- `ignoreWhilePending`: `run` returns `false` and starts nothing while a run is in flight,
-  judged by the hook's synchronous in-flight counter alone, not the last render's `pending`
-  (section 2.5.1). The option stays an internal boolean; the public surface is the part's
-  `whilePending` prop, and every pure trigger passes
-  `ignoreWhilePending: (whilePending ?? <its default>) === "ignore"`, read per render so the
-  value in force is the one of the render the activation's handler belongs to. **The
-  default is `false`** (`design/components/button.md` 16.2): the
-  hook's baseline is React's, and no part relies on the default. The continuous
-  controls (Slider, NumberField) keep running every step, with or without their explicit
-  `false`. The options object is the only form (`{ openGeneration?, ignoreWhilePending? }`).
-  Runs that overlap (any part in `"run"` mode, and the steps) take the superseded-rejection
-  path described in the next item.
+- `ignoreWhilePending` (default `false`: the hook's baseline is React's): `run` returns
+  `false` and starts nothing while a run is in flight, judged by the hook's synchronous
+  in-flight counter alone, not the last render's `pending` (2.5.1). The option is internal; the
+  public surface is the part's `whilePending` prop. The four kinds of part that have the prop
+  go through `usePureTrigger({ whilePending, defaultWhilePending, openGeneration? })`
+  (`internal/use-pure-trigger.ts`), which resolves `(whilePending ?? default) === "ignore"`
+  per render, cancels an ignored activation (`runActivation`) and returns the owned pending
+  keys (`pendingProps`: `aria-disabled` and `data-pending`, 3.6). The continuous controls call
+  `useActionTrigger` directly and run every step.
 - `then` runs once per burst of overlapping runs: when the last run in flight settles, and only
-  if the latest run resolved (it is the latest run's `then`). With one run at
-  a time (`ignoreWhilePending`) this is the run's own `then` when it resolves.
-- A rejection skips `then`. The latest run's rejection takes React's route to the boundary above
-  the part; a superseded run's rejection (reachable only with `ignoreWhilePending: false`: the
-  steps of a continuous control and a pure trigger in `"run"` mode) is passed to `reportError`
-  (section 2.4), every one of a burst, also after the part unmounted. So is the latest run's once the part unmounted or is hidden
- .
+  if the latest run resolved (it is the latest run's `then`). With one run at a time this is
+  the run's own `then` when it resolves. A rejection skips `then`; where it goes is 2.4.
 - `then` still runs when the part unmounted meanwhile (an overlay's close must happen even though
   the part left with the content), so the only thing that cancels it is the **open-generation
   guard**: with `openGeneration` given, the hook reads the counter when `run` is called and skips
   `then` when it has changed by the time `work` resolved, which means the user dismissed and
   re-opened the overlay while the action ran and the close belongs to the earlier open (Popover
-  3.4). `Popover.Root`, `Dialog.Root` and `Menu.Root` all carry the
-  counter.
+  3.4). `Popover.Root`, `Dialog.Root` and `Menu.Root` all carry the counter.
 - React entangles transitions with a pending async action: a re-open dispatched while a run is
   still pending commits only when the run settles. Documented per component (Popover 3.4, Menu
   12), not worked around.
@@ -1345,7 +1240,45 @@ can delay or roll it back. The boundary:
 | Controlled mode | React value is the source of truth | React value is re-applied to the DOM after every commit once nothing is in flight (`showPopover()` / `hidePopover()`, `showModal()` / `close()`); a parent that keeps `open={true}` after a fact gets the popup re-shown in the fact's own commit. It follows the browser, it does not gate it |
 | Pending | `data-pending` while the action runs | `data-pending` while a request runs; a fact never pends (the open/close itself is already done) |
 | Server Components | Only through Server Functions as actions | Uncontrolled form needs no behaviour JS; the part may still be a client module (section 7.3) |
-| Residual browser path | A library-owned state the browser can also change is reconciled by dispatching the change with `details.reason: "platform"` and `event` set to the platform event (or `undefined` at mount), then re-applying committed state to the DOM after the action settles. Known paths: find-in-page revealing `<details>` or `hidden="until-found"`; **mount reconciliation** for pre-hydration clicks on `<summary>` or a native input, and for Firefox's form-state restoration of `checked` across reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`), one dispatch per component or group; **form reset**, both an external `form.reset()` and React's automatic reset after a successful `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time default without telling React. Each native-input component listens to `reset` on `input.form` through its ref and, in a microtask after the reset, dispatches the new DOM value with `reason: "platform"` and `event` set to the `reset` event; **late-mounting options** in a `<select>` (Select) are never selected by React (`updateOptions` runs only in the select's own commit), so the Root re-applies the intended option when an Option reports its mount: an option that **hydrated** is reconciled first (a user may have picked it before hydration) and one React **created** is only re-applied (the browser's automatic first-option selection on insertion is not an intent), told apart by `useSyncExternalStore`'s server snapshot; and a platform dispatch on a `<select>` requires the **intended option to exist in the DOM**, so a value whose option is still loading is never "reconciled" to the fallback; **text typed into a controlled text input before hydration** (Combobox) is adopted at mount through the urgent action with `reason: "platform"` (react-dom keeps a hydrated text input's DOM value and fires no `onChange`), and **a value stepped into a native range before hydration** (Slider) the same way through its step + commit dispatch; **a controlled value input** (`type=text`, `type=range`, …) has no reset target of its own, because react-dom keeps its `value` attribute equal to the current value after every update, so the component writes the reset target into `defaultValue` synchronously in the `reset` event (`useFormReset`'s `onResetEvent`) and dispatches the JS-computed target (uncontrolled: the latest `defaultX`; controlled: the mount-time value) from the microtask (Combobox's text, Slider's thumbs); and a component that owns a form value with no visible form element of its own **mirrors the optimistic value into a hidden input** and listens to `reset` on it; a hidden input has **no reset behaviour** (its `.value` is the `value` attribute, which React keeps equal to the optimistic value), so the reset target is computed in JS (uncontrolled: the latest `defaultX`; controlled: the mount-time value) and dispatched from the `reset` microtask, while the visible text input's `defaultValue` mirror is written synchronously in the `reset` event itself, because react-dom syncs a text input's `defaultValue` attribute to its value after every keystroke (Combobox, `useFormReset`'s `onResetEvent`); a form `reset` also **clears the user-validity flag (`:user-invalid`) but not custom validity**, so `Field.Root` re-reads its validity mirror and recomputes its custom-validity slot in the reset microtask (Field); and **the settle of a form submission** (the `useFormStatus` `true → false` edge) is a form-channel event the library observes without owning: `Dialog.Form` closes on it, `Form.Root` advances its settle generation, focuses the first errored field and applies `autoReset` on it; **text typed into a NumberField's visible input before hydration** is parsed and dispatched as a `"platform"` step + commit at mount, or adopted as the draft when the input is still focused; and **a library-owned native input that is not the user's surface may be uncontrolled** (NumberField's hidden number input): its `defaultValue` prop is the reset target (uncontrolled: the latest `defaultX`; controlled: the mount-time value), which react-dom keeps in the `value` attribute and updates when the prop changes, its `.value` is written through the ref at every change and re-applied after every commit, so the platform's own reset applies to it and it needs no `onResetEvent` mirror (a controlled `value` would make react-dom rewrite the attribute on every update) | n/a |
+
+**Residual browser paths.** A library-owned state the browser can also change is reconciled by
+dispatching the change with `details.reason: "platform"` (2.2; user dispatches use
+`"activate"`) and `event` set to the platform event, or `undefined` at mount, then re-applying
+committed state to the DOM after the action settles. The paths (the hooks are in 3.8):
+
+- **Find-in-page** revealing `<details>` or `hidden="until-found"`.
+- **Mount reconciliation**, one dispatch per component or group: pre-hydration clicks on
+  `<summary>` or a native input, and Firefox's form-state restoration of `checked` across
+  reloads (react-dom keeps the DOM value when hydrating and fires no `onChange`). Likewise for
+  values: text typed into a controlled text input before hydration (Combobox) is adopted at
+  mount through the urgent handler with `reason: "platform"`; a value stepped into a native
+  range (Slider) through its step + commit dispatch; text typed into a NumberField's visible
+  input is parsed and dispatched as a `"platform"` step + commit, or adopted as the draft when
+  the input is still focused.
+- **Form reset**, both an external `form.reset()` and React's automatic reset after a successful
+  `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time
+  default without telling React. Each native-input component listens to `reset` on `input.form`
+  through its ref and, in a microtask after the reset, dispatches the new value with `event` set
+  to the `reset` event. What the reset target is, and how it reaches each kind of input (a
+  checkable input, a controlled value input, a hidden input, a hidden native input that is not
+  the user's surface), is 3.8 rule 6. A component that owns a form value with no visible form
+  element of its own **mirrors the optimistic value into a hidden input** and listens to
+  `reset` on it (Combobox).
+- A form `reset` also **clears the user-validity flag (`:user-invalid`) but not custom
+  validity**, so `Field.Root` re-reads its validity mirror and recomputes its custom-validity
+  slot in the reset microtask.
+- **Late-mounting options in a `<select>`** are never selected by React (`updateOptions` runs
+  only in the select's own commit), so the Root re-applies the intended option when an Option
+  reports its mount: an option that **hydrated** is reconciled first (a user may have picked it
+  before hydration), one React **created** is only re-applied (the browser's automatic
+  first-option selection on insertion is not an intent); the two are told apart by
+  `useSyncExternalStore`'s server snapshot. A platform dispatch on a `<select>` requires the
+  **intended option to exist in the DOM**, so a value whose option is still loading is never
+  "reconciled" to the fallback.
+- **The settle of a form submission** (the `useFormStatus` `true → false` edge) is a
+  form-channel event the library observes without owning: `Dialog.Form` closes on it;
+  `Form.Root` advances its settle generation, focuses the first errored field and applies
+  `autoReset` on it.
 
 Rules:
 
@@ -1354,39 +1287,34 @@ Rules:
   the only way a primitive can be JS-free.
 - A component never mirrors browser-owned state into React state as the source of truth. It reads
   the DOM (`matches(":popover-open")`, `details.open`) when it needs the value for attributes.
-- `<ViewTransition>` does not apply to browser-owned open/close (the browser performs it outside
-  a React transition). Those parts animate with `@starting-style` and
-  `transition-behavior: allow-discrete` in CSS, and the component docs show the CSS. It **does**
-  apply to a **library-driven** open or close of a top-layer element: when the part calls
-  `showPopover()` / `hidePopover()` (or `showModal()` / `close()`) in a layout effect of a
-  transition commit and the boundary wraps the top-layer element itself (section 5.1), both the
-  enter and the exit are captured, in Firefox too, where CSS cannot animate a popover's exit
-  (`docs/research/popover-menu.md`, "ViewTransition"). Popover uses this for its part-initiated
-  closes (`design/components/popover.md` 2.3, 10.2), Dialog for its Close part, Form and
-  controlled close (`design/components/dialog.md` 2.3, 10.3).
 - Per-component designs list every state and label it library-owned or browser-owned.
+- `<ViewTransition>` does not apply to browser-owned open/close (the browser performs it outside
+  a React transition): those parts animate with `@starting-style` and
+  `transition-behavior: allow-discrete`, and the component docs show the CSS. It **does** apply
+  to a **library-driven** open or close of a top-layer element: when the part calls
+  `showPopover()` / `hidePopover()` (or `showModal()` / `close()`) in a layout effect of a
+  transition commit and the boundary wraps the top-layer element itself (5.1), enter and exit
+  are captured, in Firefox too, where CSS cannot animate a popover's exit. Popover uses this
+  for its part-initiated closes (`design/components/popover.md` 2.3, 10.2), Dialog for its
+  Close part, Form and controlled close (`design/components/dialog.md` 2.3, 10.3).
 - A library-driven **move** of a shown top-layer element (Menu's context menu re-opened at a
   new point) is not a state change: no dispatch, the part re-shows the popover under its
   own "opening" flag so the coalesced `toggle` (`open` → `open`) notifies nothing, and the
   component doc says what else the move does (focus, pointer capture).
-- **Resolved placement is browser-owned geometry, observed** (section 13). Which
-  `position-try-fallbacks` option the browser applied is read from the computed style of the
-  shown popup (`position-area`) and mirrored into a plain `useState` in the part, written
-  **urgently** from platform events (`toggle`, a `ResizeObserver`, `scroll`, `resize`) and
-  only when the value changed, so a popup that did not flip costs no render. It is exposed as
-  `data-side` / `data-align` / `state.side` / `state.align` (section 4.1) and is never the
-  source of anything: the browser keeps placing the popup; the library only reports where.
-  Same lane as the context menu's placement: a transition write would wait for an
-  unrelated pending action and the arrow would point the wrong way meanwhile.
-- Dispatches on the residual browser path use `details.reason: "platform"` (section 2.2); user
-  dispatches use `"activate"`.
+- **Resolved placement is browser-owned geometry, observed** (13.2): which
+  `position-try-fallbacks` option the browser applied is read from the shown popup's computed
+  `position-area` and mirrored into a plain `useState` in the part, written **urgently** from
+  platform events and only when the value changed. It is exposed as `data-side` / `data-align`
+  / `state.side` / `state.align` (4.1) and is never the source of anything. Urgent for the
+  reason the context menu's placement is: a transition write would wait for an unrelated
+  pending action and the arrow would point the wrong way meanwhile.
 - A **module-level registry** is an allowed shape for a cross-component fact the DOM does not
   expose: `src/internal/modal-registry.ts` (directive-free) holds the stack of open modal
   `<dialog>` elements; `Dialog.Popup` pushes after `showModal()` and removes on `close` and
   unmount, and a reader (Toast's Viewport, which portals its region into the topmost modal so
   it is not inert) subscribes through `useSyncExternalStore` with a server snapshot of `null`.
   Writes happen in layout effects or platform event listeners, never during render; the
-  registry is never the source of truth for a component's own state (Toast).
+  registry is never the source of truth for a component's own state.
 - **Relocating a portal without a remount**: `createPortal` remounts its subtree when the
   container changes, so a region that must follow something (Toast's region, into and out of
   the topmost modal) portals once into a **library-owned `display: contents` host element** and
@@ -1395,89 +1323,82 @@ Rules:
   (`useActionTrigger`, timers) survives it. The hydration render stays inline to match the server
   HTML and switches to the portal on the first client render (Toast 4.3).
 - A fourth kind of state, **consumer-owned, mirrored**: a controlled-only prop that the library
-  writes to a DOM property it does not own (`Checkbox`'s `indeterminate` or Dialog
-  `returnValue`; not Progress's `value`, which is rendered as attributes on a `div` with no DOM
-  property to mirror and is simply a prop). It has no `defaultX` and no action; the library re-applies it
-  after every commit and may suspend it while an action is pending (section 4.1).
-- A state may be **library-owned in one direction and browser-owned in the other**, or
-  **library-owned for some causes of a change and browser-owned for others** (Dialog's `open`:
-  opening and the closes a part asks for are transitions the library drives and awaits; a
-  dismissal is performed by the browser and is a fact, reported to `onOpenChange` with
-  `reason: "dismiss"` and `details.returnValue`). Such a state has both props,
-  `xChangeAction` for requests and `onXChange` for facts (2.1), and the component doc lists
-  which cause goes where.
-- Where the platform step a part's close goes through is **cancelable without an anti-abuse
-  rule**, a component may **own the closes its parts initiate and leave dismissals to the
-  browser**. The cancelable steps are the invoker's `command` event (popovers and dialogs
-  alike), a form's `submit` event, and the part's own `click` (cancelling it cancels the
-  command); the steps that are not are a dialog's close request (`cancel` is honoured once per
-  user activation) and the `close()` a `method="dialog"` form performs once its `submit` was
-  allowed, which is why a dialog's **Escape** is never library-owned while its **Close part**
+  writes to a DOM property it does not own (`Checkbox`'s `indeterminate`, Dialog's
+  `returnValue`; not Progress's `value`, which is rendered as attributes and is simply a prop).
+  It has no `defaultX` and no action; the library re-applies it after every commit and may
+  suspend it while an action is pending (4.1).
+- A state may be **library-owned for some causes of a change and browser-owned for others**
+  (an overlay's `open`: opening and the closes a part asks for are transitions the library
+  drives and awaits; a dismissal is performed by the browser and is a fact). Such a state has
+  both props, `xChangeAction` for requests and `onXChange` for facts (2.1, 3.9), and the
+  component doc lists which cause goes where.
+- **Which closes a component may own.** Where the platform step a part's close goes through is
+  **cancelable without an anti-abuse rule**, a component owns the closes its parts initiate and
+  leaves dismissals to the browser. Cancelable: the invoker's `command` event (popovers and
+  dialogs alike), a form's `submit` event, and the part's own `click` (cancelling it cancels
+  the command). Not cancelable: a dialog's close request (`cancel` is honoured once per user
+  activation) and the `close()` a `method="dialog"` form performs once its `submit` was
+  allowed; that is why a dialog's **Escape** is never library-owned while its **Close part**
   is. Popover: Trigger toggle, `Close` and a controlled `open={false}` are awaited and hidden
-  in the apply effect; Escape and light dismiss are facts (`onOpenChange`). Dialog:
-  `Close`, `Form` (a `method="dialog"` submit, or the settle after a function action), a
-  foreign close command and a controlled `open={false}` are awaited and closed in the apply
-  effect; Escape, Android back, AT dismiss and light dismiss are facts. The component doc lists
-  which close is which.
-- **A part's library-owned close is the single source of that close.** Whatever the press does
-  on the way to the `click` must not trip one of the component's immediate, browser-shaped
-  closes first; otherwise the popup is gone before the action runs, the reason is wrong (the
-  fact's `"dismiss"` lands first and the click's dispatch is a no-op) and the outcome depends
-  on the engine. Two traps, and the rule for each:
-  1. **The focus move of a `mousedown`** (Chromium and Firefox focus a button on press, WebKit
-     does not). A component that closes on focus leaving (Menu's Tab-out, Combobox's focus
-     loss) has the parts outside its popup `preventDefault()` the `mousedown` while the popup
-     is open (Combobox: always, the input must keep focus; Menu's Trigger: while `intended()`
-     is `true`, because an opening click must focus the Trigger for the platform's focus
-     return). **The same press on a foreign invoker** (a consumer's own `<button>` whose
-     `popovertarget`, or `commandfor` with a popover `command`, names the shown popup) is not a
-     focus-out either: the component keeps a document capture `mousedown` listener while the
-     popup is shown and prevents the primary button's default when the target's closest
-     `<button>` is outside the popup and names it (`popoverTargetElement === popup`, or
-     `commandForElement === popup` with a `*-popover` command). The click's native toggle then
-     closes the popup and `ToggleEvent.source` names the close `"activate"`; focus never left,
-     so the platform's hide returns it (Menu: to the Trigger) or it stays in the input
-     (Combobox). Ignoring an invoker `relatedTarget` in the `focusout` path instead is wrong: a
-     Tab onto such a button would leave the popup open with focus outside, and a dragged-off
-     press would strand focus on the button with no `focusout` left
-     (`memo/architect/issue-126-foreign-invoker-press.md`).
-  2. **Light dismiss** (engine-independent): a press on a part outside the popup that is
-     not a button naming the popover hides the popup at `pointerup`, a task before the
-     `click`. The exemption is the invoker relationship of HTML's "topmost clicked popover": a
-     `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names the shown
-     popover counts as part of it (so do the platform's own invokers, `interestfor` and a
-     `<select>`'s picker); a custom `command` does not qualify. **The element the popover was
-     shown with (`showPopover({ source })`) is not exempt**: `source` sets the popover's invoker
-     for nested stacking and the implicit anchor, and nothing in the light-dismiss path reads
-     it. A part that closes through its action therefore names the popup with `popovertarget`
-     and cancels its click so the activation never runs (`usePopoverTrigger` does both for
-     Popover and Menu; Combobox's Trigger writes the attribute through its ref after hydration,
-     section 7.4, because a pre-hydration activation would open an empty, mis-anchored popup).
-     The exemption exists for `<button>`s only, so a Trigger rendered as another element
-     through `render` keeps a browser-shaped close in library mode (a fact with reason
-     `"activate"`, nothing awaited, no veto, no exit transition); the guarantee is stated for a
-     `<button>` Trigger and the non-button development warning says so (popover.md 2.7).
-  3. **A part that is not a `<button>` and must survive its own press** (Combobox's Input) has
-     one lever, **pointer capture**: light dismiss compares the popover under the press with
-     the popover under the release, and capture retargets the release, so
-     `popup.setPointerCapture(pointerId)` at the part's `pointerdown` (primary button, popover
-     shown) makes the release count as inside the popup and nothing hides, with a mouse, a pen
-     or a finger (one engine hole: Chromium ignores the capture for a touch tap inside a
-     same-origin iframe). The compat `mousedown` is not retargeted (the caret still lands where
-     the user pressed); for a mouse or pen press `pointerup`, `mouseup` and the `click` land on
-     the popup, so the part's own `onClick` does not fire for that press (a touch tap's compat
-     `click` is hit-tested and reaches the part). Known cost: Firefox routes the mouse drag to
-     the capturing element, so a drag-to-select in the field does not extend while the popover
-     is open. Prevented `pointerdown`, `pointerup` or `click` change nothing: light dismiss is
-     not cancelable.
+  in the apply effect; Escape and light dismiss are facts. Dialog: `Close`, `Form` (a
+  `method="dialog"` submit, or the settle after a function action), a foreign close command and
+  a controlled `open={false}` are awaited and closed in the apply effect; Escape, Android back,
+  AT dismiss and light dismiss are facts.
 
-  A part whose close is browser-owned by design (Combobox's Clear) needs none of this; nor does
-  a Trigger that never closes: Dialog's Trigger only opens, so a Trigger click on an open
-  non-modal `lightDismiss` dialog is a dismissal on every path, as native `closedby="any"`
-  (which has no invoker exemption at all) treats it (dialog.md 2.7). jsdom cannot catch this
-  class of bug (user-event fires mousedown, mouseup and click in one task and a synthesised
-  click runs no light dismiss): a browser row with a real pointer that asserts the reason,
-  `document.activeElement` and `:popover-open` across the click's pending window is required.
+**A part's library-owned close is the single source of that close.** Whatever the press does on
+the way to the `click` must not trip one of the component's immediate, browser-shaped closes
+first; otherwise the popup is gone before the action runs, the reason is wrong (the fact's
+`"dismiss"` lands first and the click's dispatch is a no-op) and the outcome depends on the
+engine. Three traps, and the rule for each (the helpers are `internal/invokers.ts`,
+`use-popover-trigger.ts` and `pointer-capture.ts`):
+
+1. **The focus move of a `mousedown`** (Chromium and Firefox focus a button on press, WebKit
+   does not). A component that closes on focus leaving (Menu's Tab-out, Combobox's focus loss)
+   has the parts outside its popup `preventDefault()` the `mousedown` while the popup is open
+   (Combobox: always, the input must keep focus; Menu's Trigger: while `intended()` is `true`,
+   because an opening click must focus the Trigger for the platform's focus return). **The
+   same press on a foreign invoker** (a consumer's own `<button>` whose `popovertarget`, or
+   `commandfor` with a popover `command`, names the shown popup) is not a focus-out either:
+   while the popup is shown a document capture `mousedown` listener prevents the primary
+   button's default when the target's closest `<button>` is outside the popup and names it.
+   The click's native toggle then closes the popup, `ToggleEvent.source` names the close
+   `"activate"`, and focus never left, so the platform's hide returns it (Menu: to the
+   Trigger) or it stays in the input (Combobox). Ignoring an invoker `relatedTarget` in the
+   `focusout` path instead is wrong: a Tab onto such a button would leave the popup open with
+   focus outside, and a dragged-off press would strand focus on the button.
+2. **Light dismiss** (engine-independent): a press on a part outside the popup that is not a
+   button naming the popover hides the popup at `pointerup`, a task before the `click`. The
+   exemption is the invoker relationship of HTML's "topmost clicked popover": a `<button>`
+   whose `popovertarget`, or `commandfor` with a popover `command`, names the shown popover
+   counts as part of it (so do `interestfor` and a `<select>`'s picker); a custom `command`
+   does not. **The element the popover was shown with (`showPopover({ source })`) is not
+   exempt.** A part that closes through its action therefore names the popup with
+   `popovertarget` and cancels its click so the activation never runs (`usePopoverTrigger`
+   does both for Popover and Menu; Combobox's Trigger writes the attribute through its ref
+   after hydration, 7.4). The exemption exists for `<button>`s only, so a Trigger rendered as
+   another element through `render` keeps a browser-shaped close in library mode (a fact with
+   reason `"activate"`, nothing awaited, no veto, no exit transition); the guarantee is stated
+   for a `<button>` Trigger and the non-button development warning says so (popover.md 2.7).
+3. **A part that is not a `<button>` and must survive its own press** (Combobox's Input) has
+   one lever, **pointer capture**: light dismiss compares the popover under the press with the
+   popover under the release, and capture retargets the release, so
+   `popup.setPointerCapture(pointerId)` at the part's `pointerdown` (primary button, popover
+   shown) makes the release count as inside the popup, with a mouse, a pen or a finger (one
+   engine hole: Chromium ignores the capture for a touch tap inside a same-origin iframe). The
+   compat `mousedown` is not retargeted (the caret still lands where the user pressed); for a
+   mouse or pen press `pointerup`, `mouseup` and the `click` land on the popup, so the part's
+   own `onClick` does not fire for that press (a touch tap's `click` reaches the part). Known
+   cost: Firefox routes the mouse drag to the capturing element, so a drag-to-select in the
+   field does not extend while the popover is open. Preventing `pointerdown`, `pointerup` or
+   `click` changes nothing: light dismiss is not cancelable.
+
+A part whose close is browser-owned by design (Combobox's Clear) needs none of this; nor does a
+Trigger that never closes: Dialog's Trigger only opens, so a Trigger click on an open non-modal
+`lightDismiss` dialog is a dismissal on every path, as native `closedby="any"` treats it
+(dialog.md 2.7). jsdom cannot catch this class of bug (user-event fires mousedown, mouseup and
+click in one task and a synthesised click runs no light dismiss): a browser row with a real
+pointer that asserts the reason, `document.activeElement` and `:popover-open` across the
+click's pending window is required.
 
 ### 3.6 `disabled`
 
@@ -1552,115 +1473,97 @@ only, because `"until-found"` cannot apply inside a closed `display: none` dialo
 
 ### 3.8 Native checkable inputs: the shared machinery
 
-Switch, Checkbox and RadioGroup render controlled native inputs. Beyond `useControllableAction`
-they share three internal hooks, so that one dispatch model covers single controls and groups;
-every form control's owner part additionally calls `useFieldControl` (last rows), which is how
-a control becomes a Field's control.
-This is the one contract both designs implement (`design/components/switch.md` 7,
-`design/components/radio-group.md`).
+Switch, Checkbox and RadioGroup render controlled native inputs, and every form control shares
+one dispatch model for the residual browser paths of 3.5 (mount reconciliation, form reset).
+The model lives in internal hooks; each hook's doc comment is its contract, and this section is
+the list of them plus the rules they implement (numbered: the source cites "3.8 rule N").
+`design/components/switch.md` 7 and `design/components/radio-group.md` show them in use.
 
-| Hook | Called by | Does |
+| Helper (`internal/`) | Used by | What it is |
 | --- | --- | --- |
-| `useFormReset(ref, onReset, onResetEvent?)` (`internal/use-form-reset.ts`) | the other two, Combobox | **Stable** `reset` subscription on the form owner (`ref.current.form`; the element may be an `<input>`, a `<select>` or a `<fieldset>`, both form-associated and honouring `form=`). Re-reads the owner after every commit but re-subscribes only when it changed; the handler body is a `useEffectEvent`. On `reset` it calls the optional `onResetEvent(event)` synchronously (before the reset algorithm: where a text input's `defaultValue` mirror must be written, rule 6), then queues a microtask and, unless `event.defaultPrevented`, calls `onReset(event)`. |
-| `useResetTarget(value, defaultValue)` (`internal/use-form-reset.ts`) | Slider, NumberField, Select, Combobox (value and text) | Rule 6's target by mode: controlled, the mount-time value; uncontrolled, the latest `defaultValue`; `undefined` when that is absent, and the caller adds its fallback (`?? null`, `?? value`, a platform default). |
-| `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies, in this order, `defaultChecked` (if given), then `checked` (optimistic), then `indeterminate` (if given). The order matters in exactly one case: react-dom's `updateInput` writes `el.checked` on every update of the input (setting the dirty-checkedness flag), and React's automatic form reset runs in the form's mutation effects, after the inputs' updates and before layout effects; after that reset the dirty flag is clear, so writing `defaultChecked` (the `checked` content attribute) would move `checked` too, and writing `checked` afterwards settles it. `indeterminate` is independent of both; and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
-| `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns a stable `{ onItemMounted }`, which the Root passes down through context and `group: true` items call from their mount layout effect (`useNativeChecked` takes `onItemMounted` and `component` options). The adapter **ignores calls made before its own mount reconciliation has run** (members rendered in the Root's commit run their effects first, so they are covered by that reconciliation; the flag is reset in the effect cleanup so StrictMode's re-run behaves the same); any later call queues **one microtask per commit** that compares `readCurrent()` with `base()` and dispatches `"platform"` with `event: undefined`. Comparison is `equals` (option, default `Object.is`); a group with a set value (`CheckboxGroup.Root`) passes set equality, because two sets are never `Object.is`-equal. `element` accepts any `FormAssociatedElement`: Slider subscribes through its first Thumb's input (a Root `div` has no `.form`), with `readCurrent` reading every registered input and `readDefault` returning the JS-computed reset target; the optional `onResetEvent` option is passed through to `useFormReset` for the `defaultValue` mirror of a controlled value input (rule 6). |
-| `useNativeSelectValue(options)` (`internal/use-native-select-value.ts`) | `Select.Root` with its `<select>` ref | The select analogue of `useNativeChecked`, built on `useNativeGroupReconciliation`. After every commit, and for each late Option's mount report, it mirrors the reset target into `option.defaultSelected` (uncontrolled: the latest `defaultValue`, nothing when absent; controlled: the Root's mount-time value; react-dom writes `defaultSelected` only for an uncontrolled `defaultValue`) **and then** re-applies the intended option's `selected`, in that order in one synchronous step, because `defaultSelected = true` on an option the user or script never selected moves the selection. Mount reconciliation reads `select.value`; the reset path reads the spec's reset result (the last `defaultSelected` option, else the first enabled option, else `""`); both dispatch once per Select and only when the intended option exists. With neither `value` nor `defaultValue` the uncontrolled value is **adopted** from the browser's choice without a dispatch (`adopt(next)` on `useControllableAction`, uncontrolled only). |
-| `useFormOwnerEvent(ref, type, handler, options?)` (`internal/use-form-owner-event.ts`) | `useFormReset` (now a thin wrapper), `Field.Root` (`input` / `change` on the form owner for cross-field `validate`, `submit` and `reset` for its flags) | The stable form-owner subscription of rule 4 generalised to any event type: re-reads `ref.current.form` after every commit, re-subscribes only when the owner changed, handler body through `useEffectEvent`. |
-| `useFieldControl({ labelable, name?, disabled?, required?, id?, component, validityElement? })` (`internal/use-field-control.ts`) | `Field.Control` and the owner part of every FUNSTACK form control: `Checkbox`, `Switch`, `RadioGroup.Root` and `CheckboxGroup.Root` (their `<fieldset>`, `labelable: false`), `Select.Root`, `Combobox.Input`, `Slider` (#60; one thumb: the thumb's input; several: the group element, `labelable: false`), `NumberField.Input` (#67; registers the visible input, `labelable: true`, with the hidden number input as `validityElement`) | Outside a `Field.Root`: `inField: false`, nothing to merge. Inside: returns a **ref callback** the part merges into its library ref (`useMergedRefs`, `internal/use-merged-refs.ts`), which registers `{ element, labelable, required, disabled }` with the Field and returns the cleanup (no extra render; a `required` / `disabled` change re-registers without re-attaching listeners); the **Field** attaches its native listeners (`input`, `change`, `focusout`, `invalid`, capture) to the registered element and resolves the **validity element** (the element itself when it is a form control, else the first named `willValidate` member of a `<fieldset>`'s `elements`, else the first control inside) where `validity` / `validationMessage` / `:user-invalid` are read and `setCustomValidity` is written. Returns `name` / `disabled` / `required` (own, else the Field's), `id` (labelable: the Field's control id) and `attributes`, the owned layer the part spreads: `id` (labelable only), `aria-labelledby` (groups: the Label id), `aria-describedby` (token-merged by the part), `aria-invalid` (`"true"` / `"false"`; a `group` such as CheckboxGroup moves it to its items, ARIA 1.2), `data-invalid`. **No `data-pending`**: a control inside a Field keeps its own, for its own action (2.7); only `Field.Control` carries the form's. **`validityElement?: () => ValidatableElement \| null`**: where `validity`, `validationMessage` and the custom-validity slot are read and written when that is not the registered element; `:user-invalid`, the listeners and the focus target stay on the registered element, and the Field mirrors `validityElement.validationMessage` into the registered element's slot after writing its own (3.6). Controls that pass none are unchanged. Two registrations in one Field warn (`design/components/field-form.md` 7). |
-| `useFieldValueChange(value, takeEdit?)` (`internal/use-field-control.ts`) | every owner part that calls `useFieldControl` and whose DOM value can change **without** an `input` / `change` event the Field hears: `Combobox.Root` (a pick; `takeEdit` returns `true` for its own dispatches), `CheckboxGroup.Root` (a Parent click, the derived `required`), `Checkbox`, `Switch`, `RadioGroup.Root`, `Select.Root` (a controlled change from outside, a rollback), `Slider` (#60; a pointer gesture), `NumberField.Root` (#67; `useFieldValueChange(optimistic, edit = "activate")`: a step or commit writes the hidden input through the ref with no event the Field hears) | A layout effect with no deps that compares `value` with the last committed one and, when it changed (never at mount), calls the Field's `notifyChange(edit)` with `edit = takeEdit?.() ?? false`: the Field re-reads validity and recomputes its slot (dismissing a shown server error when `edit`, as an `input` event would) and asks the `Form.Root` to refresh its other Fields (cross-field `validate`); outside a `Form.Root` only the control's own Field is refreshed. Not a synthetic event: the consumer's handlers and other `useFormOwnerEvent` subscribers do not see it (`design/components/field-form.md` 7.1). |
-| `useCheckableInput(options)` (`internal/use-checkable-input.ts`) | `Checkbox`, `Switch` | The single-input machinery the two share, in this hook order: `useFieldControl` (`labelable: true`, the own `name` / `required` / `id`), `useControllableAction<boolean>` (the component passes `transitionTypes` and its warning tag), `useFieldValueChange`, `useNativeChecked` (with `indeterminate` when the component has one), `useMergedRefs`. Returns `{ optimistic, pending, disabled, shownIndeterminate, ref, libraryProps }`: the input's owned layer in the component's key order (Switch's `role`; Checkbox's `indeterminate` / `data-indeterminate` only when the option is given). The components keep their props, state, `useRender` call and transition boundary. |
-| `useFieldsetGroup({ component, name, disabled, required })` (`internal/use-fieldset-group.ts`) | `RadioGroup.Root`, `CheckboxGroup.Root` | The `<fieldset>` wiring of a group Root: `useFieldControl` (`labelable: false`), the fallback `name` (own, else the Field's, else `useId()`), "own or the Field's" `disabled` / `required`, the fieldset ref with its element check, and `rootRef`, the merged library ref (fieldset ref, element check, Field registration). |
-| `groupMemberProps(options)` (`internal/group-member.ts`) | `RadioGroup.Item`, `CheckboxGroup.Item` | The owned layer of a group member's `<input>`: `type`, the group's `name` / `form`, `value`, optimistic `checked`, `defaultChecked` never rendered, a checkbox's `aria-checked` removed, the member's own `disabled` (the Root's reaches it through `<fieldset disabled>`), `required`, `aria-invalid` only when given (CheckboxGroup inside a Field), the state `data-*` attributes and the guarded `onChange`. The hydration-time attribute sync next to it is `syncPresences` (`internal/sync-presence.ts`). |
-| `useItemOrder({ optimistic, initial, read, changed?, duplicateMessage })` (`internal/use-item-order.ts`) | `CheckboxGroup.Root`, `ToggleGroup.Root` | The Items' document order kept in state for the Root state's `value`: a deps-less layout effect re-reads the layout after each Root commit and re-renders only when what renders from it changed; returns `{ layout, renderedValue }` (the optimistic set in document order, values with no Item last). The set and order arithmetic is `internal/value-set.ts` (`toSet`, `setsEqual`, `applyPatch`, `sortByOrder`, `firstDuplicate`, `EMPTY_SET`; Accordion uses it too) and document order `internal/dom-order.ts` (`compareDocumentOrder`, `sortByDocumentOrder`). |
-| `resolveFieldDefaults(field, own)` (`internal/use-field-control.ts`) | `useFieldControl` itself; `NumberField.Root` (whose owner part is the Input but whose `name` / `disabled` the Root resolves) | The one "own or the Field's" rule: `name` falls back to the Field's, `disabled` and `required` are either's; the own props outside a Field. `FieldControlBinding.fieldName` is the Field's own `name` for a control that must tell the two apart (Slider). |
-| `intendedValue(latestInFlight, optimistic)` (`internal/use-controllable-action.ts`) | the group Roots' residual paths, `useNativeChecked`, Accordion, the overlay Roots' `intended()`, Dialog.Root | Rule 1's base with the explicit null check, in one place; an absent `latestInFlight` means nothing in flight. |
+| `useFormOwnerEvent(ref, type, handler, options?)` (`use-form-owner-event.ts`) | `useFormReset`; `Field.Root` (`input` / `change` for cross-field `validate`, `submit` and `reset` for its flags) | The stable subscription of rule 4 for any event of the form owner (`ref.current.form`; an `<input>`, `<select>` or `<fieldset>`, all honouring `form=`). |
+| `useFormReset(ref, onReset, onResetEvent?)` (`use-form-reset.ts`) | the hooks below, Combobox | The `reset` subscription: `onResetEvent(event)` synchronously in the event (rule 6's mirror write), then `onReset(event)` in a microtask unless the reset was cancelled (rules 5, 7). |
+| `useResetTarget(value, defaultValue)` (`use-form-reset.ts`) | Slider, NumberField, Select, Combobox (value and text) | Rule 6's target by mode; `undefined` when absent, and the caller adds its fallback. |
+| `useNativeChecked(options)` (`use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent` | Per element: the ref callback with the dev tag / `type` check, the re-apply effect of rule 8 and, unless `group: true`, the two residual paths of a single control, reported through `onPlatformChange(next, event)`. With `group: true` it reports nothing and calls the group's `onItemMounted` (rule 3). |
+| `useNativeGroupReconciliation<T>(options)` (`use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, `CheckboxGroup.Root`: `element` is the `<fieldset>`); `useNativeSelectValue`; Slider (through its first Thumb's input, with `readDefault` returning the JS-computed target and `onResetEvent` passed through) and NumberField | Mount reconciliation (`readCurrent()` against `base()`) and form reset (`readDefault()` against `base()`), **one dispatch per group** through `onPlatformChange(next, event, path)`; returns the stable `{ onItemMounted }` for late members (rule 3). Comparison is the `equals` option (default `Object.is`; `CheckboxGroup.Root` passes set equality). |
+| `useNativeSelectValue(options)` (`use-native-select-value.ts`) | `Select.Root` | The `<select>` analogue: mirrors the reset target into `option.defaultSelected` **and then** re-applies the intended option's `selected` (that order: `defaultSelected = true` on a never-selected option moves the selection), after every commit and for each late Option. Both paths dispatch once per Select and only when the intended option exists. With neither `value` nor `defaultValue` the browser's choice is **adopted** without a dispatch (`adopt(next)` on `useControllableAction`, uncontrolled only). |
+| `useCheckableInput(options)` (`use-checkable-input.ts`) | `Checkbox`, `Switch` | The single-input machinery the two share, in one hook order: `useFieldControl`, `useControllableAction<boolean>`, `useFieldValueChange`, `useNativeChecked`, `useMergedRefs`. Returns the input's owned layer (`libraryProps`) and state; the components keep their props, `useRender` call and transition boundary. |
+| `useFieldsetGroup(options)` (`use-fieldset-group.ts`) | `RadioGroup.Root`, `CheckboxGroup.Root` | The `<fieldset>` wiring of a group Root: `useFieldControl` (`labelable: false`), the fallback `name` (own, else the Field's, else `useId()`), "own or the Field's" `disabled` / `required`, the element check and the merged `rootRef`. |
+| `groupMemberProps(options)` (`group-member.ts`) | `RadioGroup.Item`, `CheckboxGroup.Item` | The owned layer of a group member's `<input>`: `type`, the group's `name` / `form`, `value`, optimistic `checked`, `defaultChecked` never rendered, a checkbox's `aria-checked` removed, the member's own `disabled` (the Root's reaches it through `<fieldset disabled>`), `required`, `aria-invalid` only when given, the state `data-*` attributes and the guarded `onChange` (rule 9). The hydration-time attribute sync next to it is `syncPresences` (`sync-presence.ts`). |
+| `useItemOrder(options)` (`use-item-order.ts`) | `CheckboxGroup.Root`, `ToggleGroup.Root` | The Items' document order kept in state for the Root state's `value` (the optimistic set in document order, values with no Item last); re-read after each Root commit, re-rendering only when what renders from it changed. Set and order arithmetic: `value-set.ts` (Accordion too) and `dom-order.ts`. |
+| `useFieldControl(options)` (`use-field-control.ts`) | `Field.Control` and the owner part of every FUNSTACK form control: `Checkbox`, `Switch`, the group Roots (their `<fieldset>`, `labelable: false`), `Select.Root`, `Combobox.Input`, `Slider` (one thumb: its input; several: the group element, `labelable: false`), `NumberField.Input` (the visible input, with the hidden number input as `validityElement`) | How a control becomes a Field's control. Outside a `Field.Root`: `inField: false`, nothing to merge. Inside: a **ref callback** that registers `{ element, labelable, required, disabled }` with the Field (no extra render), the resolved `name` / `disabled` / `required` / `id`, and `attributes`, the owned layer the part spreads: `id` (labelable only), `aria-labelledby` (groups), `aria-describedby` (token-merged by the part), `aria-invalid` (a `group` such as CheckboxGroup moves it to its items), `data-invalid`. **No `data-pending`**: a control keeps its own (2.7). The **Field** attaches its listeners to the registered element and resolves the **validity element** (the element itself when it is a form control, else the first named `willValidate` member of a `<fieldset>`, else the first control inside; or `validityElement()` when given, 3.6). Two registrations in one Field warn (`design/components/field-form.md` 7). |
+| `useFieldValueChange(value, takeEdit?)` (`use-field-control.ts`) | every owner part whose DOM value can change **without** an `input` / `change` event the Field hears: `Combobox.Root` (a pick), `CheckboxGroup.Root` (a Parent click, the derived `required`), `Checkbox`, `Switch`, `RadioGroup.Root`, `Select.Root` (a controlled change from outside, a rollback), `Slider` (a pointer gesture), `NumberField.Root` (a step or commit writes the hidden input through the ref) | When `value` changed in a commit (never at mount) it calls the Field's `notifyChange(edit)`: the Field re-reads validity and recomputes its slot (dismissing a shown server error when `edit`, as an `input` event would) and asks the `Form.Root` to refresh its other Fields; outside a `Form.Root` only the control's own Field. Not a synthetic event: the consumer's handlers do not see it (`design/components/field-form.md` 7.1). |
+| `resolveFieldDefaults(field, own)` (`use-field-control.ts`) | `useFieldControl`; `NumberField.Root` | The one "own or the Field's" rule: `name` falls back to the Field's, `disabled` and `required` are either's. `FieldControlBinding.fieldName` is the Field's own `name` for a control that must tell the two apart (Slider). |
+| `intendedValue(latestInFlight, optimistic)` (`use-controllable-action.ts`) | the group Roots' residual paths, `useNativeChecked`, Accordion, the overlay Roots' `intended()`, `Dialog.Root` | Rule 1's base, with the explicit null check, in one place. |
 
-Rules the three hooks implement, which component docs may cite instead of restating:
+Rules, which component docs cite instead of restating:
 
 1. **Base comparison.** A residual path dispatches only when the DOM value differs from what the
    user already intends: the latest in-flight dispatch's `next` if there is one, else the
-   optimistic value (`latestInFlight` comes from `useControllableAction`). Spell it with an
-   explicit null check on the *dispatch*, never with `??` on `next`:
-   `const f = latestInFlight(); const base = f === null ? optimistic : f.next;`
-   (`intendedValue(latestInFlight, optimistic)` in `use-controllable-action.ts` is that spelling;
-   the group Roots call it). For a nullable
-   `T` (RadioGroup's `string | null`) `latestInFlight()?.next ?? optimistic` silently drops an
-   in-flight dispatch *to* `null` (a pending reset to "nothing checked") and would re-dispatch
-   against the stale optimistic value. Reading the DOM alone would lose a pending optimistic
-   change. The comparison also makes the StrictMode double layout effect dispatch once.
+   optimistic value. Always through `intendedValue(latestInFlight, optimistic)`, which checks the
+   *dispatch* for null; `latestInFlight()?.next ?? optimistic` silently drops an in-flight
+   dispatch *to* `null` (RadioGroup's pending reset to "nothing checked"). Reading the DOM alone
+   would lose a pending optimistic change. The comparison also makes the StrictMode double
+   layout effect dispatch once.
 2. **One dispatch per state owner.** A single control dispatches for itself; a group's Root
    dispatches once for the whole group, never once per radio.
 3. **Mount reconciliation** runs in a layout effect at mount, before the re-apply effect, and
    dispatches with `reason: "platform"` and `event: undefined`. It covers clicks before hydration
-   and Firefox's form-state restoration (react-dom keeps the DOM `checked` when hydrating, fires no
-   `onChange` and logs no mismatch, so no `suppressHydrationWarning` is needed). **Ordering in a
-   group:** React runs children's layout effects before the parent's, so an Item's re-apply
-   effect would overwrite the hydrated DOM `checked` before the Root's `readCurrent()` sees it.
-   `useNativeChecked` therefore does **not** re-apply `checked` in the mount commit, including
-   StrictMode's re-run of the mount effects (detected with a per-render token rather than a
-   `useRef` flag, which StrictMode would reuse); from the second commit on it re-applies after
-   every commit. A single control is unaffected (its own mount reconciliation reads the DOM
-   first), but the rule is uniform so the hook has one behaviour. **Late-mounting items**
-   An item that mounts after the Root reconciled, for example inside a
-   Suspense boundary that hydrates after the Root, is not covered by the Root's mount effect; its
-   `useNativeChecked({ group: true, onItemMounted })` calls the adapter's `onItemMounted()` (from
-   context) in its mount layout effect. Calls that arrive before the adapter's own mount
-   reconciliation are ignored (those items are in the Root's commit and covered); later calls
-   queue one microtask per commit that compares `readCurrent()` with `base()` and dispatches
-   `"platform"` with `event: undefined` only when the late item's DOM value differs from what the
-   user intends. **The members' DOM value must be recorded in the layout phase** of the commit
-   the late members mount in, and the microtask read must use that snapshot (CheckboxGroup 8.1):
-   any re-render between a late member's mount and the adapter's microtask (a registration state
-   write, a parent re-render) makes `useNativeChecked` re-apply the optimistic value and overwrite
-   DOM state that has not been read yet, erasing a click made before the member hydrated. The
-   group adapter's `onItemMounted` wrapper takes the snapshot once per commit and clears it in a
-   microtask. A programmatic value change while members are still dehydrated is not a problem
-   (a transition update is held until hydration, an urgent one client-renders the boundary; no
-   dispatch either way, reviewer-verified). **Unsupported: partial hydration of a native radio
-   group** (radios only). Clicking a hydrated radio while same-`name` siblings are inside a
-   still-dehydrated Suspense boundary makes react-dom throw "Mixing React and non-React radio
-   inputs with the same `name` is not supported" from its radio restore. This is a React
-   limitation; RadioGroup emits a dev warning on the late-mount path, documents "keep all Items
-   in the Root's Suspense boundary", and issue #34 tracks a human upstream report. The same-`name`
-   walk in `restoreControlledInputState` is guarded by `type === "radio"`, so a **checkbox
-   group** is not affected: CheckboxGroup supports late-mounting Items and Parents through the
-   same `onItemMounted` path and emits no warning.
+   and Firefox's form-state restoration (react-dom keeps the DOM `checked` when hydrating, fires
+   no `onChange` and logs no mismatch).
+   - **Ordering in a group.** Children's layout effects run before the parent's, so
+     `useNativeChecked` does **not** re-apply `checked` in the mount commit (StrictMode's re-run
+     included); from the second commit on it re-applies after every commit. Uniform for single
+     controls too.
+   - **Late-mounting items** (inside a Suspense boundary that hydrates after the Root) call the
+     adapter's `onItemMounted()` from their mount layout effect. Calls before the adapter's own
+     mount reconciliation are ignored (those items are covered by it); later calls queue one
+     microtask per commit that compares and dispatches `"platform"` with `event: undefined`.
+     **The members' DOM value is recorded in the layout phase** of the commit the late members
+     mount in, and the microtask reads that snapshot (CheckboxGroup 8.1): a re-render in between
+     would re-apply the optimistic value over DOM state not read yet.
+   - **Unsupported: partial hydration of a native radio group.** Clicking a hydrated radio while
+     same-`name` siblings are inside a still-dehydrated Suspense boundary makes react-dom throw
+     ("Mixing React and non-React radio inputs with the same `name` is not supported"). A React
+     limitation: RadioGroup warns in development on the late-mount path and documents "keep all
+     Items in the Root's Suspense boundary" (issue #34 tracks the human upstream report).
+     Checkbox groups are not affected: CheckboxGroup supports late-mounting Items and Parents
+     through the same path, with no warning.
 4. **The reset subscription must be stable.** React's automatic reset after a successful
    `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
-   the next subscription, so a listener attached in a deps-less effect never sees it (verified,
-   `memo/architect/switch-checkbox-notes.md`).
+   the next subscription, so a listener attached in a deps-less effect never sees it.
 5. **Reset reads `defaultChecked`, not `checked`.** The `reset` event precedes the reset
    algorithm, so the hook waits a microtask; by then, for React's own reset, the re-apply effect
    has already put the optimistic value back into `checked`. `el.defaultChecked` is the value the
-   browser reset to in every case. A group's `readDefault()` therefore returns the value of the
-   radio whose `defaultChecked` is true, or `null`.
-6. **Reset target by mode.** Uncontrolled: the latest `defaultX` prop, mirrored into
-   `el.defaultChecked` by the re-apply effect (a group Root passes `defaultValue` down so each
-   item mirrors `defaultValue === value`). Controlled: React's mount-time value; the reset is
-   **offered to the parent** as a `"platform"` dispatch with `event.type === "reset"`
-   and after settle the DOM follows the parent's decision. Two
-   inputs cannot carry the mirror the usual way (Combobox): a **text input's** `defaultValue`
-   attribute is rewritten by react-dom after every value change, so its mirror is written in
-   the `reset` event itself (`onResetEvent`), and a **hidden input** has no reset behaviour at
-   all, so a Root with a hidden form input computes its reset target in JS (section 3.5). The
-   text-input rule holds for **every controlled value input**: Slider writes each thumb's
-   `defaultValue` in the `reset` event through `useNativeGroupReconciliation`'s `onResetEvent`
-   and dispatches the JS-computed target, never a DOM read (a render between the event and the
-   microtask could re-apply the shown value). A library-owned native input that is **not the
-   user's surface** (NumberField's hidden number input) is uncontrolled instead, with
-   `defaultValue` as the reset target and its `.value` written through the ref (section 3.5).
+   browser reset to in every case; a group's `readDefault()` returns the value of the radio
+   whose `defaultChecked` is true, or `null`.
+6. **Reset target by mode** (`useResetTarget`). Uncontrolled: the latest `defaultX` prop.
+   Controlled: the mount-time value; the reset is **offered to the parent** as a `"platform"`
+   dispatch with `event.type === "reset"`, and after settle the DOM follows the parent's
+   decision. How the target reaches the DOM depends on the input:
+   - a checkable input: mirrored into `el.defaultChecked` by the re-apply effect (a group Root
+     passes `defaultValue` down so each item mirrors `defaultValue === value`);
+   - **a controlled value input** (`type=text`, `type=range`; Combobox's text, Slider's thumbs):
+     react-dom rewrites its `defaultValue` attribute after every value change, so the mirror is
+     written in the `reset` event itself (`onResetEvent`) and the dispatch carries the
+     JS-computed target, never a DOM read;
+   - **a hidden input** (Combobox's value) has no reset behaviour at all: the target is computed
+     in JS and dispatched from the `reset` microtask;
+   - **a library-owned native input that is not the user's surface** (NumberField's hidden
+     number input) is uncontrolled: `defaultValue` is the reset target, `.value` is written
+     through the ref at every change and re-applied after every commit, so the platform's own
+     reset applies and no `onResetEvent` mirror is needed.
 7. **A cancelled `reset`** (`event.defaultPrevented` in the microtask) dispatches nothing.
-8. **Re-apply after every commit** is belt-and-braces for `checked` (react-dom's `updateInput`
+8. **Re-apply after every commit**, in the order `defaultChecked` (if given), `checked`
+   (optimistic), `indeterminate` (if given). It is belt-and-braces for `checked` (react-dom
    rewrites it on every commit of the input) and load-bearing for `indeterminate` and
-   `defaultChecked`, which React does not manage on a controlled input. It also ends the
-   `preventDefault()` desync at the next commit.
-9. **Click guard**, shared by every part's `onChange`
-   (`guardCheckableChange(event, dispatch, componentName?)` in `use-native-checked.ts`): if
-   `event.defaultPrevented` is already true, return without dispatching **and without warning**
-   (section 2.3 item 3: an already-cancelled click is not a change); otherwise dispatch, then in
-   development warn once per element, naming `componentName`, if the event is now
-   `defaultPrevented`.
+   `defaultChecked`, which React does not manage on a controlled input; the order matters after
+   React's automatic form reset, when writing `defaultChecked` would move `checked` too. It also
+   ends the `preventDefault()` desync (2.3 item 3) at the next commit.
+9. **Click guard**, shared by every part's `onChange` (`guardCheckableChange(event, dispatch,
+   componentName?)` in `use-native-checked.ts`): if `event.defaultPrevented` is already true,
+   return without dispatching **and without warning** (2.3 item 3); otherwise dispatch, then in
+   development warn once per element if the event is now `defaultPrevented`.
 
 ### 3.9 Overlay open state: requests and facts
 
