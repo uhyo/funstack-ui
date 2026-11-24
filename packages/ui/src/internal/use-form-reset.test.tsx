@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import { StrictMode, useRef, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { deferred, setupUser, flushMicrotasks } from "../__tests__/helpers.js";
-import { useFormReset } from "./use-form-reset.js";
+import { useFormReset, useResetTarget } from "./use-form-reset.js";
 
 interface Seen {
   readonly type: string;
@@ -226,5 +226,33 @@ describe("useFormReset", () => {
     (screen.getByTestId("form") as HTMLFormElement).reset();
     await flushMicrotasks();
     expect(onReset).toHaveBeenCalledTimes(1);
+  });
+});
+
+function TargetProbe({ value, defaultValue }: { value?: string; defaultValue?: string }) {
+  const target = useResetTarget(value, defaultValue);
+  return <output>{target === undefined ? "(none)" : target}</output>;
+}
+
+describe("useResetTarget", () => {
+  it("controlled: the value at mount, whatever the value becomes", () => {
+    const { rerender } = render(<TargetProbe value="a" defaultValue="d" />);
+    expect(screen.getByRole("status")).toHaveTextContent("a");
+    rerender(<TargetProbe value="b" defaultValue="d" />);
+    expect(screen.getByRole("status")).toHaveTextContent("a");
+  });
+
+  it("uncontrolled: the latest defaultValue", () => {
+    const { rerender } = render(<TargetProbe defaultValue="d" />);
+    expect(screen.getByRole("status")).toHaveTextContent("d");
+    rerender(<TargetProbe defaultValue="e" />);
+    expect(screen.getByRole("status")).toHaveTextContent("e");
+  });
+
+  it("undefined with neither, and once controlled after an uncontrolled mount", () => {
+    const { rerender } = render(<TargetProbe />);
+    expect(screen.getByRole("status")).toHaveTextContent("(none)");
+    rerender(<TargetProbe value="b" defaultValue="d" />);
+    expect(screen.getByRole("status")).toHaveTextContent("(none)");
   });
 });

@@ -3,7 +3,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { ChangeReason } from "../internal/types.js";
 import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
-import { useFormReset } from "../internal/use-form-reset.js";
+import { useFormReset, useResetTarget } from "../internal/use-form-reset.js";
 
 export interface ComboboxFormOptions {
   /** The Root's props, for the reset targets. */
@@ -32,13 +32,10 @@ export function useComboboxForm(options: ComboboxFormOptions): void {
     options;
   const { writeText } = options;
 
-  const [mountValue] = useState(value);
-  const [mountText] = useState(inputValue);
   // Reset targets (conventions 3.8 rule 6): uncontrolled, the latest default props; controlled,
   // the mount-time values.
-  const valueResetTarget = value !== undefined ? (mountValue ?? null) : (defaultValue ?? null);
-  const inputDefaultValue =
-    inputValue !== undefined ? (mountText ?? "") : (defaultInputValue ?? "");
+  const valueResetTarget = useResetTarget(value, defaultValue) ?? null;
+  const inputDefaultValue = useResetTarget(inputValue, defaultInputValue) ?? "";
   // After a form reset a controlled parent may not adopt the text: put React's value back into
   // the DOM (react-dom only does that after its own input events).
   const [resync, setResync] = useState(0);

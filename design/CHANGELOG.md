@@ -10782,3 +10782,14 @@ behaviour change. `internal/report-dropped.ts` keeps `reportDropped` and loses i
 `useConnected` moves to the new client module `internal/use-connected.ts`. `callUrgentHandler`
 imports `reportDropped` instead of repeating its `reportError` / `console.error` fallback.
 Sections changed: conventions 2.4 (where `useConnected` lives), the 9.1 file listing.
+
+## 2026-11-24, #157: `useResetTarget`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 2). Internal only, no
+behaviour change. The reset target of a value prop by mode (conventions 3.8 rule 6), which Slider,
+NumberField, Select and Combobox each wrote as `const [mountValue] = useState(value)` plus a
+ternary, is `useResetTarget(value, defaultValue)` in `internal/use-form-reset.ts`. Each caller
+keeps its own fallback for "no target" (Slider: the current value, else the platform default;
+Select: the current value; NumberField and Combobox: `null`; Combobox's text: `""`), so the edge
+case of a Root that became controlled after an uncontrolled mount is unchanged. Sections changed:
+the conventions 3.8 helper table (new row), the 9.1 file listing.

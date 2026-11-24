@@ -16,6 +16,7 @@ import type {
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
+import { useResetTarget } from "../internal/use-form-reset.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
@@ -568,9 +569,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // --- Residual browser paths: mount reconciliation and form reset (design 4.5, 6.4) ----------
 
-  const [mountValue] = useState(value);
-  const resetTarget = (): number | null =>
-    valueProp !== undefined ? (mountValue ?? null) : (defaultValue ?? null);
+  const resetBase = useResetTarget(value, defaultValue) ?? null;
+  const resetTarget = (): number | null => resetBase;
   const resetTargetText = hiddenText(resetTarget());
 
   const { onItemMounted } = useNativeGroupReconciliation<number | null>({

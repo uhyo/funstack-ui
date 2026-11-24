@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import type { RefObject } from "react";
 import { useFormOwnerEvent } from "./use-form-owner-event.js";
 import type { FormAssociatedElement } from "./use-form-owner-event.js";
@@ -33,4 +34,19 @@ export function useFormReset(
       latestOnReset.current(event);
     });
   });
+}
+
+/**
+ * The form-reset target of a value prop by mode (conventions 3.8 rule 6): controlled
+ * (`value !== undefined`), the value it had at mount; uncontrolled, the latest `defaultValue`.
+ * `undefined` when that is absent: an uncontrolled Root with no `defaultValue`, or a Root that
+ * became controlled after it mounted uncontrolled. The caller supplies its own fallback
+ * (`?? null`, `?? value`, a platform default).
+ */
+export function useResetTarget<T>(
+  value: T | undefined,
+  defaultValue: T | undefined,
+): T | undefined {
+  const [mountValue] = useState(value);
+  return value !== undefined ? mountValue : defaultValue;
 }
