@@ -1,5 +1,5 @@
 "use client";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -33,8 +33,8 @@ export interface ButtonActionDetails extends ActionDetails {}
  */
 export interface ButtonState {
   /**
-   * This Button's own `action` is in flight, or a submission it started through its own
-   * function `formAction` is pending.
+   * This Button's own `action` is in flight, or it submitted the form through its own function
+   * `formAction` and the form's submissions have not all finished yet.
    */
   readonly pending: boolean;
   /** The `disabled` prop. Not set by pending. */
@@ -60,8 +60,9 @@ export interface ButtonProps extends Omit<
   /**
    * React's `formAction`: a function (a Server Function, a `useActionState` dispatch, a client
    * function) or a URL, run by React instead of the form's `action` when this Button submits the
-   * form. With a function, the Button is `pending` while its own submission runs (not while
-   * another submitter's does) and defaults to `type="submit"`. A click meanwhile submits again
+   * form. With a function, the Button is `pending` from its own submission until the form's
+   * submissions have all finished (never for another submitter's alone) and defaults to
+   * `type="submit"`. A click meanwhile submits again
    * unless `whilePending` is `"ignore"`; React drops the rejection of an older overlapping
    * submission, so use `"ignore"` (or `useActionState`) for a submission that must not overlap.
    */
@@ -125,7 +126,8 @@ export interface ButtonProps extends Omit<
  * that runs `action` in its own transition, with `data-pending` while it runs. A click meanwhile
  * runs it again, or with `whilePending="ignore"` is ignored while the Button is `aria-disabled`
  * (conventions 2.5.1). With a function
- * `formAction` it is a form submitter with its own per-submitter pending. Inside a
+ * `formAction` it is a form submitter, pending from its own submission until the form's
+ * submissions have all finished. Inside a
  * `Toolbar.Root` a disabled Button stays focusable (`aria-disabled`).
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`,
@@ -156,18 +158,28 @@ export function Button({
   const ignoring = (whilePending ?? "run") === "ignore";
   const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: ignoring });
 
-  // Per-submitter pending (design 6.2): React reports the submitter's function as
+  // Per-submitter pending (design 6.2): React reports the latest submitter's function as
   // `status.action`. `submittedWith` keeps the function this Button last submitted with, so an
-  // inline `formAction` whose identity changes during the submission still matches.
+  // inline `formAction` whose identity changes during the submission still matches. Another
+  // submission overwrites `status.action` while this one still runs, so `submitted` latches the
+  // first render that named this Button and holds until the form status is idle: pending from its
+  // own submission until the form's submissions have all finished (#154).
   const status = useFormStatus();
   const submittedWith = useRef<unknown>(undefined);
-  const formPending =
+  const [submitted, setSubmitted] = useState(false);
+  const named =
     status.pending &&
     typeof formAction === "function" &&
     // Written only by the click handler, before the submission whose status this render shows,
     // so the render that reads it is never stale for that submission.
     // oxlint-disable-next-line react/refs
     (status.action === formAction || status.action === submittedWith.current);
+  // Derived state, updated during render (React re-renders this component before committing).
+  if (named && !submitted) setSubmitted(true);
+  if (!status.pending && submitted) setSubmitted(false);
+  // Gated as a whole: a latch left from a function `formAction` that became a URL or `action`
+  // must not keep the Button pending (a URL has no pending and no guard, 6.2).
+  const formPending = typeof formAction === "function" && (named || (status.pending && submitted));
   const pending = ownPending || formPending;
 
   useDevWarning(

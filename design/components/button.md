@@ -26,7 +26,8 @@ Radix Themes `loading`, GOV.UK `preventDoubleClick`.
    still works. Conventions 2.5 and 3.6 are amended.
 2. **No `aria-busy` by default, no built-in announcement** in v1.
 3. **Forms**: default `type="button"`, `"submit"` when `formAction` is given; `formAction` shows
-   pending for this button's own submissions only; `Form.Submit` stays; a plain `type="submit"`
+   pending for this button's own submissions only (from its own submission until the form's
+   submissions have all finished, a latch since #154, 6.2); `Form.Submit` stays; a plain `type="submit"`
    Button does not read `useFormStatus`.
 4. **Composition**: an already-cancelled click does not block the action
    (`Dialog.Trigger render={<Button />}` works); focus and hover listeners keep working while
@@ -47,7 +48,7 @@ Radix Themes `loading`, GOV.UK `preventDoubleClick`.
 | 4 | AT state while pending | `aria-disabled="true"` (owned), `data-disabled` **not** set, `state.disabled` unchanged. Never native `disabled`, never `inert`, no `aria-busy`, no announcement. |
 | 5 | Library-wide rule | "A pure trigger ignores re-entry" becomes the conventions' rule (2.5, 3.6) and a `useActionTrigger` option; **wave 8 lands it for Button only**; `Dialog.Close`, `Popover.Close`, `Menu.Item` follow in **#81** because their tests and docs are built on re-run and `Menu.Item`'s navigation keys on `aria-disabled` (section 5.5). `Form.Submit` is **not** guarded (section 6.4). |
 | 6 | `type` | Default `"button"`; `"submit"` when `formAction` is given. The Button's own `type` prop wins (`"submit"` / `"reset"` allowed); the computed value is owned on a `<button>` and on a **component** `render` element (assumed to render a `<button>`; review item 2, library-wide in `rendersButton`), and omitted only for a host element of another tag (`<a href>`). `action` with a submitting `type` warns in development. |
-| 7 | `formAction` | First-class pass-through with **per-submitter pending**: `useFormStatus().pending && status.action === <the function this Button submitted with>`. `action` and `formAction` together is a development error. Progressive enhancement is React's (a Server Function submits before hydration). |
+| 7 | `formAction` | First-class pass-through with **per-submitter pending**: latched once `useFormStatus().pending && status.action === <the function this Button submitted with>` has rendered, held until the form status is idle (6.2, #154). `action` and `formAction` together is a development error. Progressive enhancement is React's (a Server Function submits before hydration). |
 | 8 | `disabled` | Native `disabled` (owned) plus `data-disabled`, like `Dialog.Close` / `Form.Submit`. `focusableWhenDisabled` renders `aria-disabled="true"` instead (Base UI's name); it is implied `true` inside a `Toolbar.Root` (APG Toolbar) and for **any `render` element that is not a host `<button>`** (an `<a href>`, a component: native `disabled` means nothing on a link and would expose an enabled link to AT; review must-fix 1). Never dispatches either way; a disabled link does not navigate. |
 | 9 | Toolbar | `Button` reads `ToolbarContext`; **`Toolbar.Button` is removed** (user decision, a breaking change): a Toolbar's command button is `<Button>`, with the same `aria-disabled` behaviour `Toolbar.Button` had. One implementation, one name. |
 | 10 | Composition | Button does **not** treat a `defaultPrevented` click as a veto (a Trigger-wrapped Button runs its action); its guard cannot stop an outer part's handler that ran first; `command` / `commandfor` pass through untouched (both the action and the command run on one click). |
@@ -133,9 +134,10 @@ import { publish, saveDraft, discard } from "./actions"; // "use server"
 Three buttons, three meanings of `pending`. `Form.Submit` shows the **form channel**: it is
 pending for every submission of this form, whichever button started it (`useFormStatus().pending`,
 conventions 2.7). Each `Button formAction` shows **its own submissions only**: "Save draft" is
-pending while `saveDraft` runs, "Discard" is not, even though `useFormStatus().pending` is `true`
-for the whole form. Both Buttons are `type="submit"` (the default once `formAction` is given) so
-constraint validation, `FormData` and React's automatic reset all work; a second click on a
+pending from its own submission until the form's submissions have all finished, "Discard" is
+not (unless it submitted too), even though `useFormStatus().pending` is `true` for the whole
+form. Both Buttons are `type="submit"` (the default once `formAction` is given) so constraint
+validation, `FormData` and React's automatic reset all work; a second click on a
 pending one is ignored. The Server Functions render as `formaction` attributes before hydration,
 so the buttons submit without JavaScript (React's progressive enhancement, unchanged).
 
@@ -260,8 +262,9 @@ export interface ButtonProps extends Omit<
   /**
    * React's `formAction`: a function (a Server Function, a `useActionState` dispatch, a client
    * function) or a URL, run by React instead of the form's `action` when this Button submits the
-   * form. With a function, the Button is `pending` while its own submission runs (not while
-   * another submitter's does) and defaults to `type="submit"`. A further activation meanwhile
+   * form. With a function, the Button is `pending` from its own submission until the form's
+   * submissions have all finished (never for another submitter's alone, 6.2, #154) and defaults
+   * to `type="submit"`. A further activation meanwhile
    * submits again unless `whilePending="ignore"` (section 18.3).
    */
   formAction?: ComponentPropsWithRef<"button">["formAction"];
@@ -530,9 +533,36 @@ transition, with its automatic reset, and `useFormStatus()` reports `{ pending, 
 `useFormStatus()` unconditionally (a hook; outside a form it reports not pending) and computes
 
 ```ts
-formPending = status.pending && typeof formAction === "function"
+named = status.pending && typeof formAction === "function"
   && (status.action === formAction || status.action === submittedWith.current);
+// `submitted`: useState latch, updated during render (derived state, #154)
+if (named && !submitted) setSubmitted(true);
+if (!status.pending && submitted) setSubmitted(false);
+formPending = typeof formAction === "function" && (named || (status.pending && submitted));
 ```
+
+Rule: **a `formAction` Button is pending from its own submission until the form's submissions
+have all finished.** `status.action` is only the *latest* submitter's function: React keeps one
+optimistic status per form and overwrites it on every submission, naming no submitter and keeping
+no history. Without the latch, A lost `pending` the moment B (or the form's own `action`) submitted
+while `a` still ran, and under `whilePending="ignore"` a third click on A ran `a` a second time
+(#154, `memo/architect/154-per-submitter-pending.md`). Overlapping form actions are not queued
+(each runs at once) and React entangles them: `status.pending` ends once, when every overlapping
+submission has settled, and a settled action's transition updates are committed only then. So
+"pending exactly while my own promise is unsettled" is rendered nowhere in React; the latch gives
+the observable truth and the same lifetime as two overlapping `Button action`s. A Button that did
+not submit is still never pending; only React's status sets the latch, so a click whose submission
+constraint validation or an `onSubmit` cancels never latches. Wrapping the function to await its
+own promise was rejected: React would be given a wrapper, so a Server Function would lose its
+`$$FORM_ACTION` (no submission before hydration), `useFormStatus().action` would no longer equal
+the consumer's function and a `useActionState` dispatch would no longer be recognised; and its
+pending, a transition too, would be held just as long.
+
+Known limits (documented, not solved): two submissions started by script in one task
+(`requestSubmit(a); requestSubmit(b)`) never render the status that names `a`, so A is not
+pending (user input cannot do this: React flushes the status between discrete events); two
+Buttons sharing one function stay indistinguishable (below); after `b` settled first, B stays
+pending until `a` settles, which is React's entanglement, not the latch.
 
 `submittedWith` is a ref the click handler sets to the `formAction` the Button is about to submit
 with. The second comparison exists because the identity of an inline `formAction={(fd) => …}`
@@ -575,7 +605,7 @@ too. Test row 12 guards the first two facts.
 | | `Form.Submit` | `Button formAction` | `Button type="submit"` |
 | --- | --- | --- | --- |
 | Submits | the form's own `action` | its own function instead | the form's own `action` |
-| `pending` | the form channel: any submitter | its own submissions only | none |
+| `pending` | the form channel: any submitter | from its own submission until the form's submissions have all finished | none |
 | Re-entry while pending | **not blocked** (a `useActionState` dispatch queues it, in order; a plain action runs concurrently; `Form.Submit` has no action of its own to key a guard on, and the queue is React's documented semantics for forms, conventions 2.5) | ignored | none |
 | Use | the one primary submit button | secondary submitters | rarely; `Form.Submit` is the documented spelling |
 
@@ -762,8 +792,9 @@ commits nothing. No `fsui-button` types: `useActionTrigger` attaches none, as fo
    Second click: `formPending` is `true` → `preventDefault()`, so React's submit handler never
    sees a second `submit` event. Resolve → status clears, React resets the form.
 9. **Two `formAction` Buttons.** A pending; B clicked: B's own submission starts (React runs them
-   concurrently, verified), both show their own pending, `Form.Submit` in the same form shows the
-   form channel for the whole time.
+   concurrently, verified), both show pending until both submissions have settled (React holds
+   the form status for the whole overlap; A keeps it through the latch of 6.2, #154),
+   `Form.Submit` in the same form shows the form channel for the whole time.
 10. **`render={<a href>}`, slow action.** First click: action runs, navigation proceeds natively
     (the consumer's action may `preventDefault()` to hold it). Second click while pending:
     cancelled, no navigation.
@@ -832,7 +863,7 @@ a Button never has two of its own runs in flight** (rows 5 and 6 replace them)."
 | 8 | Suspending content | jsdom | The action sets a value that makes sibling content suspend (`createSuspender`): old content stays, `data-pending` on until it resolves, clicks ignored meanwhile. |
 | 9 | Function props, `render` | jsdom | `className` / `style` / `children` receive `{ pending, disabled }` and agree with the attributes; element form merges `className` / `style`, keeps dispatch and the guard, forwards `ref`; function form gets `(props, state)`; `render={<MyButton />}` (a component that spreads props) works; a pass-through `onFocus` / `onPointerEnter` / `onKeyDown` fires while pending. |
 | 10 | Consumer state after await | jsdom | `action={async () => { await d.promise; startTransition(() => setCount(c => c + 1)); }}` commits once per accepted click (guards the documented post-await pattern). |
-| 11 | `formAction`, per-submitter pending ★ | jsdom | A `<form>` with `Form.Submit` and two `Button formAction` (deferred functions `a`, `b`): click A → A `data-pending` + `aria-disabled`, B neither, `Form.Submit` `data-pending`; `useFormStatus().action === a` observed through a probe; click A again → `a` called once, click `defaultPrevented`; click B while A pends → `b` called, both pending; resolve A → only A clears; resolve B → all clear. `type` on both is `"submit"`. |
+| 11 | `formAction`, per-submitter pending ★ | jsdom | A `<form>` with `Form.Submit` and two `Button formAction` (deferred functions `a`, `b`): click A → A `data-pending` + `aria-disabled`, B neither, `Form.Submit` `data-pending`; `useFormStatus().action === a` observed through a probe; click A again → `a` called once, click `defaultPrevented`; click B while A pends → `b` called, both pending (A stays `aria-disabled`); resolve A → all still pending (React holds the form status); resolve B → all clear. #154 rows: two Buttons with different functions, both settle orders, each pending until both settled, then B alone leaves A idle; the form's own `action` submitted while A runs keeps A pending; `"ignore"` A, B, A again: `a` called once, the third click `defaultPrevented`, also after `b` settled; a click on A cancelled by constraint validation, then B: A never pending. `type` on both is `"submit"`. |
 | 12 | `formAction` inside `Form.Root` ★ | jsdom | `Form.Root action={formAction}` with a `Button formAction={mine}`: clicking the Button calls `mine`, not `formAction`; `Form.Root` shows `data-pending` meanwhile (form channel); the button element has a `formaction` attribute (react-dom's URL for a function), which is what `Form.Root`'s submitter check keys on; `Form.Submit` in the same form still runs `formAction`. |
 | 13 | `formAction` identity | jsdom | An inline `formAction={(fd) => …}` whose parent re-renders (state change) during the submission keeps the Button `data-pending` until it settles (the `submittedWith` ref); a stable function works without the ref (sanity). |
 | 14 | Dev warnings | jsdom | `action` + `formAction` logs an error once; `action` + `type="submit"` and `+ "reset"` warn once; no warning for `formAction` alone, `type="submit"` alone, `commandfor` + `action`. |
@@ -959,6 +990,7 @@ export function Button({ action, formAction, type, disabled = false, focusableWh
   const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: true });
   const status = useFormStatus();
   const submittedWith = useRef<unknown>(undefined);
+  // Since #154 `formPending` also holds through a `submitted` latch (6.2).
   const formPending = status.pending && typeof formAction === "function"
     && (status.action === formAction || status.action === submittedWith.current);
   const pending = ownPending || formPending;
@@ -1438,10 +1470,12 @@ Trigger dispatches on every click.
 
 Under `"run"` a `Button formAction={fn}` is React's submitter with per-submitter pending (6.2)
 and nothing more: a second click submits again, `pending` stays until React's form status
-clears. Overlapping submissions are React's form channel, where **React drops the rejection of
+clears (also when another submitter's submission overlaps its own, #154). Overlapping submissions are React's form channel, where **React drops the rejection of
 an older overlapping submission** and the library cannot see it (conventions 2.5.1, question
 4, accepted). Under `"ignore"` the guard is `formPending` as in 5.2, with its documented
-difference (a render value: a click in a held-commit window is ignored). 6.5 (implicit
+difference (a render value: a click in a held-commit window is ignored). With the latch (6.2,
+#154) the guard holds through another submitter's overlapping submission: click A, click B,
+click A again is cancelled while `a` runs. 6.5 (implicit
 submission): Enter in a field submits again under `"run"`, is cancelled under `"ignore"`.
 
 ### 18.4 The other pure triggers (replaces the defaults of section 16)
