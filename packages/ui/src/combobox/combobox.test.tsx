@@ -3461,3 +3461,28 @@ describe("Combobox inside a Field.Root", () => {
     expect(input()).toBeDisabled();
   });
 });
+
+// #159 (usePopoverPopup, as Popover's): a dismissal whose popup element remounts before its
+// `toggle` (a change of `transition`) is replayed a task later and reported.
+describe("Combobox: a remount during a hide (#159)", () => {
+  it("a dismissal is reported, and the listbox stays closed", async () => {
+    const user = setupUser();
+    const onOpenChange = vi.fn();
+    const { rerender } = render(<Harness root={{ onOpenChange }} />);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks(2);
+    const first = screen.getByTestId("popup");
+    expect(first.matches(":popover-open")).toBe(true);
+    first.hidePopover();
+    rerender(<Harness root={{ onOpenChange }} popup={{ transition: { default: "none" } }} />);
+    await flushTasks(2);
+    const second = screen.getByTestId("popup");
+    expect(second).not.toBe(first);
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(
+      false,
+      expect.objectContaining({ reason: "dismiss" }),
+    );
+    expect(second.matches(":popover-open")).toBe(false);
+  });
+});

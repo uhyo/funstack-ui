@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -25,6 +25,7 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
+import { useLatest } from "../internal/use-latest.js";
 import { useModalRegistration } from "../internal/use-modal-registration.js";
 import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -195,19 +196,6 @@ export function DialogPopup({
             "Top layer, backdrop, focus and Escape all come from a real <dialog>."
           : null),
   );
-  const libraryRef = useCallback(
-    (element: HTMLDialogElement) => {
-      checkElement?.(element);
-      popupRef.current = element;
-      setDialog(element);
-      return () => {
-        if (popupRef.current === element) popupRef.current = null;
-        setDialog(null);
-      };
-    },
-    [checkElement, popupRef],
-  );
-
   // --- Opening -----------------------------------------------------------------------------
 
   const openDialog = (element: HTMLDialogElement): void => {
@@ -332,9 +320,9 @@ export function DialogPopup({
     ctx.requestClose(event, "activate", valueOf(submitter));
   });
 
-  const onClose = useEffectEvent((event: Event) => {
-    const element = popupRef.current;
-    if (element === null || event.target !== element) return;
+  // The `close` listener's work, also replayed for an element that remounted before its `close`
+  // event (#159; `event` is `undefined` there: no event fired).
+  const handleClose = (element: HTMLDialogElement, event: Event | undefined): void => {
     flags.endClose();
 
     // Focus return is the platform's; it leaves focus inside the hidden dialog only when the
@@ -358,16 +346,58 @@ export function DialogPopup({
     // A fact, also while a part's close is in flight: it supersedes that request (committed
     // `false` now) and `onOpenChange(false)` is called (conventions 3.9.5, dialog.md 2.7).
     ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
+  };
+  const latestHandleClose = useLatest(handleClose);
+
+  const onClose = useEffectEvent((event: Event) => {
+    const element = popupRef.current;
+    if (element === null || event.target !== element) return;
+    handleClose(element, event);
   });
+
+  // Whether the Popup is mounted, for the #159 replay. A passive effect: a Suspense hide detaches
+  // the element's ref (and runs layout cleanups) but keeps passive effects, so a hidden Popup
+  // still counts as mounted.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, [mounted]);
+
+  const libraryRef = useCallback(
+    (element: HTMLDialogElement) => {
+      checkElement?.(element);
+      popupRef.current = element;
+      // A new element (a remount mid-close): the old one's `close` event never comes (#159). A
+      // lost fact is replayed a timer task later, unless the Popup unmounted meanwhile; also while
+      // a Suspense boundary hides it (the fact happened before the hide). Here, not in the
+      // listener effect's cleanup: that passive cleanup runs after the remount's layout effects,
+      // and no apply follows it.
+      flags.attach(element, (lost) => {
+        if (mounted.current) latestHandleClose.current(lost as HTMLDialogElement, undefined);
+      });
+      setDialog(element);
+      return () => {
+        if (popupRef.current === element) popupRef.current = null;
+        setDialog(null);
+      };
+    },
+    [checkElement, popupRef, flags, latestHandleClose, mounted],
+  );
 
   const onBeforeToggle = useEffectEvent((event: Event) => {
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
     const newState = (event as ToggleEvent).newState;
-    if (newState === "closed") flags.beginClose();
-    else flags.endClose();
-    // What already runs inside is not the exit.
-    if (newState === "closed") exit.recordBaseline(element);
+    // An open does not end a close (as Popover's): the close's `close` event still comes, HTML
+    // queues it whatever follows, and nothing reads the flag while the dialog is shown (#159).
+    if (newState === "closed") {
+      flags.beginClose();
+      // What already runs inside is not the exit.
+      exit.recordBaseline(element);
+    }
     // Every native open counts as a new opening (design 3.4, as Popover 14.1): foreign,
     // pre-hydration and JS-free opens too, so a Close action from an earlier opening skips its
     // close. Counted here, synchronously inside `showModal()` / `show()`, not at the queued

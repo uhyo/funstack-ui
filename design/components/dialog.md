@@ -407,7 +407,22 @@ commit landing there (any unrelated re-render) would make the effect call `showM
 re-open a dialog the user just closed. The guard is the `awaitingClose` flag set in the Popup's
 **synchronous** `beforetoggle` listener when `newState === "closed"` and cleared in the `close`
 listener before the fact is adopted; while it is set the effect does nothing. `beforetoggle` fires
-synchronously inside the close steps in every engine and in the jsdom shim.
+synchronously inside the close steps in every engine and in the jsdom shim. An open's
+`beforetoggle` (a foreign `show()` in the same task) does not clear it: HTML queues the `close`
+event whatever follows, and the flag is read only while the dialog is closed. The flag and the
+`libraryClose` marker belong to the element. When the callback ref attaches a different
+`<dialog>` (a remount during a close, such as a change of `transition`), the old element's `close`
+event never reaches the Popup. A library close (the marker set) has nothing to report: both are
+cleared there. A fact is replayed in a timer task (`setTimeout(0)`; not the `close` event's own
+task, so it can run later and an input task can come first): the `close` listener's work on the
+old element (its `returnValue`), so `onOpenChange(false, { reason,
+returnValue })` is called and committed state follows (a controlled parent that refuses gets the
+refused fact's re-open, conventions 3.9.4). `details.event` is the recorded intent's, else
+`undefined`: no event fired. Until the replay the wait stays set, so the new element is not shown
+first. Nothing is replayed once the Popup has unmounted; a Popup a Suspense boundary hides (its
+ref detached, still mounted) still gets the replay, as the fact happened before the hide. Refs attach in the layout phase, children
+first, so the attach runs before the Popup's own apply effect: that effect must stay in an
+ancestor of the `<dialog>`. The same element attached again (a new merged ref) changes nothing.
 
 This one effect covers: the normal open (committed flipped by the user's dispatch), `defaultOpen`
 on mount, a controlled parent opening the dialog programmatically (`setOpen(true)` from a menu,

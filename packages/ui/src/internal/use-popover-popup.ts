@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
 import { withCssTransitionCut } from "./css-transition-cut.js";
@@ -299,6 +299,56 @@ export function usePopoverPopup(
     }
   };
 
+  // The work of a `toggle` that finds the popup hidden; also replayed for an element that remounted
+  // before its `toggle` (#159; `event` is `undefined` there: no event fired).
+  const handleHidden = (
+    element: HTMLElement,
+    event: Event | undefined,
+    echo: boolean,
+    lostInterest: boolean,
+  ): void => {
+    interest.noteClosed();
+    // Focus return for what the platform leaves out (design 6.2): a nested popover restores
+    // nothing, and an opener that is gone leaves focus inside the hidden popup. Not after a
+    // lost-interest hide: the platform never focuses the invoker there, and focusing a Trigger
+    // with `interestfor` would give it interest again and re-open the popup.
+    const wasInside = focusWasInside.current;
+    focusWasInside.current = false;
+    if (wasInside && !lostInterest) returnFocus(element);
+
+    const intent = ctx.takeCloseIntent();
+    if (isLibrary) {
+      exit.afterClose(element, echo);
+      // Anything but the library's own hide is a fact: committed `false` now (urgent, this
+      // event's commit) and `onOpenChange(false)` (conventions 3.9.3).
+      if (!echo) {
+        flags.markFact();
+        ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
+      }
+    }
+  };
+
+  // A fact whose element remounted before its `toggle` (#159), in a timer task: the work that
+  // `toggle` would have done. The lost element is hidden; its shown mirror and `whileShown` listeners went at detach.
+  const replayLostHide = (element: HTMLElement): void => {
+    flags.endClose();
+    // Echo `false`: only facts are replayed. `lostInterest` `false`: the detach's `interest.reset()`
+    // dropped the mark, as `takeLostInterest()` would read now; a lost-interest hide never has
+    // focus inside (interest is lost once focus left), so no focus return follows from it.
+    handleHidden(element, undefined, false, false);
+  };
+
+  // Whether the Popup is mounted, for the #159 replay. A passive effect: a Suspense hide detaches
+  // the element's ref (and runs layout cleanups) but keeps passive effects, so a hidden Popup
+  // still counts as mounted.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
   const onToggle = (event: Event): void => {
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
@@ -312,27 +362,7 @@ export function usePopoverPopup(
     if (isLibrary) setShown(isPopoverOpen(element));
     else syncOpen(element);
 
-    if (!isPopoverOpen(element)) {
-      interest.noteClosed();
-      // Focus return for what the platform leaves out (design 6.2): a nested popover restores
-      // nothing, and an opener that is gone leaves focus inside the hidden popup. Not after a
-      // lost-interest hide: the platform never focuses the invoker there, and focusing a Trigger
-      // with `interestfor` would give it interest again and re-open the popup.
-      const wasInside = focusWasInside.current;
-      focusWasInside.current = false;
-      if (wasInside && !lostInterest) returnFocus(element);
-
-      const intent = ctx.takeCloseIntent();
-      if (isLibrary) {
-        exit.afterClose(element, echo);
-        // Anything but the library's own hide is a fact: committed `false` now (urgent, this
-        // event's commit) and `onOpenChange(false)` (conventions 3.9.3).
-        if (!echo) {
-          flags.markFact();
-          ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
-        }
-      }
-    }
+    if (!isPopoverOpen(element)) handleHidden(element, event, echo, lostInterest);
     const { newState } = event as ToggleEvent;
     if (newState === "open" && isPopoverOpen(element)) {
       stopWhileShown.current ??= options.whileShown?.(element) ?? null;
@@ -361,6 +391,7 @@ export function usePopoverPopup(
     onBeforeToggle,
     onToggle,
     onCommand,
+    replayLostHide,
     onInterest: interest.onInterest,
     onLoseInterest: interest.onLoseInterest,
   });
@@ -385,6 +416,12 @@ export function usePopoverPopup(
     (element: HTMLElement) => {
       checkElement?.(element);
       popupRef.current = element;
+      // A new element (a remount mid-hide): the old one's `toggle` never comes (#159). A lost
+      // fact is replayed a timer task later, unless the Popup unmounted meanwhile; also while a
+      // Suspense boundary hides it (the fact happened before the hide).
+      flags.attach(element, (lost) => {
+        if (mounted.current) handlers.current.replayLostHide(lost as HTMLElement);
+      });
       const listeners: [string, EventListener][] = [
         ["beforetoggle", (event) => handlers.current.onBeforeToggle(event)],
         ["toggle", (event) => handlers.current.onToggle(event)],
@@ -424,6 +461,7 @@ export function usePopoverPopup(
     [
       checkElement,
       popupRef,
+      flags,
       setShown,
       handlers,
       latestWhileShown,

@@ -11004,6 +11004,82 @@ mode (Menu and Combobox have none) nor a dependency of the Popup's callback ref,
 resolver does not re-attach the listeners. Sections changed: popover.md 6.1 and 15 (the name of
 the option).
 
+## 2026-11-24, #159: a remount during a close ends the close's wait
+
+Bug fix (issue #159, found in #157 step 3; developer). If a Popup's element remounted between a
+close's `beforetoggle` and its `toggle` / `close` event (a change of `transition` swaps the
+`<ViewTransition>` wrapper and with it the element, while the Popup's state stays), the old
+element's event reached no listener: `awaitingClose` stayed set, so a committed-open popup was
+never shown again and a held close never released its content; the library echo stayed set too,
+so on Dialog the next dismissal was taken for the library's own close and not reported. Popover
+(and with it Menu and Combobox) had the same bug.
+
+The rule: the wait and the echo belong to the element. When the callback ref attaches a
+different element, both are cleared (`PopupFlags.attach`), in the mutation phase, so the remount
+commit's apply effect already sees it; the same element attached again (a new merged ref,
+StrictMode) keeps them, as its event still comes. Not the listener effect's cleanup: Dialog's is
+a passive effect that runs after the remount commits' layout effects, with no apply after it, and
+a ref detach cannot tell a remount from a re-attach.
+
+Dialog's open `beforetoggle` no longer clears `awaitingClose` (as Popover's never did). HTML
+queues the `close` event of a close unconditionally, the flag is read only while the dialog is
+closed, and the only way to close it again without a closing `beforetoggle` was the remount, now
+handled at the attach; the branch was observable only through #159 (#157 review M3).
+
+Sections changed: dialog.md 2.5 (the re-open race), popover.md 2.5 (the re-open race).
+Developer notes: `memo/developer/issue-159.md`.
+
+## 2026-11-24, #159 review: a fact lost to a remount is replayed
+
+Review of `fix/159-remount-mid-close` (memo/reviewer/review-159.md), coordinator decision. Corrects
+the entry "2026-11-24, #159: a remount during a close ends the close's wait" above in two points.
+
+1. **A lost fact is reported.** That entry cleared the wait for every remount mid-close, so a
+   dismissal (Escape, light dismiss, script `close()` / `hidePopover()`) whose element remounted
+   before its event was undone silently: the apply effect showed the new element and
+   `onOpenChange(false)` never came, against the fact rule (conventions 3.9.2). Now
+   `PopupFlags.attach` tells the two apart: a library close (echo set) is still cleared at once;
+   a fact keeps the wait set and is replayed a task later, where the lost event would have run,
+   by the same code as the `close` / `toggle` listener (Dialog: `handleClose`; usePopoverPopup:
+   `handleHidden`) on the old element. So an uncontrolled popup stays closed, a controlled parent
+   decides (a refusal gets the refused fact's re-open, 3.9.4), and Dialog reports the old
+   element's `returnValue`. `details.event` is the recorded intent's event, else `undefined`
+   (the platform event never fired: a documented gap). At most one replay is queued per lost
+   close; none runs once the Popup has unmounted. No double report: the old element's event, if
+   it fired, reaches no listener (Popover's are removed at detach; Dialog's `onClose` checks the
+   target against `popupRef`).
+2. **Refs attach in the layout phase**, not the mutation phase as that entry said (only the
+   detach is in the mutation phase). Layout work runs children first and the popup element is a
+   descendant of the Popup component, so the attach still runs before the Popup's
+   `useApplyOpenState` layout effect in the same commit. The apply effect must stay in an
+   ancestor of the popup element for this to hold.
+
+Sections changed: dialog.md 2.5 and popover.md 2.5 (the re-open race: what a remount does).
+Developer notes: `memo/developer/issue-159.md`.
+
+## 2026-11-24, #159 second review: the replay and a Suspense hide
+
+Follow-up review of `fix/159-remount-mid-close` (memo/reviewer/review-159.md, findings A-C),
+coordinator decision. Corrects the entry "2026-11-24, #159 review: a fact lost to a remount is
+replayed" above.
+
+- **A Suspense hide does not cancel the replay.** The replay was skipped when `popupRef` was
+  `null`, meant as "the Popup unmounted"; but a Suspense boundary that hides the Popup detaches
+  the element's ref too while the Popup stays mounted. A hide, a remount and a suspending update
+  in one task left `awaitingClose` set for good and the fact unreported. Each Popup now tracks
+  "mounted" in a passive effect (a Suspense hide runs layout cleanups and ref detaches, not
+  passive cleanups) and replays whenever it is mounted. Reporting, rather than only ending the
+  wait, is what happens to a fact today: a dismissal that happened before the hide is reported
+  (committed `false`, `onOpenChange(false)`), and the reveal's apply effect then follows committed
+  state (uncontrolled: stays closed; a refusing parent: the refused fact's re-open). The handler's
+  work does not need the popup ref: it runs on the old element.
+- **Wording.** The replay is a timer task (`setTimeout(0)`), not "where the lost event would have
+  run": it is a different task from the event's, can run later, and an input task can come before
+  it (a Trigger click in between toggles as it does between a hide and its `toggle` today).
+
+Sections changed: dialog.md 2.5 and popover.md 2.5 (the remount paragraph). Developer notes:
+`memo/developer/issue-159.md`.
+
 ## 2026-11-24, #157: conventions.md, second slimming pass
 
 Refactoring wave #157, the follow-up `memo/architect/157-spec-slim.md` left over ("conventions.md

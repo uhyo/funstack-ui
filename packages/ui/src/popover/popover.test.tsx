@@ -2266,3 +2266,179 @@ describe("Popover", () => {
     });
   });
 });
+
+// #159 (as Dialog's): the popover element remounts between a hide's `beforetoggle` and its queued
+// `toggle` (setting `transition` does, through the ViewTransition wrapper). The old element's
+// `toggle` reaches no listener. A library hide (the echo) has nothing to report: the wait and the
+// echo end with the old element. A fact is replayed a task later, where its `toggle` would have
+// run: reported to `onOpenChange` (no `event`: none fired), and the wait ends then.
+describe("Popover: a remount during a hide (#159)", () => {
+  const withTransition = { transition: { default: "none" } } as const;
+
+  it("a dismissal: reported a task later, the uncontrolled popup stays closed and opens again", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    const { rerender } = render(<Harness mode="uncontrolled" fact={fact} />);
+    await openThroughTrigger(user);
+    const first = popup();
+    const show = vi.spyOn(HTMLElement.prototype, "showPopover");
+    // One task: a script hide (`beforetoggle` now, `toggle` queued) and a render that remounts
+    // the element before the `toggle` runs.
+    first.hidePopover();
+    rerender(<Harness mode="uncontrolled" fact={fact} popup={withTransition} />);
+    expect(popup()).not.toBe(first);
+    // Still waiting for the lost event: the new element is not shown, nothing reported yet.
+    expect(isOpen()).toBe(false);
+    expect(fact).not.toHaveBeenCalled();
+    await flushTasks(2);
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledWith(false, { reason: "dismiss" });
+    expect(committedText()).toBe("false");
+    expect(isOpen()).toBe(false);
+    expect(content()).toBeNull();
+    expect(show).not.toHaveBeenCalled();
+    show.mockRestore();
+    // A dismissal of the new element is reported once more (no echo left over).
+    await openThroughTrigger(user);
+    act(() => popup().hidePopover());
+    await flushTasks(2);
+    expect(isOpen()).toBe(false);
+    expect(committedText()).toBe("false");
+    expect(fact).toHaveBeenCalledTimes(2);
+  });
+
+  it("a dismissal a controlled parent refuses: reported, then the new element re-opens", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    const { rerender } = render(<Harness mode="controlled" refuseClose fact={fact} />);
+    await openThroughTrigger(user);
+    const first = popup();
+    first.hidePopover();
+    rerender(<Harness mode="controlled" refuseClose fact={fact} popup={withTransition} />);
+    expect(isOpen()).toBe(false);
+    await flushTasks(2);
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledWith(false, expect.objectContaining({ reason: "dismiss" }));
+    // The parent kept `open={true}`: the refused fact's re-open (conventions 3.9.4).
+    expect(committedText()).toBe("true");
+    expect(popup()).not.toBe(first);
+    expect(isOpen()).toBe(true);
+    expect(content()).not.toBeNull();
+  });
+
+  it("a dismissal, then the Popup unmounts before the replay: nothing is reported", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    const { rerender } = render(<Harness mode="uncontrolled" fact={fact} />);
+    await openThroughTrigger(user);
+    popup().hidePopover();
+    rerender(<Harness mode="uncontrolled" fact={fact} popup={withTransition} />);
+    rerender(<></>);
+    await flushTasks(2);
+    expect(fact).not.toHaveBeenCalled();
+  });
+
+  it("a dismissal, then a Suspense hide before the replay: still reported, not stuck after the reveal", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    let resolve!: () => void;
+    const pending = new Promise<void>((r) => {
+      resolve = r;
+    });
+    function Suspend(): null {
+      use(pending);
+      return null;
+    }
+    const ui = (props: { popup?: typeof withTransition; suspend?: boolean }) => (
+      <Harness
+        mode="uncontrolled"
+        suspense
+        fact={fact}
+        popup={props.popup}
+        outside={props.suspend ? () => <Suspend /> : undefined}
+      />
+    );
+    const { rerender } = render(ui({}));
+    await openThroughTrigger(user);
+    const first = popup();
+    // One task: a script hide, a remount, then a sync update that suspends the boundary above the
+    // Root (the Popup stays mounted, its element's ref detaches).
+    first.hidePopover();
+    rerender(ui({ popup: withTransition }));
+    rerender(ui({ popup: withTransition, suspend: true }));
+    expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    await flushTasks(2);
+    // The replay ran while hidden: the fact is reported.
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledWith(false, expect.objectContaining({ reason: "dismiss" }));
+    await act(async () => resolve());
+    await flushTasks(2);
+    expect(screen.queryByTestId("fallback")).toBeNull();
+    expect(popup()).not.toBe(first);
+    expect(committedText()).toBe("false");
+    expect(isOpen()).toBe(false);
+    // Not stuck: the Trigger opens it.
+    await openThroughTrigger(user);
+    expect(content()).not.toBeNull();
+  });
+
+  it("a controlled close: the hold is released, and the popup re-opens and reports a dismissal", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    let setOpen!: (open: boolean) => void;
+    const outside = (set: (open: boolean) => void) => {
+      setOpen = set;
+      return null;
+    };
+    const { rerender } = render(<Harness mode="controlled" outside={outside} fact={fact} />);
+    await openThroughTrigger(user);
+    const first = popup();
+    // A controlled close: the close commit holds the content (no `transition`, design 4.4) and
+    // its apply effect calls `hidePopover()` (the library echo).
+    act(() => setOpen(false));
+    expect(isOpen(first)).toBe(false);
+    expect(content()).not.toBeNull();
+    // Still the same task: the remount drops the old element (and its queued `toggle`).
+    rerender(<Harness mode="controlled" outside={outside} fact={fact} popup={withTransition} />);
+    await flushTasks(2);
+    expect(popup()).not.toBe(first);
+    expect(isOpen()).toBe(false);
+    expect(committedText()).toBe("false");
+    expect(content()).toBeNull();
+    // A controlled open shows the new element.
+    act(() => setOpen(true));
+    await flushTasks(2);
+    expect(isOpen()).toBe(true);
+    expect(content()).not.toBeNull();
+    // Its dismissal is a fact, not the lost hide's echo.
+    act(() => popup().hidePopover());
+    await flushTasks(2);
+    expect(isOpen()).toBe(false);
+    expect(committedText()).toBe("false");
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledWith(false, expect.objectContaining({ reason: "dismiss" }));
+  });
+
+  it("the same element re-attached (an inline ref) keeps the wait: no re-show before the toggle", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    const { rerender } = render(
+      <Harness mode="uncontrolled" fact={fact} popup={{ ref: () => {} }} />,
+    );
+    await openThroughTrigger(user);
+    const first = popup();
+    const show = vi.spyOn(first, "showPopover");
+    // One task: a script hide, then a render whose new inline ref detaches and re-attaches the
+    // same element; that commit's apply sees committed `true` and a hidden popup.
+    first.hidePopover();
+    rerender(<Harness mode="uncontrolled" fact={fact} popup={{ ref: () => {} }} />);
+    expect(popup()).toBe(first);
+    expect(isOpen(first)).toBe(false);
+    expect(show).not.toHaveBeenCalled();
+    await flushTasks(2);
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(committedText()).toBe("false");
+    expect(isOpen(first)).toBe(false);
+    expect(show).not.toHaveBeenCalled();
+  });
+});
