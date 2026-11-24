@@ -81,7 +81,7 @@ Dialog.Root, which the comment says. Fine for an internal type.
   ref (`fn.current` undefined), giving the "outside the popup" dev warning and the platform's
   choice. Now it is called: a function returning an element works (undocumented), one returning
   `null` or a non-element object leaves it to the platform, but one returning `undefined` throws
-  `TypeError` at `resolved.element` (use-popover-popup.ts:169) inside the open. Acceptable: it is
+  `TypeError` at `resolved.element` (use-popover-popup.ts:168) inside the open. Acceptable: it is
   type-violating input only, and the library does not validate other prop types at runtime.
   Optional hardening: `if (resolved == null) return null;` at use-popover-popup.ts:167 (Base UI
   migrants may pass a function `initialFocus` in JS).
