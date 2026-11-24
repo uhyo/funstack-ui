@@ -11003,3 +11003,473 @@ called right before each library open, as before, and is never written as `autof
 mode (Menu and Combobox have none) nor a dependency of the Popup's callback ref, so an inline
 resolver does not re-attach the listeners. Sections changed: popover.md 6.1 and 15 (the name of
 the option).
+
+## 2026-11-24, #157: conventions.md, second slimming pass
+
+Refactoring wave #157, the follow-up `memo/architect/157-spec-slim.md` left over ("conventions.md
+is at 3,161 lines"). No rule changed. Sections of `design/conventions.md` were rewritten shorter:
+probe evidence, measurements, rejected options and the step-by-step algorithms of internal
+helpers left the rules, which now state the rule and name the helper or the research note that
+holds the rest. Every section keeps its number. The parts below are the text each rewritten
+section had before, **verbatim** (without its heading), so nothing is lost; where a part and the
+section now disagree, the section is the rule. Notes: `memo/architect/157-spec-slim-2.md`.
+
+### conventions.md 13.2, as it stood before the second pass
+
+### 13.2 Resolved placement: `data-side` is where the popup is
+
+Every engine reports the **applied** `position-try-fallbacks` option in
+`getComputedStyle(popup).positionArea`, synchronously after `showPopover()`, in the `toggle`
+event and inside a `scroll` handler (research 1; Chromium and Firefox probed, WebKit by source:
+the chosen option is a full style resolution). So the library can tell where the popup landed
+with no geometry: parse the computed value, map it to a physical side and an alignment. This
+replaces the requested-value echo that made an arrow point the wrong way after a flip
+and answers tooltip.md's "a resolved `data-side` is exactly the positioning JS the design
+avoids": it is observation, the browser still places.
+
+**One vocabulary, one meaning.** `data-side` / `data-align` and `state.side` / `state.align`
+**are the resolved placement while the popup is shown** and the requested values otherwise (on
+the server, while closed, and when the computed value cannot be mapped). No second attribute
+(`data-resolved-side`): a CSS recipe for an arrow or a gap would otherwise need two selectors,
+and nobody needs "the side I asked for" as an attribute, since they asked for it. Floating
+UI-based libraries (Radix, Base UI) expose the resolved side under the same name.
+
+The parser (`parsePositionArea(value, selfDirection, rootDirection, writingMode)` in
+`internal/anchor-position.ts`, pure, total: it returns `null` rather than throwing;
+`rootDirection` may be a function, read lazily; `writingMode` other than `horizontal-tb` gives
+`null`) maps the full keyword grammar in `horizontal-tb`:
+
+- The side token is the one that is neither `center`, `span-all` nor `span-*`. Physical tokens
+  map directly; `self-x-*` / `self-inline-*` through the popup's computed `direction`;
+  `x-*` / `inline-*` through the root's (read lazily, only when such a token appears: a
+  consumer `style` override may use them); `y-*` / `block-*` / `self-block-*` and a bare
+  `start` / `end` / `self-start` / `self-end` in first position are the block axis (`top` /
+  `bottom`).
+- The align token is the `span-*` token, mapped to a physical direction the same way, then to
+  `start` / `end` relative to the side's cross axis (inline-relative on a horizontal side: the
+  popup's inline-end is `start`; block-relative on a vertical side: bottom is `start`). No
+  span token, `center` or `span-all` is `center`.
+- Engines serialise in grammar order and in short logical forms: `span-left top`, `top`,
+  `self-end span-self-end`, `span-self-x-end bottom`, `self-x-start span-top`; Firefox writes a
+  flipped single keyword as `span-all bottom` where Chromium writes `bottom`
+  (`computed-serialization.mjs`). The jsdom row feeds the parser exactly these strings.
+- `none`, an empty value, a vertical `writing-mode` on the popup, or any token the table does
+  not know → `null`: the part keeps the requested values. The parser is only ever run on a
+  shown popup.
+
+The observer (`internal/use-resolved-placement.ts`, `"use client"`, shared by Tooltip, Popover
+and Menu) is a hook: `useResolvedPlacement({ side, align }) → { side, align, ref }`. The part
+merges `ref` into its popup element's ref and renders the returned values.
+
+- **Sources.** A `ResizeObserver` on the popup from mount: a popover going from hidden to
+  shown is a resize (`0 × 0` to its size), delivered after layout and **before paint**, so the
+  first painted frame already carries the resolved side; a content resize while shown can
+  change the fit, so it reads again; hidden again is a reset. `toggle` on the popup (open:
+  read, and install the two listeners below; closed: remove them and reset); it is also what
+  drives the jsdom row, which has no `ResizeObserver`. While shown: `scroll` on the document
+  (capture, passive: nested scrollers included) and `resize` on the window. **Each `scroll` /
+  `resize` reads at once and again in the next two animation frames** (coalesced; a scroll
+  during a pending pair re-runs it at the end). **Both engines apply scroll-dependent
+  anchoring one frame after the `scroll` event**, geometry included: in the handler, after a
+  forced layout and in a frame registered from the handler the computed `position-area` and
+  the popup's rect are still the old ones; they are current at the second frame. The timing is
+  unspecified (css-anchor-position-1 §3.3 leaves the snapshot timing open), so the frame reads
+  are the mechanism, not a Firefox special case. **Chromium 156 additionally does
+  not re-run position-try fallback for a top-layer popover** once a few frames have passed
+  since the show: an option that now overflows is kept and the popup is scroll-compensated
+  off screen, while a non-top-layer `position-anchor` element in the same layout re-chooses
+  on every scroll; that is non-conformant (§6.5 re-chooses whenever the box overflows and
+  another option fits) and is the human upstream task **#92**, cited from the scroll rows.
+  The research probe scrolled in the same task as the show, the one case Chromium re-chooses.
+  Either way `data-side` reports what is applied; the library does not try to force a
+  re-choice (a later fallback-sensitive change does not trigger one either).
+- **Write.** A plain `useState` in the part (`flushSync` from the observer and event paths so
+  the attribute lands before paint; a plain `setState` from the layout effect that re-reads
+  when the request changes), written only when `side` or `align` changed (section 3.5);
+  `null` while not shown **and when the parsed pair equals the request**, so the comparison is
+  against what was last written. Returned value: the resolved pair, else the requested one. A
+  popup **with a physical `side`** that opens without flipping costs **no render**, which keeps
+  Tooltip's "no React work per hover" (tooltip.md 4.1); a flip costs one render on open and one
+  on close. **A logical `side` (`inline-start` / `inline-end`) always costs that one render on
+  open and one on close**, since the physical `data-side` never equals the logical request
+  (inherent: the attribute must turn physical while shown). Menu's submenus pay it
+  by default; a jsdom render-count row pins "exactly one per show and one per hide". The "only
+  when changed" rule also terminates the `ResizeObserver` loop a consumer's `[data-side]`
+  padding rule could otherwise start. A popup hidden but still rendered (exit animation) keeps
+  the resolved value until its box goes.
+- **Gap recipes must be symmetric.** `flip-block` / `flip-inline` swap the popup's **own
+  margins** along the flipped axis, so a one-sided gap keyed on the resolved side
+  (`[data-side="top"] { margin-block-end: 6px }`) is applied as `margin-block-start` once the
+  flipped option is in force: gap 0 against the trigger (measured in both engines; with v0's
+  requested-value `data-side` the swap was what put the gap right). Two correct recipes,
+  both documented:
+  1. **A static margin on the requested edge, not keyed on `data-side`** (the preferred form
+     when a class knows its `side`): `margin-block-start: 6px` for a popover below its
+     trigger, `margin-inline-start: 2px` for a submenu. The flip swaps it to the right edge by
+     itself, it is present at the first layout (no gap-less first frame), and it changes with
+     nothing, so it never triggers a re-choice. The Combobox example already does this.
+  2. **A symmetric margin along the side's axis keyed on `data-side`**, when one class serves
+     several sides: `margin-block: 6px` for `top` / `bottom`, `margin-inline: 2px` for `left`
+     / `right` **and for the closed values `inline-start` / `inline-end`**, which a logical
+     side carries until the observer writes; without those keys the first layout of every
+     submenu open has no gap, and the write is then a margin change, a fallback-sensitive
+     change (§6.5.1) that re-runs the choice and, in a width-constrained cell, can trip a
+     "ResizeObserver loop" error. The symmetric form also flips a few pixels early (the far
+     margin is part of the overflow test).
+  A one-sided margin keyed on the resolved `data-side` is the one wrong form. An **Arrow** is
+  unaffected: the insets of a child are not part of the option.
+- **Idle** with `side={null}` (the stylesheet owns placement; the parser cannot interpret
+  consumer `@position-try` rules that set insets) and for a point-placed menu (no anchor): no
+  reads, nothing emitted, as today.
+- **Not covered.** An anchor that moves through a layout shift with no scroll or resize; the
+  next scroll corrects it. After a scroll-driven flip, **one frame is painted with the old
+  `data-side`** (the engine applies the option a frame after the event, and the write follows
+  the second-frame read), so an arrow points the wrong way for that frame; the show path has
+  no such frame (ResizeObserver plus `flushSync` before paint). Chromium's anchored container queries
+  (`@container anchored(fallback: …)`) would give a pure-CSS signal but are Chromium-only
+  (BCD 143; Gecko and WebKit have no position), so they are a documented consumer recipe for
+  `side={null}`, not library code.
+- **Known cosmetic limit.** `@starting-style` is computed at the first style resolution after
+  the show, before the observer's write lands, so an entry animation keyed on `data-side`
+  (`[data-side="top"] { @starting-style { translate: 0 4px } }`) starts from the **requested**
+  side's starting values when a flip occurred, then transitions to the resolved side's. Key
+  entry animations on something direction-neutral (opacity, scale), or accept a reversed
+  4 px slide on the rare flipped open. The exit uses the resolved values throughout.
+- The hook attaches native listeners through the ref (section 7.4) and is independent of the
+  trigger mechanism: it runs on Tooltip's native `interestfor` path as well, where the
+  interaction effect attaches nothing. The research-era reading of "attach nothing" was about
+  interaction; this is observation. (Product-owner question in tooltip.md.)
+
+### conventions.md 12, as it stood before the second pass
+
+## 12. Shipped functional CSS
+
+A component may ship a **minimal functional stylesheet, placement and interaction timing only
+and nothing visual**, through React `<style href precedence>`, where inline styles cannot
+express the rule; it must be documented and overridable.
+
+The library ships no visual CSS: no reset, no theme, no colours, sizes or motion (section 11's
+"ships no CSS" stands for everything a stylesheet could do to the look of a part). A component
+may ship **functional at-rules** it needs and cannot express inline, under these rules:
+
+- **Only at-rules with no selectors** (`@position-try` options for placement are the first
+  case, `Menu.Popup`'s point placement, `design/components/context-menu.md` 4.2: eight options,
+  mirrored for a right-to-left menu and offset for a touch open). Nothing
+  cascades onto any element; the inline `style` the part renders is what references the rules.
+  **Exception:** a rule whose selector
+  matches only elements the library itself marks with a `data-fsui-<component>-<part>`
+  attribute, and whose declaration sets only a `--fsui-` registered custom property that the
+  part's own inline `style` consumes (`@property` plus `:root:has([role="tooltip"]:popover-open)
+  [data-fsui-tooltip-trigger] { --fsui-tooltip-warm: 1 }`, Tooltip's skip-delay on the native
+  `interestfor` path, `design/components/tooltip.md` 6). Still nothing visual and nothing on a
+  consumer's element; the selector exists because the inline value it feeds cannot see other
+  elements. The scope of shipped CSS is thereby **"placement and interaction timing, never
+  visuals"** (the user's wording), superseding "positioning only" above.
+- **Rendered by the part that needs them**, as a React 19 hoisted style, never as a stylesheet
+  file the consumer imports: `<style href="@funstack/ui/<name>" precedence="fsui">`. React moves
+  it into `<head>` in the commit (before layout effects), deduplicates it by `href` across
+  roots, and nothing lands in place, so the part still renders one DOM element and a
+  `<ViewTransition>` boundary around that element is unaffected. Rendered only while the part
+  uses the rules (a point-placed menu), so a page that never does never gets them.
+- **Names are prefixed** `--fsui-<component>-…` so they cannot clash with a consumer's.
+- **Opt-out through the part's existing switch** for stylesheet-owned placement (`side={null}`
+  on a Popup): then the part renders neither the inline reference nor the style, and hands the
+  consumer the data (custom properties) their own rules need.
+- **CSP** (`docs/research/interaction-wave11.md` 2.4). A hoisted `<style>` is **not** covered
+  by what allows an inline `style` attribute. Under a nonce- or hash-based `style-src`, a **client-set inline style is exempt**
+  (react-dom writes the `style` prop through the CSSOM) but a **script-inserted `<style>` is
+  blocked** unless its text matches a `'sha256-…'` source or it carries the nonce; a
+  **server-rendered `style` attribute** is blocked too without `style-src-attr 'unsafe-inline'`
+  (so the SSR'd `position-area` of an anchored popup and Tooltip's inline `interest-delay-*`
+  need that directive, as every inline-style library does; documented, not worked around).
+  The library therefore: (1) exports the **SHA-256 (base64) of every shipped stylesheet** as
+  `STYLE_SHA256` from `@funstack/ui/csp`, a committed constant whose jsdom row recomputes it
+  from the exported CSS strings so it cannot drift, and the docs' "Content Security Policy"
+  page prints the `style-src` sources; this serves hash-based policies and FUNSTACK Static's
+  static output with no API; (2) ships **one provider**, `<CSPProvider nonce>` from
+  `@funstack/ui/csp` (a client module with a serialisable prop, so a Server Component layout
+  renders it once; the library's only provider, decision 8's "no provider" being about
+  experimental flags), whose context every part that renders a hoisted `<style>` reads and
+  forwards as the element's `nonce`; the docs say "pass the same value as React's `nonce:
+  { style }` render option". Fizz's behaviour (react-dom 19.3.1, probed in the Part B review,
+  L1): with no `nonce` render option or the string form, a provider's nonce is **stripped**
+  and the rules are kept (a nonce policy then blocks them in the browser); with the object form
+  and a matching provider they carry the nonce; with the object form and a **different** nonce
+  **or no provider at all**, the rules are **dropped** (an empty `<style>`), which is the case an
+  app hits when it already passes `nonce.style` for its own CSS, so the docs say in one line:
+  "if you pass `nonce.style`, render `<CSPProvider>` with the same value". This matters for
+  the first stylesheet that renders during SSR (Tooltip's skip-delay, rendered by a Trigger
+  with `experimental_interestFor`); Menu's point rules render only after a client interaction.
+  **At most one shipped stylesheet may render during SSR per precedence bucket**:
+  Fizz writes every `<style href precedence="fsui">` of one flush as a single element
+  (`data-href="a b"`, texts concatenated), whose hash is in no `STYLE_SHA256` entry; a second
+  server-rendered stylesheet gets its own precedence, and a guard row (`csp.test.tsx`, landed
+  in a02e316) renders Tooltip and a context menu on the server and asserts exactly one `fsui`
+  `<style>` in the head whose text hashes to its `STYLE_SHA256` entry; the constraint is
+  commented on `FSUI_PRECEDENCE`. No implicit `<meta property="csp-nonce">`
+  read. A blocked stylesheet degrades: the point menu opens at the point but never flips; the
+  skip-delay inline value carries an explicit `var(--fsui-tooltip-warm, 0)` fallback so it
+  computes to the Root's `delay` (without the fallback an unregistered property makes the
+  `var()` invalid and `interest-delay-start` falls to the UA's `normal`, 500 ms in Chromium).
+  Human items: FUNSTACK Static's SSR entry passes a string `nonce` (scripts only) and would
+  need the object form for styles; React could emit the render nonce instead of dropping the
+  rules (`docs/research/interaction-wave11.md`, "Upstream issues"; tracked with Firefox's `overscroll-behavior` gap as issue #91).
+- The CSS text lives in a directive-free module of the component that ships it
+  (`menu/menu-point.ts` for the point rules, `internal/tooltip-warm.ts` for the skip-delay
+  rule; the precedence name `FSUI_PRECEDENCE` in `internal/shipped-styles.ts`), as a string
+  constant, and is covered by a jsdom row (one
+  `<style>` in `document.head` after use, none without) and a browser row (the computed
+  property names the option).
+
+### conventions.md 7.3, as it stood before the second pass
+
+### 7.3 JS-free primitives
+
+"JS-free" is a statement about **behaviour**, not about module boundaries: no JavaScript runs for
+the interaction, and the markup is complete and functional before hydration. Whether a part's
+source file carries `"use client"` is a separate, per-component fact recorded in the component's
+design doc; the Directive test row (section 10.1) asserts whatever that doc says.
+
+The two are separate because of a Flight constraint, verified while designing Accordion: a Server
+Component cannot read context ("Cannot read a Client Context from a Server Component"), and the
+parts of a compound component need context to find their Root (there is no HTML inheritance for
+`<details name>`). So every part of Accordion is a client module even though the uncontrolled
+accordion toggles with zero behaviour JS:
+
+```tsx
+// app/faq.tsx — a Server Component. Renders client parts; the toggle works before hydration.
+import { Accordion } from "@funstack/ui/accordion";
+
+export function Faq({ items }) {
+  return (
+    <Accordion.Root exclusive>
+      {items.map((item) => (
+        <Accordion.Item key={item.id} value={item.id}>
+          <Accordion.Trigger>{item.question}</Accordion.Trigger>
+          <Accordion.Panel>{item.answer}</Accordion.Panel>
+        </Accordion.Item>
+      ))}
+    </Accordion.Root>
+  );
+}
+```
+
+What a consumer gets from this: `<details>`/`<summary>` markup in the HTML, native open/close,
+find-in-page reveal and exclusive groups via `name` with no hydration required; the part code is
+in the client bundle and hydrates to add the action props, controlled mode and animation. What
+they do not get: a directive-free module.
+
+**Directive-free variants: none (option A of
+`docs/research/zero-js-variants.md` 5, whose measurements are binding).** The guarantee the
+library makes is the one above: **no behaviour JS on the native path, and the markup works
+before and without hydration**. It does not promise "no client bundle", and the docs must not
+either: on FUNSTACK Static a page with no client components still ships about 76 KB gzip of
+runtime and hydrates, and the library parts add 2 to 5 KB gzip per family on top (Accordion
++5.1, Tooltip +5.0, Switch +3.8, Progress +1.9); where a page really ships zero JS (plain SSR or
+`react-dom/static` prerender without hydration) today's parts already render complete, working
+HTML, directive or not. So no second anatomy ships. Per component:
+
+- **Form controls** (Switch, Checkbox, RadioGroup, Slider, NumberField; Select likewise): the
+  JS-free form control from a Server Component is the **native element** (`<input
+  type="checkbox" role="switch">`, same-`name` radios in a `<fieldset>`, `<input type="range">`,
+  `<input type="number">`, a real `<select>`), shown as a **recipe on each component's docs
+  page**, not a part: a directive-free part would add nothing over the element and would lose
+  Field integration, the action and the optimistic attributes.
+- **Tooltip**: not viable natively. `interestfor` exists only in Chromium (Firefox bug 1984699,
+  WebKit bug 297786, no position), so a directive-free Tooltip would show nothing at all in two
+  of three engines; `design/components/tooltip.md` 2.4 and 14 stand (every part is a client
+  module; "zero-JS" there means the native path runs no behaviour JS).
+- **Popover**: viable in principle (the Trigger is a `popoverTarget` invoker with no
+  `aria-expanded`, so a static Trigger needs no ARIA kept current, and all three engines map
+  `popovertarget`, `docs/research/invoker-aria-expanded.md`). The parts stay
+  client modules for the same reasons as Accordion's (context for ids and the mode; nested focus
+  return and `initialFocus` after hydration). Not scheduled, as Accordion's option B.
+- **Accordion**: the one real candidate (no behaviour loss in any engine, about 5 KB gzip
+  saved). **Option B, `@funstack/ui/accordion/native`** (Root `div`, Item `details` with a
+  required `name`, Trigger `summary`, Panel `div`; usable from Server and Client Components,
+  function props allowed), is recorded as a **ready plan, not scheduled**; revisit if an RSC host
+  learns to skip the runtime for pages with no client references, or if users ask.
+- **Progress / Meter**: the Root is already directive-free (below); a variant would save
+  +1.9 KB and is not worth a second surface.
+
+Two findings from the same research hold library-wide: a `React.cache()`-scoped mutable "server
+context" is unsafe (an async child resumes after a sibling Root overwrote the value; rejected as a
+way for a Root to pass data to its parts), and server `useId` ids collide across separately
+rendered Flight payloads unless the host gives each payload its own `identifierPrefix` (#94,
+below; FUNSTACK Static does from 1.3.4). Passing any action prop to a part from a Server
+Component is a type error unless the action is a Server Function (section 2.2).
+
+Progress and Meter are the first components whose **Root is itself a Server Component**:
+`Progress.Root` / `Meter.Root` are directive-free (only `useId`, arithmetic and `Intl`), render the
+client-created context provider (7.1), and their parts are client modules that read it. "JS-free"
+and "a Server Component" coincide at the Root, so function props (`getAriaValueText`,
+`children(state)`, `render`) may be passed from a Server Component and run on the server, next to
+the JS-free Accordion whose parts are all client modules. **Host requirement (#94, resolved):**
+a server `useId` restarts at `_S_1_` for each Flight render, so a host that renders more than one
+Flight payload into one document must give each payload its own `identifierPrefix`, or a
+`Progress.Root` / `Meter.Root` in one payload gets the same `${id}-label` as one in another and
+`aria-labelledby` breaks (client `useId`, `_R_…`, is unaffected). FUNSTACK Static's `defer()`
+used to render deferred payloads without a prefix; **fixed in `@funstack/static` 1.3.4**
+(uhyo/funstack-static#198 / #199, prefix `_Deferred_<n>` or `_d<n>` per payload), verified by
+`docs/research/zero-js-variants.md` ("#94 re-check"): no duplicate ids, three distinct accessible
+names, no hydration errors. Consequences: a Server-rendered Progress / Meter Root inside
+`defer()` requires `@funstack/static >= 1.3.4` (the docs site is on it; the per-page notes that
+flagged the gap were removed), the library adds no id override for this (the fallback the gap
+had reserved; `id` stays an owned key of `Progress.Label` / `Meter.Label`, and nothing in the
+library parses ids, so the prefixed form has no API impact), and the one-line host note lives on
+the Server Components docs page rather than on each component. Any other RSC host with
+multi-payload pages has the same requirement; the library cannot detect it.
+
+A third configuration: a component whose baseline **cannot** be JS-free
+(a menu needs arrow keys, typeahead and focus management that only Chromium's flagged
+`focusgroup` provides natively) runs in library mode always, with no three-prop mode switch, and
+still renders the declarative invoker on its Trigger (`popovertarget`; `commandfor` +
+`toggle-popover` before) for the implicit anchor, the platform's implicit expanded state (every
+engine; no `aria-expanded` rendered) and a pre-hydration open that mount reconciliation fills.
+That open shows an empty popup until hydration, as Dialog's and Popover's library mode do; it
+is progressive enhancement, not a supported JS-free mode, and the component doc says so.
+Combobox is the second such component: its Trigger server-renders no invoker attribute (the popup must be
+anchored to the input, not the button; `popovertarget` is written after hydration), and its progressive enhancement is that the text input
+works before hydration and the typed text is adopted at mount (section 3.5).
+
+### conventions.md 5.1, as it stood before the second pass
+
+### 5.1 Default wiring
+
+Every part whose mount, unmount or content is driven by library state (Panel, library-driven
+Popup, Toggle's own element when its children can change) renders
+`<ViewTransition default={transition}>` as the **outermost node of its output**, before any DOM
+element, **only when `transition !== undefined`**. With the prop absent the part renders no
+boundary at all (`docs/research/view-transition-mount-cost.md`).
+
+Why: react-dom 19.3.1 starts a document view transition whenever a `<ViewTransition>` **mounts**
+in a transition-lane commit or is **revealed by `<Activity>`**, regardless of what `default`,
+`enter`, or a type map resolves to (`trackEnterViewTransitions` checks only the fiber tag; the
+`"none"` check runs inside the already-started transition and decides only whether a name is
+assigned). The browser then plays its UA root cross-fade (`::view-transition-old(root)`, 250 ms)
+and React holds every later transition-lane commit until it finishes: measured 265 to 280 ms of
+added latency per tab switch or dialog open, in Chromium and Firefox. Exits and updates of a
+`"none"` boundary are free; a boundary that mounts under a *new* DOM element is shielded. So the
+only free "no animation" is no boundary.
+
+Rules:
+
+- `transition` is **static**: the part reads it as a render-time switch, and toggling it between
+  `undefined` and a value changes the element type at the root of the part, so React remounts
+  the part's subtree (DOM and state lost). Development warns once when that happens.
+- An explicit `transition="none"` **keeps the boundary**, so a consumer who switches between
+  `"none"` and a class at runtime does so without a remount, and accepts the mount cost.
+- Server rendering is unaffected: the decision is a pure function of props on both sides.
+- Any `transition` value, including a type map whose types do not match the commit, makes
+  **mounts and reveals** of that part run the page cross-fade (rollbacks and snap-backs that carry
+  no `fsui-*` types included). The consumer docs for `transition` say so and show the opt-in
+  page-policy CSS, which is the consumer's choice, never shipped by the library:
+
+  ```css
+  /* No page-wide cross-fade for any view transition on this page. */
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  /* or */ :root { view-transition-name: none; }
+  /* Keep clicks working during the transition in Firefox (hit testing is suppressed otherwise). */
+  ::view-transition { pointer-events: none; }
+  ```
+
+Parts whose visibility is **browser-owned** (section 3.5: Tooltip's `Popup` in the top layer, the
+Accordion's `<details>` in static mode) render no `<ViewTransition>` in any case and have **no
+`transition` prop** (Accordion's static mode ignores it with a dev warning); their open/close
+happens outside any React transition and animates with `@starting-style` and
+`transition-behavior: allow-discrete` in CSS. "Every animatable part has `transition`" means every
+part whose mount, unmount or **committed** library state. A part whose only library-driven
+change is an optimistic flip that never animates (Menu's items, whose `aria-checked` lands in a
+sync render and whose settle shows nothing; every Select part, since the picker is a UA
+pseudo-element, `<selectedcontent>` is written by the browser and every library attribute is
+optimistic; every Slider part, whose thumb position is urgent or optimistic and whose rollback
+animates with a CSS transition on a registered custom property; every NumberField part, whose text is urgent and whose value is urgent or optimistic) has no `transition` prop; Toggle keeps its own
+because its element's content can change with the settled action. A third category without the
+prop: parts whose **every commit is on the urgent lane by design** (Toast, section 2.6): react-dom
+never starts a view transition for an urgent commit, so a boundary could animate nothing and
+would still pay the page cross-fade whenever the part happened to mount inside another
+component's transition commit; such parts animate enter and exit in CSS (`@starting-style`,
+`data-ending`). Field and Form are in this category too: a Field's state is an urgent
+mirror of browser-owned validity (2.6) and a Form's own commits change nothing the form element
+displays, so no Field or Form part has `transition`; `Field.Error` enters with
+`@starting-style`. A fourth category (Progress and Meter): a part that displays a
+**consumer-owned value** with no library state or dispatch, whose changes arrive in the consumer's
+lane (usually urgent, 2.6) and animate through a CSS transition on a registered custom property;
+no such part has `transition`.
+
+**Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
+(the `vt-popover` probe in `docs/research/popover-menu.md`). A
+boundary placed inside a `[popover]` or `<dialog>` around content mounted on open has no box
+while the element is `display: none`, so it gets no enter; wrapping the element captures the
+popup's own box on a library-driven open (`::view-transition-new`) and on a library-driven close
+(`::view-transition-old`), in all three engines. `Dialog.Popup` already wraps the `<dialog>`;
+`Popover.Popup` and `Menu.Popup` wrap the `[popover]` element. The rule only matters for opens
+and closes the library performs in a layout effect of a transition commit; browser-initiated
+ones (Escape, light dismiss) happen outside React and animate with CSS, as above. Such
+a dismissal is a fact whose commit is **urgent**, so it starts no view transition at all, with or
+without `transition`, and carries no `fsui-<component>-close` type
+(3.9.8). **A CSS transition on the popup next to
+`transition` needs no consumer rule:** when a Popup
+(Dialog, Popover, Menu, Combobox) has `transition` and `html:active-view-transition` matches at
+the moment of the library's **own** `showPopover()` / `hidePopover()` / `showModal()` / `show()`
+/ `close()`, the library wraps that call in one synchronous step (`internal/css-transition-cut.ts`):
+an inline `transition: none !important` on the popup, the call, a forced style recalculation
+(`getComputedStyle(popup).opacity`; without it Chromium sees the restored value and the fade
+runs), and the inline `transition` restored through CSSOM (the shorthand with its priority,
+or the longhands a consumer set on their own; the `style` attribute removed again if it was
+absent and is empty). Never through the attribute: a CSP without `'unsafe-inline'` for styles
+blocks `setAttribute("style")` (Chromium would keep the cut for good, Firefox drop every inline
+declaration). The restore runs only while the cut's own `none !important` is
+still there, so a `transition` a listener wrote during the call is kept. Only CSS transitions are
+cut: a `@keyframes` exit still runs during a library close and double-images in Chromium. The view transition animates the show or hide; without the cut Chromium keeps a closing
+box rendered through its `display` / `overlay` fade and the new snapshot holds it next to the old
+image (a double image), and in every engine the open's `@starting-style` enter runs
+under the view transition's enter. **Dismissals (facts, 3.9) never go through it**: their
+CSS exit is the only thing that animates them, and an unrelated page view transition does not
+cut that fade. Gated on the active view transition, not on the prop alone: a library close React batched
+into a non-transition commit keeps its CSS exit as the fallback. Recorded trade-offs: the library
+writes an inline style on the consumer's element for the length of one synchronous call (a
+`MutationObserver` on `style` sees it; this is a functional write, not shipped CSS, section 12);
+one forced style recalculation per such call; no opt-out (a CSS transition and a view
+transition cannot run together on one popup's library show / hide); the `::backdrop` is not cut
+(its enter fade runs on open); a nested popup that is **not** a DOM
+descendant of its parent keeps fading in Chromium when the parent's library close takes it down
+(no library composition produces that layout; a consumer rule
+`html:active-view-transition .popup { transition: none }` covers whoever builds one).
+Verified in Chromium 156, Firefox 157 and WebKit (CI), `memo/architect/147-reevaluation.md`.
+
+```tsx
+// inside Tabs.Panel (mount strategy per `keepMounted`, section 3.7: not rendered, <Activity>,
+// or hidden="until-found"; when present, the boundary is the outermost node in every strategy)
+const panel = <div role="tabpanel" ...>{children}</div>;
+return transition === undefined ? panel : <ViewTransition default={transition}>{panel}</ViewTransition>;
+```
+
+Because library state changes are transitions, the commit that ends the action and any rollback
+animate through this boundary with no extra code. **The optimistic commit does not animate**: it
+is a sync-lane render, and react-dom starts a view transition only when every committed lane is a
+transition, retry or idle lane (verified on 19.3.1; see `design/components/toggle.md` section 7.2).
+What this means per kind of part:
+
+| Part renders | Animate with | Why |
+| --- | --- | --- |
+| Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
+| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop (`<ViewTransition>`, rendered only because the prop is set) | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. A boundary that mounts *under a new DOM element* is shielded: Dialog's children mount under the `<dialog>` element on a plain open, so a plain open starts no view transition even with `transition` set; only a nested Popup mounting together with outer content, or a Root inserted by a transition, pays. |
+| `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
+| Any part with `transition` absent | nothing (no boundary rendered) | Baseline timing; a switch or open calls no `startViewTransition`. |
+
+**Deferred renders animate too.** An update from `useDeferredValue` activates a boundary like a
+transition does (React rule). A part whose content re-renders from a deferred value inside an
+open boundary (Combobox's results inside `Combobox.Popup`) would run a document view transition
+per result change, so its docs recommend the type-map form with `default: "none"` and name the
+cost of a class on `default`.
+
+`Tabs.Indicator` therefore follows optimistic selection, renders no `<ViewTransition>` and has no
+`transition` prop: it is positioned by CSS Anchor Positioning on the optimistic tab and slides via
+a plain CSS `transition` on the anchored insets (moves on click, snaps back on rejection). Any
+part that keys a `<ViewTransition>` on optimistic state is a bug, not a style choice.
+
+Product-owner decision: `transition` stays on Toggle in v0 even though its own flip cannot use it,
+documented honestly (it animates the end of the action and content keyed on `pending`), so the
+"every animatable part has `transition`" rule has no exceptions. Since a part without the prop
+renders no boundary, keeping the prop on such parts costs nothing for consumers who do not set it.
