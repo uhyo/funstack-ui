@@ -118,6 +118,67 @@ describe("withCssTransitionCut", () => {
     });
   });
 
+  // #157 safety net (memo/reviewer/refactor-test-safety.md CTC7): the element leaves the
+  // "cutting" set once the call returns, so a later show or hide of the same popup is cut again.
+  it("two cuts of the same element in sequence both cut", () => {
+    activeViewTransition(true);
+    const element = popup("transition: opacity 1s;");
+    const seen: string[] = [];
+    const record = () => {
+      seen.push(
+        `${element.style.getPropertyValue("transition")} ${element.style.getPropertyPriority("transition")}`,
+      );
+    };
+    withCssTransitionCut(element, true, record);
+    withCssTransitionCut(element, true, record);
+    expect(seen).toEqual(["none important", "none important"]);
+    expect(element.getAttribute("style")).toBe("transition: opacity 1s;");
+  });
+
+  it("a cut after a throwing cut still cuts", () => {
+    activeViewTransition(true);
+    const element = popup();
+    expect(() =>
+      withCssTransitionCut(element, true, () => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    let seen = "";
+    withCssTransitionCut(element, true, () => {
+      seen = element.style.getPropertyValue("transition");
+    });
+    expect(seen).toBe("none");
+  });
+
+  // #157 safety net (CTC6): the style change of the show or hide is processed while the cut is
+  // still in place (Chromium would otherwise see the restored transition and run it). jsdom has
+  // no style engine, so the row pins the forced recalculation itself: a computed-style read of
+  // the element after the call and before the restore.
+  it("forces a style recalculation of the element after the call, before restoring", () => {
+    activeViewTransition(true);
+    const element = popup("transition: opacity 1s;");
+    const original = window.getComputedStyle.bind(window);
+    const reads: { readonly ranCall: boolean; readonly transition: string }[] = [];
+    let ranCall = false;
+    vi.spyOn(window, "getComputedStyle").mockImplementation((target, pseudo) => {
+      const computed = original(target, pseudo);
+      if (target !== element) return computed;
+      // The read is what forces the recalculation: record the inline state at that moment.
+      return new Proxy(computed, {
+        get(object, key) {
+          reads.push({ ranCall, transition: element.style.getPropertyValue("transition") });
+          const value: unknown = Reflect.get(object, key, object);
+          return typeof value === "function" ? (value as () => unknown).bind(object) : value;
+        },
+      });
+    });
+    withCssTransitionCut(element, true, () => {
+      ranCall = true;
+    });
+    expect(reads.some((read) => read.ranCall && read.transition === "none")).toBe(true);
+    expect(element.style.getPropertyValue("transition")).toBe("opacity 1s");
+  });
+
   it("a nested call runs inside the outer cut and the outer one restores", () => {
     activeViewTransition(true);
     const element = popup("transition: opacity 1s;");

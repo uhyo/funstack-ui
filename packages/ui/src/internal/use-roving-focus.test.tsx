@@ -177,6 +177,86 @@ describe("useRovingFocus", () => {
     expect(stops()).toEqual(["b"]);
   });
 
+  // #157 safety net (refactor-test-safety.md 2.9): rules the reviewer found guarded by one row
+  // in one component file (RF2 Toolbar, RF3 itemsOf, RF8 Toolbar, RF9 ToggleGroup) get a
+  // hook-level row too, so a consolidation of the component suites cannot drop the only guard.
+  it("memory: the stop survives a later commit of the container after focus left (RF2)", () => {
+    const { rerender } = render(
+      <Container>
+        <button type="button">a</button>
+        <button type="button">b</button>
+      </Container>,
+    );
+    act(() => screen.getByText("b").focus());
+    act(() => screen.getByText("b").blur());
+    rerender(
+      <Container options={{ loop: false }}>
+        <button type="button">a</button>
+        <button type="button">b</button>
+      </Container>,
+    );
+    expect(stops()).toEqual(["b"]);
+  });
+
+  it("items of a popover inside the container are not the container's (RF3)", () => {
+    render(
+      <Container>
+        <button type="button">a</button>
+        <div popover="manual">
+          <button type="button">inside</button>
+        </div>
+        <button type="button">b</button>
+      </Container>,
+    );
+    expect(screen.getByText("inside")).not.toHaveAttribute("tabindex");
+    act(() => screen.getByText("a").focus());
+    fireEvent.keyDown(screen.getByText("a"), { key: "ArrowRight" });
+    expect(screen.getByText("b")).toHaveFocus();
+  });
+
+  it("Tab from an unchecked radio whose sibling is checked moves to that sibling (RF8)", () => {
+    render(
+      <Container>
+        <button type="button">first</button>
+        <input type="radio" name="align" aria-label="left" />
+        <input type="radio" name="align" aria-label="center" defaultChecked />
+        <button type="button">last</button>
+      </Container>,
+    );
+    const left = screen.getByLabelText("left");
+    act(() => left.focus());
+    const tab = new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true });
+    act(() => {
+      left.dispatchEvent(tab);
+    });
+    expect(tab.defaultPrevented).toBe(true);
+    expect(screen.getByLabelText("center")).toHaveFocus();
+  });
+
+  it.each([["altKey"], ["ctrlKey"], ["metaKey"]] as const)(
+    "an arrow key with %s is left to the browser (RF9)",
+    (modifier) => {
+      render(
+        <Container>
+          <button type="button">a</button>
+          <button type="button">b</button>
+        </Container>,
+      );
+      act(() => screen.getByText("a").focus());
+      const event = new KeyboardEvent("keydown", {
+        key: "ArrowRight",
+        [modifier]: true,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => {
+        screen.getByText("a").dispatchEvent(event);
+      });
+      expect(event.defaultPrevented).toBe(false);
+      expect(screen.getByText("a")).toHaveFocus();
+    },
+  );
+
   it("no memory: entry while focus is outside, the focused item while inside", () => {
     render(
       <Container options={{ memory: false, entry: (items) => items[1] }}>
@@ -212,6 +292,74 @@ describe("useRovingFocus", () => {
       fireEvent.click(screen.getByText("a"));
     });
     expect(stops()).toEqual(["b"]);
+  });
+
+  // #157 safety net (memo/reviewer/refactor-test-safety.md RF6): the observer's attribute
+  // records. The attribute is written on the DOM node directly, so nothing re-renders (neither
+  // the container nor the item) and only the observer can move the stop.
+  it.each([
+    ["disabled", (el: HTMLElement) => el.setAttribute("disabled", "")],
+    ["hidden", (el: HTMLElement) => el.setAttribute("hidden", "")],
+    ["inert", (el: HTMLElement) => el.setAttribute("inert", "")],
+  ] as const)(
+    "an item's %s attribute written outside React moves the Tab stop",
+    async (_name, write) => {
+      render(
+        <Container>
+          <button type="button">a</button>
+          <button type="button">b</button>
+        </Container>,
+      );
+      expect(stops()).toEqual(["a"]);
+      await act(async () => {
+        write(screen.getByText("a"));
+      });
+      expect(stops()).toEqual(["b"]);
+    },
+  );
+
+  it("an aria-disabled flip outside React re-applies (an entry that skips aria-disabled items)", async () => {
+    // `aria-disabled` items stay items (design 6.2); an `entry` that prefers enabled ones shows
+    // that the attribute record re-ran it.
+    render(
+      <Container
+        options={{
+          memory: false,
+          entry: (items) => items.find((el) => el.getAttribute("aria-disabled") !== "true"),
+        }}
+      >
+        <button type="button">a</button>
+        <button type="button">b</button>
+      </Container>,
+    );
+    expect(stops()).toEqual(["a"]);
+    await act(async () => {
+      screen.getByText("a").setAttribute("aria-disabled", "true");
+    });
+    expect(stops()).toEqual(["b"]);
+    await act(async () => {
+      screen.getByText("a").removeAttribute("aria-disabled");
+    });
+    expect(stops()).toEqual(["a"]);
+  });
+
+  it("re-enabling an item outside React makes it reachable again (no stale tabindex)", async () => {
+    render(
+      <Container options={{ memory: false, entry: (items) => items[0] }}>
+        <button type="button">a</button>
+        <button type="button">b</button>
+      </Container>,
+    );
+    const a = screen.getByText("a");
+    await act(async () => {
+      a.setAttribute("disabled", "");
+    });
+    expect(stops()).toEqual(["b"]);
+    await act(async () => {
+      a.removeAttribute("disabled");
+    });
+    expect(stops()).toEqual(["a"]);
+    expect(screen.getByText("b")).toHaveAttribute("tabindex", "-1");
   });
 
   it("native: writes nothing and handles no key", () => {
