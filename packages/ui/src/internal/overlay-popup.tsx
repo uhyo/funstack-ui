@@ -1,9 +1,9 @@
 "use client";
 // The pieces Dialog.Popup shares with usePopoverPopup (Popover, Menu, Combobox); the close /
-// echo / refused-fact flags and the show wrapper are in overlay-show.ts. The two stay separate:
-// Dialog has showModal / show, `close` / `cancel` / `submit` and light dismiss. What they still
-// write twice: the apply effect, mount reconciliation, the platform listeners and the JS-free
-// `autofocus` write.
+// echo / refused-fact flags and the show wrapper are in overlay-show.ts, the apply effect in
+// use-apply-open-state.ts. The two stay separate: Dialog has showModal / show, `close` /
+// `cancel` / `submit` and light dismiss. What they still write twice: mount reconciliation, the
+// platform listeners and the JS-free `autofocus` write.
 import { Activity, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { ToolbarContext } from "./toolbar-context.js";

@@ -79,6 +79,7 @@ const clientFiles = [
   "popover/popover-description.mjs",
   "internal/use-overlay-root.mjs",
   "internal/use-popover-popup.mjs",
+  "internal/use-apply-open-state.mjs",
   "internal/use-popover-trigger.mjs",
   "internal/use-exit-animation.mjs",
   // Every Menu part, its context and helpers, and the hooks it shares with Popover, Dialog and

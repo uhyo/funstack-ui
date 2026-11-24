@@ -19,6 +19,7 @@ import {
   useJsFreePropWarnings,
 } from "../internal/overlay-popup.js";
 import { createPopupFlags, showWithFocus } from "../internal/overlay-show.js";
+import { useApplyOpenState } from "../internal/use-apply-open-state.js";
 import { eventSource } from "../internal/invokers.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -240,49 +241,31 @@ export function DialogPopup({
     if (isLibrary) reconcileOnMount();
   }, [isLibrary]);
 
-  // The apply effect (design 2.5), as usePopoverPopup's: once nothing is in flight, the DOM
-  // follows committed state. Opens on the user's dispatch, `defaultOpen`, a controlled parent,
-  // the re-open of a dismissal a controlled parent refused (conventions 3.9.4: in the
-  // fact's own commit, which `epoch` makes re-render the Popup, or once the requests it
-  // superseded settled); closes after a part-initiated close settled, a controlled close, or a
-  // refused pre-hydration open. Also returns focus after a close whose commit unmounted the
-  // focused content, and releases a `held` no exit animation is going to release (4.4). It runs
-  // only for commits that re-render the Popup (the Root's context is memoised): do not rely on an
-  // unrelated render to re-apply state.
-  useLayoutEffect(() => {
-    if (!isLibrary) return;
-    const element = popupRef.current;
-    if (element === null || !element.isConnected) return;
-    // The fact was adopted (or anything else closed the dialog in state): a later show is a new
-    // open, with initial focus.
-    if (!ctx.committed) flags.factAdopted();
-    if (!ctx.pending && ctx.latestInFlight() === null) {
-      if (ctx.committed && !element.open) {
-        // Closed, but its `close` event has not arrived yet: wait for it.
-        if (!flags.awaitingClose()) openDialog(element);
-      } else if (!ctx.committed && element.open) {
-        // The library's own close: the `close` listener recognises it by the echo marker
-        // (`libraryClose`) and dispatches nothing. `close()`, not `requestClose()`: the veto
-        // point was `openChangeAction`, not `cancel`. The part's `returnValue` (design 2.3), `""`
-        // for a controlled close.
-        ctx.recordCloseIntent(undefined);
-        flags.markLibraryClose();
-        const returnValue = ctx.takeCloseReturnValue();
-        withCssTransitionCut(element, transition !== undefined, () => element.close(returnValue));
-        // The close commit may have unmounted the focused content before `close()`: a
-        // non-modal dialog restores focus only from inside, so do it now (a modal one always
-        // restores it on `close()`).
-        if (contentProbe.hadFocus()) {
-          contentProbe.forget();
-          returnFocusToTrigger(element, triggerRef.current);
-        }
+  // The apply effect (design 2.5), shared with usePopoverPopup. Keep this call right after mount
+  // reconciliation (as there): layout effects run in call order, and at mount the
+  // reconciliation's dispatch must come first, so that the first apply sees it in flight and
+  // waits. Opens on the user's dispatch, `defaultOpen`, a controlled parent, the re-open of a
+  // dismissal a controlled parent refused; closes after a part-initiated close settled, a
+  // controlled close, or a refused pre-hydration open.
+  useApplyOpenState(ctx, {
+    flags,
+    exit,
+    probe: contentProbe,
+    isShown: (element) => element.open,
+    show: openDialog,
+    hide: (element) => {
+      // `close()`, not `requestClose()`: the veto point was `openChangeAction`, not `cancel`. The
+      // part's `returnValue` (design 2.3), `""` for a controlled close.
+      const returnValue = ctx.takeCloseReturnValue();
+      withCssTransitionCut(element, transition !== undefined, () => element.close(returnValue));
+      // The close commit may have unmounted the focused content before `close()`: a non-modal
+      // dialog restores focus only from inside, so do it now (a modal one always restores it on
+      // `close()`).
+      if (contentProbe.hadFocus()) {
+        contentProbe.forget();
+        returnFocusToTrigger(element, triggerRef.current);
       }
-    }
-    // Content that unmounted while the dialog stays open (not a close): forget it.
-    if (ctx.committed && element.open) contentProbe.forget();
-    // A hold the close commit set (or a fact's commit) that no exit animation is going to
-    // release: the dialog is closed and its `close` event has been handled.
-    exit.releaseIfIdle(ctx.committed, flags.awaitingClose(), element.open);
+    },
   });
 
   // JS-free mode: there is no "right before showModal()" (the browser runs the command), so the
