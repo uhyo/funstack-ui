@@ -161,8 +161,8 @@ export function pendingAriaDisabled(
 
 /**
  * The ref of a part with no library ref, merged from the consumer's `ref` and a `render`
- * element's ref without memoisation (a directive-free part cannot `useMemo`, design
- * progress.md 14.1). A fresh callback ref per render is correct because every merged callback
+ * element's ref without memoisation (the directive-free half of `use-render.tsx`,
+ * progress.md 8.1). A fresh callback ref per render is correct because every merged callback
  * returns a cleanup; a single ref is passed through untouched.
  */
 export function mergeRenderRef(
