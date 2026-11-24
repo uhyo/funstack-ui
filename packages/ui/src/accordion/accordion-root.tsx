@@ -25,7 +25,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { useValueSet } from "../internal/use-value-set.js";
-import { EMPTY_SET, setsEqual } from "../internal/value-set.js";
+import { EMPTY_SET, setsEqual, sortByOrder } from "../internal/value-set.js";
 import type { ValueSet } from "../internal/value-set.js";
 import { AccordionRootContext } from "./accordion-context.js";
 import type { AccordionMode, AccordionRootContextValue } from "./accordion-context.js";
@@ -154,17 +154,16 @@ type AccordionValue = string[] | string | null;
 type OpenSet = ValueSet;
 
 /**
- * Converts the open set back to the public value. Multiple mode lists the items in registration
- * order (the order the Items mounted, which is document order for a list rendered top to bottom),
- * not in the order they were opened; unregistered values keep their insertion order at the end.
+ * Converts the open set back to the public value. Multiple mode lists the items in `order` (the
+ * registered Items' values in document order, design 2.3), not in the order they were opened;
+ * unregistered values keep their insertion order at the end.
  */
 function fromSet(set: OpenSet, exclusive: boolean, order: readonly string[]): AccordionValue {
   if (exclusive) {
     const [first] = set;
     return first ?? null;
   }
-  const index = new Map(order.map((v, i) => [v, i] as const));
-  return [...set].sort((a, b) => (index.get(a) ?? Infinity) - (index.get(b) ?? Infinity));
+  return sortByOrder(set, order);
 }
 
 /** The optimistic reducer of design 4.1: add/remove one item, or replace when exclusive. */
@@ -264,7 +263,10 @@ export function AccordionRoot(props: AccordionRootProps) {
 
   const items = useRef(new Map<HTMLDetailsElement, string>());
   const triggers = useRef(new Set<HTMLElement>());
-  const registeredValues = () => [...items.current.values()];
+  /** The registered Items in document order. Reads the DOM: handlers and effects only. */
+  const sortedItems = (): [HTMLDetailsElement, string][] =>
+    [...items.current].sort(([a], [b]) => compareDocumentOrder(a, b));
+  const registeredValues = () => sortedItems().map(([, v]) => v);
 
   const { committed, optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     OpenSet,
@@ -361,14 +363,14 @@ export function AccordionRoot(props: AccordionRootProps) {
   const reconcileOnMount = useEffectEvent(() => {
     const base = latestInFlight()?.next ?? optimistic;
     const mismatches: { item: string; open: boolean }[] = [];
-    for (const [element, item] of items.current) {
+    for (const [element, item] of sortedItems()) {
       const want = committed.has(item);
       if (element.open === want) continue;
       if (element.hasAttribute("data-disabled")) applyOpen(element, want);
       else mismatches.push({ item, open: element.open });
     }
     if (mismatches.length === 0) return;
-    // Exclusive mode: the first opened item in registration order wins (the others are re-closed
+    // Exclusive mode: the first opened item in document order wins (the others are re-closed
     // by the re-apply effect); otherwise fold every flip onto the base.
     const opened = exclusive ? mismatches.find((m) => m.open) : undefined;
     const chosen = opened ?? mismatches[0]!;

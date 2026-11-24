@@ -1315,6 +1315,46 @@ describe("Accordion", () => {
       expect(action.mock.calls.map(([next]) => next)).toEqual([["c"], ["a", "c"], ["a", "b", "c"]]);
       expect(committed()).toEqual(["a", "b", "c"]);
     });
+
+    // #157: document order, not the order the Items registered (mounted).
+    it("an Item inserted between existing ones sorts by its place in the document", async () => {
+      const action = vi.fn<ActionFn>();
+      const { rerender } = render(
+        <Harness mode="uncontrolled" action={action} items={[{ value: "a" }, { value: "c" }]} />,
+      );
+      rerender(<Harness mode="uncontrolled" action={action} />);
+      const user = setupUser();
+      await user.click(trigger("c"));
+      await user.click(trigger("b"));
+      await user.click(trigger("a"));
+      expect(action.mock.calls.map(([next]) => next)).toEqual([["c"], ["b", "c"], ["a", "b", "c"]]);
+      expect(committed()).toEqual(["a", "b", "c"]);
+    });
+
+    it("an Item that mounts late behind a Suspense boundary sorts by document order", async () => {
+      const suspender = createSuspender();
+      const action = vi.fn<(next: string[]) => void>();
+      render(
+        <Accordion.Root defaultValue={[]} valueChangeAction={action}>
+          <Suspense fallback={null}>
+            <suspender.Suspender value="late" />
+            <Accordion.Item value="a">
+              <Accordion.Trigger data-testid="trigger-a">A</Accordion.Trigger>
+            </Accordion.Item>
+          </Suspense>
+          <Accordion.Item value="b">
+            <Accordion.Trigger data-testid="trigger-b">B</Accordion.Trigger>
+          </Accordion.Item>
+        </Accordion.Root>,
+      );
+      const user = setupUser();
+      await user.click(trigger("b"));
+      await act(async () => {
+        suspender.resolve("late");
+      });
+      await user.click(trigger("a"));
+      expect(action.mock.calls.map(([next]) => next)).toEqual([["b"], ["a", "b"]]);
+    });
   });
 
   describe("dev warnings", () => {
