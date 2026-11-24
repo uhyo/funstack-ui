@@ -2266,3 +2266,101 @@ describe("Popover", () => {
     });
   });
 });
+
+// #159 (as Dialog's): the popover element remounts between a hide's `beforetoggle` and its queued
+// `toggle` (setting `transition` does, through the ViewTransition wrapper). The old element's
+// `toggle` reaches no listener; the new element has no hide pending, so the wait
+// (`awaitingClose`) and the library echo end with the old element.
+describe("Popover: a remount during a hide (#159)", () => {
+  const withTransition = { transition: { default: "none" } } as const;
+
+  it("a dismissal: the remounted popup opens, and a later dismissal is reported", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    const { rerender } = render(<Harness mode="uncontrolled" fact={fact} />);
+    await openThroughTrigger(user);
+    const first = popup();
+    // One task: a script hide (`beforetoggle` now, `toggle` queued) and a render that remounts
+    // the element before the `toggle` runs.
+    first.hidePopover();
+    rerender(<Harness mode="uncontrolled" fact={fact} popup={withTransition} />);
+    await flushTasks(2);
+    expect(popup()).not.toBe(first);
+    // The dismissal's fact never arrived, so committed state is still open: the apply effect of
+    // the remount commit shows the new element.
+    expect(committedText()).toBe("true");
+    expect(isOpen()).toBe(true);
+    expect(content()).not.toBeNull();
+    expect(fact).not.toHaveBeenCalled();
+    // A dismissal of the new element is a fact (no echo left over).
+    act(() => popup().hidePopover());
+    await flushTasks(2);
+    expect(isOpen()).toBe(false);
+    expect(committedText()).toBe("false");
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledWith(false, expect.objectContaining({ reason: "dismiss" }));
+    // And it opens again.
+    await openThroughTrigger(user);
+    expect(content()).not.toBeNull();
+  });
+
+  it("a controlled close: the hold is released, and the popup re-opens and reports a dismissal", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    let setOpen!: (open: boolean) => void;
+    const outside = (set: (open: boolean) => void) => {
+      setOpen = set;
+      return null;
+    };
+    const { rerender } = render(<Harness mode="controlled" outside={outside} fact={fact} />);
+    await openThroughTrigger(user);
+    const first = popup();
+    // A controlled close: the close commit holds the content (no `transition`, design 4.4) and
+    // its apply effect calls `hidePopover()` (the library echo).
+    act(() => setOpen(false));
+    expect(isOpen(first)).toBe(false);
+    expect(content()).not.toBeNull();
+    // Still the same task: the remount drops the old element (and its queued `toggle`).
+    rerender(<Harness mode="controlled" outside={outside} fact={fact} popup={withTransition} />);
+    await flushTasks(2);
+    expect(popup()).not.toBe(first);
+    expect(isOpen()).toBe(false);
+    expect(committedText()).toBe("false");
+    expect(content()).toBeNull();
+    // A controlled open shows the new element.
+    act(() => setOpen(true));
+    await flushTasks(2);
+    expect(isOpen()).toBe(true);
+    expect(content()).not.toBeNull();
+    // Its dismissal is a fact, not the lost hide's echo.
+    act(() => popup().hidePopover());
+    await flushTasks(2);
+    expect(isOpen()).toBe(false);
+    expect(committedText()).toBe("false");
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledWith(false, expect.objectContaining({ reason: "dismiss" }));
+  });
+
+  it("the same element re-attached (an inline ref) keeps the wait: no re-show before the toggle", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    const { rerender } = render(
+      <Harness mode="uncontrolled" fact={fact} popup={{ ref: () => {} }} />,
+    );
+    await openThroughTrigger(user);
+    const first = popup();
+    const show = vi.spyOn(first, "showPopover");
+    // One task: a script hide, then a render whose new inline ref detaches and re-attaches the
+    // same element; that commit's apply sees committed `true` and a hidden popup.
+    first.hidePopover();
+    rerender(<Harness mode="uncontrolled" fact={fact} popup={{ ref: () => {} }} />);
+    expect(popup()).toBe(first);
+    expect(isOpen(first)).toBe(false);
+    expect(show).not.toHaveBeenCalled();
+    await flushTasks(2);
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(committedText()).toBe("false");
+    expect(isOpen(first)).toBe(false);
+    expect(show).not.toHaveBeenCalled();
+  });
+});

@@ -362,7 +362,11 @@ The re-open race is the same as Dialog's: a native hide is synchronous but `togg
 task later, so a commit landing in between would see committed `true`, a hidden popup and nothing
 in flight and would call `showPopover()` again. The guard is `awaitingClose`, set in the
 synchronous `beforetoggle(closed)` listener and cleared in `toggle`. `beforetoggle` fires inside
-the hide steps in every engine and in the jsdom shim.
+the hide steps in every engine and in the jsdom shim. As Dialog's, the flag and the `libraryHide`
+marker belong to the element: when the callback ref attaches a different element (a remount
+during a hide, such as a change of `transition`), the old element's `toggle` never reaches the
+Popup, so both are cleared there, before that commit's apply effect; the same element attached
+again (a new merged ref) keeps them.
 
 One effect covers: the normal open, `defaultOpen` on mount, a controlled open without a Trigger,
 a controlled close, a library-driven close after `openChangeAction(false)` settled, the re-show

@@ -37,6 +37,24 @@ describe("createPopupFlags", () => {
     expect(flags.takeRefusedFact()).toBe(false);
   });
 
+  it("a different element ends the close and drops the echo; the same one keeps them (#159)", () => {
+    const flags = createPopupFlags();
+    const first = document.createElement("dialog");
+    flags.attach(first);
+    flags.beginClose();
+    flags.markLibraryClose();
+    flags.markFact();
+    // Re-attached: its event still comes.
+    flags.attach(first);
+    expect(flags.awaitingClose()).toBe(true);
+    // A new element: the old one's event never comes.
+    flags.attach(document.createElement("dialog"));
+    expect(flags.awaitingClose()).toBe(false);
+    expect(flags.takeLibraryClose()).toBe(false);
+    // The refused fact is about state, not the element.
+    expect(flags.takeRefusedFact()).toBe(true);
+  });
+
   it("keeps each instance's flags apart", () => {
     const a = createPopupFlags();
     const b = createPopupFlags();

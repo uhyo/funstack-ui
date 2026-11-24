@@ -385,6 +385,8 @@ export function usePopoverPopup(
     (element: HTMLElement) => {
       checkElement?.(element);
       popupRef.current = element;
+      // A new element (a remount mid-hide): the old one's `toggle` never comes (#159).
+      flags.attach(element);
       const listeners: [string, EventListener][] = [
         ["beforetoggle", (event) => handlers.current.onBeforeToggle(event)],
         ["toggle", (event) => handlers.current.onToggle(event)],
@@ -424,6 +426,7 @@ export function usePopoverPopup(
     [
       checkElement,
       popupRef,
+      flags,
       setShown,
       handlers,
       latestWhileShown,

@@ -39,6 +39,15 @@ export interface PopupFlags {
    * apply it (a modal dialog).
    */
   readonly takeRefusedFact: () => boolean;
+  /**
+   * The popup element the callback ref attached. A different element than the last one ends the
+   * close and drops the echo (#159): the old element went away with its listeners, so its queued
+   * `toggle` / `close` event never reaches the Popup, and the new element has no close pending
+   * (a remount mid-close, such as a change of `transition`). Called at the ref's attach, before
+   * the commit's layout effects, so that commit's apply already sees it. The same element
+   * attached again (a new merged ref, StrictMode) keeps both: its event still comes.
+   */
+  readonly attach: (element: Element) => void;
 }
 
 /** A fresh set of flags, all clear. Keep one per Popup instance (`useState(createPopupFlags)`). */
@@ -46,6 +55,7 @@ export function createPopupFlags(): PopupFlags {
   let awaitingClose = false;
   let libraryClose = false;
   let refusedFact = false;
+  let attached: Element | null = null;
   return {
     awaitingClose: () => awaitingClose,
     beginClose: () => {
@@ -72,6 +82,12 @@ export function createPopupFlags(): PopupFlags {
       const refused = refusedFact;
       refusedFact = false;
       return refused;
+    },
+    attach: (element) => {
+      if (element === attached) return;
+      attached = element;
+      awaitingClose = false;
+      libraryClose = false;
     },
   };
 }

@@ -407,7 +407,13 @@ commit landing there (any unrelated re-render) would make the effect call `showM
 re-open a dialog the user just closed. The guard is the `awaitingClose` flag set in the Popup's
 **synchronous** `beforetoggle` listener when `newState === "closed"` and cleared in the `close`
 listener before the fact is adopted; while it is set the effect does nothing. `beforetoggle` fires
-synchronously inside the close steps in every engine and in the jsdom shim.
+synchronously inside the close steps in every engine and in the jsdom shim. An open's
+`beforetoggle` (a foreign `show()` in the same task) does not clear it: HTML queues the `close`
+event whatever follows, and the flag is read only while the dialog is closed. The flag and the
+`libraryClose` marker belong to the element: when the callback ref attaches a different
+`<dialog>` (a remount during a close, such as a change of `transition`), the old element's `close`
+event never reaches the Popup, so both are cleared there, before that commit's apply effect. The
+same element attached again (a new merged ref) keeps them.
 
 This one effect covers: the normal open (committed flipped by the user's dispatch), `defaultOpen`
 on mount, a controlled parent opening the dialog programmatically (`setOpen(true)` from a menu,

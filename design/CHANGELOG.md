@@ -11003,3 +11003,28 @@ called right before each library open, as before, and is never written as `autof
 mode (Menu and Combobox have none) nor a dependency of the Popup's callback ref, so an inline
 resolver does not re-attach the listeners. Sections changed: popover.md 6.1 and 15 (the name of
 the option).
+
+## 2026-11-24, #159: a remount during a close ends the close's wait
+
+Bug fix (issue #159, found in #157 step 3; developer). If a Popup's element remounted between a
+close's `beforetoggle` and its `toggle` / `close` event (a change of `transition` swaps the
+`<ViewTransition>` wrapper and with it the element, while the Popup's state stays), the old
+element's event reached no listener: `awaitingClose` stayed set, so a committed-open popup was
+never shown again and a held close never released its content; the library echo stayed set too,
+so on Dialog the next dismissal was taken for the library's own close and not reported. Popover
+(and with it Menu and Combobox) had the same bug.
+
+The rule: the wait and the echo belong to the element. When the callback ref attaches a
+different element, both are cleared (`PopupFlags.attach`), in the mutation phase, so the remount
+commit's apply effect already sees it; the same element attached again (a new merged ref,
+StrictMode) keeps them, as its event still comes. Not the listener effect's cleanup: Dialog's is
+a passive effect that runs after the remount commits' layout effects, with no apply after it, and
+a ref detach cannot tell a remount from a re-attach.
+
+Dialog's open `beforetoggle` no longer clears `awaitingClose` (as Popover's never did). HTML
+queues the `close` event of a close unconditionally, the flag is read only while the dialog is
+closed, and the only way to close it again without a closing `beforetoggle` was the remount, now
+handled at the attach; the branch was observable only through #159 (#157 review M3).
+
+Sections changed: dialog.md 2.5 (the re-open race), popover.md 2.5 (the re-open race).
+Developer notes: `memo/developer/issue-159.md`.
