@@ -39,13 +39,8 @@ export interface OverlayDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 
-/**
- * The Root's state and machinery, shared by Popover, Menu, Combobox (design 14) and Dialog. The
- * component puts it in its own context (the popover-like ones extend it, `PopoverRootValue`).
- * `Popup` is the popup element's type; `CloseArgs` are the extra arguments of a close (Dialog's
- * `returnValue`), passed on to the `details` builder.
- */
-export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends unknown[]> {
+/** What the parts render from (every part). */
+export interface OverlayRootState {
   readonly mode: OverlayMode;
   /** `useId`-based ids: the popup, its Title and its Description. */
   readonly ids: { readonly popup: string; readonly title: string; readonly description: string };
@@ -56,25 +51,25 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
   /** The Root's transition is pending (library mode). */
   readonly pending: boolean;
   /**
-   * Grows with every fact (`notifyClosed`). Part of the memoised value so that a fact always
-   * re-renders the parts, even when a controlled parent keeps `open={true}` and nothing else
-   * changed: the Popup's apply effect then re-opens the popup (design 2.4).
+   * Grows with every fact (`notifyClosed`). No part reads it: it is part of the memoised value so
+   * that a fact always re-renders the parts, even when a controlled parent keeps `open={true}` and
+   * nothing else changed: the Popup's apply effect then re-opens the popup (design 2.4).
    */
   readonly epoch: number;
+}
+
+/**
+ * How a part asks for an open or a close, from its handlers: the Triggers, the Close parts,
+ * Menu's items, keys and hover intent, Combobox's handlers, Dialog's Form; the Popup too, for a
+ * foreign open or close it catches.
+ */
+export interface OverlayRootRequests<CloseArgs extends unknown[]> {
   /**
    * What the user already intends: the latest in-flight dispatch's `next`, else the optimistic
    * value of the last commit. Safe to call from handlers and effects (layout effects included,
    * also in the commit that changed it), and after an `await`. Not during render.
    */
   readonly intended: () => boolean;
-  /**
-   * A counter that grows with every open (a requested open, or the popup being shown). A part
-   * whose close runs after an `await` records it first and drops the close when it changed: the
-   * user dismissed and re-opened meanwhile (Popover.Close, design 3.4). Handlers only.
-   */
-  readonly openGeneration: () => number;
-  /** Advance `openGeneration` (the Popup's `beforetoggle` for an open). */
-  readonly nextOpenGeneration: () => void;
   /**
    * Open through the Root's transition (library mode): a Trigger click, a foreign open caught at
    * `beforetoggle`, or mount reconciliation. A no-op when `true` is already intended.
@@ -91,6 +86,28 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
     ...args: CloseArgs
   ) => void;
   /**
+   * A counter that grows with every open (a requested open, or the popup being shown). A part
+   * whose close runs after an `await` records it first and drops the close when it changed: the
+   * user dismissed and re-opened meanwhile (Popover.Close, design 3.4). Handlers only.
+   */
+  readonly openGeneration: () => number;
+  /**
+   * Record what causes the next close. Cleared after a task if the popover did not close.
+   * `unlessRecorded`: keep an intent already recorded for this close (the `command` listener runs
+   * before the `beforetoggle` of the same click).
+   */
+  readonly recordCloseIntent: (
+    intent: OverlayCloseIntent | undefined,
+    options?: { readonly unlessRecorded?: boolean },
+  ) => void;
+}
+
+/**
+ * What only the Popup implementation calls (`usePopoverPopup`, Dialog.Popup and their shared
+ * `useApplyOpenState`): the platform events' bookkeeping and the apply effect's in-flight check.
+ */
+export interface OverlayRootPopupChannel<CloseArgs extends unknown[]> {
+  /**
    * A fact (#148, conventions 3.9.2): the browser hid the popup and the library did not
    * hide it (the caller has already excluded the library's own hide). Supersedes every request in
    * flight, writes committed `false` urgently (uncontrolled), and calls `onOpenChange(false,
@@ -102,24 +119,37 @@ export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends u
     reason: ChangeReason,
     ...args: CloseArgs
   ) => void;
-  /** From `useControllableAction`: the latest in-flight intent, or `null`. */
+  /** Advance `openGeneration` (the Popup's `beforetoggle` for an open). */
+  readonly nextOpenGeneration: () => void;
+  /** Read and clear the recorded intent (the Popup's `toggle` / `close` listener). */
+  readonly takeCloseIntent: () => OverlayCloseIntent | undefined;
+  /**
+   * From `useControllableAction`: the latest in-flight intent, or `null`. Also read by
+   * Dialog.Root, for its pending `returnValue`.
+   */
   readonly latestInFlight: () => { readonly next: boolean } | null;
+}
+
+/** The two elements, each set by its own part and read by the others. */
+export interface OverlayRootRefs<Popup extends HTMLElement> {
   /** The registered Trigger: `showPopover({ source })` and the focus-return fallback. */
   readonly triggerRef: RefObject<HTMLElement | null>;
   /** The popup element, set by the Popup's ref; how Close reaches `hidePopover()` / `close()`. */
   readonly popupRef: RefObject<Popup | null>;
-  /**
-   * Record what causes the next close. Cleared after a task if the popover did not close.
-   * `unlessRecorded`: keep an intent already recorded for this close (the `command` listener runs
-   * before the `beforetoggle` of the same click).
-   */
-  readonly recordCloseIntent: (
-    intent: OverlayCloseIntent | undefined,
-    options?: { readonly unlessRecorded?: boolean },
-  ) => void;
-  /** Read and clear the recorded intent (the Popup's `toggle` listener). */
-  readonly takeCloseIntent: () => OverlayCloseIntent | undefined;
 }
+
+/**
+ * The Root's state and machinery, shared by Popover, Menu, Combobox (design 14) and Dialog,
+ * grouped by who uses it. The component puts it in its own context (the popover-like ones
+ * extend it, `PopoverRootValue`). `Popup` is the popup element's type; `CloseArgs` are the extra
+ * arguments of a close (Dialog's `returnValue`), passed on to the `details` builder.
+ */
+export interface OverlayRootValue<Popup extends HTMLElement, CloseArgs extends unknown[]>
+  extends
+    OverlayRootState,
+    OverlayRootRequests<CloseArgs>,
+    OverlayRootPopupChannel<CloseArgs>,
+    OverlayRootRefs<Popup> {}
 
 /**
  * The root value of the popover-like components (Popover, Menu, Combobox), from `usePopoverRoot`:
