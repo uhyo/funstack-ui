@@ -2362,13 +2362,16 @@ export default defineConfig({
 away, and it can only do so when the text sits behind a `NODE_ENV` test it can evaluate. Every
 module that warns declares its own `const isDev = process.env.NODE_ENV !== "production"` and
 passes each message as `isDev && "..."` (or `isDev && ((element) => ...)`) to `useDevWarning`,
-`useElementCheck`, `useNameWarning` and `useShownNameWarning`, which accept `false`; a direct
+`useMountFixed`, `useElementCheck`, `useNameWarning` and `useShownNameWarning`, which accept
+`false`; a direct
 `console.error` sits inside `if (isDev)`. The hooks themselves are exported as `isDev ? hook :
 noop`, so a production render runs no warning hook at all. A dev check fires **once per
 instance** (`useDevWarning`: the first time its condition holds; the element and name checks:
 the first failing check). `src/__tests__/production-bundle.test.ts` bundles `src/index.ts` as a
 consumer would (`NODE_ENV` `"production"`, minified) and fails on any string from those call
-sites that survives, naming the file and the text.
+sites that survives, naming the file and the text. A message starts with the public name of
+the part that warns and a colon (`Tooltip.Trigger: the trigger is not focusable; ...`), or the
+name of the function that warns (`toast(): ...`, `toast.update: ...`).
 
 ### 7.3 JS-free primitives
 

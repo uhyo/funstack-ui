@@ -10837,3 +10837,15 @@ from a disabled current trigger, which the roving engine and Tabs.List never see
 item lists leave disabled items out), now over `ArrowMove`. A new Accordion test pins that
 ArrowLeft / ArrowRight are not navigation keys, also in RTL. Sections changed: the conventions 9.1
 file listing.
+
+## 2026-11-24, #157: Tooltip's warnings use the `Part.Name: ` form
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 10; the caller allowed this
+development-console text change). Tooltip's three development warnings started with
+`[Tooltip] `, the only ones in the library that did not name the part. They now read
+`Tooltip.Trigger: provides="name" together with aria-label on the trigger ...`,
+`Tooltip.Trigger: the trigger is not focusable; ...` and
+`Tooltip.Popup: tooltips must not contain interactive content. ...`. When and how often they fire
+is unchanged (an effect in `Tooltip.Root`, once per Root each). Sections changed: conventions 7.2
+states the message form and lists `useMountFixed` with the hooks that take `isDev && message`
+(an omission of the `useMountFixed` entry above).

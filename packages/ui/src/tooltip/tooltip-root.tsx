@@ -122,7 +122,12 @@ function isKeyboardReachable(trigger: HTMLElement): boolean {
   return trigger.hasAttribute("tabindex") && trigger.parentElement?.closest(COMPOSITE) != null;
 }
 
-/** Development-only checks that need the mounted elements (design 12.5). Each fires once. */
+/**
+ * Development-only checks that need the mounted elements (design 12.5). Each fires once per Root.
+ * Not `useDevWarning` (its condition is computed in render, which must not read these elements'
+ * attributes) nor `useElementCheck` (one warning per hook, and these run when `provides` or
+ * either element changes, from the Root): an effect with its own flags.
+ */
 function useTooltipDevWarnings(
   trigger: HTMLElement | null,
   popup: HTMLElement | null,
@@ -136,20 +141,20 @@ function useTooltipDevWarnings(
       if (provides === "name" && trigger.hasAttribute("aria-label") && !w.label) {
         w.label = true;
         console.error(
-          '[Tooltip] provides="name" together with aria-label on the trigger announces the name twice. Remove aria-label.',
+          'Tooltip.Trigger: provides="name" together with aria-label on the trigger announces the name twice. Remove aria-label.',
         );
       }
       if (!isKeyboardReachable(trigger) && !w.focusable) {
         w.focusable = true;
         console.error(
-          "[Tooltip] The trigger is not focusable; keyboard users cannot open the tooltip. Render a <button> or a link, or set tabIndex={0}.",
+          "Tooltip.Trigger: the trigger is not focusable; keyboard users cannot open the tooltip. Render a <button> or a link, or set tabIndex={0}.",
         );
       }
     }
     if (popup !== null && popup.querySelector(FOCUSABLE) !== null && !w.interactive) {
       w.interactive = true;
       console.error(
-        "[Tooltip] Tooltips must not contain interactive content. Use a non-modal dialog or a popover instead.",
+        "Tooltip.Popup: tooltips must not contain interactive content. Use a non-modal dialog or a popover instead.",
       );
     }
   }, [trigger, popup, provides]);
