@@ -26,7 +26,8 @@ Radix Themes `loading`, GOV.UK `preventDoubleClick`.
    still works. Conventions 2.5 and 3.6 are amended.
 2. **No `aria-busy` by default, no built-in announcement** in v1.
 3. **Forms**: default `type="button"`, `"submit"` when `formAction` is given; `formAction` shows
-   pending for this button's own submissions only; `Form.Submit` stays; a plain `type="submit"`
+   pending for this button's own submissions only (from its own submission until the form's
+   submissions have all finished, a latch since #154, 6.2); `Form.Submit` stays; a plain `type="submit"`
    Button does not read `useFormStatus`.
 4. **Composition**: an already-cancelled click does not block the action
    (`Dialog.Trigger render={<Button />}` works); focus and hover listeners keep working while
@@ -47,7 +48,7 @@ Radix Themes `loading`, GOV.UK `preventDoubleClick`.
 | 4 | AT state while pending | `aria-disabled="true"` (owned), `data-disabled` **not** set, `state.disabled` unchanged. Never native `disabled`, never `inert`, no `aria-busy`, no announcement. |
 | 5 | Library-wide rule | "A pure trigger ignores re-entry" becomes the conventions' rule (2.5, 3.6) and a `useActionTrigger` option; **wave 8 lands it for Button only**; `Dialog.Close`, `Popover.Close`, `Menu.Item` follow in **#81** because their tests and docs are built on re-run and `Menu.Item`'s navigation keys on `aria-disabled` (section 5.5). `Form.Submit` is **not** guarded (section 6.4). |
 | 6 | `type` | Default `"button"`; `"submit"` when `formAction` is given. The Button's own `type` prop wins (`"submit"` / `"reset"` allowed); the computed value is owned on a `<button>` and on a **component** `render` element (assumed to render a `<button>`; review item 2, library-wide in `rendersButton`), and omitted only for a host element of another tag (`<a href>`). `action` with a submitting `type` warns in development. |
-| 7 | `formAction` | First-class pass-through with **per-submitter pending**: `useFormStatus().pending && status.action === <the function this Button submitted with>`. `action` and `formAction` together is a development error. Progressive enhancement is React's (a Server Function submits before hydration). |
+| 7 | `formAction` | First-class pass-through with **per-submitter pending**: latched once `useFormStatus().pending && status.action === <the function this Button submitted with>` has rendered, held until the form status is idle (6.2, #154). `action` and `formAction` together is a development error. Progressive enhancement is React's (a Server Function submits before hydration). |
 | 8 | `disabled` | Native `disabled` (owned) plus `data-disabled`, like `Dialog.Close` / `Form.Submit`. `focusableWhenDisabled` renders `aria-disabled="true"` instead (Base UI's name); it is implied `true` inside a `Toolbar.Root` (APG Toolbar) and for **any `render` element that is not a host `<button>`** (an `<a href>`, a component: native `disabled` means nothing on a link and would expose an enabled link to AT; review must-fix 1). Never dispatches either way; a disabled link does not navigate. |
 | 9 | Toolbar | `Button` reads `ToolbarContext`; **`Toolbar.Button` is removed** (user decision, a breaking change): a Toolbar's command button is `<Button>`, with the same `aria-disabled` behaviour `Toolbar.Button` had. One implementation, one name. |
 | 10 | Composition | Button does **not** treat a `defaultPrevented` click as a veto (a Trigger-wrapped Button runs its action); its guard cannot stop an outer part's handler that ran first; `command` / `commandfor` pass through untouched (both the action and the command run on one click). |
@@ -133,9 +134,10 @@ import { publish, saveDraft, discard } from "./actions"; // "use server"
 Three buttons, three meanings of `pending`. `Form.Submit` shows the **form channel**: it is
 pending for every submission of this form, whichever button started it (`useFormStatus().pending`,
 conventions 2.7). Each `Button formAction` shows **its own submissions only**: "Save draft" is
-pending from its click until the form's submissions have all finished, "Discard" is not (unless
-it submitted too), even though `useFormStatus().pending` is `true` for the whole form. Both Buttons are `type="submit"` (the default once `formAction` is given) so
-constraint validation, `FormData` and React's automatic reset all work; a second click on a
+pending from its own submission until the form's submissions have all finished, "Discard" is
+not (unless it submitted too), even though `useFormStatus().pending` is `true` for the whole
+form. Both Buttons are `type="submit"` (the default once `formAction` is given) so constraint
+validation, `FormData` and React's automatic reset all work; a second click on a
 pending one is ignored. The Server Functions render as `formaction` attributes before hydration,
 so the buttons submit without JavaScript (React's progressive enhancement, unchanged).
 
@@ -260,8 +262,9 @@ export interface ButtonProps extends Omit<
   /**
    * React's `formAction`: a function (a Server Function, a `useActionState` dispatch, a client
    * function) or a URL, run by React instead of the form's `action` when this Button submits the
-   * form. With a function, the Button is `pending` while its own submission runs (not while
-   * another submitter's does) and defaults to `type="submit"`. A further activation meanwhile
+   * form. With a function, the Button is `pending` from its own submission until the form's
+   * submissions have all finished (never for another submitter's alone, 6.2, #154) and defaults
+   * to `type="submit"`. A further activation meanwhile
    * submits again unless `whilePending="ignore"` (section 18.3).
    */
   formAction?: ComponentPropsWithRef<"button">["formAction"];
@@ -535,7 +538,7 @@ named = status.pending && typeof formAction === "function"
 // `submitted`: useState latch, updated during render (derived state, #154)
 if (named && !submitted) setSubmitted(true);
 if (!status.pending && submitted) setSubmitted(false);
-formPending = named || (status.pending && submitted);
+formPending = typeof formAction === "function" && (named || (status.pending && submitted));
 ```
 
 Rule: **a `formAction` Button is pending from its own submission until the form's submissions

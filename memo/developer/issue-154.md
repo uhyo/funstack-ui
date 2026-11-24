@@ -21,3 +21,11 @@ option L, as specified there.
   comment, the playground text. Design: button.md 2.2, 6.2 (formula, rationale, known limits),
   6.4 table, walkthrough 9, 15.3 sketch note, 18.3, test row 11; conventions 2.7. SKILL.md did
   not restate the rule, unchanged.
+
+## Review fixes (memo/reviewer/review-154.md)
+
+- F1: `formPending` gated on `typeof formAction === "function"` as a whole; test switches A to a
+  URL `formAction` and to `action` while latched (not pending, not `aria-disabled`, click not
+  cancelled). Both cases fail without the gate.
+- F2: button.md 29, 50, 135-136 ("from its own submission"), JSDoc sketch, 6.2 formula.
+- F3: docs callout: "the Button stays pending until every overlapping submission has settled".

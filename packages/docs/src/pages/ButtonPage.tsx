@@ -337,11 +337,12 @@ import { archive } from "./actions"; // "use server"
         </p>
         <p>
           When another submitter (a second <code>Button formAction</code>, <code>Form.Submit</code>,
-          Enter in a field) submits while a Button's own submission runs, both stay pending until
-          both have settled, also the one that finished first: React holds the form's status, and
-          the results of the actions, until every overlapping submission has finished, as it does
-          for two overlapping <code>Button action</code>s. A <code>whilePending="ignore"</code>{" "}
-          Button therefore keeps ignoring clicks through the overlap. One case cannot be seen: two
+          Enter in a field) submits while a Button's own submission runs, the Button stays pending
+          until every overlapping submission has settled, also when its own finished first (a second{" "}
+          <code>Button formAction</code> likewise): React holds the form's status, and the results
+          of the actions, until every overlapping submission has finished, as it does for two
+          overlapping <code>Button action</code>s. A <code>whilePending="ignore"</code> Button
+          therefore keeps ignoring clicks through the overlap. One case cannot be seen: two
           submissions started by script in the same task (<code>requestSubmit(a)</code> then{" "}
           <code>requestSubmit(b)</code>) never let React render the status of the first, so its
           Button is not pending.

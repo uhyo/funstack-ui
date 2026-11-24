@@ -1101,6 +1101,67 @@ describe("Button", () => {
       });
     }
 
+    for (const change of ["a URL formAction", "an action"] as const) {
+      it(`the latch ends when formAction stops being a function (${change}, #154 review F1)`, async () => {
+        const da = deferred();
+        const db = deferred();
+        const a = vi.fn<(formData: FormData) => Promise<void>>(() => da.promise);
+        const b = vi.fn<(formData: FormData) => Promise<void>>(() => db.promise);
+        const act2 = vi.fn();
+        function App({ switched }: { switched: boolean }) {
+          return (
+            <form action={() => {}}>
+              {switched ? (
+                change === "an action" ? (
+                  <Button action={act2} whilePending="ignore">
+                    A
+                  </Button>
+                ) : (
+                  <Button formAction="/elsewhere" whilePending="ignore">
+                    A
+                  </Button>
+                )
+              ) : (
+                <Button formAction={a} whilePending="ignore">
+                  A
+                </Button>
+              )}
+              <Button formAction={b}>B</Button>
+            </form>
+          );
+        }
+        const { rerender } = render(<App switched={false} />);
+        const user = setupUser();
+        await user.click(button("A"));
+        await user.click(button("B"));
+        // The form status names b; A is pending through the latch only.
+        expectPending(button("A"));
+        rerender(<App switched />);
+        expectNotPending(button("A"));
+        expect(button("A")).not.toHaveAttribute("aria-disabled");
+        if (change === "an action") {
+          expect(click(button("A")).defaultPrevented).toBe(false);
+          expect(act2).toHaveBeenCalledTimes(1);
+        } else {
+          // Not cancelled by the guard; stop jsdom from attempting the navigation.
+          let preventedByButton: boolean | undefined;
+          const guard = (e: Event) => {
+            preventedByButton = e.defaultPrevented;
+            e.preventDefault();
+          };
+          document.addEventListener("click", guard);
+          click(button("A"));
+          document.removeEventListener("click", guard);
+          expect(preventedByButton).toBe(false);
+        }
+        await act(async () => {
+          da.resolve();
+          db.resolve();
+        });
+        expectNotPending(button("A"));
+      });
+    }
+
     it("the form's own action submitted while A runs: A stays pending (#154)", async () => {
       const da = deferred();
       const df = deferred();

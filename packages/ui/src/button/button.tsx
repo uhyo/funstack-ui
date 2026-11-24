@@ -177,7 +177,9 @@ export function Button({
   // Derived state, updated during render (React re-renders this component before committing).
   if (named && !submitted) setSubmitted(true);
   if (!status.pending && submitted) setSubmitted(false);
-  const formPending = named || (status.pending && submitted);
+  // Gated as a whole: a latch left from a function `formAction` that became a URL or `action`
+  // must not keep the Button pending (a URL has no pending and no guard, 6.2).
+  const formPending = typeof formAction === "function" && (named || (status.pending && submitted));
   const pending = ownPending || formPending;
 
   useDevWarning(
