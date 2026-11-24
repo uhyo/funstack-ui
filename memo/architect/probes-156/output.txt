@@ -1,0 +1,40 @@
+      Tests  26 passed (26)
+ Test Files  2 passed (2)
+[156 chromium] {"row":"L1 baseline dialog","initial":"inner","reshows":3,"afterClick":"inner","clickEvents":["inner:blur","outside:focus","outside:blur","inner:focus"],"typedInto":{"outside":"hello","inner":"X"},"afterEscape":"inner","afterBodyClick":"inner","afterTab":"outside","inertLeft":false}
+[156 chromium] {"row":"L1 baseline div","initial":"body","reshows":3,"afterClick":"outside","clickEvents":["outside:focus"],"typedInto":{"outside":"helloX","inner":""},"afterEscape":"outside","afterBodyClick":"body","afterTab":"trigger","inertLeft":false}
+[156 chromium] {"row":"L1 inert dialog","initial":"inner","reshows":3,"afterClick":"outside","clickEvents":["inner:blur","outside:focus"],"typedInto":{"outside":"helloX","inner":""},"afterEscape":"outside","afterBodyClick":"body","afterTab":"trigger","inertLeft":false}
+[156 chromium] {"row":"L1 restore dialog","initial":"inner","reshows":3,"afterClick":"outside","clickEvents":["inner:blur","outside:focus","outside:blur","inner:focus","inner:blur","outside:focus"],"typedInto":{"outside":"helloX","inner":""},"afterEscape":"outside","afterBodyClick":"inner","afterTab":"outside","inertLeft":false}
+[156 chromium] {"row":"R1 autofocus on a disabled child after hidePopover","active":"outside"}
+[156 chromium] {"row":"R1 autofocus on a disabled child","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 chromium] {"row":"R1 focusable child after hidePopover","active":"outside"}
+[156 chromium] {"row":"R1 focusable child","active":"inner","outsideEvents":["outside:blur","outside:focusout"]}
+[156 chromium] {"row":"R1 no focusable after hidePopover","active":"outside"}
+[156 chromium] {"row":"R1 no focusable","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 chromium] {"row":"R1 no focusable, tabindex=-1 on dialog after hidePopover","active":"outside"}
+[156 chromium] {"row":"R1 no focusable, tabindex=-1 on dialog","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 chromium] {"row":"R1 only an inert child after hidePopover","active":"outside"}
+[156 chromium] {"row":"R1 only an inert child","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 chromium] {"row":"R2 inert","active":"outside","open":true,"outsideEvents":[],"selection":[2,4],"innerFocusableAfter":true}
+[156 chromium] {"row":"R2 inert, hidePopover with focus outside","active":"outside"}
+[156 chromium] {"row":"R3 restore","active":"outside","outsideEvents":["outside:blur","outside:focusout","inner:focus","inner:blur","outside:focus","outside:focusin"],"selection":[2,4]}
+[156 chromium] {"row":"R4 timeline","events":["dlg:toggle(open) active=inner","outside:pointerdown","outside:mousedown","outside:focus","outside:pointerup","outside:mouseup","dlg:beforetoggle(closed) active=outside","outside:click","dlg:toggle(closed) active=outside"],"active":"outside"}
+[156 chromium] {"row":"R5 baseline","afterReshow":"inner","afterEscape":"outside","open":false}
+[156 firefox] {"row":"L1 baseline dialog","initial":"inner","reshows":3,"afterClick":"inner","clickEvents":["inner:blur","outside:focus","outside:blur","inner:focus"],"typedInto":{"outside":"hello","inner":"X"},"afterEscape":"inner","afterBodyClick":"inner","afterTab":"outside","inertLeft":false}
+[156 firefox] {"row":"L1 baseline div","initial":"body","reshows":3,"afterClick":"outside","clickEvents":["outside:focus"],"typedInto":{"outside":"helloX","inner":""},"afterEscape":"outside","afterBodyClick":"body","afterTab":"outside","inertLeft":false}
+[156 firefox] {"row":"L1 inert dialog","initial":"inner","reshows":3,"afterClick":"outside","clickEvents":["inner:blur","outside:focus"],"typedInto":{"outside":"helloX","inner":""},"afterEscape":"outside","afterBodyClick":"body","afterTab":"outside","inertLeft":false}
+[156 firefox] {"row":"L1 restore dialog","initial":"inner","reshows":3,"afterClick":"outside","clickEvents":["inner:blur","outside:focus","outside:blur","inner:focus","inner:blur","outside:focus"],"typedInto":{"outside":"helloX","inner":""},"afterEscape":"outside","afterBodyClick":"inner","afterTab":"outside","inertLeft":false}
+[156 firefox] {"row":"R1 autofocus on a disabled child after hidePopover","active":"outside"}
+[156 firefox] {"row":"R1 autofocus on a disabled child","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 firefox] {"row":"R1 focusable child after hidePopover","active":"outside"}
+[156 firefox] {"row":"R1 focusable child","active":"inner","outsideEvents":["outside:blur","outside:focusout"]}
+[156 firefox] {"row":"R1 no focusable after hidePopover","active":"outside"}
+[156 firefox] {"row":"R1 no focusable","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 firefox] {"row":"R1 no focusable, tabindex=-1 on dialog after hidePopover","active":"outside"}
+[156 firefox] {"row":"R1 no focusable, tabindex=-1 on dialog","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 firefox] {"row":"R1 only an inert child after hidePopover","active":"outside"}
+[156 firefox] {"row":"R1 only an inert child","active":"dlg","outsideEvents":["outside:blur","outside:focusout"]}
+[156 firefox] {"row":"R2 inert","active":"outside","open":true,"outsideEvents":[],"selection":[2,4],"innerFocusableAfter":true}
+[156 firefox] {"row":"R2 inert, hidePopover with focus outside","active":"outside"}
+[156 firefox] {"row":"R3 restore","active":"outside","outsideEvents":["outside:blur","outside:focusout","inner:focus","inner:blur","outside:focus","outside:focusin"],"selection":[2,4]}
+[156 firefox] {"row":"R4 timeline","events":["dlg:toggle(open) active=inner","outside:pointerdown","outside:mousedown","outside:focus","dlg:beforetoggle(closed) active=outside","outside:pointerup","outside:mouseup","outside:click","dlg:toggle(closed) active=outside"],"active":"outside"}
+[156 firefox] {"row":"R5 baseline","afterReshow":"inner","afterEscape":"outside","open":false}

@@ -1,0 +1,268 @@
+// THROWAWAY probe for issue #156 (memo/architect/156-refused-reopen-focus.md).
+//
+// Not part of the suite. To run, copy to packages/ui/src/__probes__/issue156.browser.test.tsx and:
+//   FUNSTACK_BROWSERS=chromium,firefox pnpm --filter @funstack/ui exec vitest run --project browser src/__probes__ --silent=false
+// Each row prints `[156 <engine>] {json}`.
+//
+// Part R: raw platform (no library). Part L: the library's controlled Popover with a refusing
+// parent; the candidate fixes are emulated WITHOUT touching library code by wrapping
+// `HTMLElement.prototype.showPopover` for the re-show only.
+import { render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+import { server, userEvent } from "vitest/browser";
+import { quietPeriod } from "../__tests__/browser-helpers.js";
+import { user } from "../__tests__/browser-user.js";
+import { Popover } from "../popover/index.js";
+
+const engine = server.browser;
+const out = (row: string, data: unknown) =>
+  console.log(`[156 ${engine}] ${JSON.stringify({ row, ...(data as object) })}`);
+
+const name = (el: Element | null): string =>
+  el === null
+    ? "null"
+    : el === document.body
+      ? "body"
+      : ((el as HTMLElement).dataset.testid ?? el.tagName.toLowerCase());
+const active = () => name(document.activeElement);
+
+function log(events: string[], el: Element, types: string[]): void {
+  for (const type of types) {
+    el.addEventListener(type, () => events.push(`${name(el)}:${type}`), true);
+  }
+}
+
+function raw(inner: string, attrs = ""): { outside: HTMLInputElement; dialog: HTMLDialogElement } {
+  const host = document.createElement("div");
+  host.innerHTML = `<input data-testid="outside" value="hello" style="display:block;margin:200px 0 0 300px">
+    <dialog popover="auto" data-testid="dlg" ${attrs} style="inset:auto;top:10px;left:10px;width:100px;height:60px">${inner}</dialog>`;
+  document.body.append(host);
+  cleanups.push(() => host.remove());
+  return {
+    outside: host.querySelector("input")!,
+    dialog: host.querySelector("dialog")!,
+  };
+}
+const cleanups: (() => void)[] = [];
+afterEach(() => {
+  for (const c of cleanups.splice(0)) c();
+});
+
+describe("R: raw platform", () => {
+  it.each([
+    ["focusable child", `<input data-testid="inner">`, ""],
+    ["no focusable", `<p>text</p>`, ""],
+    ["no focusable, tabindex=-1 on dialog", `<p>text</p>`, `tabindex="-1"`],
+    ["autofocus on a disabled child", `<button disabled autofocus>x</button><p>t</p>`, ""],
+    ["only an inert child", `<div inert><input data-testid="inner"></div>`, ""],
+  ])("R1 showPopover() focus: %s", (label, inner, attrs) => {
+    const { outside, dialog } = raw(inner, attrs);
+    outside.focus();
+    const events: string[] = [];
+    log(events, outside, ["blur", "focusout", "change"]);
+    dialog.showPopover();
+    out(`R1 ${label}`, { active: active(), outsideEvents: events });
+    dialog.hidePopover();
+    out(`R1 ${label} after hidePopover`, { active: active() });
+  });
+
+  it("R2 inert on the dialog around showPopover()", () => {
+    const { outside, dialog } = raw(`<input data-testid="inner">`);
+    outside.focus();
+    outside.setSelectionRange(2, 4);
+    const events: string[] = [];
+    log(events, outside, ["blur", "focusout", "focus", "focusin"]);
+    dialog.inert = true;
+    dialog.showPopover();
+    dialog.inert = false;
+    const duringShow = [...events];
+    out("R2 inert", {
+      active: active(),
+      open: dialog.matches(":popover-open"),
+      outsideEvents: duringShow,
+      selection: [outside.selectionStart, outside.selectionEnd],
+      innerFocusableAfter: (() => {
+        const inner = dialog.querySelector("input")!;
+        inner.focus();
+        const ok = document.activeElement === inner;
+        outside.focus();
+        return ok;
+      })(),
+    });
+    expect(active()).toBe("outside");
+    expect(dialog.matches(":popover-open")).toBe(true);
+    // Escape-equivalent hide: focus was not inside, so the platform restores nothing.
+    dialog.hidePopover();
+    out("R2 inert, hidePopover with focus outside", { active: active() });
+    expect(active()).toBe("outside");
+  });
+
+  it("R3 restore with .focus() after showPopover()", () => {
+    const { outside, dialog } = raw(`<input data-testid="inner">`);
+    outside.focus();
+    outside.setSelectionRange(2, 4);
+    const events: string[] = [];
+    log(events, outside, ["blur", "focusout", "focus", "focusin"]);
+    const inner = dialog.querySelector("input")!;
+    log(events, inner, ["focus", "blur"]);
+    const before = document.activeElement as HTMLElement;
+    dialog.showPopover();
+    before.focus({ preventScroll: true });
+    out("R3 restore", {
+      active: active(),
+      outsideEvents: events,
+      selection: [outside.selectionStart, outside.selectionEnd],
+    });
+  });
+
+  it("R4 timeline of a real click on an outside input while the popover is open", async () => {
+    const { outside, dialog } = raw(`<input data-testid="inner">`);
+    dialog.showPopover();
+    const events: string[] = [];
+    log(events, outside, ["pointerdown", "mousedown", "focus", "pointerup", "mouseup", "click"]);
+    dialog.addEventListener("beforetoggle", (e) =>
+      events.push(`dlg:beforetoggle(${(e as ToggleEvent).newState}) active=${active()}`),
+    );
+    dialog.addEventListener("toggle", (e) =>
+      events.push(`dlg:toggle(${(e as ToggleEvent).newState}) active=${active()}`),
+    );
+    await userEvent.click(outside);
+    await new Promise((r) => setTimeout(r, 50));
+    out("R4 timeline", { events, active: active() });
+  });
+
+  it("R5 re-show in toggle(closed), then Escape: where does focus return", async () => {
+    const { outside, dialog } = raw(`<input data-testid="inner">`);
+    const opener = document.createElement("button");
+    opener.dataset.testid = "opener";
+    dialog.before(opener);
+    cleanups.push(() => opener.remove());
+    opener.focus();
+    dialog.showPopover({ source: opener });
+    let reshow = true;
+    dialog.addEventListener("toggle", (e) => {
+      if ((e as ToggleEvent).newState === "closed" && reshow) dialog.showPopover({ source: opener });
+    });
+    await userEvent.click(outside);
+    await new Promise((r) => setTimeout(r, 50));
+    const afterReshow = active();
+    reshow = false;
+    await userEvent.keyboard("{Escape}");
+    await new Promise((r) => setTimeout(r, 50));
+    out("R5 baseline", { afterReshow, afterEscape: active(), open: dialog.matches(":popover-open") });
+  });
+});
+
+type Variant = "baseline" | "inert" | "restore";
+
+function Harness({ div }: { div: boolean }) {
+  return (
+    <div style={{ padding: "40px 160px" }}>
+      <Popover.Root open openChangeAction={() => {}} onOpenChange={() => {}}>
+        <Popover.Trigger data-testid="trigger" style={{ width: 100, height: 30 }}>
+          Filters
+        </Popover.Trigger>
+        <Popover.Popup
+          data-testid="popup"
+          aria-label="Filters"
+          style={{ width: 200, height: 120 }}
+          render={div ? <div /> : undefined}
+        >
+          <input data-testid="inner" />
+        </Popover.Popup>
+      </Popover.Root>
+      <input data-testid="outside" defaultValue="hello" style={{ display: "block", marginTop: 300 }} />
+      <button data-testid="outside-button" type="button">
+        Outside button
+      </button>
+    </div>
+  );
+}
+
+describe("L: library, controlled Popover whose parent keeps open={true}", () => {
+  const cases: [Variant, boolean][] = [
+    ["baseline", false],
+    ["baseline", true],
+    ["inert", false],
+    ["restore", false],
+  ];
+  it.each(cases)("L1 %s (div=%s)", async (variant, div) => {
+    render(<Harness div={div} />);
+    const popup = screen.getByTestId("popup");
+    await expect.poll(() => popup.matches(":popover-open")).toBe(true);
+    await quietPeriod(50, "initial open settles");
+    const initial = active();
+
+    // Emulate the candidate fix for every later show of a <dialog> (all of them are re-shows of a
+    // refused fact in this harness).
+    const original = HTMLElement.prototype.showPopover;
+    let reshows = 0;
+    HTMLElement.prototype.showPopover = function (this: HTMLElement, ...args: []) {
+      reshows++;
+      if (this.tagName !== "DIALOG" || variant === "baseline") return original.apply(this, args);
+      if (variant === "inert") {
+        const had = this.hasAttribute("inert");
+        this.setAttribute("inert", "");
+        try {
+          return original.apply(this, args);
+        } finally {
+          if (!had) this.removeAttribute("inert");
+        }
+      }
+      const before = document.activeElement;
+      const result = original.apply(this, args);
+      if (before instanceof HTMLElement && before !== document.body && !this.contains(before)) {
+        before.focus({ preventScroll: true });
+      }
+      return result;
+    };
+    cleanups.push(() => {
+      HTMLElement.prototype.showPopover = original;
+    });
+
+    const outside = screen.getByTestId<HTMLInputElement>("outside");
+    const events: string[] = [];
+    log(events, outside, ["focus", "blur"]);
+    log(events, screen.getByTestId("inner"), ["focus", "blur"]);
+
+    await user.click(outside);
+    await expect.poll(() => popup.matches(":popover-open")).toBe(true);
+    await quietPeriod(50, "re-show settles");
+    const afterClick = active();
+    const clickEvents = [...events];
+    await user.keyboard("X");
+    const typedInto = {
+      outside: outside.value,
+      inner: screen.getByTestId<HTMLInputElement>("inner").value,
+    };
+
+    // Then the keyboard: focus into the popup, Escape (refused again).
+    screen.getByTestId("inner").focus();
+    await user.keyboard("{Escape}");
+    await expect.poll(() => popup.matches(":popover-open")).toBe(true);
+    await quietPeriod(50, "re-show settles");
+    const afterEscape = active();
+
+    // And a click on empty space (body).
+    await userEvent.click(document.body, { position: { x: 5, y: 5 } });
+    await expect.poll(() => popup.matches(":popover-open")).toBe(true);
+    await quietPeriod(50, "re-show settles");
+    const afterBodyClick = active();
+
+    // Tab from wherever focus is.
+    await user.tab();
+    const afterTab = active();
+
+    out(`L1 ${variant} ${div ? "div" : "dialog"}`, {
+      initial,
+      reshows,
+      afterClick,
+      clickEvents,
+      typedInto,
+      afterEscape,
+      afterBodyClick,
+      afterTab,
+      inertLeft: popup.hasAttribute("inert"),
+    });
+  });
+});
