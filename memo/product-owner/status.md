@@ -426,3 +426,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Running: fix/159-remount-mid-close (incl. Popover check + M3 rows decision), docs/157-spec-slim-2 (conventions second pass + section-citation check L7).
 - Last: internal/ reorg (after #159). Then propose alpha.19 release (behaviour changes: B items, #158, dev warning texts).
 - Lesson: CHANGELOG is append-only — never ask agents to edit old entries.
+- MERGED docs/157-spec-slim-2 3e95868 (conventions 3,192→2,444 lines; split into internal-hooks.md, placement.md, testing.md; section-citation check in lint; CLAUDE.md updated). 3.9 → design/overlay-open-state.md still TODO after #159 merges.
+- IN FLIGHT at usage limit: fix/159-remount-mid-close (developer adding: report a lost dismissal from `attach`, wording fixes). Needs re-review of the new commit, then merge, then move 3.9.
+- Remaining: #159 merge, 3.9 move, internal/ reorg, then propose alpha.19 release.
