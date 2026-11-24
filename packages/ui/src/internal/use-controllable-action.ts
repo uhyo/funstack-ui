@@ -114,12 +114,13 @@ interface BurstEntry<T, Details> {
  * What the user intends (conventions 3.8 rule 1): the latest in-flight dispatch's `next`, else
  * `optimistic`. An explicit null check, not `?.next ?? optimistic`, which would drop an in-flight
  * dispatch of a nullish value (a pending reset to "nothing checked"). Handlers and effects only.
+ * An absent `latestInFlight` (a hook option the caller may leave out) means nothing in flight.
  */
 export function intendedValue<T>(
-  latestInFlight: () => { readonly next: T } | null,
+  latestInFlight: (() => { readonly next: T } | null) | undefined,
   optimistic: T,
 ): T {
-  const inFlight = latestInFlight();
+  const inFlight = latestInFlight === undefined ? null : latestInFlight();
   return inFlight === null ? optimistic : inFlight.next;
 }
 

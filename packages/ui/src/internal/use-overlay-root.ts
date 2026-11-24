@@ -6,7 +6,7 @@ import { callUrgentHandler } from "./call-urgent-handler.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { transitionTypes } from "./transition-types.js";
 import type { ActionDetails, ChangeAction, ChangeReason, UrgentChangeHandler } from "./types.js";
-import { useControllableAction } from "./use-controllable-action.js";
+import { intendedValue, useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
 import { useLatest } from "./use-latest.js";
 
@@ -298,7 +298,7 @@ export function useOverlayRoot<
   // deduplicates the StrictMode re-run of the mount reconciliation and recognises the library's
   // own `hidePopover()` echoing back through `toggle`.
   const intended = useCallback(
-    (): boolean => latestInFlight()?.next ?? committedOptimistic.current,
+    (): boolean => intendedValue(latestInFlight, committedOptimistic.current),
     [latestInFlight, committedOptimistic],
   );
 

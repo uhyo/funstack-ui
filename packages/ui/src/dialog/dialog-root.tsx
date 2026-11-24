@@ -9,6 +9,7 @@ import type {
   StateValue,
   UrgentChangeHandler,
 } from "../internal/types.js";
+import { intendedValue } from "../internal/use-controllable-action.js";
 import { useOverlayRoot } from "../internal/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
@@ -147,7 +148,7 @@ export function DialogRoot({
   // re-open), so the commit that shows it clears it.
   const closeReturnValue = useRef<string | undefined>(undefined);
   useInsertionEffect(() => {
-    if (latestInFlight()?.next ?? optimistic) closeReturnValue.current = undefined;
+    if (intendedValue(latestInFlight, optimistic)) closeReturnValue.current = undefined;
   });
   const takeCloseReturnValue = useCallback((): string => {
     const value = closeReturnValue.current;

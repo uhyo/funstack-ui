@@ -10793,3 +10793,15 @@ keeps its own fallback for "no target" (Slider: the current value, else the plat
 Select: the current value; NumberField and Combobox: `null`; Combobox's text: `""`), so the edge
 case of a Root that became controlled after an uncontrolled mount is unchanged. Sections changed:
 the conventions 3.8 helper table (new row), the 9.1 file listing.
+
+## 2026-11-24, #157: every intent read through `intendedValue`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 3). Internal only, no
+behaviour change. The six inline `latestInFlight()?.next ?? x` reads (`useNativeChecked` twice,
+Accordion twice, Dialog.Root's `returnValue` clear, `useOverlayRoot`'s `intended()`) call
+`intendedValue`. Every one of them reads a boolean or a set, never nullish, so the explicit null
+check changes nothing. `intendedValue` accepts an absent `latestInFlight` (`useNativeChecked`'s
+option is optional). Dialog.Root calls `intendedValue(latestInFlight, optimistic)` rather than
+`intended()`, which reads the optimistic value through `useLatest`: the same value at that point,
+but only by insertion-effect order. Sections changed: the conventions 3.8 helper table
+(`intendedValue` row).

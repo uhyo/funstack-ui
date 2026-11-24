@@ -20,7 +20,7 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
+import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -346,7 +346,7 @@ export function AccordionRoot(props: AccordionRootProps) {
       // intends (the latest in-flight dispatch, else the optimistic set), never on the DOM: a
       // pending optimistic open would otherwise be lost to latest-wins. Exclusive mode therefore
       // lets the toggled item win when it opened (design walkthrough 9.6).
-      const base = latestInFlight()?.next ?? optimistic;
+      const base = intendedValue(latestInFlight, optimistic);
       const next = reduce(base, item, open, exclusive);
       if (setsEqual(next, base)) return;
       dispatchChange(next, item, open, "platform", event);
@@ -361,7 +361,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   // and no event; disabled items are simply put back. Runs once per mount; the StrictMode re-run
   // is deduplicated against the dispatch just made.
   const reconcileOnMount = useEffectEvent(() => {
-    const base = latestInFlight()?.next ?? optimistic;
+    const base = intendedValue(latestInFlight, optimistic);
     const mismatches: { item: string; open: boolean }[] = [];
     for (const [element, item] of sortedItems()) {
       const want = committed.has(item);
