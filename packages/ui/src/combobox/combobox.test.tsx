@@ -51,6 +51,12 @@ import type {
   ComboboxValueChangeDetails,
 } from "./index.js";
 import { spyHide, watchShow } from "../__tests__/overlay-helpers.js";
+import {
+  createOverlayHarness,
+  describeOverlayOpenState,
+  popoverLikeDriver,
+} from "../__tests__/overlay-open-state-suite.js";
+import { ComboboxContext } from "./combobox-context.js";
 
 type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
@@ -206,6 +212,80 @@ async function typeText(user: ReturnType<typeof setupUser>, text: string) {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+interface OpenStateHarnessProps {
+  trigger?: Partial<ComboboxTriggerProps> | false;
+  popup?: Partial<ComboboxPopupProps>;
+  /** Popup content; default: a List (`content`) with two options, the second `close`. */
+  content?: ReactNode;
+}
+
+/** The parity harness of the shared open-state suite (`createOverlayHarness`). */
+const OpenStateHarness = createOverlayHarness<ComboboxOpenChangeDetails, OpenStateHarnessProps>(
+  (rootProps, { trigger, popup, content }) => (
+    <Combobox.Root {...rootProps}>
+      <Combobox.Label>Country</Combobox.Label>
+      <Combobox.Input data-testid="input" />
+      {trigger !== false && (
+        <Combobox.Trigger data-testid="trigger" aria-label="Show all" {...trigger} />
+      )}
+      <Combobox.Popup data-testid="popup" {...popup}>
+        {content ?? (
+          // The List carries `content`: the top-level element of the Popup's content, which
+          // `keepMounted`'s Activity hides with `display: none`.
+          <Combobox.List data-testid="content">
+            <Combobox.Option value="jp">Japan</Combobox.Option>
+            <Combobox.Option value="fr" data-testid="close">
+              France
+            </Combobox.Option>
+          </Combobox.List>
+        )}
+      </Combobox.Popup>
+    </Combobox.Root>
+  ),
+);
+
+// #157 safety net (memo/reviewer/refactor-test-safety.md 2.5): Combobox's open state is the same
+// useOverlayRoot contract as Popover's and Menu's, and had the shared suite in no project. The
+// part-initiated closes are an option's selection and a Trigger click while open (a
+// `popovertarget` invoker, as Popover's and Menu's); a dismissal is a `hidePopover()` (Escape,
+// light dismiss).
+describeOverlayOpenState<ComboboxOpenChangeDetails>({
+  ...popoverLikeDriver(),
+  name: "Combobox",
+  Harness: OpenStateHarness,
+  // Every library show names the Input as its source (the anchor), not the Trigger.
+  openArgs: () => [{ source: screen.getByTestId("input") }],
+  controlledOpenArgs: [{ source: expect.any(HTMLInputElement) }],
+  partCloses: [
+    {
+      name: "an option",
+      close: (user) => user.click(screen.getByTestId("close")),
+      cancelsClick: false,
+      closeArgs: [],
+      returnsFocus: false,
+    },
+    {
+      name: "the Trigger",
+      close: (user) => user.click(screen.getByTestId("trigger")),
+      cancelsClick: true,
+      closeArgs: [],
+      returnsFocus: false,
+    },
+  ],
+  closeIntents: {
+    render: (probe) => (
+      <Combobox.Root defaultOpen>
+        {probe}
+        <Combobox.Input aria-label="Probe" />
+        <Combobox.Popup data-testid="popup">
+          <Combobox.List aria-label="Probe" />
+        </Combobox.Popup>
+      </Combobox.Root>
+    ),
+    useIntents: () => use(ComboboxContext)!.popover,
+  },
 });
 
 describe("Combobox", () => {
