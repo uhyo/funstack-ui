@@ -565,6 +565,44 @@ describe("NumberField", () => {
       expect(onCommit.mock.calls[1]![0]).toBe(1);
     });
 
+    it("a press whose first tick steps nothing shows the current value, not an earlier gesture's", async () => {
+      const onCommit = vi.fn<Fn>();
+      function External() {
+        const [value, setValue] = useState<number | null>(1);
+        return (
+          <>
+            <NumberField.Root
+              data-testid="root"
+              locale="en-US"
+              value={value}
+              valueChangeAction={(next) => setValue(next)}
+              valueCommitAction={onCommit}
+            >
+              <Parts />
+            </NumberField.Root>
+            <button type="button" onClick={() => setValue(10)}>
+              set 10
+            </button>
+          </>
+        );
+      }
+      render(<External />);
+      // An earlier gesture leaves its value (2) behind.
+      key("ArrowUp");
+      await flushMicrotasks();
+      expect(input().value).toBe("2");
+      fireEvent.click(screen.getByText("set 10"));
+      expect(input().value).toBe("10");
+      // From the draft 9, + reaches 10: the shown value, so the first tick steps nothing.
+      typeText("9");
+      pointer("pointerDown", inc());
+      expect(input().value).toBe("10");
+      pointer("pointerUp", inc());
+      await flushMicrotasks();
+      expect(input().value).toBe("10");
+      expect(onCommit).toHaveBeenCalledTimes(1);
+    });
+
     it("contextmenu during the hold is prevented; not otherwise", () => {
       render(<Fixture mode="uncontrolled" />);
       expect(fireEvent.contextMenu(inc())).toBe(true);

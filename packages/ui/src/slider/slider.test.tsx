@@ -526,6 +526,38 @@ describe("Slider", () => {
       expect(onCommit).toHaveBeenCalledTimes(1);
     });
 
+    it("several inputs before one change are one gesture from the value shown before the first", async () => {
+      const onChange = vi.fn<ChangeFn>();
+      const onCommit = vi.fn<CommitFn>();
+      render(<Fixture mode={mode} onChange={onChange} onCommit={onCommit} />);
+      const step = (value: number) => {
+        setNativeValue(thumbInput(), String(value));
+        thumbInput().dispatchEvent(new Event("input", { bubbles: true }));
+      };
+      const change = () => thumbInput().dispatchEvent(new Event("change", { bubbles: true }));
+      // 40 -> 41 -> 42, then the change: one commit of the last value.
+      act(() => {
+        step(41);
+        step(42);
+        change();
+      });
+      await flushMicrotasks();
+      expect(onChange.mock.calls.map(([next]) => next)).toEqual([41, 42]);
+      expect(onCommit).toHaveBeenCalledTimes(1);
+      expect(onCommit.mock.calls[0]![0]).toBe(42);
+      expect(onCommit.mock.calls[0]![1].event?.type).toBe("change");
+      // 42 -> 43 -> back to 42, then the change: the gesture began at 42, nothing to commit.
+      act(() => {
+        step(43);
+        step(42);
+        change();
+      });
+      await flushMicrotasks();
+      expect(onChange.mock.calls.map(([next]) => next)).toEqual([41, 42, 43, 42]);
+      expect(onCommit).toHaveBeenCalledTimes(1);
+      expect(thumbInput().value).toBe("42");
+    });
+
     it("adds the step and commit transition types", async () => {
       // Observable only through a ViewTransition; here: the actions run inside transitions, so a
       // suspending parent update keeps the old content (see "suspending content").
