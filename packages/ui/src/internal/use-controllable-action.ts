@@ -74,7 +74,7 @@ export interface ControllableAction<T, Details extends ActionDetails> {
    */
   readonly adopt: (next: T) => void;
   /**
-   * A fact (#148, design/components/overlay-open-change.md 2.5): `next` is already true in the DOM
+   * A fact (#148, conventions 3.9.5): `next` is already true in the DOM
    * (the browser hid a popup the library did not hide). Supersedes every dispatch in flight (none
    * of them commits uncontrolled state; a later rejection is reported, not thrown), makes `next`
    * the in-flight intent, drops the optimistic patches of those dispatches, and in uncontrolled

@@ -119,7 +119,7 @@ export function usePopoverPopup(
   // from a commit that lands in between (design 2.5).
   const awaitingClose = useRef(false);
   // Set right before the library's own `hidePopover()` (the apply effect), consumed by the next
-  // `toggle`: that hide is the library's, every other is a fact (overlay-open-change.md 2.2). The
+  // `toggle`: that hide is the library's, every other is a fact (conventions 3.9.2). The
   // echo is recognised by its source, as Dialog's `libraryClose`, not by what is intended: a
   // dismissal during a pending part close is a fact and must be reported.
   const libraryHide = useRef(false);
@@ -257,7 +257,7 @@ export function usePopoverPopup(
   // in flight, the DOM follows committed state. One effect covers the normal open, `defaultOpen`,
   // a controlled open or close, a library-driven close after `openChangeAction(false)` settled,
   // the re-open of a dismissal a controlled parent refused (in the fact's own commit, or once the
-  // requests it superseded settled: overlay-open-change.md 2.4), and the close after a refused or
+  // requests it superseded settled: conventions 3.9.4), and the close after a refused or
   // failed pre-hydration open. The Root's value is memoised, so an unrelated Root render does not
   // re-render the Popup and does not run this; every path that makes the DOM diverge from state
   // goes through a dispatch, whose `pending` flips do, or a fact, whose `epoch` does. Do not rely
@@ -354,7 +354,7 @@ export function usePopoverPopup(
       if (isLibrary) {
         exit.afterClose(element, echo);
         // Anything but the library's own hide is a fact: committed `false` now (urgent, this
-        // event's commit) and `onOpenChange(false)` (overlay-open-change.md 2.3).
+        // event's commit) and `onOpenChange(false)` (conventions 3.9.3).
         if (!echo) {
           refusedFact.current = true;
           ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");

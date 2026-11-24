@@ -559,7 +559,7 @@ describe("Menu (browser)", () => {
         leaveActEnvironment();
         await mouse.pressOn(item("delete"), { moveFirst: true });
         // Light dismiss of the nested popover (a press in the parent menu: a fact), or the hover
-        // close (a request the library holds, `reason: "dismiss"`; overlay-open-change.md 2.2):
+        // close (a request the library holds, `reason: "dismiss"`; conventions 3.9.2):
         // either way a dismissal. The root stays shown through its pending close.
         await expect.poll(() => isOpen(subElement)).toBe(false);
         await expect.poll(() => subCloses.at(-1)?.[1]).toBe(false);
@@ -1239,8 +1239,8 @@ describe("Menu (browser)", () => {
       const toggles: string[] = [];
       popup().addEventListener("toggle", (event) => toggles.push((event as ToggleEvent).newState));
       await user.keyboard("{Escape}");
-      // Hidden by the platform, then shown again in the fact's own commit (overlay-open-change.md
-      // 2.4): the parent was told `false` and kept `open={true}`.
+      // Hidden by the platform, then shown again in the fact's own commit (conventions
+      // 3.9.4): the parent was told `false` and kept `open={true}`.
       await settle(() => expect(fact).toHaveBeenCalledTimes(1));
       await expect.poll(() => isOpen()).toBe(true);
       // The test's listener runs after the library's, whose fact commit (a microtask after that

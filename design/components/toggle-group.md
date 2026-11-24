@@ -1,20 +1,10 @@
 # ToggleGroup and Toolbar
 
-Status: **Accepted by the product owner** (2026-10-18, GitHub issue #66, wave 6). Draft 90d9375; recommendations 1-12 accepted as written.
-Implementation d5af7f5 (playground 5068d22, docs a621645), the review
-`memo/reviewer/toggle-group-toolbar.md` (d03c398, "acceptable with minor fixes") and its fixes
-881cb37 (library, tests) and b185942 (docs) are folded in on 2026-10-18: see "Implementation and
-review fold (#66)" and "Open questions" at the end. The code under `packages/ui/src/toggle-group/`,
+Status: **accepted**. Follows `design/conventions.md`; where this document and the conventions
+disagree, the conventions win. The code under `packages/ui/src/toggle-group/`,
 `packages/ui/src/toolbar/` and `packages/ui/src/internal/use-roving-focus.ts` is the ground truth
-where this document is silent. Wave 7 (tracker #78, 2026-10-18): sections 17 and 18 make #74
-(native radios inside a Toolbar, probed in Chromium) and #75 (Tooltip's composite check) ready to
-implement; accepted in advance by the product owner on the condition, met, that the probe confirms
-the proposal. Implemented in 5eef360 (library, Tooltip), 9e6feba (docs) and 2a836ec (WebKit test
-branch); the developer's three deviations (`memo/developer/toggle-group.md`, "Wave 7") are folded
-into 17.1, 17.2, 18 and rows 25, 27 and 28.
-Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
-conventions win. The conventions amendments this design asks for are listed at the end and were
-applied to `design/conventions.md` in the same commit, marked as pending this design's acceptance.
+where this document is silent. History (drafts, reviews, the removed `Toolbar.Button` part,
+implementation notes, the test plan): `design/CHANGELOG.md`, parts "toggle-group.md".
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/wave6.md` section 1 (probes in
 `memo/platform-researcher/probes/15-wave6/`), `design/components/toggle.md` (the element a
@@ -37,20 +27,20 @@ the items and pending exposed.
 
 | # | Topic | Decision |
 | --- | --- | --- |
-| 1 | Anatomy | Two namespaces. `ToggleGroup.Root` (`div role="group"`) and `ToggleGroup.Item` (`button type="button" aria-pressed`, the same element and states as `Toggle`). `Toolbar.Root` (`div role="toolbar" aria-orientation`), `Toolbar.Button` (a pure-trigger `button` with `action`, focusable when disabled) and `Toolbar.Separator` (`hr aria-orientation`). No `Toolbar.Group`, `Toolbar.Link`, `Toolbar.Input` or `Toolbar.ToggleGroup`: a Toolbar's items are its focusable descendants, found in the DOM, so library parts and plain elements join without wrappers. |
+| 1 | Anatomy | Two namespaces. `ToggleGroup.Root` (`div role="group"`) and `ToggleGroup.Item` (`button type="button" aria-pressed`, the same element and states as `Toggle`). `Toolbar.Root` (`div role="toolbar" aria-orientation`) and `Toolbar.Separator` (`hr aria-orientation`). No `Toolbar.Button`, `Toolbar.Group`, `Toolbar.Link`, `Toolbar.Input` or `Toolbar.ToggleGroup`: a command button is `Button` from `@funstack/ui/button`, which stays focusable when disabled inside a Toolbar (`button.md` 7.3), and a Toolbar's items are its focusable descendants, found in the DOM, so library parts and plain elements join without wrappers. |
 | 2 | Value model | Discriminated on `exclusive`, as Accordion: `exclusive` → `value: string \| null`; otherwise `string[]` (the default, as `Toggle` 10 forecast). One `ToggleGroupValueChangeDetails = { added, removed }` for both modes (conventions 2.2, set-valued diff); `next` and `state.value` in document order. |
 | 3 | Deselecting in exclusive mode | **Allowed by default**: pressing the pressed Item releases it (`null`). `deselectable={false}` keeps one Item pressed (a view switcher); it exists only on the `exclusive` props variant. An exclusive, required *form* choice is a RadioGroup, not a ToggleGroup (research 1.2). |
 | 4 | Semantics | `aria-pressed` Items in `role="group"` in both modes; no `aria-orientation` on the group (not allowed on `group`), `data-orientation` only. Arrows move focus and never press. |
 | 5 | Roving focus | One internal engine, `useRovingFocus` (`src/internal/use-roving-focus.ts`), shared by `Toolbar.Root` and a standalone `ToggleGroup.Root`. It finds its items in the DOM and **writes `tabindex` through the DOM** (the items render none), so arbitrary focusable children of a Toolbar join the sequence. Before hydration every item is a Tab stop; after it, one. |
-| 6 | Entry item | Toolbar: the last focused item (APG "may restore the last focused control"); on first entry **the first item, `aria-disabled` or not** (product-owner decision after review finding 1: native `focusgroup` enters there too, and the two paths must agree). Standalone ToggleGroup: the first pressed enabled Item (document order), else the first Item, like radios; while focus is inside, the focused Item is the stop, and the stop returns to the pressed Item when focus leaves (`onBlur`), as native `nomemory` + `focusgroupstart` behave. |
+| 6 | Entry item | Toolbar: the last focused item (APG "may restore the last focused control"); on first entry **the first item, `aria-disabled` or not** (native `focusgroup` enters there too, and the two paths must agree). Standalone ToggleGroup: the first pressed enabled Item (document order), else the first Item, like radios; while focus is inside, the focused Item is the stop, and the stop returns to the pressed Item when focus leaves (`onBlur`), as native `nomemory` + `focusgroupstart` behave. |
 | 7 | Toolbar wrap | `loop` defaults to **`true`**, as Tabs and Menu (Base UI and Radix loop too). The native path renders the `wrap` token so both paths agree; the native default (`nowrap`) is overridden on purpose. |
 | 8 | Text-entry items | An item that owns arrow keys (`input` other than button-like types, `textarea`, `select`, `[contenteditable]`, `role` `textbox` / `combobox` / `spinbutton` / `slider`) keeps its arrows, Home and End; **Tab / Shift+Tab from it move to the next / previous toolbar item while one exists**, which is what Chromium's `focusgroup="toolbar"` does. APG's advice (one such control, last) is in the docs. |
 | 9 | `Menu.Trigger` in a Toolbar | Horizontal: unchanged (ArrowDown / ArrowUp open with the first / last item focused; Left / Right are the Toolbar's). **Vertical: the trigger opens on the inline-end arrow (ArrowRight; ArrowLeft under `direction: rtl`) with the first item focused**, and leaves ArrowDown / ArrowUp to the Toolbar, the way `Menu.SubmenuTrigger` opens on the perpendicular axis. Read from `ToolbarContext`. |
 | 10 | ToggleGroup inside Toolbar | Detected through `ToolbarContext` (works under SSR). The group renders `role="group"` with no engine, no `focusgroup`, no `focusgroupstart`; its Items are plain members of the Toolbar's sequence (React Aria's `isInToolbar`). `orientation`, `loop` and `experimental_focusgroup` on such a group are ignored with a dev warning. The group is transparent to the arrow keys (no extra Up / Down within the group; see 7.3). |
 | 11 | `experimental_focusgroup` | On `Toolbar.Root`: `focusgroup="toolbar inline\|block wrap\|nowrap"`. On a standalone `ToggleGroup.Root`: `focusgroup="toolbar inline\|block wrap\|nowrap nomemory"` with `focusgroupstart` on the first pressed Item (the `toolbar` token with an explicit `role="group"`, which wins over the inferred role). Detection as Tabs and Menu (`"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore`, #43); where native, the engine writes no `tabindex` and handles no navigation key. |
-| 12 | Pending and optimistic | `ToggleGroup.Root` owns `useControllableAction` with a patch reducer (multiple mode; none in exclusive mode, 5.2); `Item` renders optimistic `aria-pressed`; `data-pending` on the Root and on each Item whose optimistic pressed state differs from the committed one (CheckboxGroup 5.3). `Toolbar.Button` runs its `action` through `useActionTrigger` with its own `data-pending`. |
-| 13 | Disabled | `ToggleGroup.Item` and `Root disabled`: native `disabled` (as `Toggle`), skipped by the roving sequence. `Toolbar.Button disabled`: `aria-disabled="true"`, focusable and in the sequence (APG Toolbar example: "so screen reader users are aware of their presence"), never dispatches. |
-| 14 | ViewTransition | `transition` on `ToggleGroup.Item` and `Toolbar.Button` (their content can key on `pending`, the Toggle rule); none on the Roots or the Separator. Types `fsui-toggle-group`, `fsui-toggle-group-press` (`added` non-empty), `fsui-toggle-group-release` (`removed` non-empty); Toolbar emits none. |
+| 12 | Pending and optimistic | `ToggleGroup.Root` owns `useControllableAction` with a patch reducer (multiple mode; none in exclusive mode, 5.2); `Item` renders optimistic `aria-pressed`; `data-pending` on the Root and on each Item whose optimistic pressed state differs from the committed one (CheckboxGroup 5.3). A `Button` in a Toolbar carries its own `data-pending` (`button.md` 5). |
+| 13 | Disabled | `ToggleGroup.Item` and `Root disabled`: native `disabled` (as `Toggle`), skipped by the roving sequence. A `Button disabled` inside a Toolbar: `aria-disabled="true"`, focusable and in the sequence (APG Toolbar example: "so screen reader users are aware of their presence"), never dispatches (`button.md` 7.3). |
+| 14 | ViewTransition | `transition` on `ToggleGroup.Item` (its content can key on `pending`, the Toggle rule); none on the Roots or the Separator. Types `fsui-toggle-group`, `fsui-toggle-group-press` (`added` non-empty), `fsui-toggle-group-release` (`removed` non-empty); Toolbar emits none. |
 | 15 | Files | `src/toggle-group/`, `src/toolbar/`, `src/internal/use-roving-focus.ts`, `src/internal/toolbar-context.ts`; every part file is `"use client"`. `Menu.Trigger` gains a context read; `Toggle` is untouched. |
 
 ---
@@ -66,7 +56,7 @@ Toolbar.Root            div role="toolbar" aria-orientation       roving-focus o
   ToggleGroup.Root      div role="group"                          joins the Toolbar's sequence; no engine of its own
     ToggleGroup.Item    button aria-pressed
   Toolbar.Separator     hr aria-orientation
-  Toolbar.Button        button type="button" [aria-disabled]      pure trigger: action, data-pending
+  Button                button type="button" [aria-disabled]      from @funstack/ui/button; focusable when disabled here
   Menu.Root / Menu.Trigger, Popover.Trigger, Dialog.Trigger, Toggle, Tooltip.Trigger,
   a plain <button>, <a href>, <input>                              all items: found in the DOM
 ```
@@ -154,6 +144,7 @@ const [styles, setStyles] = useState<string[]>(doc.styles);
 import { Toolbar } from "@funstack/ui/toolbar";
 import { ToggleGroup } from "@funstack/ui/toggle-group";
 import { Menu } from "@funstack/ui/menu";
+import { Button } from "@funstack/ui/button";
 
 <Toolbar.Root aria-label="Formatting">
   <ToggleGroup.Root aria-label="Text style" value={styles} valueChangeAction={saveStyles}>
@@ -173,9 +164,9 @@ import { Menu } from "@funstack/ui/menu";
       <Menu.Item action={insertTable}>Table</Menu.Item>
     </Menu.Popup>
   </Menu.Root>
-  <Toolbar.Button action={cut}>Cut</Toolbar.Button>
-  <Toolbar.Button action={copy} disabled={!hasSelection}>Copy</Toolbar.Button>
-  <Toolbar.Button action={paste}>Paste</Toolbar.Button>
+  <Button action={cut}>Cut</Button>
+  <Button action={copy} disabled={!hasSelection}>Copy</Button>
+  <Button action={paste}>Paste</Button>
   {/* A text-entry control owns its arrow keys; put at most one in a toolbar, and last (APG). */}
   <input type="text" aria-label="Font size" inputMode="numeric" />
 </Toolbar.Root>
@@ -191,8 +182,8 @@ every control in the DOM.
 
 ```tsx
 <Toolbar.Root orientation="vertical" aria-label="Tools">
-  <Toolbar.Button action={select}>Select</Toolbar.Button>
-  <Toolbar.Button action={draw}>Draw</Toolbar.Button>
+  <Button action={select}>Select</Button>
+  <Button action={draw}>Draw</Button>
   <Menu.Root>
     <Menu.Trigger>Shapes</Menu.Trigger>
     <Menu.Popup side="right">…</Menu.Popup>
@@ -425,54 +416,14 @@ which is urgent and lives outside React (section 6).
 Owned keys: `role`, `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocus`, `onBlur`,
 `onPointerDown` (all omitted from the props type), and `focusgroup` while the flag is on.
 
-### 3.4 `Toolbar.Button`
+### 3.4 Command buttons: `Button`
 
-> **Superseded (2026-10-22, Button #79).** `Toolbar.Button` is removed; a toolbar's command button
-> is `Button` from `@funstack/ui/button`, which reads `ToolbarContext` and renders `disabled` as
-> `aria-disabled` inside a toolbar exactly as this part did, and additionally ignores activation
-> while its own action is pending. See `design/components/button.md` 7.3 (what goes, migration)
-> and 15.4 (the `toolbar/index.ts` and test changes). The text below is kept as the historical
-> record of the accepted #66 design.
-
-```ts
-// packages/ui/src/toolbar/toolbar-button.tsx
-export interface ToolbarButtonActionDetails extends ActionDetails {}
-
-export interface ToolbarButtonState {
-  /** This button's action is in flight. */
-  readonly pending: boolean;
-  readonly disabled: boolean;
-}
-
-export interface ToolbarButtonProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "type" | "tabIndex" | "aria-disabled" | "className" | "style" | "children"> {
-  /** Runs inside this button's own transition on click, Enter or Space. Sync or async; rejections reach the nearest Error Boundary. */
-  action?: Action<[details: ToolbarButtonActionDetails]>;
-  /**
-   * `aria-disabled="true"`: the button stays focusable and in the arrow-key sequence so
-   * assistive technology still finds it (APG Toolbar example), and never dispatches.
-   */
-  disabled?: boolean;
-  /** Animates the commit that ends the action (content keyed on `pending`), not a click. */
-  transition?: ViewTransitionClass;
-  className?: StateValue<string | undefined, ToolbarButtonState>;
-  style?: StateValue<CSSProperties | undefined, ToolbarButtonState>;
-  children?: StateValue<ReactNode, ToolbarButtonState>;
-  render?: RenderProp<ComponentPropsWithRef<"button">, ToolbarButtonState>;
-}
-```
-
-`Toolbar.Button` is the library's first plain action button. It is scoped to the Toolbar because its
-one distinguishing behaviour, focusable-disabled, is the Toolbar pattern's; a general `Button` is a
-separate design. It runs `action` through `useActionTrigger` (conventions 3.4) with no open
-generation: `pending` is its own transition, a superseded run's rejection is surfaced from render,
-and `data-pending` lands on the button. A plain `<button onClick>` is still a legitimate toolbar
-item; `Toolbar.Button` is what a consumer reaches for when the click is a transition. Owned keys:
-`type` (on a `<button>` only), `aria-disabled`, `data-pending`, `data-disabled`, `onClick`.
-
-Before hydration a click on it does nothing (no command, no form): the part has no residual browser
-path and no mount reconciliation. A `render={<a href />}` navigates natively before hydration and
-dispatches `action` after it, as `Menu.Item` does.
+The Toolbar has no button part. A toolbar's command button is `Button` from
+`@funstack/ui/button` (`design/components/button.md`): it reads `ToolbarContext` and, inside a
+Toolbar, renders `disabled` as `aria-disabled="true"`, so the button stays focusable and in the
+arrow-key sequence and never dispatches (`button.md` 7.3). Its `action`, `pending`,
+`whilePending` and `transition` are `Button`'s own. A plain `<button onClick>` is a legitimate
+toolbar item too; `Button` is what a consumer reaches for when the click is a transition.
 
 ### 3.5 `Toolbar.Separator`
 
@@ -505,9 +456,8 @@ export type { ToggleGroupRootProps, ToggleGroupMultipleProps, ToggleGroupExclusi
 export type { ToggleGroupItemProps, ToggleGroupItemState } from "./toggle-group-item.js";
 
 // src/toolbar/index.ts
-export const Toolbar = { Root: ToolbarRoot, Button: ToolbarButton, Separator: ToolbarSeparator } as const;
+export const Toolbar = { Root: ToolbarRoot, Separator: ToolbarSeparator } as const;
 export type { ToolbarRootProps, ToolbarRootState, ToolbarOrientation } from "./toolbar-root.js";
-export type { ToolbarButtonProps, ToolbarButtonState, ToolbarButtonActionDetails } from "./toolbar-button.js";
 export type { ToolbarSeparatorProps, ToolbarSeparatorState } from "./toolbar-separator.js";
 ```
 
@@ -523,7 +473,6 @@ Subpaths `@funstack/ui/toggle-group` and `@funstack/ui/toolbar`; both re-exporte
 | ToggleGroup `pending` | library-owned | `ToggleGroup.Root` | `data-pending` on Root; on Items per 5.3 | `useTransition()` of the Root |
 | `disabled` | prop | Root, Item | native `disabled`, `data-disabled`, `:disabled` | prop (Item's own or inherited) |
 | `orientation` | prop | both Roots, Items, Separator | `data-orientation` (Toolbar also `aria-orientation`) | prop; inside a Toolbar the Toolbar's |
-| Toolbar.Button `pending` | library-owned | `Toolbar.Button` | `data-pending`, `state.pending` | `useActionTrigger` |
 | Roving tab stop (which item has `tabindex="0"`) | urgent, library-owned, **not React state** | the engine (Toolbar.Root; standalone ToggleGroup.Root) | `tabindex` written through the DOM | a ref updated on `focusin` / `pointerdown` and re-derived in layout effects (section 6) |
 
 Nothing here is browser-owned in the conventions' sense (no top layer, no native form state).
@@ -573,7 +522,7 @@ Tabs. A patch reducer is wrong here because an exclusive patch's `removed` is co
 optimistic value at dispatch time, not from what ends up committed. From `left`: press Center
 (rejects), press Right (resolves, `removed: [center]`) would replay to `{left, right}`; press
 Center (rejects), release Center (resolves, `next === null`) would replay to `{left}`, bringing
-back an Item the user moved away from (review finding 1 of #150). With no reducer both end on
+back an Item the user moved away from. With no reducer both end on
 the resolved action's `next`. Trade-off, accepted: in controlled exclusive mode the optimistic
 value no longer re-bases onto a parent change made while a press is pending; it shows `next`, as
 Tabs does.
@@ -633,7 +582,7 @@ optimistic and the committed set; no part renders the committed set in the DOM.
 ### 6.1 The problem a Toolbar poses
 
 A Toolbar's items are whatever the consumer puts in it: `ToggleGroup.Item`s, `Toggle`s,
-`Menu.Trigger`, `Popover.Trigger`, `Dialog.Trigger`, `Tooltip.Trigger`, `Toolbar.Button`, a plain
+`Menu.Trigger`, `Popover.Trigger`, `Dialog.Trigger`, `Tooltip.Trigger`, `Button`, a plain
 `<button>`, an `<a href>`, an `<input>`. APG wants one Tab stop and arrow keys between them. Tabs
 gets its single stop by rendering `tabindex` from state (`0` on the selected tab) because every tab is
 a library part that reads the List's context and the "current" item is a *value*. A Toolbar has
@@ -772,7 +721,7 @@ not requiring item parts. A standalone ToggleGroup has the same pre-hydration be
 | Nested `Toolbar.Root` | Its subtree is excluded from the outer items; the inner toolbar is its own sequence with its own stop (a toolbar inside a toolbar is not APG-sanctioned; supported only to the extent of not breaking). |
 | `ToggleGroup.Root` inside a Toolbar | No engine; the Toolbar's engine finds its Items (section 7.3). |
 | A `Menu.Popup` rendered inside the Toolbar subtree | Excluded (`[popover]`); its items belong to the menu. Tab closes the menu and lands per the menu's rule; the Toolbar's `focusin` then records the trigger. |
-| A `Popover.Popup`, `Dialog.Popup`, `Menu.Popup` or `Combobox.Popup` inside a Toolbar | Each renders `<ToolbarContext value={null}>` around its content (review finding 4), so a ToggleGroup inside the popup runs its own engine, a `Toolbar.Separator` takes its own default orientation and a `Menu.Trigger` keeps ArrowDown / ArrowUp: the popup's content is outside the toolbar, as the engine's `[popover]` / `dialog` exclusion already says. `Tooltip.Popup` and `Select` host no Toolbar readers and are unchanged. |
+| A `Popover.Popup`, `Dialog.Popup`, `Menu.Popup` or `Combobox.Popup` inside a Toolbar | Each renders `<ToolbarContext value={null}>` around its content, so a ToggleGroup inside the popup runs its own engine, a `Toolbar.Separator` takes its own default orientation and a `Menu.Trigger` keeps ArrowDown / ArrowUp: the popup's content is outside the toolbar, as the engine's `[popover]` / `dialog` exclusion already says. `Tooltip.Popup` and `Select` host no Toolbar readers and are unchanged. |
 | Two containers on one page | Independent engines; each writes only on its own items. |
 | StrictMode | The layout effect's double run re-applies the same values; the observer is disconnected in cleanup. |
 | `render={<ul />}` on `Toolbar.Root` | Fine: items are found by focusability, not by element type. |
@@ -805,7 +754,7 @@ add, unlike a toolbar command).
 | any of the above on a text-entry item | | | Not handled: the item keeps its caret / spin behaviour (6.3). |
 | `Tab` / `Shift+Tab` on a text-entry item | | | Next / previous toolbar item while one exists; otherwise native (6.3). |
 | `Tab` / `Shift+Tab` elsewhere | | | Native: leave the toolbar; re-enter on the remembered item (first entry: the first item, `aria-disabled` or not, as native `focusgroup` does). |
-| `Enter` / `Space` on `Toolbar.Button` | | | Native click → `action`, unless `aria-disabled`. |
+| `Enter` / `Space` on a `Button` | | | Native click → `action`, unless `aria-disabled` (`button.md` 5 and 7.3). |
 | a key the item handled (`event.defaultPrevented`) | | | Ignored by the Toolbar: a `Menu.Trigger`'s ArrowDown wins (horizontal), a `Dialog.Trigger`'s Enter is its own. |
 
 ### 7.3 `ToggleGroup` inside a `Toolbar`
@@ -842,7 +791,7 @@ alternative, giving up arrow opening in a vertical toolbar and leaving Enter / S
 orientations for no gain; the perpendicular key is discoverable by the same reasoning a submenu is.
 `ArrowLeft` (the inline-start key) on the trigger does nothing. The docs show `side="right"` on the
 `Menu.Popup` for this case, and `side="left"` under `direction: rtl`, where the trigger opens on
-ArrowLeft and the popup should sit on that side (review nit 10). `Enter` and `Space` open in every
+ArrowLeft and the popup should sit on that side. `Enter` and `Space` open in every
 case, as now.
 
 The trigger's handled arrow calls `preventDefault()`, so the Toolbar's handler sees
@@ -887,7 +836,7 @@ to be recorded in `memo/developer/cross-engine.md` by the implementer.
 | `ToggleGroup.Root` | `role="group"`, `data-orientation`, `data-pending`, `data-disabled`; standalone with the flag: `focusgroup`; `aria-label` / `aria-labelledby` pass through. **No `aria-orientation`** (not supported on `group`, research 1.2). |
 | `ToggleGroup.Item` | `type="button"` (on a `<button>`), `aria-pressed="true" \| "false"` (optimistic, never `"mixed"`), `disabled`, `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`; `tabindex` written by the engine on the JS path; `focusgroupstart` on the first pressed Item when standalone with the flag on (every engine) |
 | `Toolbar.Root` | `role="toolbar"`, `aria-orientation` (always emitted, as Tabs.List), `data-orientation`; with the flag: `focusgroup`; `aria-label` / `aria-labelledby` pass through (required by APG; docs) |
-| `Toolbar.Button` | `type="button"` (on a `<button>`), `aria-disabled="true"` when disabled (no native `disabled`), `data-pending`, `data-disabled`; `tabindex` by the engine |
+| `Button` (inside a Toolbar) | as `button.md` 4, with `aria-disabled="true"` when disabled (no native `disabled`); `tabindex` by the engine |
 | `Toolbar.Separator` | `<hr aria-orientation="vertical" \| "horizontal">` (perpendicular to the Toolbar), `data-orientation` (the same value) |
 
 Ids: none are needed (no `aria-controls`, no labelling between parts). Items are registered by
@@ -900,7 +849,6 @@ element, not id.
 | Part | `transition` | What it animates |
 | --- | --- | --- |
 | `ToggleGroup.Item` | yes | the commit that ends the group's action (a spinner keyed on `pending` leaving, a rollback, a snap-back); never the optimistic flip, which is a CSS-transition job on `[data-pressed]` (Toggle 7.2) |
-| `Toolbar.Button` | yes | the commit that ends its own action (content keyed on `pending`) |
 | `ToggleGroup.Root`, `Toolbar.Root`, `Toolbar.Separator` | no | nothing library-driven changes inside them; `data-pending` on the Root is a CSS job |
 
 Types (conventions 5.3): `fsui-toggle-group`, `fsui-toggle-group-press`, `fsui-toggle-group-release`
@@ -958,18 +906,11 @@ click Bold   → optimistic has bold → {removed:[bold]}, next = []; Bold NOT p
 both resolve → committed [] (latest wins)
 ```
 
-### 11.5 `Toolbar.Button` with a slow action, clicked twice
+### 11.5 A toolbar `Button` with a slow action, clicked twice
 
-> **Superseded (2026-10-22, Button #79).** With `Button` in place of `Toolbar.Button` the second
-> click is **ignored** while the first run is pending (`aria-disabled="true"` meanwhile), so the
-> walkthrough below no longer describes a toolbar button; see `design/components/button.md` 5.2
-> and 10 (walkthrough 2). With #81 (wave 9) the same holds for every pure trigger
-> (`Dialog.Close`, `Popover.Close`, `Menu.Item`, `Toast.Action`; `button.md` 16), so "both runs
-> execute" describes no part of the library any more. Kept as the historical record of the #66
-> design.
-
-`useActionTrigger`: both runs execute; `data-pending` stays until both settle; the second run's
-rejection is React's route, the first's is surfaced from render if it rejects. No optimistic state
+`Button`'s own rule (`button.md` 5 and 18): the default is `whilePending="run"`, so both runs
+execute and `data-pending` stays until both settle; with `whilePending="ignore"` the second click
+is dropped and the button renders `aria-disabled="true"` while pending. No optimistic state
 (nothing to show).
 
 ### 11.6 Dependent content that suspends
@@ -986,10 +927,10 @@ until the new preview's data is ready, then both land in one commit. The require
   (conventions 3.2). Content elsewhere keyed on the value is the consumer's and follows 11.6.
 - No `use()` inside either component; no Suspense boundary is required during SSR.
 - Errors: a ToggleGroup rejection reaches the boundary above `ToggleGroup.Root` (the owner); a
-  `Toolbar.Button` rejection reaches the boundary above that button (the part owns the transition).
+  `Button` rejection reaches the boundary above that button (the part owns the transition).
   Uncontrolled committed state is untouched by a rejection; a controlled parent vetoes by not
   updating. Caught-inside counts as success (conventions 2.4).
-- Overlap: 5.4 and 11.3; `Toolbar.Button` as `Menu.Item`.
+- Overlap: 5.4 and 11.3; a `Button` in a Toolbar per 11.5.
 - Entanglement (conventions 2.3 item 5): a slow `valueChangeAction` holds every other transition in
   the app; the docs show `void save(next)` for fire-and-forget.
 
@@ -998,7 +939,7 @@ until the new preview's data is ready, then both land in one commit. The require
 ## 13. Server Components and directives
 
 Every part file is `"use client"` (`toggle-group-root.tsx`, `toggle-group-item.tsx`,
-`toggle-group-context.ts`, `toolbar-root.tsx`, `toolbar-button.tsx`, `toolbar-separator.tsx`,
+`toggle-group-context.ts`, `toolbar-root.tsx`, `toolbar-separator.tsx`,
 `internal/toolbar-context.ts`, `internal/use-roving-focus.ts`); the two `index.ts` files carry no
 directive. A Server Component renders any part with serialisable props and a Server Function as
 `valueChangeAction` or `action` (2.6). `Toolbar.Separator` could be directive-free (it reads
@@ -1010,315 +951,21 @@ directive. A Server Component renders any part with serialisable props and a Ser
 
 ## 14. Test plan
 
-`src/toggle-group/toggle-group.test.tsx`, `src/toolbar/toolbar.test.tsx` and
-`src/internal/use-roving-focus.test.tsx` in jsdom; `src/toggle-group/toggle-group.browser.test.tsx`
-and `src/toolbar/toolbar.browser.test.tsx` in browser mode (Chromium, Firefox, WebKit). Rows marked
-(both) run under `renderBoth`. N/A rows for ToggleGroup: platform path (no residual browser path),
-urgent action, continuous control, form channel, inside a Field (not a form control). N/A for
-Toolbar: every action-state row except `Toolbar.Button`'s own sync / async / rejection / overlap /
-superseded rejection, which `useActionTrigger` gives it (tested as for `Menu.Item`).
-
-| # | Area | Project | Test |
-| --- | --- | --- | --- |
-| 1 | Roles and ARIA | jsdom | `ToggleGroup.Root` is `div[role="group"]` with `data-orientation`, no `aria-orientation`; Items are `button[type="button"][aria-pressed]`, never `"mixed"`; `data-pressed` / `data-pending` / `data-disabled` by presence. `Toolbar.Root` is `div[role="toolbar"][aria-orientation]`; `Toolbar.Button disabled` renders `aria-disabled="true"` and no `disabled`; `Toolbar.Separator` is `hr[aria-orientation]` perpendicular to the toolbar in both orientations. |
-| 2 | Value model (both) | jsdom | Multiple: click dispatches `(next, { added, removed })` with `next` in document order and a fresh array; exclusive: switch carries both `added` and `removed`, deselect gives `null` with `removed: [prev]`; `deselectable={false}` dispatches nothing on the pressed Item; disabled Items (own and Root) never dispatch; `details.event` is the native click (asserted via `details.event`). |
-| 3 | Async action (both) | jsdom | Deferred action: Item `aria-pressed` flips at once, `data-pending` on Root and the Item, sibling committed content unchanged; after resolve pending gone, content updated. Per-Item pending: a second click on the same Item clears its `data-pending` while the Root keeps it. |
-| 4 | Rejection (both) | jsdom | Rejected action reaches `<ErrorCatcher>` above the Root; optimistic reverts; uncontrolled committed unchanged. Caught-inside resolves and commits. |
-| 5 | Overlap | jsdom | Bold then Italic with two deferreds, resolved 2 → 1 and 1 → 2: final committed `[bold, italic]`; stacked patches re-base when 1 rejects. Settled changes (#150, uncontrolled multiple): 1 rejects before / after 2 resolves: committed `[italic]`, the rejection reported. Exclusive (uncontrolled, from `left`), both settle orders: a rejected press of Center then a resolved press of Right ends on Right alone; a rejected press of Center then a resolved release ends with nothing pressed. |
-| 6 | Superseded rejection (both) | jsdom | Reject 1 after 2 resolved, and while 2 pends: `reportError` (stubbed) is called once and the catcher is not; 2's outcome unaffected. |
-| 7 | Suspending content (both) | jsdom | 11.6 with `createSuspender`. |
-| 8 | Function props, `render` | jsdom | Root and Item `className` / `style` / `children` / `render` receive the documented state; `render={<MyButton />}` keeps dispatch, class merge, `ref`. `Toolbar.Button render={<a href />}` gets no `type`. |
-| 9 | Post-await rule | jsdom | Controlled parent updating after `await` inside `startTransition` converges in one state. |
-| 10 | Keyboard, standalone group | jsdom | Matrix `{horizontal, vertical} × {ArrowRight, ArrowLeft, ArrowDown, ArrowUp, Home, End}` with `loop` on and off; RTL swaps horizontal arrows (`direction: rtl` via style); disabled Items are skipped; arrows never dispatch; `preventDefault` on handled keys; modifier keys ignored. |
-| 11 | Roving tab stop, standalone group | jsdom | After mount exactly one Item has `tabindex="0"`: the first pressed enabled Item, else the first enabled; it follows the optimistic pressed Item after a click (and reverts on rollback); an Item mounted later (child-only re-render) gets `tabindex="-1"` through the observer; an Item with its own `tabIndex={-1}` is skipped by arrows. Before the layout effect (SSR string) no `tabindex` is rendered. |
-| 12 | Keyboard, Toolbar | jsdom | Same matrix over mixed children (`Toolbar.Button`, `Toggle`, plain `<button>`, `<a href>`, a disabled button, an `aria-disabled` `Toolbar.Button`): `disabled` skipped, `aria-disabled` reachable; memory: Tab out and back (focus `body`, then `tab()`) lands on the last focused item; first entry on the first item, `aria-disabled` included; the remembered item unmounting moves the stop to the first item. |
-| 13 | Text-entry items | jsdom | An `<input type="text">`, a `textarea`, a `[contenteditable]` and a `role="spinbutton"` in the toolbar: arrows and Home / End are not `preventDefault`ed and move nothing; Tab from the input moves to the next item, Shift+Tab to the previous; Tab from a last-placed input leaves the toolbar (focus not inside). |
-| 14 | ToggleGroup inside Toolbar | jsdom | One `tabindex="0"` in the whole toolbar; Left / Right flow through the group's Items and out the other side; the group renders no `focusgroup` even with `experimental_focusgroup` (warns once), and `orientation` / `loop` on it warn and are ignored; group `data-orientation` equals the Toolbar's; disabled Items skipped; the group's clicks still dispatch with correct `next`. |
-| 15 | `Menu.Trigger` in a Toolbar | jsdom | Horizontal: ArrowDown opens with the first item focused and the toolbar does not move (`defaultPrevented`); ArrowRight moves to the next item without opening. Vertical: ArrowRight opens with the first item focused (ArrowLeft under RTL); ArrowDown moves to the next item without opening; Enter still opens. Outside a toolbar: unchanged. A `Menu.Popup`'s items are not toolbar items (arrow from the trigger after close lands on the next toolbar item). |
-| 16 | `experimental_focusgroup` tokens | jsdom | `Toolbar.Root` renders `toolbar inline wrap`, `toolbar block nowrap` for vertical + `loop={false}`; standalone group adds `nomemory` and `focusgroupstart` on the first pressed Item, none when nothing is pressed; JS navigation still works in jsdom (no `focusGroup`); nested group renders none. |
-| 17 | Dev warnings | jsdom | `value` + `defaultValue` warns once; `exclusive` switch after mount warns; nested group's ignored props warn once each. |
-| 18 | Directive | script | Every part file in `dist/toggle-group/`, `dist/toolbar/`, `dist/internal/use-roving-focus.mjs` and `dist/internal/toolbar-context.mjs` starts with `"use client"`; the two `index.mjs` do not. |
-| 19 | `details.event` is virtual | jsdom | As Toggle row 21, for `ToggleGroupValueChangeDetails` and `ToolbarButtonActionDetails`. |
-| 20 | Native focusgroup path | browser | Chromium: with the flag, one Tab stop from outside (a `<button>` before and after the toolbar; `page.keyboard.press("Tab")` counts), items carry no `tabindex`, arrows and Home / End move (RTL mirrored), `disabled` skipped and `aria-disabled` reached, Tab from an `<input>` item goes to the next item, the nested `ToggleGroup` adds no Tab stop, Tab re-enters on the last focused item; standalone group: Tab enters on the pressed Item. Firefox and WebKit (`focusGroup` absent, `src/__tests__/engine.ts`): the same assertions hold through the JS path with the attribute inert. |
-| 21 | JS path parity | browser | Without the flag, Chromium runs the JS path: the row-20 assertions hold identically (guards decision 7 and 6.3 across paths). |
-| 22 | Safari click focus | browser | WebKit: clicking an item (which does not focus it) still makes it the Tab stop (`pointerdown` memory): Tab from outside lands on it. |
-| 23 | ViewTransition | browser | `{show && <ToggleGroup.Item />}` and `{show && <Toolbar.Button />}` mounted in a `startTransition`: `document.startViewTransition` called zero times without `transition`, once with `transition="none"` (conventions 10.1). |
-| 24 | Engine unit | jsdom | `use-roving-focus.test.tsx`: item discovery (focusable set, `[popover]` / `dialog` / nested toolbar / `inert` / `tabindex="-1"` exclusions), `entry` and `memory` modes, re-apply on observer records, `native: true` writes nothing. |
-| 25 | Radio unit, navigation (#74) | jsdom | Toolbar `b1`, a same-`name` group of three radios with the middle one checked, `b2`, a group with none checked, `b3`. ArrowRight from `b1` focuses the checked radio and checks nothing; ArrowLeft from `b2` the same; ArrowRight from `b2` and ArrowLeft from `b3` both focus the **first** radio of the unchecked group; Home / End from `b2` land on `b1` / `b3` (the toolbar's first and last items; the native path does the same, and the probe never pressed Home from a button); a separate toolbar whose first and last items are radio units: Home / End land on their representatives; on a radio, every arrow and Home / End is left unhandled (`defaultPrevented` false, focus unchanged in jsdom, which has no native radio navigation); `loop` wrapping from `b3` lands on `b1`, from `b1` backwards on `b3`. |
-| 26 | Radio unit, Tab (#74) | jsdom | Tab from the checked radio focuses `b2`; Shift+Tab from it focuses `b1`; Tab from an unchecked radio whose sibling is checked focuses that sibling, then `b2`; Tab from any radio of the unchecked group focuses `b3`, Shift+Tab `b2`; Tab from the last unit of a toolbar with nothing after it is not handled (leaves natively). `tabindex`: `0` on the representative while its unit is the stop and `-1` on the other radios of the unit; `-1` on every radio of a unit that is not the stop; after `focusin` on an unchecked radio, `0` moves to it. A `RadioGroup.Root` (fieldset) inside the toolbar behaves the same; `RadioGroup.Root disabled` removes the unit (`:disabled`). A `button[role="radio"]` is an ordinary item (arrows walk through it). |
-| 27 | Radio unit, both paths (#74) | browser | The row-25 and row-26 sequences on Chromium native (flag on) and on the JS path (flag off, and Firefox / WebKit): identical focus and `checked` results, including arrows checking and wrapping within the group (WebKit: stopping at the group's last radio, the browser's own radio behaviour; the row branches on the engine for that step, `server.browser`) and the "trapped horizontal arrows, leave with Tab" consequence; memory re-enters on the remembered radio. WebKit runs on CI only. |
-| 28 | Tooltip in a roving container (#75) | jsdom | A `Tooltip.Trigger` with `tabindex="-1"` written by the engine inside a standalone `ToggleGroup.Root` and inside a `Toolbar.Root` logs no #57 warning (before the selector change the row failed with three warnings: the check runs in a passive effect, after the engine's layout effect wrote `-1` in the same mount commit, so every non-first Item's Tooltip warned); a `tabindex="-1"` trigger under a plain `div` still warns. |
-
-ViewTransition behaviour beyond row 23 is observed in the docs examples, as for every component.
-
----
+Moved to `design/CHANGELOG.md` (part "toggle-group.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 15. Docs pages
 
-- `packages/docs/src/pages/ToggleGroupPage.tsx` at `/components/toggle-group`: intro, the 2.1
-  formatting example (`ToggleGroupStyles.tsx`, fake async save with a pending spinner, inside
-  `DemoErrorBoundary`), the 2.2 alignment example with `exclusive` and the `deselectable={false}`
-  variant (`ToggleGroupAlignment.tsx`), the controlled diff pattern of 2.3, anatomy, props tables for
-  Root (both variants, with the `exclusive` discriminant explained), Item, state / data attributes,
-  keyboard table 7.1, a "When to use RadioGroup instead" callout (research 1.2), the
-  `experimental_focusgroup` note, the reduced-motion block.
-- `packages/docs/src/pages/ToolbarPage.tsx` at `/components/toolbar`: intro, the 2.4 editor toolbar
-  (`ToolbarEditor.tsx`: two groups, separators, a `Menu.Trigger`, `Toolbar.Button`s with a fake
-  async action and an `aria-disabled` one, a text input last), the 2.5 vertical toolbar
-  (`ToolbarVertical.tsx`), anatomy, props tables for Root / Button / Separator, keyboard tables 7.2
-  to 7.4, the "one text-entry control, last" and "label the toolbar" callouts, a "before hydration
-  every item is a Tab stop" note, CSS for the `<hr>` separator, the flag note.
-- `packages/docs/src/navigation.ts`: `ToggleGroup` after `Toggle`, `Toolbar` after `Menu` in
-  `componentNavItems`; routes in `App.tsx`.
-- `ExperimentalPage.tsx`: two rows for `Toolbar.Root experimental_focusgroup` and
-  `ToggleGroup.Root experimental_focusgroup`.
-- `MenuPage.tsx`: a short "Inside a Toolbar" note with the 7.4 table.
-- `TogglePage.tsx`: a cross-link ("several toggles that share a value: ToggleGroup").
-- `RoadmapPage.tsx`: move ToggleGroup out of "more components" into the shipped list with Toolbar.
-- `packages/example`: a page combining both with the Tooltip toolbar demo's icons, so the
-  cross-engine behaviour of the Toolbar can be checked by hand.
-
----
+Moved to `design/CHANGELOG.md` (part "toggle-group.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 16. Implementation notes
 
-### 16.1 Files
+Moved to `design/CHANGELOG.md` (part "toggle-group.md"). Not part of the contract: the code and the tests are the reference.
 
-```
-packages/ui/src/internal/
-  toolbar-context.ts          # "use client": ToolbarContext = createContext<{ orientation } | null>(null); useToolbarContext()
-  use-roving-focus.ts         # "use client": the engine (6.2); exports isTextEntryItem for tests
-  use-roving-focus.test.tsx
-packages/ui/src/toggle-group/
-  index.ts
-  toggle-group-context.ts     # "use client": optimistic + committed sets, toggle(value, event), disabled, orientation, nativeFocusgroup, focusgroupStartValue, registerItem(element, value)
-  toggle-group-root.tsx       # "use client"
-  toggle-group-item.tsx       # "use client"
-  toggle-group.test.tsx
-  toggle-group.browser.test.tsx
-packages/ui/src/toolbar/
-  index.ts
-  toolbar-root.tsx            # "use client"
-  toolbar-button.tsx          # "use client"
-  toolbar-separator.tsx       # "use client"
-  toolbar.test.tsx
-  toolbar.browser.test.tsx
-```
+## 17. Native radios inside a Toolbar
 
-`tsdown.config.ts` gains `src/toggle-group/index.ts` and `src/toolbar/index.ts`; both `index.ts`
-import `../internal/platform-attributes.js` for the `focusgroup` / `focusgroupstart` typing
-(conventions 7.4; `focusgroupstart` is added to the augmentation if Tabs has not already).
-
-### 16.2 `ToggleGroup.Root`
-
-- `useControllableAction<ReadonlySet<string>, ToggleGroupValueChangeDetails>` over the internal
-  set (`controlled` mapped from `value`, `defaultValue` mapped the same way, `initialValue` an
-  empty set), `reducer` = `reduce` of 5.2 in multiple mode and `undefined` in exclusive mode,
-  `transitionTypes` from `added` / `removed`,
-  `warn: { component: "ToggleGroup", prop: "value" }`. The action wrapper converts `next` to the
-  consumer's shape (`string[]` in document order, or `string | null`) before calling
-  `valueChangeAction`.
-- `toggle(value, event)` (context): computes the patch per the 5.2 table against `optimistic`,
-  returns without dispatching for the no-op cases, else `dispatch(reduce(optimistic, patch),
-  createActionDetails(event, patch))`.
-- `const toolbar = useToolbarContext()`; `inToolbar = toolbar !== null`. Standalone:
-  `useRovingFocus(rootRef, { orientation, loop, native, entry: pressedFirst, memory: false })` and
-  its handlers in `libraryProps`; inside a Toolbar: no engine, no handlers, `orientation =
-  toolbar.orientation`, and `useDevWarning` for each of `orientation`, `loop`,
-  `experimental_focusgroup` when passed (`experimental_focusgroup` only when `true`).
-- Registration: `registerItem(element, value)` adds to a `Map<HTMLElement, string>` in a ref and
-  returns the cleanup; the Item merges it into its ref with `useMergedRefs`. Document order at
-  dispatch: the map's entries sorted with `compareDocumentOrder` (`internal/dom-order.ts`); the
-  set arithmetic (`toSet`, `applyPatch`, `sortByOrder`, `EMPTY_SET`) is `internal/value-set.ts`.
-- `nativeFocusgroup` comes from `useNativeFocusgroup(flag)` (`internal/use-native-focusgroup.ts`,
-  shared with Tabs.List and Menu.Popup).
-- `focusgroupStartValue` (standalone, flag on, every engine): the first pressed enabled value in
-  the current order, or `null`. The order (and which values have a disabled Item) is the `layout` of
-  `useItemOrder` (`internal/use-item-order.ts`, conventions 3.8, shared with CheckboxGroup),
-  refreshed in a layout effect after each Root commit rather than a ref read during render; `state.value` is the optimistic set sorted by it (the value's own
-  order until the first layout effect), while `next` is always sorted from the DOM at dispatch.
-  An Item reordered by a child-only render is picked up at the Root's next commit.
-- The multiple variant declares `deselectable?: never`: TypeScript's excess-property check does
-  not reject `deselectable` on the union when no discriminant is present.
-
-### 16.3 `ToggleGroup.Item`
-
-- Reads context; `pressed = optimistic.has(value)`; `pending` per 5.3; `disabled = ctx.disabled
-  || props.disabled`.
-- Renders exactly what `Toggle` renders (same `useRender` call shape, `rendersButton`, owned keys)
-  with `onClick: (e) => { if (disabled) return; ctx.toggle(value, e.nativeEvent); }` and
-  `focusgroupstart` when `ctx.focusgroupStartValue === value`. The implementer may lift Toggle's
-  attribute block into an internal helper (`internal/toggle-button-props.ts`) used by both; the
-  public `Toggle` is unchanged either way.
-- `useTransitionBoundary("ToggleGroup.Item", transition, element)`.
-
-### 16.4 `Toolbar.Root`
-
-- `useRovingFocus(rootRef, { orientation, loop, native, entry: firstEnabled, memory: true })`;
-  provides `ToolbarContext` `{ orientation }` (memoised).
-- `focusgroup` token string as Tabs.List builds it, without `nomemory`.
-
-### 16.5 `Toolbar.Button`
-
-- `const { pending, run } = useActionTrigger();` `onClick: (e) => { if (disabled) return;
-  run(() => action?.(createActionDetails(e.nativeEvent, {}))); }`. `aria-disabled` instead of
-  `disabled`; `type="button"` through `rendersButton`.
-
-### 16.6 `Menu.Trigger`
-
-- `const toolbar = useToolbarContext();` In `onKeyDown`: `openKeys = toolbar?.orientation ===
-  "vertical" ? { [rtl ? "ArrowLeft" : "ArrowRight"]: "first" } : { ArrowDown: "first", ArrowUp:
-  "last" }` with `rtl` from `getComputedStyle(event.currentTarget).direction` at keydown. Nothing
-  else in Menu changes; `menu.md` 3.2 and 5 get a one-line amendment on acceptance.
-
-### 16.7 `useRovingFocus` sketch
-
-```ts
-"use client";
-export function useRovingFocus(ref: RefObject<HTMLElement | null>, options: RovingFocusOptions) {
-  const current = useRef<HTMLElement | null>(null);
-  const managed = useRef(new WeakSet<HTMLElement>());
-  const latest = useLatest(options);
-
-  const apply = useEffectEvent(() => {
-    const root = ref.current; if (root === null || latest.current.native) return;
-    const items = itemsOf(root, managed.current);
-    if (!latest.current.memory || current.current === null || !items.includes(current.current)) {
-      current.current = latest.current.entry(items) ?? null;
-    }
-    for (const el of items) { managed.current.add(el); el.tabIndex = el === current.current ? 0 : -1; }
-  });
-  useLayoutEffect(() => { apply(); });                      // after every commit of the container
-  useEffect(() => {                                          // children that change without the container
-    const root = ref.current; if (root === null) return;
-    const mo = new MutationObserver(apply);
-    mo.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["disabled", "hidden", "inert", "aria-disabled"] });
-    return () => mo.disconnect();
-  }, []);
-  // onFocus / onPointerDown: if the target is an item of this root, current = item; apply().
-  // onKeyDown: 6.2 and 6.3.
-  return { onKeyDown, onFocus, onPointerDown };
-}
-```
-
-`itemsOf` is the pure query of 6.2; `isTextEntryItem` the predicate of 6.3; both exported for the
-unit test. As built (d5af7f5, 881cb37) the sketch differs in shape, not behaviour: `createEngine()`
-is a closure object held in `useState` whose `setOptions` is called from an insertion effect
-(oxlint's `react(refs)` rejects reading refs in the `useState` initializer, and the idiom is
-`useLatest`'s); `managed` is a `Map<HTMLElement, string | null>` of original `tabindex` values with
-`restore` / `release`; the options carry `enabled`; the handlers include `onBlur`; the observer is
-installed only while `enabled`.
-
----
-
-## Conventions feedback (applied in this commit, pending acceptance of this design)
-
-1. **1.1 part vocabulary**: `Item` row gains ToggleGroup's `button[aria-pressed]`; new `Button` row
-   (`Toolbar.Button`: a pure-trigger `button` with `action`, focusable when disabled); `Separator`
-   row notes the perpendicular `aria-orientation` inside a Toolbar.
-2. **3.2 / 7.4**: a roving Tab stop over arbitrary children is urgent library state that lives
-   outside React: the container writes `tabindex` through the DOM from layout effects, a
-   `MutationObserver` and focus / pointer events, items render none, and library item parts omit
-   `tabIndex` (new row in the 7.4 table; one sentence in 3.2 next to virtual focus).
-3. **3.6**: `Toolbar.Button` joins Tabs as a part that uses `aria-disabled` because its pattern wants
-   a focusable disabled control.
-4. **4.1**: `pressed` row gains `ToggleGroup.Item`; `pending` row gains `ToggleGroup.Root` / `Item`
-   and `Toolbar.Button`; `orientation` row gains both components' parts.
-5. **5.3**: ToggleGroup's three types; Toolbar none.
-6. **7.1**: `internal/toolbar-context.ts` as the second cross-folder context (read by
-   `ToggleGroup.Root`, `Toolbar.Separator` and `Menu.Trigger`).
-7. **8 flag table**: `Toolbar.Root experimental_focusgroup` and `ToggleGroup.Root
-   experimental_focusgroup` on the `focusgroup` row, with the nested-group rule.
-8. **9.1 layout**: `use-roving-focus.ts` and `toolbar-context.ts` under `internal/`.
-9. **Header**: the amendment note for #66, marked as pending the design's acceptance.
-
-Nothing in `ChangeReason`, the action signature, the state triple or the Suspense stance changes.
-
----
-
-## Recommendations for the product owner
-
-1. **Exclusive mode deselects by default.** A pressed `aria-pressed` button can always be released,
-   and that is what the button announces; `deselectable={false}` (exclusive variant only) is the
-   opt-out for view switchers, documented as "prefer RadioGroup for an exclusive form choice".
-   Alternative: default `false` (React Aria's `disallowEmptySelection` is opt-in too, so this is the
-   ecosystem's default as well).
-2. **`exclusive` is the discriminant, multiple is the default** (`value: string[]`), as Accordion
-   and as the Toggle design forecast, rather than Base UI's `multiple` flag with single as default.
-3. **Toolbar `loop` defaults to `true`** (Tabs, Menu, Base UI, Radix), overriding the native
-   `focusgroup="toolbar"` default with the `wrap` token so the two paths agree. Alternative:
-   `false`, matching the platform and React Aria.
-4. **`Menu.Trigger` in a vertical Toolbar opens on the inline-end arrow** (ArrowRight; ArrowLeft in
-   RTL) with the first item focused and leaves Up / Down to the Toolbar; horizontal is unchanged
-   (7.4). Alternative: no arrow opening in a vertical toolbar (Enter / Space only).
-5. **A ToggleGroup inside a Toolbar is transparent to the arrows** (no second axis within the
-   group, 7.3), diverging from the APG example's nested radiogroup on purpose.
-6. **One roving engine that writes `tabindex` through the DOM** for both the Toolbar and a
-   standalone ToggleGroup, instead of item wrapper parts (6.1). Consequences to accept: before
-   hydration every item is a Tab stop; an item's own `tabIndex` prop is unsupported in a toolbar;
-   a `MutationObserver` per container. This is the decision I would escalate to the user if any:
-   it is the first library-written attribute on elements the library did not render.
-7. **Text-entry items keep their arrows and Tab moves to the next item from them** (6.3), matching
-   Chromium's native toolbar focusgroup; the docs carry APG's "one such control, last".
-8. **`Toolbar.Button` ships as the library's first plain action button**, scoped to the Toolbar
-   (focusable-disabled, `useActionTrigger`, `data-pending`); a general `Button` stays a separate
-   design. `Toolbar.Separator` is an `<hr>` with perpendicular `aria-orientation`. No `Toolbar.Link`,
-   `Toolbar.Group` or `Toolbar.Input`.
-9. **`Toggle` is unchanged**; `ToggleGroup.Item` renders the same element through the same
-   attribute block, and `Menu.Trigger` gains only a `ToolbarContext` read.
-10. **`experimental_focusgroup` on both Roots** with the `toolbar` token under an explicit
-    `role="group"` for the standalone ToggleGroup (`nomemory` + `focusgroupstart` on the first pressed
-    Item), and a dev warning plus no attribute on a nested group.
-11. **No `Label` parts and no missing-label warning**: both Roots are named through `aria-label` /
-    `aria-labelledby` pass-through, with the docs insisting on it. Alternative: a dev warning on an
-    unnamed `Toolbar.Root` (APG requires the name) — cheap to add if wanted.
-12. **ToggleGroup has no form participation and no `details.reason`** (no residual browser path);
-    `ToggleGroupValueChangeDetails` is `{ added, removed }` and can grow.
-
----
-
-## Implementation and review fold (#66, 2026-10-18)
-
-From `memo/developer/toggle-group.md` (deviations and "Review fixes") and
-`memo/reviewer/toggle-group-toolbar.md` (d03c398; six should-fix findings, five nits, eight
-deviation verdicts); library and tests in d5af7f5 and 881cb37, docs in a621645 and b185942. Each
-item is folded into the sections named.
-
-| # | Item | Folded into |
-| --- | --- | --- |
-| D1 | **Standalone Tab stop.** `memory: false` taken literally put Tab from an unpressed Item onto the pressed one, still inside the group. As built: while focus is inside, the focused Item is the stop; on `focusout` to outside (`onBlur`, a new owned handler) the stop returns to `entry` (the pressed Item), as native `nomemory` + `focusgroupstart`. Reviewer: acceptable, better than the literal design. | decisions 6, 3.1, 6.2, 7.1 |
-| D2 | **Engine shape.** `enabled` option (the hook runs unconditionally, off inside a Toolbar); `managed` is a `Map` from element to original `tabindex` with cleanup (a stale `0` on a disabled button) and restore (review finding 2: `release()` had removed a consumer-rendered `tabindex="0"`, making a `div[role=spinbutton]` unreachable under the flag in Chromium after SSR); `release()` on the native switch-over after hydration; `[popover]` / `dialog` elements excluded, the element itself included in the check; options through an insertion effect. | 6.2, 6.5, 16.7 |
-| D3 | **Item order** (`state.value`, `focusgroupstart`) from a `layout` state refreshed in a layout effect, not a ref read in render. One extra sync render at mount when the value's order differs from the DOM's. | 16.2 |
-| D4 | **`focusgroupstart`** rendered whenever the flag is on, not only where native (16.2 had said "native"; row 16 and Tabs said "flag on"; the latter wins: identical server and hydration markup). | 8, 9, 16.2 |
-| D5 | **First entry in a Toolbar** had skipped `aria-disabled` items (APG "first control that is not disabled"); review finding 1 showed Chromium's native `focusgroup` enters on an `aria-disabled` first item, and the design requires the paths to agree. **Product-owner decision: the first item, `aria-disabled` or not**, matching native. Browser row on both paths. | decisions 6, 6.2, 7.2, 14 row 12 |
-| D6 | `deselectable?: never` on the multiple variant (excess-property checks do not cover the union without a discriminant); `@ts-expect-error` test. | 16.2 |
-| D7 | A disabled link `Toolbar.Button` (`render={<a href />}`, `aria-disabled`) `preventDefault()`s the click. Correct for a focusable-disabled control. | 3.4 (implied) |
-| R4 | **Popups reset the Toolbar context.** `Popover.Popup`, `Dialog.Popup`, `Menu.Popup` and `Combobox.Popup` render `<ToolbarContext value={null}>` around their content, so a ToggleGroup, a Separator or a `Menu.Trigger` inside a popup within a Toolbar behaves as outside one (the engine already excluded popup content, which had left such a ToggleGroup with no engine at all). jsdom rows for each. | 6.5 |
-| R5 | **Rollback re-basing test** (14 row 5) now rejects Bold's save with Italic pending. React keeps every optimistic update of the async action scope until it settles, so the rollback is observable only at the end (controlled, consumer-caught rejection: Bold `false`, Italic `true`); the re-base itself is tested by changing the committed value under two pending presses. | 14 row 5 |
-| R6 | **Native-path browser coverage** gained vertical + `loop={false}` (`block nowrap`) and `Menu.Trigger` in a horizontal and a vertical Toolbar (opens on the perpendicular arrow with the first item focused, menu arrows stay the menu's, Escape returns to the trigger, the toolbar arrow moves on), on both paths. Result: no divergence on any row tested (`memo/developer/cross-engine.md`). | 14 rows 20, 21 |
-| N7 | **Owned handlers.** Both Roots omit every handler they own (`onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`) from their props types, Tabs.List's rule; the docs pages say so. | 3.1, 3.3 |
-| N8 | The in-Toolbar `experimental_focusgroup` warning fires only for `true`. | 3.1, 16.2 |
-| N9 | 14 row 15 asserts the first menu item has focus after the perpendicular arrow. | 14 row 15 |
-| N10 | **RTL `side` advice**: `side="left"` for a vertical toolbar's menu under `direction: rtl`. | 7.4 |
-| N11 | Reduced-motion block on the Toolbar page (`Toolbar.Button` has `transition`). | 15 |
-| N13 | Tooltip's #57 composite-role check does not know `role="group"`. Believed at the time not to fire (check before the engine's write); it did fire, since the check is a passive effect and the engine's write a layout effect. Issue #75, fixed in 5eef360. | section 18 |
-| R3 | Native radios inside a Toolbar diverge between the paths. Issue #74; the Toolbar page advises an exclusive ToggleGroup meanwhile. | section 17 |
-
-Browser-test notes recorded by the developer: Playwright refuses to click an `aria-disabled`
-button ("element is not enabled"), so the click-memory row (14 row 22) clicks an enabled one; the
-`pointerdown` memory path is isolated only in WebKit, which CI runs.
-
-## 17. Native radios inside a Toolbar (#74, wave 7)
-
-Raised by review finding 3: the JS engine listed `radio` among the button-like inputs, so a
-toolbar arrow moved focus to the next radio without checking it and then walked out of the
-group, while Chromium's native `focusgroup="toolbar"` left the arrows to the radio group. The
-design had not covered native radios. Probe (2026-10-18, wave 7):
-`memo/architect/probes/toolbar-radios-focusgroup.mjs` with its `.output.txt`, Chromium
-156.0.8078.4 (`focusGroup` in the prototype, no flag needed in the Playwright build the browser
-tests use), a `role="toolbar" focusgroup="toolbar wrap"` holding `b1`, a `name="align"` group of
-three radios with the middle one checked, `b2`, a `name="size"` group of three with none checked,
-`b3`, plus a vertical `focusgroup="toolbar block"` with one checked group between two buttons.
+Native radios own their arrow keys, and a same-`name` group is one unit of the Toolbar's
+sequence, on the JS path exactly as under Chromium's native `focusgroup="toolbar"`. Probe:
+`memo/architect/probes/toolbar-radios-focusgroup.mjs`.
 
 ### 17.1 What native does
 
@@ -1334,10 +981,8 @@ three radios with the middle one checked, `b2`, a `name="size"` group of three w
 | Vertical toolbar | ArrowDown from `v1` → the checked `va`; ArrowDown again → `vb` (checked), again → `va`: the group traps the toolbar's axis as in the horizontal case; Tab from `va` or `vb` → `v2`. |
 | `button[role="radio"]` custom radios, no nested focusgroup | Plain items: the toolbar's arrows walk through them without checking (a nested `focusgroup="radiogroup"` is a separate segment with extra Tab stops, research 1.3). |
 
-The product owner's condition for acceptance in advance (radios own their arrows; a same-`name`
-group is one unit; Tab leaves the group) is met. Two details the probe adds: Tab from an
-unchecked radio with a checked sibling visits that sibling before leaving, and custom
-`role="radio"` elements are not a unit natively.
+Tab from an unchecked radio with a checked sibling visits that sibling before leaving, and
+custom `role="radio"` elements are not a unit natively.
 
 ### 17.2 The rule, JS path
 
@@ -1370,42 +1015,21 @@ unchecked radio with a checked sibling visits that sibling before leaving, and c
    at its ends in WebKit), and the user leaves it with Tab
    or Shift+Tab; a vertical toolbar traps ArrowUp / ArrowDown the same way. The docs keep
    advising an `exclusive` ToggleGroup, which is transparent to the arrows (7.3); the Toolbar
-   page's callout changes from "radios behave differently on the two paths" to this trap and the
-   Tab exit, and the APG Toolbar example's custom radiogroup is named as the pattern a consumer
+   page's callout names this trap and the Tab exit, and the APG Toolbar example's custom
+   radiogroup as the pattern a consumer
    who wants Up / Down within the group and Left / Right through the toolbar should build with
    `button[role="radio"]` elements and their own handlers.
-7. **Native path**: nothing to add; the browser already does all of the above. The flag's
-   browser row (14 row 27) runs the same sequences on both paths.
+7. **Native path**: nothing to add; the browser already does all of the above.
 
-Where it landed (5eef360): `collectItems(root, managed)` returns `{ items, units }`; native
-radios sharing a `name` form one unit (a radio **without** a `name` is a unit of one),
-represented in `items` by the checked radio, else the first, at the position of the unit's first
-radio; `itemsOf` stays as `collectItems(...).items`. `isTextEntryItem` became `ownsArrows`
-(`radio` removed from the button-like inputs). `apply` writes `tabindex` on the items and on
-every radio of every unit; `current` may be any radio of a unit and is kept while its unit's
-representative is an item. The Tab branch visits the checked sibling first, then the item next to
-the unit. The `use-roving-focus.test.tsx` unit test covers the unit cases; 6.2 and 6.3 are read
-with this section.
+In `use-roving-focus.ts`: `collectItems(root, managed)` returns `{ items, units }`; a radio
+without a `name` is a unit of one; a unit sits in `items` at the position of its first radio.
+6.2 and 6.3 are read with this section.
 
-### 17.3 Test rows
+## 18. Tooltip's composite-role check
 
-14 rows 25 to 28.
-
-## 18. Tooltip's composite-role check (#75, wave 7)
-
-`tooltip-root.tsx`'s #57 development check warns when a `Tooltip.Trigger` renders
-`tabindex="-1"` outside a composite widget, because a tooltip trigger must be focusable. It
-accepts the trigger when an ancestor has a composite role or `[focusgroup]`; a standalone
-`ToggleGroup.Root` (`role="group"`) and a `Toolbar.Root` (`role="toolbar"`, already composite)
-manage a roving `tabindex` too. Rule: **the check also accepts an ancestor with `role="group"` or
-`role="toolbar"`** (`role="toolbar"` was already in its composite list; `role="group"` is added,
-5eef360), the two containers whose engine writes the attribute (6.1). The premise recorded earlier
-(the check runs at mount before the engine writes, so it could not fire) was **wrong**: Tooltip's
-check runs in a **passive effect**, after the ToggleGroup's layout effect has written
-`tabindex="-1"` in the same mount commit, so a Tooltip on a non-first Item of a standalone
-ToggleGroup did warn before the fix (row 28 failed with three warnings). Test: 14 row 28.
-`design/components/tooltip.md` carries the one-line amendment; nothing else in Tooltip changes.
-
-## Open questions
-
-None at present: #74 and #75 are sections 17 and 18.
+`tooltip-root.tsx`'s development check warns when a `Tooltip.Trigger` renders `tabindex="-1"`
+outside a composite widget, because a tooltip trigger must be focusable. It accepts the trigger
+when an ancestor has a composite role, `[focusgroup]`, `role="toolbar"` or **`role="group"`**:
+a standalone `ToggleGroup.Root` and a `Toolbar.Root` are the two containers whose engine writes
+the attribute (6.1). The check runs in a passive effect, after the engine's layout effect has
+written `tabindex="-1"` in the same mount commit, so it sees the engine's write.

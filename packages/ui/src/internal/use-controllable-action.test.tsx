@@ -88,7 +88,7 @@ describe("useControllableAction: adopt", () => {
   });
 });
 
-// #148 (design/components/overlay-open-change.md 2.5): a fact supersedes every dispatch in flight.
+// #148 (conventions 3.9.5): a fact supersedes every dispatch in flight.
 describe("useControllableAction: adoptFact", () => {
   it("uncontrolled, nothing in flight: commits urgently, never calls the action, never pending", () => {
     const { action, hook, value } = setup();

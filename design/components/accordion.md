@@ -1,7 +1,8 @@
 # Accordion
 
-Status: **proposed** (2026-10-15, GitHub issue #8). Follows `design/conventions.md` (accepted).
-Deviations from it are listed in "Conventions feedback" at the end.
+Status: **accepted**, implemented. History (conventions feedback, implementation notes, the
+test plan): `design/CHANGELOG.md`, parts "accordion.md". Follows `design/conventions.md`; where
+this document and the conventions disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/react-async-apis.md`,
 `docs/research/modern-platform-survey.md` (details/summary, `name`, `::details-content`, `:open`,
@@ -18,7 +19,7 @@ find-in-page, `interpolate-size`, `@starting-style`), probes in `memo/architect/
 | 5 | Platform-initiated opens | Find-in-page and text fragments open a closed `<details>` natively in all engines. Library mode listens to `toggle`, dispatches `valueChangeAction` with `reason: "platform"`, and re-applies committed state to the DOM once the action settles. No `hidden="until-found"` needed. |
 | 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item, Trigger and Panel in library mode, animating only the settling commit (layout/cross-fade of the whole list); the optimistic `data-open` flip is a CSS transition; not both on the same change. No `keepMounted`: `<details>` keeps content mounted and auto-opens on find-in-page natively. `experimental_interpolateSize` on Root. |
 | 7 | Keyboard | Enter/Space native on `<summary>`. Up/Down/Home/End between triggers is implemented by Root in both modes (APG: optional; we ship it). No `focusgroup` flag (it would collapse the Tab stops). |
-| 8 | RSC | All four parts are `"use client"` files (Flight cannot read context in a Server Component, see notes). A Server Component renders them freely; JS-free mode needs no interaction JS, works before hydration and with JS off, but the parts' code is in the client bundle. This contradicts the conventions' sketch of a directive-free `accordion-static.tsx`; escalated, and resolved by #19 (2026-10-23, option A): one anatomy, "JS-free" means no behaviour JS and works without hydration; a directive-free `@funstack/ui/accordion/native` is a recorded, unscheduled plan (conventions 7.3). |
+| 8 | RSC | All four parts are `"use client"` files (Flight cannot read context in a Server Component). A Server Component renders them freely; JS-free mode needs no interaction JS, works before hydration and with JS off, but the parts' code is in the client bundle. One anatomy: "JS-free" means no behaviour JS and works without hydration; a directive-free `@funstack/ui/accordion/native` is a recorded, unscheduled plan (conventions 7.3). |
 
 ---
 
@@ -591,7 +592,7 @@ Tabs convention and keeping them perceivable to AT.
   fast action that is a non-issue; for a slow one the user hears nothing until the content lands,
   and `data-pending` styling is visual only. Consumers who need an audible pending state can add
   an `aria-live` region in the Trigger's `children` function. Deviation from conventions 3.2,
-  forced by the platform; recorded in "Conventions feedback".
+  forced by the platform.
 - **Heading inside the Trigger.** `<summary><h3>…</h3></summary>` is valid HTML. Exposure varies:
   VoiceOver exposes and navigates to the heading, JAWS historically did not (2018 test), and the
   2026 state is unverified. Because the disclosure semantics are native regardless, the heading is
@@ -870,139 +871,8 @@ then the item grows. No `Suspense` fallback flashes because the update is a tran
 
 ## 11. Test plan
 
-Mapped to the conventions' required-coverage table. "both" = `describe.each` over uncontrolled
-and controlled wrappers (controlled follows update-on-success). Library mode unless stated.
-
-| Row | Accordion tests |
-| --- | --- |
-| Roles and ARIA | Default elements are `div > details > summary + div`; no ARIA added except `aria-disabled`; `exclusive` in JS-free mode renders the same `name` on every details and none in library mode; `defaultOpen` renders `open` in JS-free mode and warns in library mode. |
-| Keyboard | ArrowDown/ArrowUp wrap, Home/End, disabled triggers skipped, nested Root does not steal keys. Enter/Space toggling is **not** testable in jsdom (no synthesized click on summary; see below); covered by the click path plus a browser-mode note. |
-| Sync action (both) | Click dispatches `(next, { event, reason: "activate", item, open })`; `event` is the native `MouseEvent`; disabled items never dispatch and the click is default-prevented; clicking a link inside the summary neither toggles nor dispatches; multiple vs exclusive compute `next` correctly. |
-| Async action (both) | While unresolved: `data-pending` on Root, Item, Trigger; `data-open` on Trigger/Item; `details.open` false; Panel `state.open` false. After resolve: `open` true, `data-pending` gone. |
-| Rejection (both) | `ErrorCatcher` receives the error; `data-open` gone; `details.open` still false; uncontrolled value unchanged. Caught-inside: commits. |
-| Overlap | Walkthrough 9.3 with `deferred()` resolved out of order; final `open` attributes match the latest dispatch; action called twice. Multiple, uncontrolled (#150): the older open rejects before / after the newer resolves: only the newer item is open, the rejection is reported. Exclusive, uncontrolled: a rejected open then a resolved close of the same item, both settle orders: nothing is open (the previously open item does not come back). |
-| Superseded rejection (both) | The older dispatch rejects after and while the newer is pending: `reportError` (stubbed) is called once, the catcher is not; the newer outcome unaffected (conventions 10.1). |
-| Suspending content (both) | Panel function child mounts `<Suspender>` when open; old state stays, no fallback from the boundary above, `data-pending` on; after resolve, open and content present. |
-| Function props | `className`/`style`/`children`/`render` on all four parts receive the documented state; JS-free mode passes `open: undefined`. |
-| `render` element | `render={<details className="x" />}` on Item and `render={<summary />}` on Trigger keep the library's handlers and `ref`; dev warning when the mounted tag is wrong. |
-| Post-await rule | Controlled parent updating after `await` inside `startTransition`. |
-| Directive | Every file under `src/accordion/` except `index.ts` begins with `"use client"` (there is no directive-free part; see Conventions feedback). |
-| Platform path | `details.setAttribute("open", "")` (jsdom fires `toggle`) dispatches with `reason: "platform"`; controlled parent that ignores it → attribute removed after settle; parent that accepts → stays open; walkthrough 9.6; disabled item re-closes without dispatching. |
-| Mode guard | Changing Root from JS-free to library mode after mount warns. Changing `exclusive` after mount warns and keeps the mounted mode (value shape, reducer). |
-| `transition` smoke | Item, Trigger and Panel render with and without `transition`; JS-free mode warns and renders no boundary. Animation itself is an example-app check (jsdom has no `startViewTransition`). **Browser:** expanding an item with `transition` absent calls `document.startViewTransition` zero times; with `transition="none"` on the Panel it is called (conventions 10.1). |
-
-jsdom facts the tests rely on (verified against jsdom 29.1.1, the version `packages/ui` resolves
-today; the manifest asks for `^30.1.3`, re-check after the lockfile moves):
-
-- `summary.click()` toggles `details.open` synchronously and a `preventDefault`ed click does not.
-- `toggle` is dispatched asynchronously as a plain `Event` (no `newState`) on any change of the
-  `open` attribute, including `setAttribute`; tests `await act(async () => {})` after triggering.
-- `:open` works in `matches()`.
-- `name` exclusivity is **not** implemented; JS-free exclusive tests assert the attribute only,
-  and the exclusive *library* mode (which does not use `name`) is tested fully.
-- Enter/Space on a summary do not synthesize a click; `user-event`'s Enter clicks buttons, links
-  and inputs only. Keyboard toggling is therefore a browser-mode (or example-app) check, noted at
-  the top of `accordion.test.tsx`.
-- Find-in-page cannot be simulated; the platform path is tested through `setAttribute("open")`.
-
----
+Moved to `design/CHANGELOG.md` (part "accordion.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 12. Implementation notes
 
-```
-packages/ui/src/accordion/
-  index.ts                 # no directive: namespace + type re-exports
-  accordion-context.ts     # "use client": RootContext, ItemContext
-  accordion-root.tsx       # "use client": state owner, keyboard navigation, registry
-  accordion-item.tsx       # "use client": <details>, open/onToggle, DOM reconciliation
-  accordion-trigger.tsx    # "use client": <summary>, click interception, aria-disabled
-  accordion-panel.tsx      # "use client": <div>, committed open in state
-  accordion.test.tsx
-```
-
-- **Every part file is `"use client"`.** Item, Trigger and Panel read context (`use(Context)`),
-  which Flight refuses in a Server Component; Root creates context. The build test asserts the
-  directive on all five modules. There is no `accordion-static.tsx`.
-- **Context.** `RootContext`: `{ mode: "static" | "library", exclusive, name (static+exclusive),
-  disabled, pending, committed: ReadonlySet<string>, optimistic: ReadonlySet<string>, dispatch,
-  dispatchFromDom, registerItem, registerTrigger }`. `ItemContext`: `{ value, disabled,
-  committedOpen, optimisticOpen, pending, library, dispatch, registerTrigger }` (the opens are
-  `undefined` in static mode; `dispatch` and `registerTrigger` are the Root's, `undefined`
-  outside a Root). **Trigger and Panel read only the `ItemContext`**, never the Root's: the
-  members they need are copied into it, and Item memoises its context value on its own fields,
-  so opening one item re-renders every Item (they read the Root's sets) but not the other
-  items' Triggers and Panels (review follow-ups 6 and 7 of #48, commit 0ba1612; internal only,
-  no public change). Root recomputes its context value with `useMemo`; the sets are new objects
-  only when they change, and the **controlled set is keyed on `JSON.stringify(value)`**, so an
-  inline `value={["a"]}` (a new array per render) neither re-bases `useOptimistic` nor changes
-  the context. `dispatch` and `dispatchFromDom` read `{ optimistic, exclusive }` through
-  `useLatest`, so their identity is stable across open-state changes (a handler only ever runs
-  against the committed UI, which is the set it would have closed over).
-- **Mode detection** once, from the first render's props (`value !== undefined ||
-  defaultValue !== undefined || valueChangeAction !== undefined`), stored in a ref; warn if it
-  changes.
-- **Normalisation.** Root converts `string | null` ⇄ `Set<string>` at the prop boundary (`toSet`,
-  `setsEqual`, `EMPTY_SET` from `internal/value-set.ts`, shared with ToggleGroup and
-  CheckboxGroup) and calls
-  `useControllableAction` with the set; the reducer in 4.1 is passed in in multiple mode only
-  (`exclusive ? undefined : …`). `next` for the action is
-  converted back before the call.
-- **Registry.** `registerTrigger(el) => cleanup` through a callback ref in Trigger; Root keeps a
-  `Set<HTMLElement>` in a ref and sorts by document order (`compareDocumentOrder`,
-  `internal/dom-order.ts`) inside the keydown handler
-  (`useEffectEvent` is unnecessary; the handler reads refs).
-- **Item.** Renders `<details open={committedOpen}` (wrapped in `<ViewTransition default={transition}>` only in library mode with `transition` given)
-  name={staticExclusiveName} onToggle={…} data-open={optimisticOpen || undefined} …>`. In static
-  mode the `open` prop is the value of `defaultOpen` captured on the first render (`useState(() =>
-  defaultOpen)`), so later re-renders pass the same prop and React never rewrites the attribute the
-  browser now owns. The layout effect from 2.3 exists only in library mode.
-- **Trigger.** `onClick` per 2.2; `isNestedInteractive` = `event.target` has an ancestor matching
-  `a[href], button, input, select, textarea, [contenteditable]` below the summary. Renders
-  `aria-disabled` and `data-*`. Registers through the `ItemContext`'s `registerTrigger` and
-  dispatches through its `dispatch` (both the Root's functions, read from the item context).
-- **Panel.** Reads `ItemContext`, renders `<div data-disabled …>`, wrapped in a boundary only
-  when `transition` is given in library mode.
-- **Ids.** `useId()` only in Root, only consumed for `name` in static exclusive mode.
-- **Transition types** added in Root's dispatch, before `setOptimistic`.
-- **`reason`.** `AccordionValueChangeDetails.reason` is the shared `ChangeReason` (conventions
-  2.2); until #100 the implementation carried a narrower local union, a type change after
-  0.1.0-alpha.11 for a consumer who annotated it.
-- **Dev warnings:** mode change after mount; `exclusive` change after mount (#153); `defaultOpen` in library mode; `transition` in static
-  mode; wrong `tagName` behind `render`; Item without Root (Item works standalone as a disclosure
-  in static mode, so this one is informational only if the consumer passed `transition` or
-  expected `exclusive`).
-
-Standalone Items: an `Accordion.Item` outside any Root is a valid JS-free disclosure (no context,
-static mode). This is intentional and documented as the library's Disclosure until one is designed.
-
----
-
-## Conventions feedback
-
-1. **7.3 / 7.1, directive-free Accordion.** The sketch `accordion-static.tsx` (no directive) cannot
-   be built: a Server Component cannot read context (Flight: "Cannot read a Client Context from a
-   Server Component"), HTML offers no inheritance for `name`, so Item/Trigger/Panel need either
-   context (client) or per-item props from the consumer. This design keeps one anatomy and makes
-   all parts client. Suggested rewording for 7.3: "JS-free primitive" means *no JS runs for the
-   interaction and the markup is complete and functional before hydration*; whether a part file is
-   directive-free is a per-component fact recorded in its design doc. The Directive test row then
-   asserts whatever the design doc says. Decision for the product owner (see report).
-   **Resolved:** the rewording is conventions 7.3; the directive-free Accordion itself is #19,
-   decided 2026-10-23 (user, option A): not built, but recorded there as the one ready plan
-   (option B, `@funstack/ui/accordion/native`: Item `details` with a required `name`, no
-   action props, no state attributes) should an RSC host ever skip the runtime.
-2. **4.1 vocabulary.** Both `expanded` ("Accordion trigger/panel") and `open` ("Popup, Trigger:
-   platform or library open state") claim the Accordion trigger. This design uses `open` because
-   the platform says `open` everywhere (`<details open>`, `:open`, `ToggleEvent.newState`).
-   Suggest removing the `expanded` row or reserving it for a future non-details Disclosure.
-3. **3.2 "triggers render optimistic state" and ARIA.** On `<summary>` the optimistic value cannot
-   be exposed to AT (`aria-expanded` is disallowed). Suggest a sentence in 3.2: "where the platform
-   owns the ARIA state (`<details>`), optimistic state is visual (`data-*`) only."
-4. **8, `experimental_interpolateSize` on Panel.** Should be on Root (inherited property; the
-   animated box is a pseudo-element of `<details>`). Update the "first customers" table.
-5. **8, `focusgroup` list.** Accordion should not be listed as a `focusgroup` customer: it
-   collapses Tab stops, which the APG accordion forbids.
-6. **3.5 browser-owned table.** Add the row this design needed: a library-owned state with a
-   residual browser-owned path (find-in-page on `<details>`, pre-hydration clicks) is reconciled
-   by dispatching with `reason: "platform"` and re-applying committed state after settle. Tabs
-   with `hidden="until-found"` will need the same rule.
+Moved to `design/CHANGELOG.md` (part "accordion.md"). Not part of the contract: the code and the tests are the reference.
