@@ -967,34 +967,7 @@ The same drawing with no Arrow part, as a pseudo-element on the popup (what reso
 
 ## 11. Conventions feedback
 
-1. **ViewTransition table (5.1 / 5.3).** Add a row stating that Tooltip renders no
-   `<ViewTransition>` and has no `transition` prop, and that this follows from 3.5. The current
-   wording "every part whose mount, unmount or content is driven by library state" is correct but
-   a reader of 5.1 alone will expect `Popup` to wrap.
-2. **Augmentation file (7.4).** Resolved: the CSS properties are augmented on
-   `React.CSSProperties` inside the single `declare module "react"`; a `csstype` augmentation is
-   not possible (not a dependency; TS2664 under pnpm).
-3. **Id-reference merging (1.2).** "Library-controlled attributes (`aria-*` state, `id` wiring)
-   win over the element's" should carve out ARIA id-reference lists (`aria-describedby`,
-   `aria-labelledby`), which are merged as token lists. A trigger can be described by more than
-   its tooltip.
-4. **Listeners via `addEventListener` (1.5 / 7.4).** Tooltip attaches hover/focus listeners
-   through refs rather than React event props, so no `on*` prop is omitted from its types. 7.4
-   permits this for events React does not synthesize; it should say a part may do the same for
-   synthesized events when the handlers must be feature-detected away, and that only prop-form
-   handlers are omitted from the type.
-5. **Required coverage (10.1).** Add: "Rows that cannot apply to a component with no action props
-   (sync, async, rejection, overlap, post-await, controlled/uncontrolled parity) are listed as N/A
-   in a comment at the top of the test file, with the reason."
-6. **`open` in the vocabulary (4.1).** The table lists `open` on Popup and Trigger; Tooltip emits
-   neither because 7.4's "do not duplicate a pseudo-class for browser-owned state" rule applies.
-   Suggest the row read "library-owned open state only; browser-owned open uses `:popover-open`".
-7. **RSC context providers (7.1).** Not needed by Tooltip, but the rule "directive-free files must
-   not import from files with the directive" conflicts with React 19.3's sanctioned pattern of
-   rendering a client-module context provider from a server file. Worth a sentence when a
-   component actually needs it.
-
----
+Moved to `design/CHANGELOG.md` (part "tooltip.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 12. Implementation notes
 
@@ -1320,29 +1293,7 @@ first real WebKit check of the computed-style claim, which the research took fro
 
 ## 14. Open questions for the product owner
 
-1. **"Zero-JS" reading.** No Tooltip part can be directive-free (section 2.4). Accept "no
-   runtime behaviour JS on the native path, client components still hydrate", or ask for the
-   `children`-function variant of `Root` that makes `Trigger` and `Popup` directive-free at the
-   cost of a second API shape. Recommendation: accept. **Resolved (#19, 2026-10-23, option A;
-   conventions 7.3 and resolved question 38):** accepted as recommended, and a directive-free
-   Tooltip is ruled out on its own merits: `interestfor` is Chromium-only, so it would show no
-   tooltip at all in Firefox and Safari (`docs/research/zero-js-variants.md` 4).
-2. **Baseline popover type `manual`.** Chosen over `auto` so tooltips never close open menus.
-   The price is that the library owns Escape and outside-click in JS until `hint` is universal.
-3. **No `open` / `openChangeAction` / `data-open` in v0** (section 4.1). Confirm that a tooltip
-   is the first component with no action prop at all.
-4. **Focus delay.** Keyboard focus waits `delay` like hover (parity with Chromium's native
-   behaviour). Radix and Base UI open instantly on focus. Keep parity, or special-case focus to 0?
-5. **Prop name `provides`** for the name/description relation. Alternatives considered:
-   boolean `label` (ambiguous with string labels), `relation` (vague).
-6. **No skip-delay group** in v0 (section 6).
-7. **Arrow ships thin** and mis-points after a fallback flip (section 3). Ship it, or hold it
-   back until a resolved-side signal exists? (Held: conventions resolved question 10. The
-   signal exists since wave 11, section 7.4; see the amendment below.)
-8. **vitest browser mode** is the only way to test what this component actually does in a
-   browser. The jsdom plan tests the JS shim and the markup only.
-
----
+Moved to `design/CHANGELOG.md` (part "tooltip.md"). Not part of the contract: the code and the tests are the reference.
 
 ## Amendment: resolved side and direction (wave 11, 2026-10-23, issues #20 and #53)
 

@@ -1205,26 +1205,6 @@ recipe, and the "`next` is a set" guidance.
 
 ---
 
-## Conventions feedback
-
-To apply to `design/conventions.md` if this design is accepted:
-
-1. **3.8, `useNativeGroupReconciliation`**: add the `equals` option (default `Object.is`), as the
-   table already anticipates for #33.
-2. **3.8 rule 3, "Unsupported: partial hydration"**: scope it to **radio** groups; react-dom's
-   same-`name` restore is radio-only, and CheckboxGroup supports late Items without a warning.
-3. **1.1 part vocabulary**: add `Parent` ("a mixed-state checkbox that controls a subset of a
-   CheckboxGroup; `input[type=checkbox]`").
-4. **4.1 `indeterminate` row**: add `CheckboxGroup.Parent`, where the value is library-derived
-   from optimistic state and **not** suspended while pending (the suspension rule is for the
-   consumer-owned prop on Checkbox).
-5. **4.1 / 3.6**: a note that a library may render a **computed native validity attribute**
-   (`required` on CheckboxGroup Items) from optimistic state; it is owned on the part.
-6. **5.3 transition types**: `fsui-checkbox-group`, `fsui-checkbox-group-check`,
-   `fsui-checkbox-group-uncheck`.
-7. **2.2 `details` fields**: `added` / `removed` as the shape for set-valued states (Accordion's
-   `item` / `open` stays; a future set-valued component should prefer the diff form).
-
 ## Decisions recorded (product owner, 2026-10-17)
 
 All eight questions raised by the proposal were accepted as recommended; the conventions

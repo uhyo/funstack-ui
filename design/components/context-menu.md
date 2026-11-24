@@ -1206,28 +1206,6 @@ packages/ui/vitest.config.ts                   # registers the command
 
 ---
 
-## Conventions feedback
-
-Applied to `design/conventions.md` with this design:
-
-1. **1.1 part vocabulary.** Add `ContextTrigger`: a region whose `contextmenu` (right-click,
-   Shift+F10, long-press) opens the owner's Popup at the pointer; a plain element with no role
-   or ARIA; `data-open` / `data-pending` / `data-disabled`.
-2. **4.1 vocabulary.** `open` row: `Menu.ContextTrigger`. New row `context` (boolean,
-   `Menu.Popup`): the current open came from a ContextTrigger and is placed at a point, with
-   `--menu-point-x` / `--menu-point-y` set.
-3. **2.2 `"dismiss"` examples.** A right- or middle-click outside a menu (the library's own
-   close, since click-based light dismiss ignores those buttons).
-4. **New section 12, shipped functional CSS.** The library ships no visual CSS; a component may
-   ship **functional at-rules** it cannot express inline (`@position-try` options) as a React
-   `<style href precedence>` rendered by the part that needs them, hoisted and deduplicated,
-   with `--fsui-` prefixed names, an opt-out through the part's existing "stylesheet owns
-   placement" switch, and the CSP note. First (and so far only) user: `Menu.Popup`'s point
-   placement.
-5. **3.5 residual paths.** A **move** (re-show at a new point without a state change) is a new
-   kind of library-driven DOM operation on browser-owned open state: no dispatch, a coalesced
-   `toggle`, documented in the component.
-
 ## Decisions recorded (2026-10-22)
 
 **User decision:** the library may ship a minimal functional stylesheet, positioning only and

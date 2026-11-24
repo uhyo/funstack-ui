@@ -1278,35 +1278,6 @@ packages/ui/src/internal/
 
 ---
 
-## Conventions feedback
-
-All eight items were applied to `design/conventions.md` at acceptance. Kept for the record:
-
-1. **1.1 part vocabulary.** Add `GroupLabel` ("Names a `Group`; `div` with an id, wired through
-   `aria-labelledby`") and note `Separator`'s default element `hr`. `Item` gains "Menu:
-   `button[role=menuitem]`".
-2. **2.5 / 2.4: a shared `useActionTrigger`.** Pure-trigger parts with their own transition
-   (`Dialog.Close`, `Popover.Close`, `Menu.Item`) should share one internal hook that surfaces a
-   superseded rejection as `useControllableAction` does, closing the gap Dialog recorded. Suggest
-   naming it in 3.4 next to the state hook.
-3. **3.5 ownership.** Menu adds "always library mode" as a legitimate third configuration: a
-   component whose baseline cannot be JS-free still renders the declarative command for the
-   anchor and the pre-hydration open. One sentence in 3.5 or 7.3.
-4. **5.1 `transition` on items.** Menu items have no `transition` prop (their only library-driven
-   change is the optimistic flip, which never animates). This contradicts "every animatable part
-   has `transition`" only if an item counts as animatable; suggest the rule read "every part whose
-   mount, unmount or content is driven by committed library state", which items are not.
-5. **5.3 types.** `Menu`: `fsui-menu`, `fsui-menu-open`, `fsui-menu-close`, `fsui-menu-check`,
-   `fsui-menu-uncheck`, `fsui-menu-select`.
-6. **8 experimental table.** `focusgroup` row: add `Menu.Popup experimental_focusgroup`
-   (`focusgroup="menu wrap|nowrap"`, no `tabindex` on items on the native path).
-7. **4.1 vocabulary.** `checked` on `Menu.CheckboxItem` / `Menu.RadioItem` (optimistic,
-   `aria-checked`), `open` on `Menu.Trigger` / `SubmenuTrigger`.
-8. **2.2 `"dismiss"` examples.** "Focus leaving the component (Tab out of a menu), the pointer
-   leaving a hover-opened submenu, a parent overlay closing."
-
----
-
 ## Decisions recorded (product owner, 2026-10-17)
 
 All eleven accepted as recommended:

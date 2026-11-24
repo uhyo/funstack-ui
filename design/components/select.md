@@ -1016,61 +1016,6 @@ Function-like action, an "options load late" variant and a "label changes while 
 with the opt-in CSS and a Firefox note. Docs page: the props tables from the declarations, the
 CSS recipes of section 7, the per-engine keyboard table, the Firefox column of section 11.
 
-## Conventions feedback (applied 2026-10-17)
-
-1. **1.1 part vocabulary**: add `Value` ("the element the browser fills with the selected
-   option's content; `<selectedcontent>`; no `children`") and `Option` (`<option>` in Select).
-2. **1.2 `render` rules**: Select's `Root`, `Trigger`, `Value`, `Option`, `Group` must keep
-   their element (`select`, `button`, `selectedcontent`, `option`, `optgroup`).
-3. **3.1**: note that Select's `value` is `string` with `""` as the placeholder, an exception to
-   "none selected is `null`" grounded in `select.value` (question 1).
-4. **3.5 residual paths**: add "late-mounting options in a `<select>` are re-applied; a hydrated
-   late option is reconciled, a created one is not (the `useSyncExternalStore` server-snapshot
-   tell)", and "a platform dispatch requires the intended option to exist".
-5. **3.8**: widen `FormAssociatedElement` with `HTMLSelectElement`; add `useNativeSelectValue`
-   as the select analogue of `useNativeChecked` (mirror `defaultSelected` then re-apply, in that
-   order, because `defaultSelected` moves a non-dirty option's selection); `adopt(next)` on
-   `useControllableAction` for the no-default case.
-6. **4.1**: `selected` row gains `Select.Option` (optimistic, equal to `:checked`); `open` row
-   notes Select emits none (`:open` only).
-7. **5.1**: Select's parts have no `transition` (the Menu-items reasoning).
-8. **5.3**: `fsui-select`.
-9. **7.4**: `selectedcontent` intrinsic element added to the augmentation; the
-   `suppressHydrationWarning` + `dangerouslySetInnerHTML` pattern for a browser-filled element
-   gets a row ("element whose children the parser writes before hydration").
-10. **8**: withdraw the `Select.Root experimental_baseAppearance` row: the markup is
-    unconditional and the opt-in is consumer CSS (progressive enhancement, no flag).
-
-## Questions for the product owner (resolved 2026-10-17, see below)
-
-1. **`value: string`, never `null`** (decision 3). Accept the deviation from conventions 3.1
-   ("none selected is `null`"), on the grounds that a `<select>` has no empty state other than
-   an option, that `""` is what `required` validates against, and that it keeps
-   `valueChangeAction` free of a `null` branch? The alternative (`string | null` with `null`
-   mapped to "no option selected") would make `null` and `""` two spellings of the same DOM
-   state.
-2. **Automatic `<selectedcontent>` refresh through a MutationObserver** (decision 6, 6.3), in
-   `Select.Value`. Accept the mechanism, with the WebKit contingency recorded as an issue if the
-   first CI runs show the picker closing or losing focus on refresh?
-3. **The hydration tell for late options** (6.2): one `useSyncExternalStore` per Option so that
-   a pick made before a late boundary hydrates is kept while a client-created option is never
-   mis-reported. The simpler alternative, "late options are re-applied, never reconciled", would
-   silently overwrite a pre-hydration pick on options that streamed in after the Root hydrated.
-   Accept the extra hook, or accept the limitation?
-4. **Dev warning when neither `value` nor `defaultValue` is given** (decision 3; Tabs
-   precedent). RadioGroup chose no warning because "unchecked" is the HTML default; here the HTML
-   default (first option) is not representable without a placeholder. Confirm the warning.
-5. **No `transition` prop on any Select part** (decision 13): the first component where no part
-   has one. The alternative is a `transition` on `Option` for parity with `RadioGroup.Item`,
-   which would wrap an `<option>` inside the UA picker and animate nothing. Confirm the
-   omission.
-6. **`Group label` required, `GroupLabel` optional** (1.). Confirm, or make `GroupLabel`
-   required and derive the attribute from its text (impossible for rich content, so rejected
-   here).
-7. **WebKit 302008 handling**: a dedicated WebKit row under a timeout, and a documented consumer
-   CSS mitigation rather than any library CSS. Confirm (the Menu precedent).
-8. **Conventions change 10**: withdraw the `experimental_baseAppearance` flag row. Confirm.
-
 ## Decisions recorded (product owner, 2026-10-17)
 
 1. `value: string`, never `null`: accepted (conventions 3.1 carries the exception).
@@ -1119,4 +1064,3 @@ Accepted deviations (developer, judged in the review):
    `memo/developer/` and `memo/reviewer/select.md` hold the detail. The code under
    `packages/ui/src/select/` and `src/internal/use-native-select-value.ts` is the ground truth
    where this document is silent.
-

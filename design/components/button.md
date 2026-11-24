@@ -1046,41 +1046,6 @@ unchanged. `packages/example` and the docs examples follow the same rename.
 
 ---
 
-## Conventions amendments (applied to `design/conventions.md` in this commit; accepted 2026-10-22)
-
-1. **Decisions table, row 2**: a pure trigger ignores activation while its own action is pending
-   and says so with `aria-disabled="true"` (#79).
-2. **1.1 `Button` row**: `Button` is now the general single-element button (`@funstack/ui/button`)
-   and replaces `Toolbar.Button`; the "not a general button component" sentence goes. 3.6, 4.1
-   and 5.3 drop their `Toolbar.Button` mentions accordingly.
-3. **2.3 item 3**: a pure trigger does not treat an already-cancelled click as a veto (the
-   Trigger-wrapped Button); item 9 reworded to "never *natively* disabled while pending; pure
-   triggers ignore re-entry (2.5)".
-4. **2.5**: new bullet "**Pure triggers ignore re-entry.**" with the rule, the two guard sources,
-   `preventDefault()`, the non-awaiting spelling, and the staged rollout (Button in #79; the
-   other parts in the follow-up).
-5. **2.7**: a part with its **own** `formAction` may expose per-submitter form-channel pending
-   (`useFormStatus().action` identity), the third allowed reading of the channel.
-6. **3.4**: `useActionTrigger`'s `ignoreWhilePending` option and `run`'s boolean return.
-7. **3.6**: "A part is never **natively** disabled while pending" (unchanged reason), plus: a pure
-   trigger renders `aria-disabled="true"` while its own action is pending because it ignores
-   activation then; `data-disabled` and `state.disabled` are the consumer's `disabled` only; the
-   "latest-intent rule makes repeated activation safe" sentence is removed (it never protected a
-   trigger); `focusableWhenDisabled` joins Tabs / Toolbar as a source of `aria-disabled`.
-8. **4.1 `pending` row**: `Button` (its own action, or its own `formAction` submission).
-9. **5.3**: `Button` emits no types.
-10. **9.1**: `button/` folder.
-11. **10.1**: a "Re-entry" row required for every guarded pure trigger; the superseded-rejection
-    row notes that a guarded trigger declares it N/A with the reason.
-12. **Resolved questions**: entry 34.
-13. **1.2** (review fold, 2026-10-22): `type="button"` is emitted for a host `<button>` **and for a
-    component `render` element**, omitted only for a host element of another tag; a `disabled`
-    part whose rendered element is not a host `<button>` uses `aria-disabled`.
-14. **2.5, 3.4, 10.1** (review fold): the guard source is the in-flight counter only; the held
-    commit window accepts a new run.
-
----
-
 ## Implementation and review fold (#79, 2026-10-22)
 
 Implementation d8136b4 (library, `Toolbar.Button` removed), 465d106 (playground), 0201cec
@@ -1103,46 +1068,6 @@ the review's open items and the developer's deviations, folded into the sections
 | D4 | Playwright `force: true` for clicks on an `aria-disabled` Button (row 22): Playwright's actionability treats it as disabled; the real pointer click still dispatches. | Accepted. | row 22 |
 | D5 | `useDevWarning` (`console.error`, once per instance, in an effect) where the design says "warns". | Accepted; the library's one warning channel. | 6.1 |
 | D6 | oxlint disable for reading `submittedWith` in render. | Accepted; written only by the click handler before the submission whose status the render shows (precedent: `progress-root`). | 15.3 |
-
----
-
-## Recommendations and decisions (all accepted 2026-10-22)
-
-1. **Re-entry guard: Button in wave 8, the rest in a follow-up** (5.5). The rule is library-wide
-   in the conventions now; `Dialog.Close`, `Popover.Close`, `Menu.Item` switch in **#81** because
-   of their re-run tests and docs and `menu-dom.ts`'s `aria-disabled` query.
-   Alternative: switch all five now (one wave, about twenty assertions and four design docs,
-   plus the Menu navigation change). Recommended: staged. **Accepted: staged, #81 filed.**
-2. **No opt-out prop** (5.4): the non-awaiting action is the spelling. Alternative: `repeatable`.
-3. **`aria-disabled="true"` while pending; `data-disabled` and `state.disabled` untouched** (5.3).
-4. **`type` is owned on a `<button>`**, computed from the Button's own `type` prop (6.1), so a
-   `render` element's `type` is overridden. Alternative: not owned (the element's wins), which
-   would make `render={<button type="submit">}` a silent submit button.
-5. **`formAction` per-submitter pending with the `submittedWith` ref** (6.2). Alternative: prop
-   identity only, with a documented "pass a stable function" rule.
-6. **`Form.Submit` stays unguarded** (6.4).
-7. **Implicit submission goes through the guard**, no `type` flip (6.5).
-8. **`Button` reads `ToolbarContext`** (7.3). Accepted.
-9. **`Toolbar.Button`: keep as an alias or remove.** The draft recommended keeping the alias
-   through `0.1.0`. **User decision: remove it now** (one name for one component; the project is
-   alpha; a breaking change recorded in 7.3 and the migration note in 14).
-10. **`focusableWhenDisabled`** (3, 7.2): the one prop this design adds beyond the product owner's
-    list. It is the toolbar rule as a prop and the only way to put a Tooltip on a disabled Button
-    (a natively disabled button fires no events, and `aria-disabled` is owned). **User decision:
-    in v1.**
-11. **Trigger-wrapped Button runs its action on a cancelled click** (7.1), as decided.
-12. **Browser rows 21 to 26** are the ones jsdom cannot observe; 21 (focus retention) is the
-    load-bearing accessibility claim and runs on all three engines.
-
-## Resolved questions (2026-10-22)
-
-1. Remove `Toolbar.Button` now, or keep the alias? **Removed now** (user).
-2. `focusableWhenDisabled` in v1, or defer? **In v1** (user).
-3. The follow-up for the other pure triggers: **one issue, #81** (product owner).
-
-## Open questions
-
-None at present.
 
 ---
 

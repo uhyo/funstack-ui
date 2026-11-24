@@ -523,29 +523,3 @@ Example app: the select-all list of 2.4 against a fake 800 ms API with a failure
 rollback-to-mixed path of 6.2 can be seen in real engines; the CSS of 2.6 and 2.7.
 
 ---
-
-## Cross-component (resolved 2026-10-16)
-
-As Switch's section: everything assumed here is now in conventions 3.8 and resolved questions 16
-to 21. `CheckboxGroup` is deferred as issue #33 (section 10). RadioGroup has no `indeterminate`;
-an empty radio group matching `:indeterminate` is the platform's business.
-
-## Conventions feedback (applied 2026-10-16)
-
-Both items were applied: "consumer-owned, mirrored" is named as the fourth kind of state in
-conventions 3.5 and on the `indeterminate` row of 4.1; the `render` element-type restriction for
-native inputs and fieldset Roots is in 1.2, with the dev warning in the shared hook.
-
-## Questions for the product owner
-
-1. **`state.indeterminate = indeterminate && !pending`** (section 4): resolved, suspended while
-   pending (conventions resolved question 18).
-2. **No `Checkbox.Indicator` in v0** (section 1): resolved, plain-input anatomy (conventions
-   resolved question 16).
-3. **CheckboxGroup deferred** (section 10): resolved, issue #33 (conventions resolved question
-   20); designed and accepted 2026-10-17 in `design/components/checkbox-group.md`, which also
-   answered the group-level `required` question (dynamic native `required` on the Items).
-4. **`indeterminate` with uncontrolled `checked`** is allowed (no warning). Alternative: warn
-   that mixed only makes sense when the parent controls `checked`. Recommendation: allow; the
-   dash simply persists until the parent changes the prop, and a warning would be wrong for the
-   "mixed until first interaction" use.

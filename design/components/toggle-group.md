@@ -1211,72 +1211,6 @@ installed only while `enabled`.
 
 ---
 
-## Conventions feedback (applied in this commit, pending acceptance of this design)
-
-1. **1.1 part vocabulary**: `Item` row gains ToggleGroup's `button[aria-pressed]`; new `Button` row
-   (`Toolbar.Button`: a pure-trigger `button` with `action`, focusable when disabled); `Separator`
-   row notes the perpendicular `aria-orientation` inside a Toolbar.
-2. **3.2 / 7.4**: a roving Tab stop over arbitrary children is urgent library state that lives
-   outside React: the container writes `tabindex` through the DOM from layout effects, a
-   `MutationObserver` and focus / pointer events, items render none, and library item parts omit
-   `tabIndex` (new row in the 7.4 table; one sentence in 3.2 next to virtual focus).
-3. **3.6**: `Toolbar.Button` joins Tabs as a part that uses `aria-disabled` because its pattern wants
-   a focusable disabled control.
-4. **4.1**: `pressed` row gains `ToggleGroup.Item`; `pending` row gains `ToggleGroup.Root` / `Item`
-   and `Toolbar.Button`; `orientation` row gains both components' parts.
-5. **5.3**: ToggleGroup's three types; Toolbar none.
-6. **7.1**: `internal/toolbar-context.ts` as the second cross-folder context (read by
-   `ToggleGroup.Root`, `Toolbar.Separator` and `Menu.Trigger`).
-7. **8 flag table**: `Toolbar.Root experimental_focusgroup` and `ToggleGroup.Root
-   experimental_focusgroup` on the `focusgroup` row, with the nested-group rule.
-8. **9.1 layout**: `use-roving-focus.ts` and `toolbar-context.ts` under `internal/`.
-9. **Header**: the amendment note for #66, marked as pending the design's acceptance.
-
-Nothing in `ChangeReason`, the action signature, the state triple or the Suspense stance changes.
-
----
-
-## Recommendations for the product owner
-
-1. **Exclusive mode deselects by default.** A pressed `aria-pressed` button can always be released,
-   and that is what the button announces; `deselectable={false}` (exclusive variant only) is the
-   opt-out for view switchers, documented as "prefer RadioGroup for an exclusive form choice".
-   Alternative: default `false` (React Aria's `disallowEmptySelection` is opt-in too, so this is the
-   ecosystem's default as well).
-2. **`exclusive` is the discriminant, multiple is the default** (`value: string[]`), as Accordion
-   and as the Toggle design forecast, rather than Base UI's `multiple` flag with single as default.
-3. **Toolbar `loop` defaults to `true`** (Tabs, Menu, Base UI, Radix), overriding the native
-   `focusgroup="toolbar"` default with the `wrap` token so the two paths agree. Alternative:
-   `false`, matching the platform and React Aria.
-4. **`Menu.Trigger` in a vertical Toolbar opens on the inline-end arrow** (ArrowRight; ArrowLeft in
-   RTL) with the first item focused and leaves Up / Down to the Toolbar; horizontal is unchanged
-   (7.4). Alternative: no arrow opening in a vertical toolbar (Enter / Space only).
-5. **A ToggleGroup inside a Toolbar is transparent to the arrows** (no second axis within the
-   group, 7.3), diverging from the APG example's nested radiogroup on purpose.
-6. **One roving engine that writes `tabindex` through the DOM** for both the Toolbar and a
-   standalone ToggleGroup, instead of item wrapper parts (6.1). Consequences to accept: before
-   hydration every item is a Tab stop; an item's own `tabIndex` prop is unsupported in a toolbar;
-   a `MutationObserver` per container. This is the decision I would escalate to the user if any:
-   it is the first library-written attribute on elements the library did not render.
-7. **Text-entry items keep their arrows and Tab moves to the next item from them** (6.3), matching
-   Chromium's native toolbar focusgroup; the docs carry APG's "one such control, last".
-8. **`Toolbar.Button` ships as the library's first plain action button**, scoped to the Toolbar
-   (focusable-disabled, `useActionTrigger`, `data-pending`); a general `Button` stays a separate
-   design. `Toolbar.Separator` is an `<hr>` with perpendicular `aria-orientation`. No `Toolbar.Link`,
-   `Toolbar.Group` or `Toolbar.Input`.
-9. **`Toggle` is unchanged**; `ToggleGroup.Item` renders the same element through the same
-   attribute block, and `Menu.Trigger` gains only a `ToolbarContext` read.
-10. **`experimental_focusgroup` on both Roots** with the `toolbar` token under an explicit
-    `role="group"` for the standalone ToggleGroup (`nomemory` + `focusgroupstart` on the first pressed
-    Item), and a dev warning plus no attribute on a nested group.
-11. **No `Label` parts and no missing-label warning**: both Roots are named through `aria-label` /
-    `aria-labelledby` pass-through, with the docs insisting on it. Alternative: a dev warning on an
-    unnamed `Toolbar.Root` (APG requires the name) — cheap to add if wanted.
-12. **ToggleGroup has no form participation and no `details.reason`** (no residual browser path);
-    `ToggleGroupValueChangeDetails` is `{ added, removed }` and can grow.
-
----
-
 ## Implementation and review fold (#66, 2026-10-18)
 
 From `memo/developer/toggle-group.md` (deviations and "Review fixes") and
@@ -1405,7 +1339,3 @@ check runs in a **passive effect**, after the ToggleGroup's layout effect has wr
 `tabindex="-1"` in the same mount commit, so a Tooltip on a non-first Item of a standalone
 ToggleGroup did warn before the fix (row 28 failed with three warnings). Test: 14 row 28.
 `design/components/tooltip.md` carries the one-line amendment; nothing else in Tooltip changes.
-
-## Open questions
-
-None at present: #74 and #75 are sections 17 and 18.

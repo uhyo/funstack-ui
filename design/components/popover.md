@@ -1689,58 +1689,6 @@ Dialog option C; research question 3).
 
 ---
 
-## Conventions feedback
-
-All applied to `design/conventions.md` (items 1 and 2 with the proposal, items 3 to 8 at
-acceptance). Kept for the record:
-
-1. **3.5 / 5.1: the boundary wraps the top-layer element itself.** A library-driven open or close
-   of a top-layer element (`showPopover()` / `hidePopover()` in a layout effect of a transition
-   commit) is animatable by `<ViewTransition>` when the boundary wraps the element, in every
-   engine; browser-initiated opens and closes still are not.
-2. **8: `focusGroup` detection** (issue #43), with the developer's `useSyncExternalStore` form
-   and the Tabs native-path markup.
-
-3. **4.1 `open` row.** Add Popover: Trigger emits optimistic `data-open` in library mode and a
-   DOM-synced `data-open` in JS-free mode; its exposed expanded state is the browser's (`popovertarget`, #121; `aria-expanded` only on a non-button render, the shown state since #118); the Popup emits none
-   (`:popover-open`).
-4. **5.3 types.** `Popover`: `fsui-popover`, `fsui-popover-open`, `fsui-popover-close`.
-5. **3.5 ownership table.** A third shape next to Dialog's "library-owned open, browser-owned
-   close": Popover's "library-owned for parts, browser-owned for dismissals". Suggested sentence
-   under the table: "Where the platform's close is cancelable without an anti-abuse rule
-   (popovers), a component may own the closes its parts initiate and leave dismissals to the
-   browser; the component doc lists which is which."
-6. **2.2 `"dismiss"` row.** Add "script `hidePopover()` or another top-layer element hiding the
-   popover" to the examples; the `toggle` event is the platform event there.
-7. **1.5 / 3.2.** `aria-expanded` is the first ARIA state attribute the library keeps current
-   through a DOM write outside React (JS-free Popover). If accepted (question 3), 7.4's table
-   gets a row: "ARIA state the platform changes for browser-owned state and AT needs explicitly:
-   write it on the DOM from the platform event through the ref; never React state."
-8. **1.1 part vocabulary.** `Popup`'s default element reads `div[popover]`; Popover's is
-   `dialog[popover]`. Suggest "`div[popover]` or `dialog[popover]`".
-
----
-
-## Follow-ups (not part of this design)
-
-- **Dialog: view transition on the library-driven close.** `Dialog.Close action` calls
-  `dialog.close()` from the action's continuation, outside any commit, so `transition` never
-  animates it, and Dialog 10.3 says "never the close". With the amended convention, Dialog could
-  route the post-action close through the Root (`dispatch(false)`, then `close()` in the apply
-  effect) and get a view-transition exit in every engine. It changes `openChangeAction(false)`
-  from a notification to an awaited call for that one path. Filed as issue #46; not changed
-  here.
-- `internal/anchor-position.ts` shared by Tooltip, Popover and Menu; Tooltip's design names the
-  helper locally.
-- `Popover.Form`, an `anchor` prop, a hover-to-open prop ("hover to preview, click to pin";
-  a consumer's own `interestfor` button already opens and, since #127, dismisses a library
-  Popover on Chromium), a `manual` pinned variant, and a `returnFocus` prop: each when a consumer case
-  appears. Context menus: #45.
-- Human upstream reports collected in #44: Chromium `<dialog popover>` exposed as modal; WebKit
-  302008 / 317926.
-
----
-
 ## Review corrections (2026-10-17)
 
 From `memo/reviewer/popover.md` (review of the implementation, #40) and the developer's fix
