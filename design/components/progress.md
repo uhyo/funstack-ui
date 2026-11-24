@@ -1,11 +1,7 @@
 # Progress and Meter
 
-Status: **accepted** (2026-10-18, wave 6, GitHub issue #68; research issue #65,
-`docs/research/wave6.md` §3; the product owner accepted all twelve items of "For the product
-owner" as recommended, see the end of this document; the conventions proposals were applied in
-f3ab2e4, conventions resolved question 32). Implemented in 6fef197; the review
-(`memo/reviewer/progress-meter.md`) and its fixes (ab22773) are folded in on 2026-10-18, see
-"Review corrections (#68)" at the end. The code under `packages/ui/src/progress/`,
+Status: **accepted**, implemented. History (reviews, decisions, implementation notes, the
+test plan): `design/CHANGELOG.md`, parts "progress.md". The code under `packages/ui/src/progress/`,
 `packages/ui/src/meter/` and the `internal/` helpers it names is the ground truth where this
 document is silent. Follows `design/conventions.md` (accepted); where this document and the
 conventions disagree, the conventions win. Open human checks: the Next.js provider pattern and
@@ -892,164 +888,12 @@ Nothing in the anatomy suspends and no part reads a promise. Consumers own bound
 
 ## 12. Test plan
 
-`packages/ui/src/progress/progress.test.tsx`, `packages/ui/src/meter/meter.test.tsx` (jsdom),
-`progress.browser.test.tsx`, `meter.browser.test.tsx` (Chromium, Firefox, WebKit), and unit
-tests next to the pure modules (`range-value.test.ts`, `meter-region.test.ts`). Top-of-file
-comment (conventions 10.1): "Progress / Meter: no action props and no library-owned state; the
-sync / async / rejection / overlap / superseded-rejection / suspending-content / controlled-parity /
-post-await / platform-path / urgent-action rows are N/A." The design replaces them with the rows
-marked ★.
-
-### 12.1 jsdom
-
-| Area | Tests |
-| --- | --- |
-| Roles and ARIA | The section 1 HTML for both components: `role`, `aria-valuemin` / `max` / `now` / `text`, `aria-labelledby` = consumer tokens + `${id}-label` (present without a Label too), `Label`'s `id` matches, `Value` has `aria-hidden="true"` by default and not with `aria-hidden={false}`; `aria-valuenow` / `aria-valuetext` absent while indeterminate, `aria-valuemin` / `max` still present; a consumer `role` / `aria-valuenow` / `aria-valuetext` prop or `render` element does not land (owned keys). |
-| Arithmetic (unit) | `clamp` (150 of 100 → 100; −5 → `min`), percentage (0, 50, 100, fractional), degenerate range (`max <= min`: warning, `0`, not complete), non-finite (warning; Progress → indeterminate, Meter → `min`), `complete` at exactly `max` and above, not below. |
-| Text | Default `{ style: "percent" }` of the fraction (`40` of `100` → "40%", `2` of `8` → "25%"); a percent `format` with `maximumFractionDigits` formats the fraction; a unit `format` formats the value ("3.2 MB"); `locale="de"` ("40 %"); `getAriaValueText(value, state)` receives the clamped value and a state whose `valueText` is the default, its result lands in `aria-valuetext` and `state.valueText` while `Progress.Value` still shows `formattedValue`; returning `null` omits the attribute; while indeterminate it is called with `null` and can set a text; the `NumberFormat` cache returns the same instance for equal inputs (unit). |
-| Regions (unit) ★ | Every row of the 2.4 table at and beside each boundary (`value` equal to `low` / `high` in each of the three cases), the defaults (`low` = `min`, `high` = `max`, `optimum` = midpoint → `optimum` for any value in range), the clamping order (`high < low` → `high = low`; `optimum` outside the range), and `low <= optimum <= high` never yielding `even-less-good`. |
-| Data attributes | `data-indeterminate` / `data-complete` on all five Progress parts and `data-region` on all five Meter parts, agreeing with the state passed to each part's function props; never the other component's attributes. |
-| Custom properties | `--progress-value: 40%` on the Root's `style`, absent while indeterminate; `--meter-value` / `-low` / `-high` / `-optimum` with the clamped values; a consumer `style={{ "--progress-value": "1%" }}` wins (per-property merge); the Indicator renders no inline size. |
-| Function props / `render` | Every part: `className` / `style` / `children` functions receive the documented state; `render` element form merges `className` / `style` and forwards `ref`; function form receives `(props, state)`; `Value` default children and `children(state)`; `Label` as `render={<label />}` keeps the `id`. |
-| Lanes ★ | A parent runs `startTransition(async () => { setValue(50); await deferred.promise; setValue(80); })` through `useTransition`'s `start` (no `Button` exists in the library; the same React rule is exercised, review N6): before resolve `aria-valuenow` is `"80"` (the post-await write is urgent) while the sync-prefix `setValue(50)` was **held** (never observable as `aria-valuenow`), and the Progress is mounted from `{pending && …}` in the same tick as the click; the counter-example `startTransition(() => setValue(80))` after the await leaves `aria-valuenow` unchanged until the deferred resolves (guards the documented pitfall of 4.2, so the docs claim stays true across React versions). Each step runs inside `await act(async …)`. |
-| Dev warnings | Degenerate range, non-finite value, a part outside its Root (throws), **no** warning for a missing name (documented limitation); each once per element / key. |
-| Server render ★ | `renderToString` of both anatomies equals the client's markup attribute for attribute (a pure function of props); the HTML contains `--progress-value`, `aria-valuetext` and the data attributes before any script; `renderToString` with `locale` fixed produces the same string on both sides. |
-| Directive | `progress-root.tsx`, `meter-root.tsx`, `meter-region.ts`, `internal/range-value.ts`, `internal/render-element.ts`, `internal/dev-warn.ts` and both `index.ts` start **without** `"use client"`; every other file under `src/progress/` and `src/meter/` starts with it (the directive script over `dist`). Also: the Root modules import nothing from a `"use client"` module except the context (`directives.test.ts` walks the Roots' runtime imports over the sources, ignoring `import type` / `export type`, and asserts the context is the only client module reached, so a refactor cannot quietly pull `useRender` into the Root). |
-| Types | `value` optional on `Progress.Root`, required on `Meter.Root`; `transition`, `defaultValue`, `valueChangeAction` are not props (type test); `MeterRegion` exported; `getAriaValueText`'s state parameter is `ProgressState` / `MeterState`. |
-
-### 12.2 Browser mode
-
-| Row | Assertion | Engine branches |
-| --- | --- | --- |
-| Accessibility tree (Chromium, CDP) | `role` progressbar / meter; `valuemin` / `valuemax` / `valuenow`; **no** `valuenow` while indeterminate; the **name** from `Progress.Label` through `aria-labelledby`, and, with no Label and an `aria-label`, the name is the `aria-label` although a dangling `aria-labelledby` token is present (the load-bearing accname assumption of 6.1); a consumer `aria-labelledby` token plus the Label both contribute, in order. **`valuetext` cannot be read from CDP**: `Accessibility.getFullAXTree` reports `valuetext: ""` for `aria-valuetext` on every role (progressbar, meter, slider, native `<progress>`; only `input type=range` reports its own value), so `aria-valuetext` is asserted on the attribute (`memo/developer/cross-engine.md`). Shared helper `src/__tests__/ax-tree.ts`. | `browserName === "chromium"`; others assert the attributes |
-| Native meter oracle ★ | For each row of the 2.4 table: a native `<meter>` with the same `min` / `max` / `low` / `high` / `optimum` / `value` agrees with `meterRegion()`. **Firefox**: `meter.matches(":-moz-meter-optimum" \| ":-moz-meter-sub-optimum" \| ":-moz-meter-sub-sub-optimum")`, compared with **Gecko's** operators (`geckoRegion` in the test: boundaries fall in `suboptimum`, 2.4) while the library's region is asserted as designed. **Chromium**: `getComputedStyle(meter, "::-webkit-meter-*-value")` reports the same width for all three pseudo-elements (useless as an oracle), so the row styles the three value pseudo-elements with distinct colours under `appearance: none`, screenshots the native meter and reads one pixel. | `browserName` branches; **WebKit**: attributes only (no oracle exposed to script; the screenshot oracle could be tried later, since WebKit has the same pseudo-elements), the row asserts the library's region and records the gap |
-| Fill transition | With the 7.3 CSS, changing `value` fires exactly one `transitionstart` for `--progress-value` on the Root (registered property) and the Indicator's `inline-size` animates (its box width between the two values mid-transition: the row waits 300 ms into a 1 s linear transition and asserts a wide band); with `prefers-reduced-motion: reduce` emulated through the custom `emulateReducedMotion` browser command (Playwright `page.emulateMedia`, registered in `vitest.config.ts`; `withReducedMotion()` in `src/__tests__/browser-commands.ts` restores it in `finally`; each Vitest session has its own page, so the emulation does not leak into concurrent files), no `transitionstart`. | none expected; `@property` is in all three engines (research table) |
-| Indeterminate animation | `[data-indeterminate]` has a running animation (`getAnimations()` on the Indicator non-empty), none after `value` becomes a number; the reduced-motion rendering has none. | none |
-| No `startViewTransition` | Spy before mounting from `{pending && …}` in a transition, before a value change in a transition, before unmount: zero calls (no boundary exists). | none |
-| RTL and vertical | Under `dir="rtl"` the Indicator's box starts at the inline end; with `writing-mode: vertical-lr` on the Track the fill grows along the block axis (the recipe's logical insets). | none |
-
----
+Moved to `design/CHANGELOG.md` (part "progress.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 13. Docs pages
 
-Two pages, both Server Components in `packages/docs/src/pages/`, listed in `navigation.ts` after
-Field & Form and routed in `App.tsx`:
-
-**`/components/progress` — `ProgressPage.tsx`.** Intro (output-only; the display of someone
-else's action; works with no JS). Examples (`src/examples/`, each shown with its source):
-
-| Example | Directive | Shows |
-| --- | --- | --- |
-| `ProgressUpload.tsx` | `"use client"` | A fake upload action (`fake-api.ts`) driven by `useTransition`: indeterminate until the size is known, then determinate, `Progress.Value` with a unit `format`, `data-complete` styling, the **lane callout** (plain `setState` after each `await`; the `startTransition` pitfall shown as a non-example). The click handler resets `size` / `sent` **urgently before** starting the action (review S2: otherwise a second upload shows the previous run's complete bar for the 600 ms before the first chunk, the sync-prefix rule of 4.2 in action). |
-| `ProgressForm.tsx` | `"use client"` | An indeterminate bar while a `Form.Root` submits, from `Form.Root`'s `children(state)`; the `aria-busy` / `aria-describedby` region recipe around the content being replaced. |
-| `ProgressJobs.tsx` | **none (Server Component)** | A list of server-side jobs rendered from "server data" with `format`, `locale` and a `getAriaValueText` function passed from the Server Component, plus a `Progress.Root aria-label` spinner with no parts (the indeterminate ring, a fixed arc, review S1). The page says this file has no `"use client"` and that the Root ran on the server; this example is the RSC proof of 8.1. |
-| `progress.css` | | The 7.3 recipes: linear, circular, indeterminate, complete, reduced motion. |
-
-Then: props tables (Root, Track, Indicator, Label, Value), the `ProgressState` table, data
-attributes, custom properties, the `format` rule (percent → fraction, else value), labelling
-(Label / `aria-label`; the dangling token note), inside a Field (6.2), "What AT hears", "Server
-Components" (which files are client modules; `locale` under SSR), "Not in v1", and the
-reduced-motion block.
-
-**`/components/meter` — `MeterPage.tsx`.** Shorter, linking to Progress for the shared parts.
-
-| Example | Directive | Shows |
-| --- | --- | --- |
-| `MeterStorage.tsx` | **none (Server Component)** | Storage quota with `low` / `high` / `optimum={0}` (lower is better), zones from `--meter-low` / `--meter-high`, the fill coloured by `data-region`, the visible text ("4.6 GB of 5 GB") formatted in the **Root's `children(state)`** and passed to `Meter.Value` as a string (a `Meter.Value children` function cannot be passed from a Server Component, 8.1; the first draft of this row said otherwise), `getAriaValueText` naming the region ("almost full"). |
-| `MeterStrength.tsx` | `"use client"` | A password-strength meter under a `Field.Control` inside a `Field.Root` (the supported sibling layout of 6.2): `optimum={max}` (higher is better), the control's `aria-describedby` → `Meter.Value id`, the meter's own `Meter.Label`. |
-| `meter.css` | | The zone and region recipes. |
-
-Then: props tables, `MeterState`, the region table of 2.4 with the defaults and clamping (and
-the Firefox boundary note), data attributes, custom properties, the AT note from research §3.3
-(support is uneven; always a name and a text: `aria-valuemin` / `max` / `now` always,
-`aria-valuetext` unless `getAriaValueText` returns `null`, review N1), the `max <= min` warning
-and the non-finite boundaries (N3), and the "format part content in the Root's `children(state)`"
-sentence next to the Server Component example (N2).
-
-Also: `RoadmapPage` / changelog entry; the Server Components concept page gains Progress and
-Meter as the first components whose Root is itself a Server Component (a row in its table next
-to the JS-free Accordion); `packages/ui/src/index.ts` and `tsdown.config.ts` gain the two
-entries; the playground (`packages/example/src/progress-meter-demo.tsx`) has a demo of both.
-
----
+Moved to `design/CHANGELOG.md` (part "progress.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 14. Implementation notes
 
-1. **The directive-free Root and `useRender`.** `internal/use-render.tsx` is `"use client"` for
-   one `useMemo` (the merged callback ref's identity). A Root with no library ref does not need
-   it. **Taken (6fef197): the split.** `internal/render-element.ts` (directive-free) holds
-   `resolveStateValue`, `rendersButton`, `renderElement(options)` taking an already-merged `ref`,
-   and `mergeRenderRef(consumerRef, render)`, which merges the consumer's and a `render`
-   element's ref unmemoised only when both exist (`mergeRefs` from `merge-props.ts`, which is
-   directive-free) and passes a single ref through untouched; a fresh identity per render is
-   correct because every merged callback returns a cleanup (it re-attaches, harmless for a node
-   with no library ref). `useRender` memoises the merge and calls `renderElement`; it keeps its
-   directive and re-exports, so no other part changed. The conventions (f3ab2e4, 7.1) also
-   allow the alternative, dropping the directive from `use-render.tsx` on the strength of
-   React's `react-server` export list; it was not needed. The Roots pass `ref` into
-   `mergeRenderRef` during render, which oxlint's `react/refs` rule flags; both call sites carry
-   `// oxlint-disable-next-line react/refs` with the reason (the value is only forwarded to the
-   element, never read). Either way the Root must not import from any other `"use client"`
-   module than its context (the import-graph test row).
-2. **The context provider from the Root.** `<ProgressContext value={{ id, state }}>` with the
-   React 19 provider syntax; never `ProgressContext.Provider` (a property access on a client
-   reference is not portable across frameworks' proxies). The value is a fresh object per render;
-   the parts are cheap and re-render with the Root anyway, so no memoisation (and `useMemo` in
-   the Root would raise the directive question again).
-3. **`warnOnce`** (`internal/dev-warn.ts`): `isDev && !seen.has(key)` → `console.error`; keys
-   include the part name, the condition and the values, not the element (a Server Component has
-   no element identity); called during render, so a discarded render may warn. `resetWarnOnce()`
-   exists for tests. Existing client parts keep `useDevWarning`.
-4. **Formatting cache**: `Map<string, Intl.NumberFormat>` keyed by `locale ?? ""` +
-   `JSON.stringify(format ?? PERCENT)`, capped (drop the oldest past 32 entries); the fraction
-   rule reads `format.style` (`undefined` means `"percent"` only when `format` is absent; a
-   `format` without `style` is `"decimal"` per `Intl` and formats the value).
-5. **Attribute values**: `aria-valuenow` renders the clamped number as React stringifies it
-   (`String(n)`), not rounded; `--progress-value` is `${percentage}%` with the full float
-   (CSS does not care), so `scale` and `inline-size` consumers get the exact fraction.
-6. **Owned-key merge** as everywhere (`mergeProps(partProps, elementProps, controlled)`): the
-   custom properties go into the part's `style` *before* the consumer's resolved `style` so the
-   consumer wins per property (Slider's rule); `aria-labelledby` through the token-merge path.
-7. **Tests for the lane row** use the existing `deferred()` helper and `useTransition`'s `start`
-   from a plain button (there is no `Button` in the library; the React rule is the same, review
-   N6); the assertion between dispatch and resolve runs inside `await act(async …)` (the Slider
-   review's L4 rule for anything that may suspend or settle later).
-
----
-
-## Review corrections (#68, 2026-10-18)
-
-The review (`memo/reviewer/progress-meter.md`, of 6fef197; verdict: acceptable with minor fixes)
-found the library code matching the design: ARIA semantics, owned keys, the directive-free Root
-with the client context provider, the lane rule, the region algorithm and the formatting. Its
-fixes landed in ab22773 and are folded into the sections above. Nothing was must-fix.
-
-| Item | Change | Sections |
-| --- | --- | --- |
-| S1 | The docs' indeterminate ring was invisible: a registered property with an `initial-value` is never guaranteed-invalid, so a `var(--progress-value, 25%)` fallback was never used and the `conic-gradient` drew 0 %. The ring now draws a fixed arc in its own `[data-indeterminate]` rule; the 7.3 recipe says why. | 7.3, 13 |
-| S2 | `ProgressUpload` showed the previous run's complete bar for the 600 ms before a second upload's first chunk: `size` / `sent` are now reset urgently in the click handler before the action starts, which is the sync-prefix rule of 4.2 demonstrated instead of tripped over. | 4.2, 13 |
-| S3 | `defaultValue` type-checked on both Roots and was a silent no-op (react-dom drops it on a `div`, so `<Progress.Root defaultValue={40} />`, the spelling every value component teaches, rendered an indeterminate bar with no warning). `defaultValue` and `defaultChecked` are omitted from both props types; the type test asserts it with `@ts-expect-error`. | 3.1, 3.3 |
-| N1–N3 | Meter page wording: `aria-valuetext` is absent when `getAriaValueText` returns `null`; the Server Component example formats part content in the Root's `children(state)`; the `max <= min` warning and the non-finite boundaries are documented. | 13 |
-| N4 | "A Root with no parts ships only the context module" was unverified (it depends on how the RSC bundler emits client references reachable from the namespace object); softened to "the parts' code is only loaded where they are used". | 8.1 |
-| N5 | `emulateReducedMotion` moved above `selectBrowsers`'s doc comment in `vitest.config.ts`. | 12.2 |
-| N6 | The lane row uses `useTransition`'s `start` from a plain button; the design said "a `Button` with an `action`", which does not exist. Wording fixed. | 12.1, 14.7 |
-| N7 | A degenerate range clamps `aria-valuenow` to `min`, which can exceed `aria-valuemax` when `min > max`; accepted (the call site already warns) and documented. | 2.1 |
-
-Developer deviations (`memo/developer/progress-meter.md`) and the review's verdicts:
-
-| Deviation | Verdict | Sections |
-| --- | --- | --- |
-| `use-render` split into `internal/render-element.ts` (`mergeRenderRef` unmemoised) | Acceptable, the design's preferred option | 8.1, 14.1 |
-| A Server Component may pass function props to the Root only; a function on a part fails with "Functions cannot be passed directly to Client Components" and the docs build still exits 0 | Acceptable, inherent (the parts are client modules); the design's MeterStorage row was wrong and is corrected; the silent build is #72 | 8.1, 13 |
-| Firefox `<meter>` puts a value exactly at `low` / `high` in `suboptimum` where Chromium says `optimum` | Acceptable: HTML leaves the boundaries to the implementation; the library follows Chromium as designed, the Firefox oracle asserts Gecko's operators | 2.4, 12.2 |
-| Non-finite `low` / `high` / `optimum` count as absent | Acceptable: matches the platform's attribute parser, unit-tested | 2.1 |
-| `aria-valuenow` clamped (to `min`) for a degenerate range | Acceptable (N7) | 2.1 |
-| `defaultValue` passes through to the div | **Not acceptable**: fixed in ab22773 (S3) | 3.1, 3.3 |
-| `// oxlint-disable-next-line react/refs` on `mergeRenderRef(ref, render)` in both Roots | Acceptable: the ref is only forwarded to the element, never read during render; the comment says so | 14.1 |
-
-Other facts recorded by the implementation: the CDP accessibility tree reports `valuetext: ""`
-for `aria-valuetext` on every role, so the browser rows assert the attribute (12.2); the
-Chromium meter oracle is a screenshot pixel, because the three `::-webkit-meter-*-value`
-pseudo-elements report the same computed width (12.2); the provider-from-server pattern is
-confirmed with `@funstack/static`, the Next.js check and the screen-reader pass are human tasks
-in #73 (5.3, 8.1).
+Moved to `design/CHANGELOG.md` (part "progress.md"). Not part of the contract: the code and the tests are the reference.
