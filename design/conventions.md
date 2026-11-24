@@ -601,7 +601,7 @@ Contract:
   is still reported.
 - **The latest rejection once the owner is gone is reported too**. The hook rethrows a
   latest rejection only while its component's effects are connected (`useConnected` in
-  `report-dropped.ts`: set in a mount layout effect, cleared by its cleanup); otherwise it passes
+  `use-connected.ts`: set in a mount layout effect, cleared by its cleanup); otherwise it passes
   it to `reportDropped` and returns. Why: React routes a transition's rejection only through a
   render of the component that owns it; with that component unmounted nothing reads it (probed
   on 19.3.1 with `useActionTrigger`: no boundary, no `reportError`, no
@@ -2594,7 +2594,8 @@ packages/ui/src/
     use-action-trigger.ts   # section 3.4: pure triggers
     use-pure-trigger.ts     # usePureTrigger: the whilePending wiring of the four pure triggers with the prop (2.5.1, 3.6)
     use-step-commit.ts      # the step / commit core of the continuous controls, Slider and NumberField (2.3; slider.md 2.4)
-    report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; useConnected(); both hooks call them
+    report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; directive-free (callUrgentHandler imports it)
+    use-connected.ts        # section 2.4: useConnected(), whether the owner's effects are connected; both hooks and Form.Root call it
     use-render.tsx          # resolves render / className / style / children against state
     render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
     merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
@@ -2638,7 +2639,7 @@ packages/ui/src/
     anchor-position.ts      # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free
     use-resolved-placement.ts  # useResolvedPlacement, useAnchoredPlacement (13.2)
     shipped-styles.ts       # FSUI_PRECEDENCE (section 12); directive-free
-    call-urgent-handler.ts  # callUrgentHandler: the one rule of every `on*` handler (2.1)
+    call-urgent-handler.ts  # callUrgentHandler: the one rule of every `on*` handler (2.1); directive-free
     css-transition-cut.ts   # withCssTransitionCut (5.1); directive-free
     transition-boundary.tsx # the `<ViewTransition default={transition}>` wrapper, only when `transition` is given (5.1)
     trigger-ref.ts          # the Root's triggerRef, with the second-Trigger dev warning

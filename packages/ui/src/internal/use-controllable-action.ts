@@ -12,7 +12,8 @@ import {
 } from "react";
 import type { ActionDetails, ChangeAction } from "./types.js";
 import { useLatest } from "./use-latest.js";
-import { reportDropped, useConnected } from "./report-dropped.js";
+import { reportDropped } from "./report-dropped.js";
+import { useConnected } from "./use-connected.js";
 
 export interface UseControllableActionOptions<T, Details extends ActionDetails> {
   /** The controlled prop (`x`). `undefined` means uncontrolled. */

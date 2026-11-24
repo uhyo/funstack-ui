@@ -1,3 +1,5 @@
+import { reportDropped } from "./report-dropped.js";
+
 /** Whether `value` is a thenable (a promise, or anything with a callable `then`). */
 function isThenable(value: unknown): value is PromiseLike<unknown> {
   return (
@@ -16,8 +18,7 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  * Used by `onOpenChange` (the overlay Roots), a toast's `onClose` and Combobox's
  * `onInputValueChange`. A missing handler is a no-op.
  *
- * Directive-free: no client-only API (it does not import `report-dropped.ts`, a client module,
- * and repeats its two-line `reportError` fallback instead).
+ * Directive-free: no client-only API (`report-dropped.ts` is directive-free too).
  */
 export function callUrgentHandler<Args extends readonly unknown[]>(
   handler: ((...args: Args) => unknown) | undefined,
@@ -28,14 +29,8 @@ export function callUrgentHandler<Args extends readonly unknown[]>(
   try {
     result = handler(...args);
   } catch (error) {
-    report(error);
+    reportDropped(error);
     return;
   }
-  if (isThenable(result)) result.then(undefined, report);
-}
-
-/** `reportError`, or `console.error` where it does not exist (jsdom), as `reportDropped`. */
-function report(error: unknown): void {
-  if (typeof reportError === "function") reportError(error);
-  else console.error(error);
+  if (isThenable(result)) result.then(undefined, reportDropped);
 }

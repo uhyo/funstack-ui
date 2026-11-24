@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useTransition } from "react";
-import { reportDropped, useConnected } from "./report-dropped.js";
+import { reportDropped } from "./report-dropped.js";
+import { useConnected } from "./use-connected.js";
 
 export interface ActionTriggerOptions {
   /**

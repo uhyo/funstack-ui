@@ -28,6 +28,7 @@ const clientFiles = [
   "tabs/tabs-indicator.mjs",
   "internal/use-until-found.mjs",
   "internal/use-controllable-action.mjs",
+  "internal/use-connected.mjs",
   "internal/use-dev-warning.mjs",
   "internal/use-render.mjs",
   // Every Tooltip part is a client module (design/components/tooltip.md, 2.4 and 12.1).
@@ -247,6 +248,9 @@ const directiveFreeFiles = [
   "internal/range-value.mjs",
   "internal/render-element.mjs",
   "internal/dev-warn.mjs",
+  // The rejection fallback and the `on*` handler rule (conventions 2.1, 2.4).
+  "internal/report-dropped.mjs",
+  "internal/call-urgent-handler.mjs",
   "toggle-group/index.mjs",
   "toolbar/index.mjs",
   "number-field/index.mjs",

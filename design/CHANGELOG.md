@@ -10774,3 +10774,11 @@ separate). Internal only, no behaviour change.
 - Mount reconciliation stays in each Popup. The hook is called right after it in both, because
   layout effects run in call order and the reconciliation's dispatch must precede the first
   apply.
+
+## 2026-11-24, #157: directive-free `reportDropped`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 10). Internal only, no
+behaviour change. `internal/report-dropped.ts` keeps `reportDropped` and loses its directive;
+`useConnected` moves to the new client module `internal/use-connected.ts`. `callUrgentHandler`
+imports `reportDropped` instead of repeating its `reportError` / `console.error` fallback.
+Sections changed: conventions 2.4 (where `useConnected` lives), the 9.1 file listing.
