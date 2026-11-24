@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
 import type { RefObject } from "react";
+import { sortByDocumentOrder } from "../internal/dom-order.js";
 import type { ComboboxOptionEntry } from "./combobox-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -83,10 +84,7 @@ export function useOptionRegistry(labels: Map<string, string>): OptionRegistry {
   const orderedOptions = useCallback((): OrderedOption[] => {
     const options: OrderedOption[] = [];
     for (const [optionValue, entry] of registry) options.push({ value: optionValue, ...entry });
-    options.sort((a, b) =>
-      a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
-    );
-    return options;
+    return sortByDocumentOrder(options, (option) => option.element);
   }, [registry]);
 
   return {
