@@ -12475,3 +12475,22 @@ Also on this branch, after its review (`memo/reviewer/review-157-spec-slim-2.md`
 `committed` is the controlled value when it is not `undefined` (the second pass first
 wrote "`controlled ?? internal`", which is wrong for a controlled `null`), and the callers of
 `useFormReset` and `resolveFieldDefaults` in 3.8 are complete.
+
+## 2026-11-24, #157: conventions 3.9 moved to design/overlay-open-state.md
+
+Refactoring wave #157, the last step of the split decided by the product owner (entry
+"conventions.md split into four documents" above; it waited for #159, which changed this text
+and has merged). No rule changed and no text was rewritten.
+
+- Section 3.9 (overlay open state: requests and facts, 3.9.1 to 3.9.13) is in
+  `design/overlay-open-state.md`, verbatim, under the same numbers. `design/conventions.md`
+  keeps the 3.9 heading with a stub ("Moved to `design/overlay-open-state.md`, same numbers",
+  and one line that says what the section rules); `scripts/check-design-refs.mjs` resolves
+  "conventions 3.9.4" through it.
+- The three traps of 3.5 ("A part's library-owned close is the single source of that close":
+  the focus move of a `mousedown`, light dismiss, a non-button part that must survive its own
+  press) are in the same document, verbatim, under "The light-dismiss traps (conventions
+  3.5)". 3.5 keeps the rule's first sentence and names the document. 3.5 is not a stub.
+- `design/conventions.md`: 2,444 lines before, 2,140 after. The conventions are now five
+  documents: `conventions.md`, `internal-hooks.md`, `overlay-open-state.md`, `placement.md`,
+  `testing.md`.
