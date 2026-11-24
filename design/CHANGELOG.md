@@ -10873,4 +10873,22 @@ directive-free parts): the sites that warn from a registration callback or an ev
 no-Track warnings, Combobox's duplicate option value, RadioGroup's partial hydration,
 `Menu.ContextTrigger`'s missing Popup, `useInitialFocusTarget`), the ones that read the DOM or a
 ref in an effect (`Field.Root`'s "no form control", `useItemOrder`'s duplicate values, Tooltip's
-three checks), and the two in `toast/toast-viewport.tsx` (left for the branch that splits it).
+three checks), and the two in `toast/toast-viewport.tsx` (skipped by that branch; its split, #160,
+was already on master, see the follow-up entry below).
+
+## 2026-11-24, #157 follow-up: the helpers in the files skipped for the split
+
+Follow-up to the two #157 helper entries above (`memo/reviewer/review-157-helpers.md` finding 3).
+The files that branch left alone because #160 was splitting them now use the shared helpers:
+
+- `Combobox.Root` resolves `name` and `disabled` with `resolveFieldDefaults` (same values).
+- `useToastFocus` sorts the Roots with `compareDocumentOrder` instead of its own
+  `byDocumentPosition` (the same order; the two differ only for unrelated nodes, which open
+  toasts in one region never are).
+- `Toast.Viewport`'s "another Toast.Viewport already renders this manager" is a
+  `useDevWarning(rejected, ...)` call instead of a `console.error` in the subscription effect. It
+  fires one commit later and once per instance (it fired twice under StrictMode). "toast.update:
+  no toast" warns from a call and stays as it is.
+
+The earlier entry's "left for the branch that splits it" is corrected in place to say the split
+was already on master.

@@ -2570,6 +2570,23 @@ describe("Toast", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("another Toast.Viewport"));
     });
 
+    it("the second-Viewport warning fires once per instance under StrictMode", async () => {
+      const error = silenceErrors();
+      render(
+        <StrictMode>
+          <Toast.Viewport manager={manager} data-testid="one" />
+          <Toast.Viewport manager={manager} data-testid="two" />
+        </StrictMode>,
+      );
+      await flushMicrotasks(2);
+      expect(screen.getByTestId("one")).toBeInTheDocument();
+      expect(screen.queryByTestId("two")).toBeNull();
+      const warnings = error.mock.calls.filter((args) =>
+        String(args[0]).includes("another Toast.Viewport"),
+      );
+      expect(warnings).toHaveLength(1);
+    });
+
     // #63 L8
     it("two Viewports mounted in one commit: the second region is never shown", async () => {
       silenceErrors();

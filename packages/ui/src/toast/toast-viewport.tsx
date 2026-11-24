@@ -364,12 +364,6 @@ export function ToastViewport({
     const unsubscribe = toastManagerInternals(manager).subscribe(listener.current!);
     if (unsubscribe === null) {
       setRejected(true);
-      if (isDev) {
-        console.error(
-          "Toast.Viewport: another Toast.Viewport already renders this manager; this one renders " +
-            "nothing. Use one Viewport per manager, or `createToastManager()` for a second queue.",
-        );
-      }
       return;
     }
     setRejected(false);
@@ -450,6 +444,14 @@ export function ToastViewport({
   });
 
   // --- Development checks ---------------------------------------------------------------------
+
+  // A second Viewport on a taken manager renders nothing (`rejected`, set above).
+  useDevWarning(
+    rejected,
+    isDev &&
+      "Toast.Viewport: another Toast.Viewport already renders this manager; this one renders " +
+        "nothing. Use one Viewport per manager, or `createToastManager()` for a second queue.",
+  );
 
   // A Viewport inside a library Dialog would close (and unmount) with it.
   const insideDialog = use(DialogContext) !== null;

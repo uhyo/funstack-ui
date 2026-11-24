@@ -15,7 +15,7 @@ import { announce, canAnnounce } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
 import { isPopoverOpen } from "../internal/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
-import { useFieldValueChange } from "../internal/use-field-control.js";
+import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
 import type {
   ActionDetails,
   ChangeAction,
@@ -275,8 +275,11 @@ export function ComboboxRoot(props: ComboboxRootProps) {
   // `disabled` default from the Field, and the List is named by `Field.Label` when no
   // `Combobox.Label` is mounted.
   const field = use(FieldContext);
-  const name = props.name ?? field?.name;
-  const disabled = (props.disabled ?? false) || (field?.disabled ?? false);
+  const { name, disabled } = resolveFieldDefaults(field, {
+    name: props.name,
+    disabled: props.disabled ?? false,
+    required: false,
+  });
   const fieldControlId = field?.ids.control;
 
   const id = useId();
