@@ -3,6 +3,7 @@ import { useId, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { compareDocumentOrder } from "../internal/dom-order.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
   ActionDetails,
@@ -160,8 +161,7 @@ export function TabsRoot({
       const prevTab = findById(rootRef.current, tabId(rootId, prev));
       const nextTab = findById(rootRef.current, tabId(rootId, next));
       if (prevTab === null || nextTab === null) return transitionTypes("tabs");
-      const following = prevTab.compareDocumentPosition(nextTab) & Node.DOCUMENT_POSITION_FOLLOWING;
-      return transitionTypes("tabs", following ? "next" : "prev");
+      return transitionTypes("tabs", compareDocumentOrder(prevTab, nextTab) < 0 ? "next" : "prev");
     },
     warn: { component: "Tabs.Root", prop: "value" },
   });

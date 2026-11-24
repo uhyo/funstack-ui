@@ -18,6 +18,7 @@
 // Root, which replaces the Select, so the rollback is asserted where the Select stays mounted (a
 // controlled veto, a rejection caught inside the action, a refused platform dispatch).
 import { act, render, screen } from "@testing-library/react";
+import { createPortal } from "react-dom";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -309,6 +310,21 @@ describe("Select", () => {
       expect(() => render(<Select.Group label="x" />)).toThrow(/Select\.Group must be rendered/);
       expect(() => render(<Select.GroupLabel />)).toThrow(/Select\.GroupLabel must be rendered/);
       expect(() => render(<Select.Separator />)).toThrow(/Select\.Separator must be rendered/);
+    });
+
+    it("warns for a Select.Value rendered outside the <select> (a portal)", () => {
+      const error = silenceErrors();
+      render(
+        <Select.Root aria-label="x" defaultValue="a">
+          <Select.Option value="a">A</Select.Option>
+          {createPortal(<Select.Value data-testid="outside" />, document.body)}
+        </Select.Root>,
+      );
+      expect(screen.getByTestId("outside").closest("select")).toBeNull();
+      expect(error).toHaveBeenCalledWith(
+        "Select.Value: rendered outside the Select.Root's <select>; put it inside " +
+          "Select.Trigger, the select's first child.",
+      );
     });
 
     it("types: no multiple / size on Root, no children on Value, no transition anywhere", () => {

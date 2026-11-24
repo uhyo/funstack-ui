@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -99,23 +99,23 @@ export function DialogTrigger({
             "a <button>, or put the Dialog in library mode (`defaultOpen={false}`)."
           : null),
   );
+  // A Trigger without a Popup opens nothing (design 14, dev warnings). Checked when the Trigger's
+  // element attaches: the commit's DOM is complete by then, Popup included.
+  const checkPopup = useElementCheck(
+    isDev &&
+      (() =>
+        document.getElementById(ids.popup) === null
+          ? "Dialog.Trigger: no Dialog.Popup is rendered for this Dialog.Root; the trigger opens nothing."
+          : null),
+  );
   const libraryRef = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);
+      checkPopup?.(element);
       return registerTrigger(triggerRef, element, "Dialog.Trigger");
     },
-    [checkElement, triggerRef],
+    [checkElement, checkPopup, triggerRef],
   );
-
-  // A Trigger without a Popup opens nothing (design 14, dev warnings).
-  useEffect(() => {
-    if (!isDev) return;
-    if (document.getElementById(ids.popup) === null) {
-      console.error(
-        "Dialog.Trigger: no Dialog.Popup is rendered for this Dialog.Root; the trigger opens nothing.",
-      );
-    }
-  }, [ids.popup]);
 
   // Library mode (both modal and non-modal) and non-modal JS-free mode need a click handler;
   // modal JS-free mode is the browser's command.

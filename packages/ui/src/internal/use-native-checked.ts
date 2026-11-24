@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { RefCallback } from "react";
+import { intendedValue } from "./use-controllable-action.js";
 import { useElementCheck } from "./use-element-check.js";
 import { useFormReset } from "./use-form-reset.js";
 
@@ -87,7 +88,7 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
   );
 
   /** What the user intends: the latest in-flight dispatch, else the optimistic value (rule 1). */
-  const readBase = useEffectEvent(() => options.latestInFlight?.()?.next ?? checked);
+  const readBase = useEffectEvent(() => intendedValue(options.latestInFlight, checked));
   const report = useEffectEvent((next: boolean, event: Event | undefined) => {
     options.onPlatformChange?.(next, event);
   });
@@ -150,7 +151,7 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
     const el = node.current;
     if (el === null) return;
     const next = el.defaultChecked;
-    const base = options.latestInFlight?.()?.next ?? checked;
+    const base = intendedValue(options.latestInFlight, checked);
     if (next !== base) options.onPlatformChange?.(next, event);
     else if (el.checked !== base) el.checked = base;
   });

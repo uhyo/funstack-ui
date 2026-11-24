@@ -601,7 +601,7 @@ Contract:
   is still reported.
 - **The latest rejection once the owner is gone is reported too**. The hook rethrows a
   latest rejection only while its component's effects are connected (`useConnected` in
-  `report-dropped.ts`: set in a mount layout effect, cleared by its cleanup); otherwise it passes
+  `use-connected.ts`: set in a mount layout effect, cleared by its cleanup); otherwise it passes
   it to `reportDropped` and returns. Why: React routes a transition's rejection only through a
   render of the component that owns it; with that component unmounted nothing reads it (probed
   on 19.3.1 with `useActionTrigger`: no boundary, no `reportError`, no
@@ -1562,6 +1562,7 @@ This is the one contract both designs implement (`design/components/switch.md` 7
 | Hook | Called by | Does |
 | --- | --- | --- |
 | `useFormReset(ref, onReset, onResetEvent?)` (`internal/use-form-reset.ts`) | the other two, Combobox | **Stable** `reset` subscription on the form owner (`ref.current.form`; the element may be an `<input>`, a `<select>` or a `<fieldset>`, both form-associated and honouring `form=`). Re-reads the owner after every commit but re-subscribes only when it changed; the handler body is a `useEffectEvent`. On `reset` it calls the optional `onResetEvent(event)` synchronously (before the reset algorithm: where a text input's `defaultValue` mirror must be written, rule 6), then queues a microtask and, unless `event.defaultPrevented`, calls `onReset(event)`. |
+| `useResetTarget(value, defaultValue)` (`internal/use-form-reset.ts`) | Slider, NumberField, Select, Combobox (value and text) | Rule 6's target by mode: controlled, the mount-time value; uncontrolled, the latest `defaultValue`; `undefined` when that is absent, and the caller adds its fallback (`?? null`, `?? value`, a platform default). |
 | `useNativeChecked(options)` (`internal/use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item` | Per element: the ref callback with the dev tag/`type` check; a layout effect after **every** commit that re-applies, in this order, `defaultChecked` (if given), then `checked` (optimistic), then `indeterminate` (if given). The order matters in exactly one case: react-dom's `updateInput` writes `el.checked` on every update of the input (setting the dirty-checkedness flag), and React's automatic form reset runs in the form's mutation effects, after the inputs' updates and before layout effects; after that reset the dirty flag is clear, so writing `defaultChecked` (the `checked` content attribute) would move `checked` too, and writing `checked` afterwards settles it. `indeterminate` is independent of both; and, **unless `group: true`**, the two residual paths for a single control: mount reconciliation and `useFormReset`, both reporting `onPlatformChange(next: boolean, event)`. With `group: true` it reports nothing; the group adapter does. |
 | `useNativeGroupReconciliation<T>({ element, readCurrent, readDefault, base, onPlatformChange })` (`internal/use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, `CheckboxGroup.Root`) with `element` = its `<fieldset>` ref | Mount reconciliation once (`readCurrent()` vs `base()`) and `useFormReset` on the fieldset (`readDefault()` vs `base()`), each producing **one dispatch per group** through `onPlatformChange(next: T, event)`. Returns a stable `{ onItemMounted }`, which the Root passes down through context and `group: true` items call from their mount layout effect (`useNativeChecked` takes `onItemMounted` and `component` options). The adapter **ignores calls made before its own mount reconciliation has run** (members rendered in the Root's commit run their effects first, so they are covered by that reconciliation; the flag is reset in the effect cleanup so StrictMode's re-run behaves the same); any later call queues **one microtask per commit** that compares `readCurrent()` with `base()` and dispatches `"platform"` with `event: undefined`. Comparison is `equals` (option, default `Object.is`); a group with a set value (`CheckboxGroup.Root`) passes set equality, because two sets are never `Object.is`-equal. `element` accepts any `FormAssociatedElement`: Slider subscribes through its first Thumb's input (a Root `div` has no `.form`), with `readCurrent` reading every registered input and `readDefault` returning the JS-computed reset target; the optional `onResetEvent` option is passed through to `useFormReset` for the `defaultValue` mirror of a controlled value input (rule 6). |
 | `useNativeSelectValue(options)` (`internal/use-native-select-value.ts`) | `Select.Root` with its `<select>` ref | The select analogue of `useNativeChecked`, built on `useNativeGroupReconciliation`. After every commit, and for each late Option's mount report, it mirrors the reset target into `option.defaultSelected` (uncontrolled: the latest `defaultValue`, nothing when absent; controlled: the Root's mount-time value; react-dom writes `defaultSelected` only for an uncontrolled `defaultValue`) **and then** re-applies the intended option's `selected`, in that order in one synchronous step, because `defaultSelected = true` on an option the user or script never selected moves the selection. Mount reconciliation reads `select.value`; the reset path reads the spec's reset result (the last `defaultSelected` option, else the first enabled option, else `""`); both dispatch once per Select and only when the intended option exists. With neither `value` nor `defaultValue` the uncontrolled value is **adopted** from the browser's choice without a dispatch (`adopt(next)` on `useControllableAction`, uncontrolled only). |
@@ -1573,7 +1574,7 @@ This is the one contract both designs implement (`design/components/switch.md` 7
 | `groupMemberProps(options)` (`internal/group-member.ts`) | `RadioGroup.Item`, `CheckboxGroup.Item` | The owned layer of a group member's `<input>`: `type`, the group's `name` / `form`, `value`, optimistic `checked`, `defaultChecked` never rendered, a checkbox's `aria-checked` removed, the member's own `disabled` (the Root's reaches it through `<fieldset disabled>`), `required`, `aria-invalid` only when given (CheckboxGroup inside a Field), the state `data-*` attributes and the guarded `onChange`. The hydration-time attribute sync next to it is `syncPresences` (`internal/sync-presence.ts`). |
 | `useItemOrder({ optimistic, initial, read, changed?, duplicateMessage })` (`internal/use-item-order.ts`) | `CheckboxGroup.Root`, `ToggleGroup.Root` | The Items' document order kept in state for the Root state's `value`: a deps-less layout effect re-reads the layout after each Root commit and re-renders only when what renders from it changed; returns `{ layout, renderedValue }` (the optimistic set in document order, values with no Item last). The set and order arithmetic is `internal/value-set.ts` (`toSet`, `setsEqual`, `applyPatch`, `sortByOrder`, `firstDuplicate`, `EMPTY_SET`; Accordion uses it too) and document order `internal/dom-order.ts` (`compareDocumentOrder`, `sortByDocumentOrder`). |
 | `resolveFieldDefaults(field, own)` (`internal/use-field-control.ts`) | `useFieldControl` itself; `NumberField.Root` (whose owner part is the Input but whose `name` / `disabled` the Root resolves) | The one "own or the Field's" rule: `name` falls back to the Field's, `disabled` and `required` are either's; the own props outside a Field. `FieldControlBinding.fieldName` is the Field's own `name` for a control that must tell the two apart (Slider). |
-| `intendedValue(latestInFlight, optimistic)` (`internal/use-controllable-action.ts`) | the group Roots' residual paths | Rule 1's base with the explicit null check, in one place. |
+| `intendedValue(latestInFlight, optimistic)` (`internal/use-controllable-action.ts`) | the group Roots' residual paths, `useNativeChecked`, Accordion, the overlay Roots' `intended()`, Dialog.Root | Rule 1's base with the explicit null check, in one place; an absent `latestInFlight` means nothing in flight. |
 
 Rules the three hooks implement, which component docs may cite instead of restating:
 
@@ -2361,13 +2362,16 @@ export default defineConfig({
 away, and it can only do so when the text sits behind a `NODE_ENV` test it can evaluate. Every
 module that warns declares its own `const isDev = process.env.NODE_ENV !== "production"` and
 passes each message as `isDev && "..."` (or `isDev && ((element) => ...)`) to `useDevWarning`,
-`useElementCheck`, `useNameWarning` and `useShownNameWarning`, which accept `false`; a direct
+`useMountFixed`, `useElementCheck`, `useNameWarning` and `useShownNameWarning`, which accept
+`false`; a direct
 `console.error` sits inside `if (isDev)`. The hooks themselves are exported as `isDev ? hook :
 noop`, so a production render runs no warning hook at all. A dev check fires **once per
 instance** (`useDevWarning`: the first time its condition holds; the element and name checks:
 the first failing check). `src/__tests__/production-bundle.test.ts` bundles `src/index.ts` as a
 consumer would (`NODE_ENV` `"production"`, minified) and fails on any string from those call
-sites that survives, naming the file and the text.
+sites that survives, naming the file and the text. A message starts with the public name of
+the part that warns and a colon (`Tooltip.Trigger: the trigger is not focusable; ...`), or the
+name of the function that warns (`toast(): ...`, `toast.update: ...`).
 
 ### 7.3 JS-free primitives
 
@@ -2594,7 +2598,8 @@ packages/ui/src/
     use-action-trigger.ts   # section 3.4: pure triggers
     use-pure-trigger.ts     # usePureTrigger: the whilePending wiring of the four pure triggers with the prop (2.5.1, 3.6)
     use-step-commit.ts      # the step / commit core of the continuous controls, Slider and NumberField (2.3; slider.md 2.4)
-    report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; useConnected(); both hooks call them
+    report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; directive-free (callUrgentHandler imports it)
+    use-connected.ts        # section 2.4: useConnected(), whether the owner's effects are connected; both hooks and Form.Root call it
     use-render.tsx          # resolves render / className / style / children against state
     render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
     merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
@@ -2604,7 +2609,7 @@ packages/ui/src/
     use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
     use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2)
     dev-warn.ts             # warnOnce for directive-free parts
-    use-form-reset.ts       # section 3.8
+    use-form-reset.ts       # section 3.8; also useResetTarget(value, defaultValue), the reset target by mode (rule 6)
     use-form-owner-event.ts # section 3.8; declares FormAssociatedElement
     use-native-checked.ts   # section 3.8; also exports guardCheckableChange
     use-native-group-reconciliation.ts  # section 3.8
@@ -2621,10 +2626,10 @@ packages/ui/src/
     validity.ts, focus-first-invalid.ts  # Field helpers; directive-free
     toolbar-context.ts      # section 7.1: ToolbarContext, read across folders
     use-roving-focus.ts     # section 7.4: DOM-written roving tabindex
-    arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine); directive-free
+    arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine; Accordion.Root uses resolveArrowKey); directive-free
     use-native-focusgroup.ts  # useNativeFocusgroup(flag): the native `focusgroup` detection (section 8)
     use-overlay-root.ts     # useOverlayRoot, popoverDetails, OverlayRootValue (section 3.9): Popover, Menu, Combobox, Dialog
-    use-popover-popup.ts, use-popover-trigger.ts  # the shared Popup and Trigger of Popover, Menu, Combobox
+    use-popover-popup.ts, use-popover-trigger.ts  # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger
     overlay-popup.tsx       # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
     overlay-show.ts         # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
     use-apply-open-state.ts # useApplyOpenState: the apply effect (popover.md 2.5, dialog.md 2.5) both Popup implementations share, over an `isShown` / `show` / `hide` driver
@@ -2638,7 +2643,7 @@ packages/ui/src/
     anchor-position.ts      # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free
     use-resolved-placement.ts  # useResolvedPlacement, useAnchoredPlacement (13.2)
     shipped-styles.ts       # FSUI_PRECEDENCE (section 12); directive-free
-    call-urgent-handler.ts  # callUrgentHandler: the one rule of every `on*` handler (2.1)
+    call-urgent-handler.ts  # callUrgentHandler: the one rule of every `on*` handler (2.1); directive-free
     css-transition-cut.ts   # withCssTransitionCut (5.1); directive-free
     transition-boundary.tsx # the `<ViewTransition default={transition}>` wrapper, only when `transition` is given (5.1)
     trigger-ref.ts          # the Root's triggerRef, with the second-Trigger dev warning
@@ -2647,6 +2652,7 @@ packages/ui/src/
     use-value-set.ts        # a set-valued `value` / `defaultValue` prop as a set
     use-hydrated-mount.ts   # whether this mount is the hydration render (useSyncExternalStore)
     use-register-count.ts   # how many parts of a kind are registered
+    use-mount-fixed.ts      # useMountFixed(value, isDev && message): a prop read once at mount (the JS-free / library mode, `exclusive`), with its dev warning
     use-delayed-pair.ts     # an open timer and a close timer that exclude each other
     use-until-found.ts      # hidden="until-found" (section 7.4)
     modal-registry.ts, use-modal-registration.ts  # the stack of open modal dialogs (section 3.5); the registry is directive-free

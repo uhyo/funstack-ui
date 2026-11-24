@@ -23,6 +23,7 @@ const DEV_CALLEES = new Set([
   "console.error",
   "console.warn",
   "useDevWarning",
+  "useMountFixed",
   "useElementCheck",
   "useNameWarning",
   "useShownNameWarning",

@@ -1,15 +1,9 @@
 "use client";
-import {
-  useCallback,
-  useEffectEvent,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffectEvent, useId, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
+import { resolveArrowKey } from "../internal/arrow-keys.js";
+import type { ArrowMove } from "../internal/arrow-keys.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { compareDocumentOrder, sortByDocumentOrder } from "../internal/dom-order.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -20,8 +14,8 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
+import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
+import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { useValueSet } from "../internal/use-value-set.js";
@@ -178,8 +172,6 @@ function reduce(set: OpenSet, item: string, open: boolean, exclusive: boolean): 
   return set.has(item) ? set : new Set(set).add(item);
 }
 
-const NAV_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
-
 /** Writes `open` to the DOM; it fires `toggle`, whose handler sees DOM === committed and returns. */
 function applyOpen(element: HTMLDetailsElement, open: boolean): void {
   if (element.open !== open) element.open = open;
@@ -190,21 +182,22 @@ function isEnabledTrigger(el: HTMLElement): boolean {
 }
 
 /**
- * Picks the trigger to focus for an arrow/Home/End key: `sorted` is every registered trigger in
- * document order; disabled ones are skipped; arrows wrap. Works when `current` is itself disabled
- * (disabled triggers stay focusable).
+ * Picks the trigger to focus for a move (ArrowDown / ArrowUp / Home / End, `resolveArrowKey` on
+ * the vertical axis): `sorted` is every registered trigger in document order; disabled ones are
+ * skipped; arrows wrap. Works when `current` is itself disabled (disabled triggers stay
+ * focusable), which is why this is not the roving engine's index arithmetic.
  */
 function nextTrigger(
   sorted: readonly HTMLElement[],
   current: HTMLElement,
-  key: string,
+  move: ArrowMove,
 ): HTMLElement | undefined {
   const enabled = sorted.filter(isEnabledTrigger);
   if (enabled.length === 0) return undefined;
-  if (key === "Home") return enabled[0];
-  if (key === "End") return enabled[enabled.length - 1];
+  if (move === "first") return enabled[0];
+  if (move === "last") return enabled[enabled.length - 1];
   const position = sorted.indexOf(current);
-  if (key === "ArrowDown") {
+  if (move === "next") {
     return enabled.find((el) => sorted.indexOf(el) > position) ?? enabled[0];
   }
   return enabled.findLast((el) => sorted.indexOf(el) < position) ?? enabled[enabled.length - 1];
@@ -234,9 +227,8 @@ export function AccordionRoot(props: AccordionRootProps) {
   // Mode is decided once, from the first render's props (design 12).
   const isLibraryNow =
     value !== undefined || defaultValue !== undefined || valueChangeAction !== undefined;
-  const [mode] = useState<AccordionMode>(isLibraryNow ? "library" : "static");
-  useDevWarning(
-    (mode === "library") !== isLibraryNow,
+  const mode = useMountFixed<AccordionMode>(
+    isLibraryNow ? "library" : "static",
     isDev &&
       "Accordion.Root: the mode changed after mount (`value`, `defaultValue` and `valueChangeAction` " +
         "were all absent on one render and present on another). Switching between JS-free and " +
@@ -245,9 +237,8 @@ export function AccordionRoot(props: AccordionRootProps) {
 
   // Exclusive or multiple is decided once too, like ToggleGroup's mode (design 12): the reducer,
   // the value shape handed to the action and the static `name` all follow the mounted mode.
-  const [exclusive] = useState(exclusiveProp);
-  useDevWarning(
-    exclusive !== exclusiveProp,
+  const exclusive = useMountFixed(
+    exclusiveProp,
     isDev &&
       "Accordion.Root: `exclusive` changed after mount. Switching between exclusive and " +
         "multiple mode is not supported; the accordion keeps the mode it mounted with.",
@@ -346,7 +337,7 @@ export function AccordionRoot(props: AccordionRootProps) {
       // intends (the latest in-flight dispatch, else the optimistic set), never on the DOM: a
       // pending optimistic open would otherwise be lost to latest-wins. Exclusive mode therefore
       // lets the toggled item win when it opened (design walkthrough 9.6).
-      const base = latestInFlight()?.next ?? optimistic;
+      const base = intendedValue(latestInFlight, optimistic);
       const next = reduce(base, item, open, exclusive);
       if (setsEqual(next, base)) return;
       dispatchChange(next, item, open, "platform", event);
@@ -361,7 +352,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   // and no event; disabled items are simply put back. Runs once per mount; the StrictMode re-run
   // is deduplicated against the dispatch just made.
   const reconcileOnMount = useEffectEvent(() => {
-    const base = latestInFlight()?.next ?? optimistic;
+    const base = intendedValue(latestInFlight, optimistic);
     const mismatches: { item: string; open: boolean }[] = [];
     for (const [element, item] of sortedItems()) {
       const want = committed.has(item);
@@ -393,11 +384,13 @@ export function AccordionRoot(props: AccordionRootProps) {
   }, [isLibrary, pending, committed, latestInFlight]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
-    if (!NAV_KEYS.has(event.key)) return;
+    // Vertical only, so no RTL mirroring: ArrowLeft / ArrowRight are not navigation keys.
+    const move = resolveArrowKey(event.key, "vertical", false);
+    if (move === null) return;
     const target = event.target;
     if (!(target instanceof HTMLElement) || !triggers.current.has(target)) return;
     const sorted = [...triggers.current].sort(compareDocumentOrder);
-    const next = nextTrigger(sorted, target, event.key);
+    const next = nextTrigger(sorted, target, move);
     if (next === undefined) return;
     event.preventDefault();
     // A nested Root handles its own triggers; the outer one must not move focus again.

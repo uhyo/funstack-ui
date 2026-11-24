@@ -10,6 +10,38 @@ import { cancelClick, disabledButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-overlay-root.js";
 
+/**
+ * The click rule of a Trigger that toggles a popover-kind Root (popover.md 2.8): Popover.Trigger,
+ * Menu.Trigger, Menu.SubmenuTrigger (through `usePopoverTrigger`) and Combobox.Trigger. It toggles
+ * against what the user already intends (`intended()`, conventions 3.8 rule 1), not the DOM:
+ *
+ * - intended open, and the browser already hid the popup (a non-button Trigger, #115: light
+ *   dismiss hid it at `pointerup`, before this click): the hide is a fact, reported by its pending
+ *   `toggle`; the click only names its cause, an `"activate"` close intent;
+ * - intended open otherwise: `requestClose(event, "activate")`;
+ * - intended closed: `beforeOpen()`, then `requestOpen(event, "activate")`. First, because what
+ *   it records (Menu's open cause) must be in place before anything can show the popup. Today the
+ *   show waits for the apply effect, so the order is not observable.
+ *
+ * The caller cancels the click and checks `disabled` first. Handlers only.
+ */
+export function toggleFromTrigger(
+  ctx: PopoverRootValue,
+  event: Event,
+  beforeOpen?: () => void,
+): void {
+  if (ctx.intended()) {
+    if (ctx.hiddenBeforeToggle()) {
+      ctx.recordCloseIntent({ reason: "activate", event });
+      return;
+    }
+    ctx.requestClose(event, "activate");
+  } else {
+    beforeOpen?.();
+    ctx.requestOpen(event, "activate");
+  }
+}
+
 const isDev = process.env.NODE_ENV !== "production";
 
 /**
@@ -169,22 +201,7 @@ export function usePopoverTrigger<State>(
       activate(event);
       return;
     }
-    const native = event.nativeEvent;
-    if (ctx.intended()) {
-      if (ctx.hiddenBeforeToggle()) {
-        // A non-button Trigger (#115): light dismiss hid the popup at `pointerup`, before this
-        // click. The hide is a fact, reported by its pending `toggle`; this click only names its
-        // cause (popover.md 2.8).
-        ctx.recordCloseIntent({ reason: "activate", event: native });
-        return;
-      }
-      ctx.requestClose(native, "activate");
-    } else {
-      // First: what it records (Menu's open cause) must be in place before anything can show the
-      // popup. Today the show waits for the apply effect, so the order is not observable.
-      beforeOpen?.(event);
-      ctx.requestOpen(native, "activate");
-    }
+    toggleFromTrigger(ctx, event.nativeEvent, beforeOpen && (() => beforeOpen(event)));
   };
 
   // The component's handlers first, then the Trigger's (design/components/menu.md 14). The click

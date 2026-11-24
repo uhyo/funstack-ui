@@ -16,6 +16,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFieldControl, useFieldValueChange } from "../internal/use-field-control.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
+import { useResetTarget } from "../internal/use-form-reset.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -402,11 +403,11 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   // --- Residual browser paths: mount reconciliation and form reset (design 9.2, 9.3) --------
 
-  const [mountValue] = useState(value);
+  // Neither mode's target given: the current value (controlled after an uncontrolled mount), else
+  // the platform default.
+  const resetBase = useResetTarget(value, defaultValue);
   const resetTarget = (): readonly number[] =>
-    value !== undefined
-      ? toArray(mountValue ?? value)
-      : toArray(defaultValue ?? platformDefault(min, max, step));
+    toArray(resetBase ?? value ?? platformDefault(min, max, step));
 
   const readCurrent = (): readonly number[] =>
     shownRef.current.map((v, index) => {

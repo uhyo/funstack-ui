@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -17,6 +17,7 @@ import {
   useFieldControl,
   useFieldValueChange,
 } from "../internal/use-field-control.js";
+import { useResetTarget } from "../internal/use-form-reset.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useNativeSelectValue } from "../internal/use-native-select-value.js";
 import { useRender } from "../internal/use-render.js";
@@ -167,8 +168,7 @@ export function SelectRoot({
 
   // Controlled: the mount-time value is the reset target (conventions 3.8 rule 6). Neither
   // `value` nor `defaultValue`: the value adopted at mount, chosen inside the hook.
-  const [mountValue] = useState(value);
-  const resetTarget = value === undefined ? defaultValue : (mountValue ?? value);
+  const resetTarget = useResetTarget(value, defaultValue) ?? value;
 
   // Any dispatch, a pick or a platform change, ends the adoption of the browser's default.
   const established = useRef(false);

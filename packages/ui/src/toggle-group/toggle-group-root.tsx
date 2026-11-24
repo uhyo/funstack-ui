@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -9,6 +9,7 @@ import { transitionTypes } from "../internal/transition-types.js";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { useItemOrder } from "../internal/use-item-order.js";
 import type { ItemLayout } from "../internal/use-item-order.js";
 import { useLatest } from "../internal/use-latest.js";
@@ -253,9 +254,8 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
   const flag = !inToolbar && focusgroupProp === true;
 
   // The mode is fixed at mount (design 3.1).
-  const [mountExclusive] = useState(exclusive);
-  useDevWarning(
-    mountExclusive !== exclusive,
+  const mountExclusive = useMountFixed(
+    exclusive,
     isDev &&
       "ToggleGroup.Root: `exclusive` changed after mount. Switching between exclusive and " +
         "multiple mode is not supported; the group keeps the mode it mounted with.",

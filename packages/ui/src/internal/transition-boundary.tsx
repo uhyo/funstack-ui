@@ -1,6 +1,8 @@
 "use client";
-import { useEffect, useRef, ViewTransition } from "react";
+import { useState, ViewTransition } from "react";
 import type { ReactNode, ViewTransitionClass } from "react";
+
+import { useDevWarning } from "./use-dev-warning.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -43,17 +45,14 @@ export function useTransitionBoundary(
   node: ReactNode,
 ): ReactNode {
   const hasBoundary = transition !== undefined;
-  const initial = useRef(hasBoundary);
-  const warned = useRef(false);
-  useEffect(() => {
-    if (!isDev || warned.current || hasBoundary === initial.current) return;
-    warned.current = true;
-    console.error(
+  const [initial] = useState(hasBoundary);
+  useDevWarning(
+    hasBoundary !== initial,
+    isDev &&
       `${part}: \`transition\` changed between undefined and a value after mount. The part ` +
         "renders a <ViewTransition> only when `transition` is given, so this remounts its " +
         'subtree (DOM and state are lost). Keep `transition` static; use `transition="none"` ' +
         "to switch animation off without removing the boundary.",
-    );
-  }, [hasBoundary, part]);
+  );
   return transitionBoundary(transition, node);
 }

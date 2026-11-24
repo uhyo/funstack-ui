@@ -10774,3 +10774,103 @@ separate). Internal only, no behaviour change.
 - Mount reconciliation stays in each Popup. The hook is called right after it in both, because
   layout effects run in call order and the reconciliation's dispatch must precede the first
   apply.
+
+## 2026-11-24, #157: directive-free `reportDropped`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 10). Internal only, no
+behaviour change. `internal/report-dropped.ts` keeps `reportDropped` and loses its directive;
+`useConnected` moves to the new client module `internal/use-connected.ts`. `callUrgentHandler`
+imports `reportDropped` instead of repeating its `reportError` / `console.error` fallback.
+Sections changed: conventions 2.4 (where `useConnected` lives), the 9.1 file listing.
+
+## 2026-11-24, #157: `useResetTarget`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 2). Internal only, no
+behaviour change. The reset target of a value prop by mode (conventions 3.8 rule 6), which Slider,
+NumberField, Select and Combobox each wrote as `const [mountValue] = useState(value)` plus a
+ternary, is `useResetTarget(value, defaultValue)` in `internal/use-form-reset.ts`. Each caller
+keeps its own fallback for "no target" (Slider: the current value, else the platform default;
+Select: the current value; NumberField and Combobox: `null`; Combobox's text: `""`), so the edge
+case of a Root that became controlled after an uncontrolled mount is unchanged. Sections changed:
+the conventions 3.8 helper table (new row), the 9.1 file listing.
+
+## 2026-11-24, #157: every intent read through `intendedValue`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 3). Internal only, no
+behaviour change. The six inline `latestInFlight()?.next ?? x` reads (`useNativeChecked` twice,
+Accordion twice, Dialog.Root's `returnValue` clear, `useOverlayRoot`'s `intended()`) call
+`intendedValue`. Every one of them reads a boolean or a set, never nullish, so the explicit null
+check changes nothing. `intendedValue` accepts an absent `latestInFlight` (`useNativeChecked`'s
+option is optional). Dialog.Root calls `intendedValue(latestInFlight, optimistic)` rather than
+`intended()`, which reads the optimistic value through `useLatest`: the same value at that point,
+but only by insertion-effect order. Sections changed: the conventions 3.8 helper table
+(`intendedValue` row).
+
+## 2026-11-24, #157: `useMountFixed`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 1). Internal only, no
+behaviour change, the warning texts unchanged. The four "read once at mount, warn when it
+changes" sites (the overlay Roots' and Accordion's JS-free / library mode, Accordion's and
+ToggleGroup's `exclusive`) call `useMountFixed(value, isDev && message)` in the new
+`internal/use-mount-fixed.ts`. The audit's second step, a shared `useLibraryMode`, was not done:
+with `useMountFixed` each mode detection is one call whose only other content is the component's
+own prop list and message, so a second helper would only move those. `production-bundle.test.ts`
+collects the texts passed to `useMountFixed` too. Sections changed: the conventions 9.1 file
+listing.
+
+## 2026-11-24, #157: `toggleFromTrigger`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 7). Internal only, no
+behaviour change. The Trigger click rule (toggle against `intended()`; the #115 "hidden before
+its `toggle`" branch records an `"activate"` close intent; `beforeOpen` before `requestOpen`),
+written in `usePopoverTrigger` and again in Combobox.Trigger, is `toggleFromTrigger(ctx, event,
+beforeOpen?)` in `internal/use-popover-trigger.ts`. Each Trigger keeps its own `preventDefault()`,
+`disabled` check and what follows (Combobox focuses its input). Sections changed: the conventions
+9.1 file listing.
+
+## 2026-11-24, #157: Accordion's key table is `resolveArrowKey`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 9). Internal only, no
+behaviour change. Accordion.Root's own `NAV_KEYS` set and key strings are
+`resolveArrowKey(key, "vertical", false)`; its `nextTrigger` keeps its own arithmetic (it works
+from a disabled current trigger, which the roving engine and Tabs.List never see, because their
+item lists leave disabled items out), now over `ArrowMove`. A new Accordion test pins that
+ArrowLeft / ArrowRight are not navigation keys, also in RTL. Sections changed: the conventions 9.1
+file listing.
+
+## 2026-11-24, #157: Tooltip's warnings use the `Part.Name: ` form
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 10; the caller allowed this
+development-console text change). Tooltip's three development warnings started with
+`[Tooltip] `, the only ones in the library that did not name the part. They now read
+`Tooltip.Trigger: provides="name" together with aria-label on the trigger ...`,
+`Tooltip.Trigger: the trigger is not focusable; ...` and
+`Tooltip.Popup: tooltips must not contain interactive content. ...`. When and how often they fire
+is unchanged (an effect in `Tooltip.Root`, once per Root each). Sections changed: conventions 7.2
+states the message form and lists `useMountFixed` with the hooks that take `isDev && message`
+(an omission of the `useMountFixed` entry above).
+
+## 2026-11-24, #157: hand-rolled dev warnings through the shared helpers
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 10). Development console only;
+the texts are unchanged.
+
+- `useControllableAction`'s two warnings ("both `value` and `defaultValue`", "changed from
+  controlled to uncontrolled") and `useTransitionBoundary`'s "`transition` changed between
+  undefined and a value" are `useDevWarning` calls (the mount value is kept in `useState`).
+- `Select.Value`'s "rendered outside the Select.Root's `<select>`" is the `position` check of
+  `useSelectPartRef` (`useElementCheck`) instead of a `console.error` in its layout effect.
+- `Dialog.Trigger`'s "no Dialog.Popup is rendered" is a `useElementCheck` run from the Trigger's
+  ref instead of a mount effect. The commit's DOM is complete when refs attach, so it sees the
+  same Popup.
+- The last two used to warn on every mount of the effect (twice under StrictMode). They now warn
+  once per instance like every other check (conventions 7.2).
+
+Not converted, because their timing fits none of `useDevWarning` (a condition known at render),
+`useElementCheck` (a check of the part's own element) and `warnOnce` (once per key, for
+directive-free parts): the sites that warn from a registration callback or an event handler
+(`Field.Root`'s two-controls and two-Errors warnings, Slider's duplicate-index, mixed-form and
+no-Track warnings, Combobox's duplicate option value, RadioGroup's partial hydration,
+`Menu.ContextTrigger`'s missing Popup, `useInitialFocusTarget`), the ones that read the DOM or a
+ref in an effect (`Field.Root`'s "no form control", `useItemOrder`'s duplicate values, Tooltip's
+three checks), and the two in `toast/toast-viewport.tsx` (left for the branch that splits it).

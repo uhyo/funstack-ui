@@ -9,7 +9,11 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { nonInvokerMessage, RESERVED_INVOKER_KEYS } from "../internal/use-popover-trigger.js";
+import {
+  nonInvokerMessage,
+  RESERVED_INVOKER_KEYS,
+  toggleFromTrigger,
+} from "../internal/use-popover-trigger.js";
 import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
@@ -163,15 +167,7 @@ export function ComboboxTrigger({
       // listbox anchored to the input), and a disabled link must not navigate either.
       event.preventDefault();
       if (disabled) return;
-      const native = event.nativeEvent;
-      if (popover.intended()) {
-        // A non-button Trigger after light dismiss (#115): the hide is a fact; name its cause.
-        if (popover.hiddenBeforeToggle()) {
-          popover.recordCloseIntent({ reason: "activate", event: native });
-        } else {
-          popover.requestClose(native, "activate");
-        }
-      } else popover.requestOpen(native, "activate");
+      toggleFromTrigger(popover, event.nativeEvent);
       ctx.inputRef.current?.focus();
     },
     "data-open": dataAttr(popover.optimistic),

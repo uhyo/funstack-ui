@@ -1846,6 +1846,24 @@ describe("Dev warnings", () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("announces the name twice"));
   });
 
+  it("names the part in the library's `Part.Name: ` form", () => {
+    render(
+      <Harness
+        root={{ provides: "name" }}
+        trigger={{ "aria-label": "Save", render: <span /> }}
+        popup={{ children: <a href="/more">more</a> }}
+      />,
+    );
+    const messages = errorSpy.mock.calls.map(([m]) => String(m));
+    expect(messages).toEqual(
+      expect.arrayContaining([
+        expect.stringMatching(/^Tooltip\.Trigger: provides="name" together with aria-label/),
+        expect.stringMatching(/^Tooltip\.Trigger: the trigger is not focusable/),
+        expect.stringMatching(/^Tooltip\.Popup: tooltips must not contain interactive content/),
+      ]),
+    );
+  });
+
   it("warns once when the trigger is not focusable", () => {
     const { rerender } = render(<Harness trigger={{ render: <span /> }} />);
     rerender(<Harness trigger={{ render: <span />, className: "x" }} />);

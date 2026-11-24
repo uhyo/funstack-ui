@@ -7,7 +7,7 @@ import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { deferred, ErrorCatcher, silenceErrors } from "../__tests__/helpers.js";
 import type { ActionDetails } from "./types.js";
-import { useControllableAction } from "./use-controllable-action.js";
+import { intendedValue, useControllableAction } from "./use-controllable-action.js";
 import type { ControllableAction } from "./use-controllable-action.js";
 
 type Hook = ControllableAction<string, ActionDetails>;
@@ -494,5 +494,20 @@ describe("useControllableAction: uncontrolled reducer commits", () => {
     act(() => toggle("a", true));
     await act(async () => runs[0]!.resolve());
     expect(value()).toBe("x|x");
+  });
+});
+
+describe("intendedValue (conventions 3.8 rule 1)", () => {
+  it("is the latest in-flight dispatch's next when there is one", () => {
+    expect(intendedValue(() => ({ next: true }), false)).toBe(true);
+  });
+
+  it("keeps a nullish in-flight next instead of falling back", () => {
+    expect(intendedValue<string | null>(() => ({ next: null }), "a")).toBeNull();
+  });
+
+  it("is the optimistic value with nothing in flight, or no latestInFlight at all", () => {
+    expect(intendedValue(() => null, "a")).toBe("a");
+    expect(intendedValue(undefined, "a")).toBe("a");
   });
 });

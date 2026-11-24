@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
 import type { RefObject } from "react";
+import { sortByDocumentOrder } from "../internal/dom-order.js";
+import { useRegisterCount } from "../internal/use-register-count.js";
 import type { ComboboxOptionEntry } from "./combobox-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -34,9 +36,12 @@ export interface OptionRegistry {
 export function useOptionRegistry(labels: Map<string, string>): OptionRegistry {
   const [registry] = useState(() => new Map<string, ComboboxOptionEntry>());
   const [optionCount, setOptionCount] = useState(0);
-  const [statusCount, setStatusCount] = useState(0);
-  const statusCountRef = useRef(0);
-  const [labelCount, setLabelCount] = useState(0);
+  const {
+    count: statusCount,
+    register: registerStatus,
+    countRef: statusCountRef,
+  } = useRegisterCount();
+  const { count: labelCount, register: registerLabel } = useRegisterCount();
   const warnedDuplicate = useRef(false);
 
   const registerOption = useCallback(
@@ -66,27 +71,10 @@ export function useOptionRegistry(labels: Map<string, string>): OptionRegistry {
     [registry, labels],
   );
 
-  const registerStatus = useCallback(() => {
-    statusCountRef.current += 1;
-    setStatusCount((count) => count + 1);
-    return () => {
-      statusCountRef.current -= 1;
-      setStatusCount((count) => count - 1);
-    };
-  }, []);
-
-  const registerLabel = useCallback(() => {
-    setLabelCount((count) => count + 1);
-    return () => setLabelCount((count) => count - 1);
-  }, []);
-
   const orderedOptions = useCallback((): OrderedOption[] => {
     const options: OrderedOption[] = [];
     for (const [optionValue, entry] of registry) options.push({ value: optionValue, ...entry });
-    options.sort((a, b) =>
-      a.element.compareDocumentPosition(b.element) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
-    );
-    return options;
+    return sortByDocumentOrder(options, (option) => option.element);
   }, [registry]);
 
   return {
