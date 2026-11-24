@@ -396,3 +396,9 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #147 re-evaluation (architect) running → memo/architect/147-reevaluation.md. Then alpha.17 release (user: wait for #148 — done; ask before releasing).
 - MERGED #147 (6fec240, option B CSS cut; review H1 strict-CSP restore bug fixed via CSSOM) and #155 (7bf4fb2). #156 filed (dialog popover refocus, design decision, low). All #143 work done; ready for alpha.17 — ask user.
 - RELEASED 0.1.0-alpha.17 (71c007d; Publish + Deploy Docs green; npm "being processed" at publish time). Notes: memo/product-owner/notes-alpha17.md. WAVE 20 (#143 feedback) DONE. Open dev issues: #153, #154, #156. Human tasks unchanged (#122 now has slow-open examples live on production).
+
+## Wave 21: dev backlog #153 #154 #156 (user request 2026-11-24)
+- #153 MERGED b3919f6 (internal `whole` dispatch option + NativeGroupPath; Accordion exclusive fixed at mount with dev warning). Review 9a129d3.
+- #154 MERGED 0c73fb5. Architect a99cd5a: React doesn't serialize form actions; useFormStatus is one value per form; pending ends when all overlapping submissions settle. Fix = latch: a function-formAction Button stays pending from its own submission until form status idle (gated on formAction being a function, review F1). Closes whilePending="ignore" hole. No user decision (bug fix; public wording changed).
+- #156 user chose (d): popup `inert` during refused re-show → "a refused re-open never moves focus". PO extended to every popup element (consumer autofocus in <div>) and non-modal Dialog show() (reviewer found same symptom); modal Dialog unchanged. MERGED 7e7e770. Reviews in memo/reviewer/review-156.md. WebKit only checked in CI; fallback if it fails = assert old behaviour on WebKit (not .focus()).
+- Optional test gaps left (review-156 follow-up): Dialog "adopted dismissal then open gets initial focus" not pinned; no Dialog browser row for non-modal re-show.
