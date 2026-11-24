@@ -213,23 +213,17 @@ Rules, which component docs cite instead of restating:
 
 ## The files of `internal/` (conventions 9.1)
 
-One line per file of `packages/ui/src/internal/` (not exported). A new shared helper gets a
-line here in the commit that adds it. "section N" in a comment is a section of
-`design/conventions.md` or of this document.
+One line per file of `packages/ui/src/internal/` (not exported): the flat helpers first, then
+the three subfolders `action/`, `form/` and `overlay/` (the layering rule is in conventions
+9.1). A new shared helper gets a line here in the commit that adds it. "section N" in a comment
+is a section of `design/conventions.md` or of this document.
 
 ```
 packages/ui/src/internal/
   types.ts                # Action, ActionDetails, ChangeAction, ChangeReason, RenderProp, StateValue
-  action-details.ts       # createActionDetails (section 2.2); directive-free
   data-attr.ts            # dataAttr(flag) -> "" | undefined (section 4.1)
   transition-types.ts     # transitionTypes(component, change?) -> string[] (section 5.3)
   platform-attributes.ts  # the one `declare module "react"` (section 7.4)
-  use-controllable-action.ts  # section 3.4; also intendedValue (3.8 rule 1)
-  use-action-trigger.ts   # section 3.4: pure triggers
-  use-pure-trigger.ts     # usePureTrigger: the whilePending wiring of the four pure triggers with the prop (2.5.1, 3.6)
-  use-step-commit.ts      # the step / commit core of the continuous controls, Slider and NumberField (2.3; slider.md 2.4)
-  report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; directive-free (callUrgentHandler imports it)
-  use-connected.ts        # section 2.4: useConnected(), whether the owner's effects are connected; both hooks and Form.Root call it
   use-render.tsx          # resolves render / className / style / children against state
   render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
   merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
@@ -239,54 +233,64 @@ packages/ui/src/internal/
   use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
   use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2)
   dev-warn.ts             # warnOnce for directive-free parts
-  use-form-reset.ts       # section 3.8; also useResetTarget(value, defaultValue), the reset target by mode (rule 6)
-  use-form-owner-event.ts # section 3.8; declares FormAssociatedElement
-  use-native-checked.ts   # section 3.8; also exports guardCheckableChange
-  use-native-group-reconciliation.ts  # section 3.8
-  use-native-select-value.ts  # section 3.8 (Select)
-  use-checkable-input.ts  # section 3.8: Checkbox / Switch
-  use-fieldset-group.ts   # section 3.8: RadioGroup.Root / CheckboxGroup.Root
-  group-member.ts         # section 3.8: a group Item's owned input layer
-  sync-presence.ts        # hydration-time attribute presence sync (3.8)
   use-item-order.ts       # section 3.8: the Items' document order in state (CheckboxGroup, ToggleGroup)
   value-set.ts            # set / order arithmetic of the set-valued components; directive-free
   dom-order.ts            # compareDocumentOrder, sortByDocumentOrder; directive-free
-  field-context.ts        # FieldContext, FormContext, fieldDataAttributes (7.1)
-  use-field-control.ts    # useFieldControl, useFieldValueChange, fieldInputProps, resolveFieldDefaults (3.8)
-  validity.ts, focus-first-invalid.ts  # Field helpers; directive-free
   toolbar-context.ts      # section 7.1: ToolbarContext, read across folders
   use-roving-focus.ts     # section 7.4: DOM-written roving tabindex
   arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine; Accordion.Root uses resolveArrowKey); directive-free
   use-native-focusgroup.ts  # useNativeFocusgroup(flag): the native `focusgroup` detection (section 8)
-  use-overlay-root.ts     # useOverlayRoot, OverlayRootValue (section 3.9; Dialog), usePopoverRoot, PopoverRootValue (plus the `shown` mirror; Popover, Menu, Combobox), popoverDetails
-  use-popover-popup.ts, use-popover-trigger.ts  # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger
-  overlay-popup.tsx       # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
-  overlay-show.ts         # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
-  use-apply-open-state.ts # useApplyOpenState: the apply effect (popover.md 2.5, dialog.md 2.5) both Popup implementations share, over an `isShown` / `show` / `hide` driver
-  use-overlay-close.ts    # useOverlayClose: the one Close part of Popover and Dialog
-  content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
-  use-exit-animation.ts   # held content while an exit animates (popover.md 4.4)
-  popover-open.ts         # isPopoverOpen(element); directive-free
-  invokers.ts             # eventSource, closedByPopoverTarget, isPopoverInvoker, listenInvokerPresses (popover.md 2.3, menu.md 2.2); directive-free
-  focus-visible.ts        # QuietFocusTarget, supportsFocusVisibleOption, resetFocusVisibleOption (popover.md 6.1); directive-free
   announce.ts             # announce(target, message, priority?), canAnnounce(target) (section 8, number-field.md 8.3); directive-free
-  anchor-position.ts      # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free
-  use-resolved-placement.ts  # useResolvedPlacement, useAnchoredPlacement (13.2)
   shipped-styles.ts       # FSUI_PRECEDENCE (section 12); directive-free
-  call-urgent-handler.ts  # callUrgentHandler: the one rule of every `on*` handler (2.1); directive-free
-  css-transition-cut.ts   # withCssTransitionCut (5.1); directive-free
   transition-boundary.tsx # the `<ViewTransition default={transition}>` wrapper, only when `transition` is given (5.1)
-  trigger-ref.ts          # the Root's triggerRef, with the second-Trigger dev warning
-  use-interest-dismiss.ts # the lost-interest hide of an interest-opened popup (popover.md 2.9)
   pointer-capture.ts      # setPointerCapture that tolerates a pointer the engine no longer tracks; directive-free
   use-value-set.ts        # a set-valued `value` / `defaultValue` prop as a set
   use-hydrated-mount.ts   # whether this mount is the hydration render (useSyncExternalStore)
   use-register-count.ts   # how many parts of a kind are registered
   use-mount-fixed.ts      # useMountFixed(value, isDev && message): a prop read once at mount (the JS-free / library mode, `exclusive`), with its dev warning
   use-delayed-pair.ts     # an open timer and a close timer that exclude each other
-  modal-registry.ts, use-modal-registration.ts  # the stack of open modal dialogs (section 3.5); the registry is directive-free
   decimal.ts              # decimal helpers of Slider and NumberField; directive-free
   range-value.ts          # clamp, percentage and formatting of Progress and Meter; directive-free
   csp-context.ts          # what <CSPProvider> gives the parts that render a hoisted <style> (section 12)
-  form-status-watcher.tsx # the useFormStatus edge watcher of Form.Root and Dialog.Form
+  action/                 # actions and triggers (section 3.4, conventions 2); imports flat modules only
+    action-details.ts     # createActionDetails (section 2.2); directive-free
+    use-controllable-action.ts # section 3.4; also intendedValue (3.8 rule 1)
+    use-action-trigger.ts # section 3.4: pure triggers
+    use-pure-trigger.ts   # usePureTrigger: the whilePending wiring of the four pure triggers with the prop (2.5.1, 3.6)
+    use-step-commit.ts    # the step / commit core of the continuous controls, Slider and NumberField (2.3; slider.md 2.4)
+    report-dropped.ts     # section 2.4: reportDropped(error) -> global reportError, console.error fallback; directive-free (callUrgentHandler imports it)
+    use-connected.ts      # section 2.4: useConnected(), whether the owner's effects are connected; both hooks and Form.Root call it
+    call-urgent-handler.ts # callUrgentHandler: the one rule of every `on*` handler (2.1); directive-free
+  form/                   # native form controls and Field (section 3.8); imports action/ and flat modules
+    use-form-reset.ts     # section 3.8; also useResetTarget(value, defaultValue), the reset target by mode (rule 6)
+    use-form-owner-event.ts # section 3.8; declares FormAssociatedElement
+    use-native-checked.ts # section 3.8; also exports guardCheckableChange
+    use-native-group-reconciliation.ts # section 3.8
+    use-native-select-value.ts # section 3.8 (Select)
+    use-checkable-input.ts # section 3.8: Checkbox / Switch
+    use-fieldset-group.ts # section 3.8: RadioGroup.Root / CheckboxGroup.Root
+    group-member.ts       # section 3.8: a group Item's owned input layer
+    sync-presence.ts      # hydration-time attribute presence sync (3.8)
+    field-context.ts      # FieldContext, FormContext, fieldDataAttributes (7.1)
+    use-field-control.ts  # useFieldControl, useFieldValueChange, fieldInputProps, resolveFieldDefaults (3.8)
+    validity.ts, focus-first-invalid.ts # Field helpers; directive-free
+    form-status-watcher.tsx # the useFormStatus edge watcher of Form.Root and Dialog.Form
+  overlay/                # open state, popups, placement, the modal stack (3.9, 13); imports action/ and flat modules
+    use-overlay-root.ts   # useOverlayRoot, OverlayRootValue (section 3.9; Dialog), usePopoverRoot, PopoverRootValue (plus the `shown` mirror; Popover, Menu, Combobox), popoverDetails
+    use-popover-popup.ts, use-popover-trigger.ts # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger
+    overlay-popup.tsx     # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
+    overlay-show.ts       # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
+    use-apply-open-state.ts # useApplyOpenState: the apply effect (popover.md 2.5, dialog.md 2.5) both Popup implementations share, over an `isShown` / `show` / `hide` driver
+    use-overlay-close.ts  # useOverlayClose: the one Close part of Popover and Dialog
+    content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
+    use-exit-animation.ts # held content while an exit animates (popover.md 4.4)
+    popover-open.ts       # isPopoverOpen(element); directive-free
+    invokers.ts           # eventSource, closedByPopoverTarget, isPopoverInvoker, listenInvokerPresses (popover.md 2.3, menu.md 2.2); directive-free
+    focus-visible.ts      # QuietFocusTarget, supportsFocusVisibleOption, resetFocusVisibleOption (popover.md 6.1); directive-free
+    anchor-position.ts    # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free
+    use-resolved-placement.ts # useResolvedPlacement, useAnchoredPlacement (13.2)
+    css-transition-cut.ts # withCssTransitionCut (5.1); directive-free
+    trigger-ref.ts        # the Root's triggerRef, with the second-Trigger dev warning
+    use-interest-dismiss.ts # the lost-interest hide of an interest-opened popup (popover.md 2.9)
+    modal-registry.ts, use-modal-registration.ts # the stack of open modal dialogs (section 3.5); the registry is directive-free
 ```

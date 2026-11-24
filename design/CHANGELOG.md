@@ -12494,3 +12494,24 @@ and has merged). No rule changed and no text was rewritten.
 - `design/conventions.md`: 2,444 lines before, 2,140 after. The conventions are now five
   documents: `conventions.md`, `internal-hooks.md`, `overlay-open-state.md`, `placement.md`,
   `testing.md`.
+
+## 2026-11-24, #157: internal/ split into action/, form/ and overlay/
+
+Refactoring wave #157, last step; plan `memo/architect/157-internal-reorg.md`, product owner
+decision (the light variant, the name `internal/form/`, and moving the two single-consumer
+modules). No code, rule or public path changed: the 25 consumer bundles are byte-identical.
+
+- `packages/ui/src/internal/` has three subfolders: `action/` (8 modules: the shared hook of
+  3.4, the pure triggers, the rejection and `on*` rules of conventions 2), `form/` (14 modules:
+  the native-input machinery of 3.8 and the Field helpers) and `overlay/` (19 modules: open
+  state, popups, placement, the modal registry). The other 32 modules stay flat. Tests moved
+  with their module. Moved with a codemod (`memo/architect/probes-157/reorg-internal.mjs`), one
+  commit per folder.
+- `internal/tooltip-warm.ts` moved to `tooltip/` and `internal/use-until-found.ts` to `tabs/`
+  (conventions 9.1: a helper one component uses lives in its folder).
+- Conventions 9.1 states the layering: flat ← `action/` ← `form/` and `overlay/`, nothing the
+  other way and nothing between `form/` and `overlay/`. `scripts/check-internal-layers.mjs`,
+  run by `pnpm lint`, enforces it.
+- The file index in `design/internal-hooks.md` is grouped by folder. Code spans in the design
+  documents name the new paths. Entries above this one, the memos and `docs/research/` keep the
+  old flat paths on purpose: they are history.

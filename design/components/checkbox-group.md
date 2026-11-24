@@ -15,7 +15,7 @@ Inputs: `docs/vision.md`, `design/conventions.md` (3.8 in particular), `docs/res
 §4 ("Mixed state and CheckboxGroup", binding), `design/components/checkbox.md` §10 (what Checkbox
 left room for), `design/components/accordion.md` 2.2 and 4.1 (the set-valued reducer and the
 functional-update recipe), the implemented `packages/ui/src/radio-group/*` and
-`packages/ui/src/internal/use-native-*.ts`, the WAI-ARIA APG Checkbox pattern and its
+`packages/ui/src/internal/form/use-native-*.ts`, the WAI-ARIA APG Checkbox pattern and its
 "Checkbox Example (Mixed-State)", prior art (Base UI `CheckboxGroup` with `allValues` and
 `Checkbox.Root parent`, React Aria `CheckboxGroup`, Ark UI `CheckboxGroup`), react-dom 19.3.1
 source (`restoreControlledInputState`), and working notes in

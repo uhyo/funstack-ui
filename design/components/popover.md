@@ -2,7 +2,7 @@
 
 Status: **accepted**, implemented. History (reviews, amendments, implementation notes, the
 test plan): `design/CHANGELOG.md`, parts "popover.md". The code under
-`packages/ui/src/popover/` and `src/internal/use-popover-*.ts` is the
+`packages/ui/src/popover/` and `src/internal/overlay/use-popover-*.ts` is the
 ground truth where this document is silent. Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/dialog.md` first**: Popover is the Dialog's two-mode model (JS-free mode

@@ -2012,6 +2012,11 @@ packages/ui/src/
   `number-field/use-step-button.ts`). A pure module (no hook, no DOM write) carries no directive
   and says so in its header comment (7.1); a model worth testing on its own gets a colocated
   unit test (`toast-queue.test.ts`, `slider-arithmetic.test.ts`).
+- `internal/` is flat except for three subfolders, layered flat ← `action/` ← `form/` and
+  `overlay/`: a flat module imports from no subfolder, `action/` imports only flat modules, and
+  `form/` and `overlay/` import `action/` and flat modules but not each other (a helper goes in a
+  subfolder only if it is about that subject; `scripts/check-internal-layers.mjs` enforces the
+  direction).
 
 ### 9.2 Exports
 
