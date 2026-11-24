@@ -7,11 +7,11 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
-import { stubComputedPlacement } from "../__tests__/placement-stub.js";
-import type { PlacementStub } from "../__tests__/placement-stub.js";
+import { stubComputedPlacement } from "../../__tests__/placement-stub.js";
+import type { PlacementStub } from "../../__tests__/placement-stub.js";
 import type { AnchorSide } from "./anchor-position.js";
 import { useResolvedPlacement } from "./use-resolved-placement.js";
-import { flushTasks } from "../__tests__/helpers.js";
+import { flushTasks } from "../../__tests__/helpers.js";
 
 let renders = 0;
 

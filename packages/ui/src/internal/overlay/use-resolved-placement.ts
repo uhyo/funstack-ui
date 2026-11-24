@@ -11,9 +11,9 @@ import type {
   ResolvedPlacement,
 } from "./anchor-position.js";
 import { isPopoverOpen } from "./popover-open.js";
-import { resolveStateValue } from "./render-element.js";
-import type { DataAttributes } from "./render-element.js";
-import type { StateValue } from "./types.js";
+import { resolveStateValue } from "../render-element.js";
+import type { DataAttributes } from "../render-element.js";
+import type { StateValue } from "../types.js";
 
 export interface PlacementRequest<Side extends AnchorSide> {
   /** The requested side; `null` when the stylesheet owns placement (the hook is idle). */

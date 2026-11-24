@@ -3,9 +3,9 @@
 // memo/reviewer/review-147-155.md).
 import { render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it } from "vitest";
-import { leaveActEnvironment, spyViewTransitions } from "../__tests__/browser-helpers.js";
-import { browserName } from "../__tests__/engine.js";
-import { Popover } from "../popover/index.js";
+import { leaveActEnvironment, spyViewTransitions } from "../../__tests__/browser-helpers.js";
+import { browserName } from "../../__tests__/engine.js";
+import { Popover } from "../../popover/index.js";
 
 /** Whether the page's CSP blocks a `style` attribute write (after the meta below). */
 let attributeWritesBlocked = false;

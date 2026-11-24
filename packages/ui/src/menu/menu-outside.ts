@@ -1,7 +1,7 @@
 // The outside right- and middle-click, scroll and wheel handling of an open top-level menu
 // (design/components/context-menu.md 5). No "use client" directive: DOM listeners only
 // (conventions 7.1).
-import { isPopoverOpen } from "../internal/popover-open.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { isHandledBy } from "./menu-context.js";
 import type { MenuContextValue, MenuPlacement } from "./menu-context.js";
 

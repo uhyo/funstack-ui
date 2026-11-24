@@ -978,7 +978,7 @@ The Popup never carries `data-pending` (it is a content region, conventions 4.3)
 ### 4.4 Exit animations and the deferred unmount
 
 (Rewritten for #46 to Popover 4.4's shape; the shared `useExitAnimation` hook in
-`src/internal/use-exit-animation.ts` replaces the Popup's local `exiting` state.) With the default
+`src/internal/overlay/use-exit-animation.ts` replaces the Popup's local `exiting` state.) With the default
 `keepMounted={false}`, committed `false` unmounts the children, and two kinds of close must not
 keep them for the wrong reason:
 
@@ -1144,7 +1144,7 @@ command. The library covers two platform gaps:
    dialog is unaffected: the platform restores its previously focused element on `close()`
    unconditionally. A **non-modal** dialog restores only when focus is inside at the close, so
    it would leave focus on `<body>`. The Popup renders its library-mode content through the
-   shared content probe (`useContentFocusProbe` in `src/internal/content-focus-probe.tsx`, the
+   shared content probe (`useContentFocusProbe` in `src/internal/overlay/content-focus-probe.tsx`, the
    one `usePopoverPopup` uses), whose layout-effect cleanup records that the content
    held focus when it went away; the apply effect, right after `close()`, then applies the
    Popover 6.2 rule: focus is on `<body>` or inside the dialog → focus the Trigger if connected,
@@ -1500,7 +1500,7 @@ carries the exit. Per engine (13.3): Chromium 156 shows the double image without
 Firefox animates no CSS exit; WebKit has the box `display: none` by the transition's `ready`
 either way. `Dialog.Popup` wraps its own `showModal()` / `show()` and the apply effect's
 `close()` in `withCssTransitionCut` when the Popup has `transition`
-(`internal/css-transition-cut.ts`); no consumer CSS is needed. The cut is scoped to the
+(`internal/overlay/css-transition-cut.ts`); no consumer CSS is needed. The cut is scoped to the
 library's own calls: a dismissal starts no view transition and keeps its CSS fade, also during
 an unrelated page view transition.
 The backdrop deserves one sentence in the docs: with the page's root cross-fade disabled,

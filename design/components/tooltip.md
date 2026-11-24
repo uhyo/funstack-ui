@@ -666,7 +666,7 @@ research `arrow-flip.mjs`, `resolved-side-timing.mjs`) and renders **that** as `
 `data-align` and `state.side` / `state.align`; the Arrow echoes it through
 `TooltipPopupContext`. Closed, on the server, or when the computed value cannot be mapped, the
 requested values are rendered. The mechanism is the shared hook of conventions 13.2
-(`internal/use-resolved-placement.ts`): a `ResizeObserver` on the popup from mount (hidden to
+(`internal/overlay/use-resolved-placement.ts`): a `ResizeObserver` on the popup from mount (hidden to
 shown is a resize delivered after layout and before paint, so the first frame is right), the
 `toggle` event, and `scroll` (document, capture, passive) plus `resize` (window) while shown,
 each read at once and again in the next two animation frames (both engines apply

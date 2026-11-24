@@ -3,7 +3,7 @@ import { useCallback, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { registerTrigger } from "../internal/trigger-ref.js";
+import { registerTrigger } from "../internal/overlay/trigger-ref.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { cancelClick, disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";

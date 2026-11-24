@@ -2704,7 +2704,7 @@ describe("submenus", () => {
   describe("a press on a foreign invoker of the open menu", () => {
     // The root Popup's document capture `mousedown` guard: the press moves no focus, so the
     // focusout never pre-empts the click's own toggle (design 2.2, conventions 3.5). Which buttons
-    // are invokers is internal/invokers.test.ts; the real press is the browser suite.
+    // are invokers is internal/overlay/invokers.test.ts; the real press is the browser suite.
     function foreignInvoker(attributes: Record<string, string>) {
       const foreign = screen.getByTestId("elsewhere");
       for (const [name, value] of Object.entries(attributes)) foreign.setAttribute(name, value);

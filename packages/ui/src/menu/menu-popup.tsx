@@ -9,10 +9,10 @@ import type {
   ReactNode,
   ViewTransitionClass,
 } from "react";
-import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
+import type { AnchorAlign, AnchorSide } from "../internal/overlay/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
-import { listenInvokerPresses } from "../internal/invokers.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
+import { listenInvokerPresses } from "../internal/overlay/invokers.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
 import { FSUI_PRECEDENCE } from "../internal/shipped-styles.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
@@ -21,8 +21,8 @@ import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useNativeFocusgroup } from "../internal/use-native-focusgroup.js";
-import { usePopoverPopup } from "../internal/use-popover-popup.js";
-import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
+import { usePopoverPopup } from "../internal/overlay/use-popover-popup.js";
+import { useAnchoredPlacement } from "../internal/overlay/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { claimPress, MenuListContext, useMenuContext } from "./menu-context.js";

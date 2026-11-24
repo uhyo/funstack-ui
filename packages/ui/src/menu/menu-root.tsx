@@ -10,7 +10,7 @@ import type {
 } from "../internal/types.js";
 import { useDelayedPair } from "../internal/use-delayed-pair.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { popoverDetails, usePopoverRoot } from "../internal/use-overlay-root.js";
+import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import {
   ANCHOR_PLACEMENT,

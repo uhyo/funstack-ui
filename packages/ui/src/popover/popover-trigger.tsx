@@ -1,8 +1,8 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
-import type { PopoverTriggerHookState } from "../internal/use-popover-trigger.js";
+import { usePopoverTrigger } from "../internal/overlay/use-popover-trigger.js";
+import type { PopoverTriggerHookState } from "../internal/overlay/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
 

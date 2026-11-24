@@ -111,7 +111,7 @@ refers to the popup's **own** writing mode, which it inherits from its DOM paren
    combobox note "Firefox lacks `span-self-inline-end`" was this trap, not an engine gap: BCD
    lists every `self-*` keyword in Chrome 129+, Firefox 147+, Safari 26+.
 
-The matrix the shared helper (`internal/anchor-position.ts`, directive-free) emits, assuming
+The matrix the shared helper (`internal/overlay/anchor-position.ts`, directive-free) emits, assuming
 `horizontal-tb` (the library does not design for vertical writing modes; `block-start` /
 `block-end` would add nothing over `top` / `bottom` there):
 
@@ -161,7 +161,7 @@ the computed value cannot be mapped). One vocabulary: there is no second attribu
 (`docs/research/positioning-wave11.md` 1), and the browser still places the popup.
 
 **The parser**, `parsePositionArea(value, selfDirection, rootDirection, writingMode)` in
-`internal/anchor-position.ts`, is pure and total (`null`, never a throw) and is only run on a
+`internal/overlay/anchor-position.ts`, is pure and total (`null`, never a throw) and is only run on a
 shown popup. In `horizontal-tb` it maps the full keyword grammar:
 
 - The side token is the one that is neither `center`, `span-all` nor `span-*`. Physical tokens
@@ -181,7 +181,7 @@ shown popup. In `horizontal-tb` it maps the full keyword grammar:
   `null`: the part keeps the requested values.
 
 **The observer**, `useResolvedPlacement({ side, align }) → { side, align, ref }`
-(`internal/use-resolved-placement.ts`), is shared by Tooltip, Popover and Menu. The part merges
+(`internal/overlay/use-resolved-placement.ts`), is shared by Tooltip, Popover and Menu. The part merges
 `ref` into its popup's ref and renders the returned values. The hook's comments hold the
 mechanism; the rules are:
 

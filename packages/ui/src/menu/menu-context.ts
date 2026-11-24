@@ -1,7 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { DelayedPair } from "../internal/use-delayed-pair.js";
-import type { PopoverRootValue } from "../internal/use-overlay-root.js";
+import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 
 /**
  * Where focus goes when the menu opens (design/components/menu.md 6.1): the first enabled item,

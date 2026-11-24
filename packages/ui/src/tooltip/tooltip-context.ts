@@ -1,6 +1,6 @@
 "use client";
 import { createContext, use } from "react";
-import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
+import type { AnchorAlign, AnchorSide } from "../internal/overlay/anchor-position.js";
 
 /**
  * `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). While

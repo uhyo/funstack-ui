@@ -1,4 +1,4 @@
-// Shared open-state suite for the overlays built on `useOverlayRoot` (src/internal/use-overlay-root.ts):
+// Shared open-state suite for the overlays built on `useOverlayRoot` (src/internal/overlay/use-overlay-root.ts):
 // Dialog, Popover and Menu (#106, audit T8). It pins the Root's contract through the public
 // components: `openChangeAction` plumbing and `details`, optimistic open and pending, part-initiated
 // closes (requests, library-owned: awaited, then the library closes) against dismissals (facts:
@@ -25,7 +25,7 @@ import type {
 } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
-import type { OverlayCloseIntent } from "../internal/use-overlay-root.js";
+import type { OverlayCloseIntent } from "../internal/overlay/use-overlay-root.js";
 import {
   createSuspender,
   deferred,

@@ -393,7 +393,7 @@ Chromium and Firefox; WHATWG #9936 open). An Undo toast under a modal is a dead 
 The Viewport therefore **portals its region into the topmost open modal dialog** for as long as
 one exists, and back when it closes:
 
-- `src/internal/modal-registry.ts` (directive-free) keeps a module-level stack of `<dialog>`
+- `src/internal/overlay/modal-registry.ts` (directive-free) keeps a module-level stack of `<dialog>`
   elements with `subscribe` / `getTopmost` (`null` on the server). `Dialog.Popup` pushes its
   element right after `showModal()` and removes it from the `close` event (and on unmount). The
   registry is the library's second module-level store after the default toast manager, and the
@@ -904,7 +904,7 @@ It is not set while content is merely suspended (that is the guard's job, and no
   is client code; a Server Function returns data and the client calls `toast()` with it (section
   15.4). Passing `toast` to a Server Component is a type error like any function.
 - **Directives**: every part file is `"use client"` (hooks, DOM). `toast.ts` (the manager and
-  `createToastManager`) and `internal/modal-registry.ts` carry none: no React, no DOM API beyond
+  `createToastManager`) and `internal/overlay/modal-registry.ts` carry none: no React, no DOM API beyond
   `queueMicrotask`, so a Server Component may import `toast` for its type without a client
   reference. **A `toast()` call on the server is a no-op with a dev warning and is never
   buffered** (product-owner amendment): the default manager is module-level, so a server-side

@@ -10,7 +10,7 @@ import type {
   UrgentChangeHandler,
 } from "../internal/types.js";
 import { intendedValue } from "../internal/use-controllable-action.js";
-import { useOverlayRoot } from "../internal/use-overlay-root.js";
+import { useOverlayRoot } from "../internal/overlay/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
 import type { DialogContextValue } from "./dialog-context.js";

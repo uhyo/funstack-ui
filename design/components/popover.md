@@ -927,7 +927,7 @@ as Dialog's: the library writes `autofocus` on the resolved element right before
 and removes it after; it never calls `.focus()` on open, with **one exception**: a
 resolver function as the hook's `initialFocus` (Menu) may return a `QuietFocusTarget`
 (`{ element, focusVisible: false }`) for a pointer-initiated open, and where the engine reads
-the `focusVisible` option (a getter probe on a detached element, `internal/focus-visible.ts`;
+the `focusVisible` option (a getter probe on a detached element, `internal/overlay/focus-visible.ts`;
 Chromium 145, Firefox 104, Safari 18.4) the hook skips the `autofocus` write and calls `element.focus({ focusVisible:
 false })` right after `showPopover()` instead, so a mouse open does not paint a focus ring on the
 item (Menu 6.1). Elsewhere the `autofocus` path runs as before. `initialFocus` itself
@@ -1063,7 +1063,7 @@ span-bottom`, `inline-end` → `self-x-end`, and so on) plus `position-try-fallb
 flip-inline, flip-block flip-inline`. The popover UA stylesheet supplies `position: fixed` and
 the implicit anchor comes from `popovertarget` or `showPopover({ source })`, so no `anchor-name`
 or `position-anchor` is needed. The matrix lives in one shared helper,
-`internal/anchor-position.ts` (`positionArea(side, align)`, `POSITION_TRY_FALLBACKS`), which
+`internal/overlay/anchor-position.ts` (`positionArea(side, align)`, `POSITION_TRY_FALLBACKS`), which
 Tooltip, Popover and Menu import; `PopoverSide` / `PopoverAlign` are the flat public names for
 Popover.
 
@@ -1216,7 +1216,7 @@ view transition would capture the fading popup as a live `::view-transition-new(
 `old` image (a double image), and the open's `@starting-style` enter would run under the view
 transition's enter. So `usePopoverPopup` wraps its own `showPopover()`, the apply effect's
 `hidePopover()` and Menu's `reshow()` (one cut around both halves) in `withCssTransitionCut`
-when the Popup has `transition` (conventions 5.1, `internal/css-transition-cut.ts`); Menu and
+when the Popup has `transition` (conventions 5.1, `internal/overlay/css-transition-cut.ts`); Menu and
 Combobox get it through the shared hook. No consumer CSS is needed. The hides the library
 performs as dismissals (a JS-free Close with `action`, Menu's Tab-out, outside press and drag
 release, Combobox's focus-leave, a lost interest) are facts and are not cut.
@@ -1455,7 +1455,7 @@ Moved to `design/CHANGELOG.md` (part "popover.md"). Not part of the contract: th
 
 ## 15. What Menu (#39) reuses, and what is Menu's own
 
-Reused as is, through the internal hooks (`internal/use-overlay-root.ts`, `use-popover-popup.ts`, `use-popover-trigger.ts`):
+Reused as is, through the internal hooks (`internal/overlay/use-overlay-root.ts`, `use-popover-popup.ts`, `use-popover-trigger.ts`):
 
 - The two modes and the Root state (`usePopoverRoot` with `component: "menu"`), including
   `intended()`, `requestOpen` / `requestClose`, the fact route (`adoptFact`), close intents, and the

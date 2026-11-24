@@ -7,7 +7,7 @@ import type {
   StateValue,
   UrgentChangeHandler,
 } from "../internal/types.js";
-import { popoverDetails, usePopoverRoot } from "../internal/use-overlay-root.js";
+import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { PopoverContext } from "./popover-context.js";
 

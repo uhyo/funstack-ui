@@ -4,10 +4,10 @@ import { render } from "@testing-library/react";
 import { Activity, StrictMode } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { Combobox } from "../combobox/index.js";
-import { Dialog } from "../dialog/index.js";
-import { Menu } from "../menu/index.js";
-import { Popover } from "../popover/index.js";
+import { Combobox } from "../../combobox/index.js";
+import { Dialog } from "../../dialog/index.js";
+import { Menu } from "../../menu/index.js";
+import { Popover } from "../../popover/index.js";
 
 type Case = {
   name: string;

@@ -5,7 +5,7 @@
 // directly with `:active-view-transition` stubbed to match, as in css-transition-cut.test.ts:
 // what is pinned is the helper's contract, not a view transition.
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { addStyle } from "../__tests__/browser-helpers.js";
+import { addStyle } from "../../__tests__/browser-helpers.js";
 import { withCssTransitionCut } from "./css-transition-cut.js";
 
 function activeViewTransition(): void {

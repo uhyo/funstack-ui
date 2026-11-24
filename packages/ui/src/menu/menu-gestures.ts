@@ -1,6 +1,6 @@
 // The pointer gestures of Menu.ContextTrigger (design/components/context-menu.md 2.2, 2.6). No
 // "use client" directive: DOM listeners only (conventions 7.1).
-import { isPopoverOpen } from "../internal/popover-open.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { submenuHover } from "./menu-context.js";
 import { isDisabledItem, ITEM_SELECTOR } from "./menu-dom.js";
 

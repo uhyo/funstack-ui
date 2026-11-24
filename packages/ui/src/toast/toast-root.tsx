@@ -3,7 +3,7 @@ import { Suspense, useCallback, useId, useLayoutEffect, useMemo, useRef, useStat
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { exitAnimations } from "../internal/use-exit-animation.js";
+import { exitAnimations } from "../internal/overlay/use-exit-animation.js";
 import { useLatest } from "../internal/use-latest.js";
 import { ownsArrows } from "../internal/use-roving-focus.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";

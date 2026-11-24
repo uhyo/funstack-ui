@@ -4,7 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
+import { useAnchoredPlacement } from "../internal/overlay/use-resolved-placement.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { TooltipPopupContext, useTooltipContext } from "./tooltip-context.js";

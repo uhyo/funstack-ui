@@ -5,7 +5,7 @@
 // module graph of the `jsdom` project a mocked "react" would leak into other files.
 //
 //   vi.mock("react", async (importOriginal) => {
-//     const { withTransitionTypeSpy } = await import("../__tests__/transition-type-spy.js");
+//     const { withTransitionTypeSpy } = await import("./transition-type-spy.js");
 //     return withTransitionTypeSpy(await importOriginal());
 //   });
 import { vi } from "vitest";

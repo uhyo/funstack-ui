@@ -6,13 +6,13 @@ import type {
   RefObject,
   ViewTransitionClass,
 } from "react";
-import type { AnchorAlign, AnchorSide } from "../internal/anchor-position.js";
+import type { AnchorAlign, AnchorSide } from "../internal/overlay/anchor-position.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useJsFreePropWarnings } from "../internal/overlay-popup.js";
+import { useJsFreePropWarnings } from "../internal/overlay/overlay-popup.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { usePopoverPopup } from "../internal/use-popover-popup.js";
-import { useAnchoredPlacement } from "../internal/use-resolved-placement.js";
+import { usePopoverPopup } from "../internal/overlay/use-popover-popup.js";
+import { useAnchoredPlacement } from "../internal/overlay/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";

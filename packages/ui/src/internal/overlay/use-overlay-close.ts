@@ -1,11 +1,11 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
-import { dataAttr } from "./data-attr.js";
-import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "./types.js";
-import { useElementCheck } from "./use-element-check.js";
-import { usePureTrigger } from "./use-pure-trigger.js";
-import { cancelClick, disabledButton, rendersButton, useRender } from "./use-render.js";
-import type { DataAttributes } from "./use-render.js";
+import { dataAttr } from "../data-attr.js";
+import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "../types.js";
+import { useElementCheck } from "../use-element-check.js";
+import { usePureTrigger } from "../use-pure-trigger.js";
+import { cancelClick, disabledButton, rendersButton, useRender } from "../use-render.js";
+import type { DataAttributes } from "../use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 

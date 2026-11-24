@@ -1,13 +1,13 @@
 "use client";
 import { useCallback } from "react";
 import type { ComponentPropsWithRef, DOMAttributes, MouseEvent } from "react";
-import { dataAttr } from "./data-attr.js";
+import { dataAttr } from "../data-attr.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { registerTrigger } from "./trigger-ref.js";
-import type { RenderProp } from "./types.js";
-import { useElementCheck } from "./use-element-check.js";
-import { cancelClick, disabledButton, rendersButton } from "./use-render.js";
-import type { DataAttributes } from "./use-render.js";
+import type { RenderProp } from "../types.js";
+import { useElementCheck } from "../use-element-check.js";
+import { cancelClick, disabledButton, rendersButton } from "../use-render.js";
+import type { DataAttributes } from "../use-render.js";
 import type { PopoverRootValue } from "./use-overlay-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";

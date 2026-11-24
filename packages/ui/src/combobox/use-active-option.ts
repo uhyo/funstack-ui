@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import type { PopoverRootValue } from "../internal/use-overlay-root.js";
+import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 import type { OptionRegistry } from "./use-option-registry.js";
 
 export interface ActiveOptionOptions {

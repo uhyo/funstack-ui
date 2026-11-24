@@ -38,7 +38,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
 | 11 | Handlers (facts) and strings | A change the library cannot hold (the browser performed it before the library heard: a keystroke in a controlled text input, a dismissed popup, a toast that left) is reported to a **handler**, `on<State>Change: UrgentChangeHandler` or `on<Event>: UrgentHandler`, named as a handler precisely because it is not an action. **One rule for every `on*` handler the library defines**: called synchronously, outside any transition, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. The handlers: `onInputValueChange` (Combobox), `onOpenChange` (Popover, Menu, Combobox, Dialog Roots), `onClose` (a toast). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
-| 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13). |
+| 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/overlay/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/overlay/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13). |
 | 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay): shipped CSS covers placement and interaction timing, never visuals. A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>`. |
 
 ---
@@ -1216,7 +1216,7 @@ Rules:
   reason the context menu's placement is: a transition write would wait for an unrelated
   pending action and the arrow would point the wrong way meanwhile.
 - A **module-level registry** is an allowed shape for a cross-component fact the DOM does not
-  expose: `src/internal/modal-registry.ts` (directive-free) holds the stack of open modal
+  expose: `src/internal/overlay/modal-registry.ts` (directive-free) holds the stack of open modal
   `<dialog>` elements; `Dialog.Popup` pushes after `showModal()` and removes on `close` and
   unmount, and a reader (Toast's Viewport, which portals its region into the topmost modal so
   it is not inert) subscribes through `useSyncExternalStore` with a server snapshot of `null`.
@@ -1529,7 +1529,7 @@ type (3.9.8) and animates with CSS.
 rule. When a Popup (Dialog, Popover, Menu, Combobox) has `transition` and
 `html:active-view-transition` matches at the moment of the library's **own** `showPopover()` /
 `hidePopover()` / `showModal()` / `show()` / `close()`, the library runs that call with the
-popup's CSS transitions cut (`withCssTransitionCut` in `internal/css-transition-cut.ts`, whose
+popup's CSS transitions cut (`withCssTransitionCut` in `internal/overlay/css-transition-cut.ts`, whose
 comment holds the steps), so only the view transition animates the show or hide. Without the
 cut Chromium paints a double image on close and every engine runs the `@starting-style` enter
 under the view transition's enter. What a consumer can rely on:
@@ -1719,7 +1719,7 @@ module and imports no other client module (the Server render row in 10.1 guards 
 a component that does this says so in its design doc. Pure modules are
 directive-free: arithmetic and formatting (`slider/slider-arithmetic.ts`; NumberField's
 `number-field-format.ts`, `number-field-arithmetic.ts` and `internal/decimal.ts`), pure
-DOM reads, prop builders and listener installers (`internal/popover-open.ts`, `dom-order.ts`,
+DOM reads, prop builders and listener installers (`internal/overlay/popover-open.ts`, `dom-order.ts`,
 `arrow-keys.ts`, `render-element.ts`, `value-set.ts`, `shipped-styles.ts`; `menu/menu-dom.ts`,
 `menu-hover.ts`, `menu-gestures.ts`, `menu-outside.ts`, `menu-point.ts`) and the Toast
 Viewport's queue, hotkey and timer models (`toast/toast-queue.ts`, `toast-hotkey.ts`,

@@ -17,10 +17,10 @@ import {
 import { createPopupFlags, showWithFocus } from "./overlay-show.js";
 import { useApplyOpenState } from "./use-apply-open-state.js";
 import { isPopoverOpen } from "./popover-open.js";
-import { useElementCheck } from "./use-element-check.js";
+import { useElementCheck } from "../use-element-check.js";
 import { useInterestDismiss } from "./use-interest-dismiss.js";
-import { useLatest } from "./use-latest.js";
-import { useShownNameWarning } from "./use-name-warning.js";
+import { useLatest } from "../use-latest.js";
+import { useShownNameWarning } from "../use-name-warning.js";
 import type { PopoverRootValue } from "./use-overlay-root.js";
 
 export interface UsePopoverPopupOptions {

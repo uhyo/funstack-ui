@@ -11,7 +11,7 @@ import type {
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { registerTrigger } from "../internal/trigger-ref.js";
+import { registerTrigger } from "../internal/overlay/trigger-ref.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useFieldControl } from "../internal/use-field-control.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";

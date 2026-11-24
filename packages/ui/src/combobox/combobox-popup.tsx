@@ -8,12 +8,12 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { listenInvokerPresses } from "../internal/invokers.js";
+import { listenInvokerPresses } from "../internal/overlay/invokers.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { usePopoverPopup } from "../internal/use-popover-popup.js";
+import { usePopoverPopup } from "../internal/overlay/use-popover-popup.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { ComboboxPopupContext, useComboboxContext } from "./combobox-context.js";

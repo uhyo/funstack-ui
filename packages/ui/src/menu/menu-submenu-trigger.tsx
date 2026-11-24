@@ -11,7 +11,7 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
-import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
+import { usePopoverTrigger } from "../internal/overlay/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { registerSubmenuHover, useMenuContext } from "./menu-context.js";
 import { hasModifier, isRtl } from "./menu-dom.js";

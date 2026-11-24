@@ -1,7 +1,7 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type {
   Action,
   ActionDetails,
@@ -9,7 +9,7 @@ import type {
   StateValue,
   WhilePending,
 } from "../internal/types.js";
-import { useOverlayClose } from "../internal/use-overlay-close.js";
+import { useOverlayClose } from "../internal/overlay/use-overlay-close.js";
 import { usePopoverContext } from "./popover-context.js";
 
 /**

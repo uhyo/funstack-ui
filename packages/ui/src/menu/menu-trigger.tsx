@@ -6,12 +6,12 @@ import type {
   MouseEvent as ReactMouseEvent,
   ReactNode,
 } from "react";
-import { isPopoverOpen } from "../internal/popover-open.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { toggleFromTrigger, usePopoverTrigger } from "../internal/use-popover-trigger.js";
-import type { PopoverTriggerHookState } from "../internal/use-popover-trigger.js";
+import { toggleFromTrigger, usePopoverTrigger } from "../internal/overlay/use-popover-trigger.js";
+import type { PopoverTriggerHookState } from "../internal/overlay/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import type { MenuContextValue } from "./menu-context.js";

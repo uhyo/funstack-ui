@@ -7,8 +7,8 @@ import type {
   RefObject,
   ViewTransitionClass,
 } from "react";
-import { useContentFocusProbe } from "../internal/content-focus-probe.js";
-import { withCssTransitionCut } from "../internal/css-transition-cut.js";
+import { useContentFocusProbe } from "../internal/overlay/content-focus-probe.js";
+import { withCssTransitionCut } from "../internal/overlay/css-transition-cut.js";
 import {
   commandOf,
   renderOverlayContent,
@@ -17,16 +17,16 @@ import {
   useCloseHold,
   useInitialFocusTarget,
   useJsFreePropWarnings,
-} from "../internal/overlay-popup.js";
-import { createPopupFlags, showWithFocus } from "../internal/overlay-show.js";
-import { useApplyOpenState } from "../internal/use-apply-open-state.js";
-import { eventSource } from "../internal/invokers.js";
+} from "../internal/overlay/overlay-popup.js";
+import { createPopupFlags, showWithFocus } from "../internal/overlay/overlay-show.js";
+import { useApplyOpenState } from "../internal/overlay/use-apply-open-state.js";
+import { eventSource } from "../internal/overlay/invokers.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
-import { useModalRegistration } from "../internal/use-modal-registration.js";
+import { useModalRegistration } from "../internal/overlay/use-modal-registration.js";
 import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";

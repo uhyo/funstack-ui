@@ -13,7 +13,7 @@ import {
   nonInvokerMessage,
   RESERVED_INVOKER_KEYS,
   toggleFromTrigger,
-} from "../internal/use-popover-trigger.js";
+} from "../internal/overlay/use-popover-trigger.js";
 import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";

@@ -2545,7 +2545,7 @@ describe("Combobox", () => {
   describe("a press on a foreign invoker of the shown listbox", () => {
     // The Popup's document capture `mousedown` guard: the input keeps focus, so its focusout never
     // pre-empts the click's own toggle and the text is left alone (design 5.4, conventions 3.5).
-    // Which buttons are invokers is internal/invokers.test.ts; the real press is the browser suite.
+    // Which buttons are invokers is internal/overlay/invokers.test.ts; the real press is the browser suite.
     it("a popovertarget or commandfor button: prevented while shown, the input keeps focus", async () => {
       const user = setupUser();
       render(<Harness />);

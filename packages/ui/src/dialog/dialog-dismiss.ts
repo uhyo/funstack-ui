@@ -1,7 +1,7 @@
 // Dialog's JS baseline for what the platform gives only behind `closedby`: Escape on a
 // non-modal dialog and light dismiss (design/components/dialog.md 2.6). No "use client"
 // directive: DOM listeners only (conventions 7.1).
-import { isPopoverOpen } from "../internal/popover-open.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 
 /** The nearest `<dialog>` around a node (the dialog itself counts). */
 function closestDialog(target: EventTarget | null): Element | null {

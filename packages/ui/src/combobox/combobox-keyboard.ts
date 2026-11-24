@@ -1,7 +1,7 @@
 "use client";
 import { flushSync } from "react-dom";
-import { isPopoverOpen } from "../internal/popover-open.js";
-import type { PopoverRootValue } from "../internal/use-overlay-root.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
+import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 import type { ActiveOption } from "./use-active-option.js";
 import type { OptionRegistry } from "./use-option-registry.js";
 

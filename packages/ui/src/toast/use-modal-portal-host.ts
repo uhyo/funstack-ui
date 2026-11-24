@@ -5,7 +5,7 @@ import {
   getServerTopmostModal,
   getTopmostModal,
   subscribeModals,
-} from "../internal/modal-registry.js";
+} from "../internal/overlay/modal-registry.js";
 
 /** No store: `useSyncExternalStore` only tells the hydration render from a client render. */
 const subscribeNothing = (): (() => void) => () => {};

@@ -8,7 +8,7 @@ import type {
   StateValue,
   WhilePending,
 } from "../internal/types.js";
-import { useOverlayClose } from "../internal/use-overlay-close.js";
+import { useOverlayClose } from "../internal/overlay/use-overlay-close.js";
 import { useDialogContext } from "./dialog-context.js";
 
 /**

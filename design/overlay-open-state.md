@@ -15,7 +15,7 @@ The `open` state of an overlay is the one state in the library that has both cha
 parts ask for a change (a request, `openChangeAction`), and the browser performs one in front
 of the user (a fact, `onOpenChange`). This section is the rule for the four overlay Roots:
 `Popover.Root`, `Menu.Root` (a context-menu Root and each submenu Root included),
-`Combobox.Root` (`open` only) and `Dialog.Root`. All four run on `internal/use-overlay-root.ts`.
+`Combobox.Root` (`open` only) and `Dialog.Root`. All four run on `internal/overlay/use-overlay-root.ts`.
 Each component doc has a table of which cause goes to which channel: `popover.md` 2.8,
 `menu.md` 2.4, `combobox.md` 5.6, `dialog.md` 2.7. Tooltip has no `open` prop and no callback
 (`tooltip.md` 4.1); a toast has no open state, its fact is `onClose` (`toast.md` 9).
@@ -207,7 +207,7 @@ Uncontrolled, or controlled with an adopting parent. "Fact commit" is the urgent
 The split is by who performs the change: the view transition animates what the library does,
 CSS animates what the browser does. Where one popup has both a `transition` and a CSS exit,
 the library cuts the CSS transition around its own show and hide (5.1,
-`internal/css-transition-cut.ts`); a fact's hide is not cut.
+`internal/overlay/css-transition-cut.ts`); a fact's hide is not cut.
 
 ### 3.9.9 Errors
 
@@ -277,7 +277,7 @@ legitimate with `onOpenChange` alone), and a promise returned from any `on*` han
 the way to the `click` must not trip one of the component's immediate, browser-shaped closes
 first; otherwise the popup is gone before the action runs, the reason is wrong (the fact's
 `"dismiss"` lands first and the click's dispatch is a no-op) and the outcome depends on the
-engine. Three traps, and the rule for each (the helpers are `internal/invokers.ts`,
+engine. Three traps, and the rule for each (the helpers are `internal/overlay/invokers.ts`,
 `use-popover-trigger.ts` and `pointer-capture.ts`):
 
 1. **The focus move of a `mousedown`** (Chromium and Firefox focus a button on press, WebKit

@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { announce, canAnnounce } from "../internal/announce.js";
 import { FieldContext } from "../internal/field-context.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
 import type {
@@ -27,7 +27,7 @@ import { transitionTypes } from "../internal/transition-types.js";
 import { useControllableAction } from "../internal/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
-import { popoverDetails, usePopoverRoot } from "../internal/use-overlay-root.js";
+import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { ComboboxContext } from "./combobox-context.js";
 import { useActiveOption } from "./use-active-option.js";

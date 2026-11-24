@@ -5,7 +5,7 @@ import "./pointer-capture-shim.js";
 import { cleanup } from "@testing-library/react";
 import { afterEach, vi } from "vitest";
 import { resetWarnOnce } from "../internal/dev-warn.js";
-import { resetFocusVisibleOption } from "../internal/focus-visible.js";
+import { resetFocusVisibleOption } from "../internal/overlay/focus-visible.js";
 import { resetInvalidBatch } from "../internal/focus-first-invalid.js";
 import { resetToastServerWarning } from "../toast/toast.js";
 import { runCleanups } from "./cleanups.js";

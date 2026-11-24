@@ -6,8 +6,8 @@
 // platform listeners and the JS-free `autofocus` write.
 import { Activity, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
-import { ToolbarContext } from "./toolbar-context.js";
-import { useDevWarning } from "./use-dev-warning.js";
+import { ToolbarContext } from "../toolbar-context.js";
+import { useDevWarning } from "../use-dev-warning.js";
 import { useExitAnimation } from "./use-exit-animation.js";
 import type { ExitAnimation } from "./use-exit-animation.js";
 
