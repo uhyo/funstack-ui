@@ -111,7 +111,7 @@ export function ComboboxPopup({
   const { setElement, renderContent } = usePopoverPopup(popover, {
     part: "Combobox.Popup",
     // Focus stays in the input: nothing inside the popup is ever focused.
-    resolveInitialFocus: () => null,
+    initialFocus: () => null,
     keepMounted,
     transition,
     // While shown, a press on a foreign invoker of the popup keeps focus in the input (design

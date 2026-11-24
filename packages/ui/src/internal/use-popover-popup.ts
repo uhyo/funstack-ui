@@ -26,14 +26,18 @@ import type { PopoverRootValue } from "./use-overlay-root.js";
 export interface UsePopoverPopupOptions {
   /** Public name of the part for development warnings (`"Popover.Popup"`). */
   readonly part: string;
-  /** Element to focus on open: a ref, or a selector resolved inside the popup (design 6.1). */
-  readonly initialFocus?: RefObject<HTMLElement | null> | string | undefined;
   /**
-   * Replaces `initialFocus` with a function called right before each library open (Menu: the
-   * first or last item by open cause). `null` leaves the choice to the platform. A
-   * `QuietFocusTarget` asks for focus without the focus ring (a pointer-opened menu).
+   * Element to focus on open (design 6.1): a ref, or a selector resolved inside the popup (the
+   * consumer's `initialFocus`, also written as `autofocus` in JS-free mode); or a function called
+   * right before each library open (Menu: the first or last item by open cause; Combobox: none).
+   * The function's `null` leaves the choice to the platform, and a `QuietFocusTarget` asks for
+   * focus without the focus ring (a pointer-opened menu).
    */
-  readonly resolveInitialFocus?: (popup: HTMLElement) => HTMLElement | QuietFocusTarget | null;
+  readonly initialFocus?:
+    | RefObject<HTMLElement | null>
+    | string
+    | ((popup: HTMLElement) => HTMLElement | QuietFocusTarget | null)
+    | undefined;
   /** The consumer's `keepMounted`: `renderContent` keeps the children in an `<Activity>`. */
   readonly keepMounted?: boolean | undefined;
   /** The consumer's `transition`; decides how a library-driven close keeps its content (4.4). */
@@ -106,6 +110,8 @@ export function usePopoverPopup(
   options: UsePopoverPopupOptions,
 ): PopoverPopupHook {
   const { part, initialFocus, transition } = options;
+  // The consumer's ref or selector; a resolver function is read at each open only.
+  const staticFocus = typeof initialFocus === "function" ? undefined : initialFocus;
   const isLibrary = ctx.mode === "library";
   // The library's own shows and hides cut the popup's CSS transitions while a view transition
   // runs (conventions 5.1).
@@ -156,8 +162,8 @@ export function usePopoverPopup(
   const resolveFocusTarget = (
     element: HTMLElement,
   ): { readonly target: HTMLElement; readonly quiet: boolean } | null => {
-    if (options.resolveInitialFocus !== undefined) {
-      const resolved = options.resolveInitialFocus(element);
+    if (typeof initialFocus === "function") {
+      const resolved = initialFocus(element);
       if (resolved === null) return null;
       const target = resolved instanceof HTMLElement ? resolved : resolved.element;
       if (!element.contains(target)) return null;
@@ -167,7 +173,7 @@ export function usePopoverPopup(
         !(resolved instanceof HTMLElement) && supportsFocusVisibleOption(element.ownerDocument);
       return { target, quiet };
     }
-    const target = initialFocusTarget(element, initialFocus);
+    const target = initialFocusTarget(element, staticFocus);
     return target === null ? null : { target, quiet: false };
   };
 
@@ -397,8 +403,8 @@ export function usePopoverPopup(
       }
 
       let autofocused: HTMLElement | null = null;
-      if (!isLibrary && initialFocus !== undefined) {
-        const target = resolveInitialFocus(element, initialFocus);
+      if (!isLibrary && staticFocus !== undefined) {
+        const target = resolveInitialFocus(element, staticFocus);
         if (target !== null && element.contains(target) && !target.hasAttribute("autofocus")) {
           target.setAttribute("autofocus", "");
           autofocused = target;
@@ -421,7 +427,7 @@ export function usePopoverPopup(
       handlers,
       latestWhileShown,
       isLibrary,
-      initialFocus,
+      staticFocus,
       resetInterest,
     ],
   );

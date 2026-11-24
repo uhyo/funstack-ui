@@ -1,5 +1,5 @@
 // The extension points of the shared popover hooks that Menu (#39, design/components/menu.md 14)
-// uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, a
+// uses and Popover does not: a forced library mode, `onDispatch`, a function `initialFocus`, a
 // `<div popover>` popup (no dialog focusing steps), `renderContent` with a Menu-style
 // `requestClose`, and `whileShown` (Menu and Combobox). Popover's own behaviour is covered by
 // src/popover/popover.test.tsx.
@@ -59,8 +59,7 @@ function Mini({
   });
   const { setElement, renderContent } = usePopoverPopup(ctx, {
     part: "Mini.Popup",
-    initialFocus: undefined,
-    resolveInitialFocus: resolve,
+    initialFocus: resolve,
     keepMounted: undefined,
     transition,
     whileShown,
@@ -153,7 +152,7 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("resolveInitialFocus writes autofocus on its result right before showPopover()", async () => {
+  it("a function initialFocus writes autofocus on its result right before showPopover()", async () => {
     const user = setupUser();
     let autofocused: string | null | undefined;
     const show = HTMLElement.prototype.showPopover;

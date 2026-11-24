@@ -10907,3 +10907,14 @@ non-button warning), `beforeOpen` (Menu.Trigger's open cause) and `disabledAs: "
   but always come together: the Trigger that is an item of a parent menu and never closes.
 
 Sections changed: conventions 1.2 (the `alwaysFocusable` sentence names `submenuItem`).
+
+## 2026-11-24, #157: `usePopoverPopup` has one `initialFocus` option
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 11). Internal only.
+`usePopoverPopup` took `initialFocus` (a ref or selector: Popover's prop) and
+`resolveInitialFocus` (a function, Menu and Combobox), the second replacing the first. They are
+one option, `initialFocus`, that is a ref, a selector or a resolver function; a function is
+called right before each library open, as before, and is never written as `autofocus` in JS-free
+mode (Menu and Combobox have none) nor a dependency of the Popup's callback ref, so an inline
+resolver does not re-attach the listeners. Sections changed: popover.md 6.1 and 15 (the name of
+the option).

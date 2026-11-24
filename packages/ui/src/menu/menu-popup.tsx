@@ -215,7 +215,7 @@ export function MenuPopup({
     // Design 6.1: the first (or last) enabled item by open cause, nothing for a hover open, the
     // popup itself when there are no items.
     // A pointer open focuses without the focus ring where the engine can be told so.
-    resolveInitialFocus: (popup) => {
+    initialFocus: (popup) => {
       const { cause, pointer } = menu.takeOpenCause();
       if (cause === "none") return null;
       const element = edgeItem(popup, cause) ?? popup;
