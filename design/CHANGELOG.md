@@ -5929,3 +5929,163 @@ Chromium meter oracle is a screenshot pixel, because the three `::-webkit-meter-
 pseudo-elements report the same computed width (12.2); the provider-from-server pattern is
 confirmed with `@funstack/static`, the Next.js check and the screen-reader pass are human tasks
 in #73 (5.3, 8.1).
+
+---
+
+# radio-group.md: test plan, implementation notes, review corrections, decisions
+
+## 12. Test plan
+
+`packages/ui/src/radio-group/radio-group.test.tsx` (jsdom, `user-event`, helpers from
+`src/__tests__/helpers.tsx`) plus `radio-group.browser.test.tsx` for what jsdom cannot do. Rows
+marked (both) run under `describe.each` with the uncontrolled and the "update on success"
+controlled wrapper.
+
+| Area | Tests |
+| --- | --- |
+| Roles and ARIA | `fieldset[role=radiogroup]` with accessible name from `Label` (`toHaveAccessibleName`); `aria-required="true"` on the fieldset when `required`, absent otherwise, and not overridable through a `render` element; `aria-label` fallback without `Label`; every Item is `input[type=radio]` with the same `name`; `useId` name when `name` omitted, prop when given; `value` attribute per Item; `required` on every Item when set on Root; `disabled` on the fieldset for `Root disabled`, on the input for `Item disabled`; `data-disabled` on Items in both cases; `form` attribute on fieldset and inputs. |
+| Keyboard | Click, Space and arrow keys (user-event emulates native radio walking: next/previous, wrap, disabled skipped) each dispatch once with a native `click` event; Tab enters on the checked radio; `Home`/`End` do nothing. **Browser mode:** RTL mirroring and native wrap on Chromium and Firefox; on WebKit the non-wrapping, non-mirrored sequence, including that a press past the end dispatches nothing (`arrowsWrap` / `arrowsMirrorRtl` branch on the engine); Shift+Tab return; Safari note. |
+| Sync action (both) | `(next, details)` shape; `details.reason === "activate"`; `details.event.type === "click"`; clicking the checked radio, a disabled radio, or any radio under `Root disabled` never dispatches; a click whose `defaultPrevented` is already true (pass-through `onClick`) never dispatches and leaves the DOM on the old radio. |
+| Async action (both) | While unresolved: `data-pending` on Root and the clicked Item only; the clicked input is `checked` in the DOM; `data-checked` moved; other Items unchanged. After resolve: pending gone, value committed (uncontrolled) / parent updated (controlled). |
+| Rejection (both) | Uncaught: `ErrorCatcher` above the Root receives the error and the whole group is replaced by the boundary's fallback, so no DOM assertion on the radios; uncontrolled internal value unchanged (re-mount shows the old value). DOM rollback is asserted where the group stays mounted: a controlled parent that catches inside the action and does not update → the previously checked input is `checked` again in the DOM, `data-checked` reverted, no `data-pending`; a controlled veto (9.5) → same; uncontrolled caught-inside variant resolves and commits. |
+| Overlap | Arrow to b then c, resolve b last: DOM and `data-checked` on c throughout, final committed c; walkthrough 9.6 (click back to committed while pending): final committed is the committed value, both actions called. |
+| Superseded rejection (both) | b rejects after c resolved, and while c is pending: the error is passed to `reportError` (stubbed) once and does not reach the boundary; c's outcome unaffected. |
+| Suspending content (both) | Dependent `<Suspender />` keyed on the consumer's state updated in the action: old content stays, no fallback from the boundary above, Root `data-pending`; after resolve, new content. |
+| Platform: mount reconciliation | `renderToString` with "a" checked, set `.checked` on "c" in the HTML before `hydrateRoot`: exactly one dispatch with `reason: "platform"`, `event === undefined`, `next === "c"`; DOM stays on "c"; a controlled parent that refuses the hydration dispatch (or catches a rejection inside the action without updating) → the DOM is back on "a" after settle, group still mounted. StrictMode: still one dispatch. Late-mounting Item: an Item under a Suspense boundary that resolves after hydration, with its DOM `checked` set before reveal, produces one additional dispatch via `onItemMounted()`; two such Items in one commit produce one. |
+| Platform: form reset | Inside a `<form>`: check "b", call `form.reset()` → one dispatch `(a-or-null, { reason: "platform", event: Event("reset") })`, uncontrolled commits it; controlled parent that ignores → DOM re-checks the parent's radio after settle; `<form action>` that succeeds auto-resets and dispatches the same way; a cancelled `reset` event dispatches nothing; `Root disabled` still dispatches on reset; reset whose target equals the optimistic value dispatches nothing. |
+| `preventDefault` warning | `details.event.preventDefault()` inside the action logs the dev warning once; the action still ran. |
+| Platform: base comparison (rule 1) | Two synchronous `form.reset()` calls while a reset to `null` is still pending dispatch **once** (the second reads the in-flight `null` as the base); a copy using `?.next ?? optimistic` would dispatch twice, so this row is the guard for conventions 3.8 rule 1. |
+| Platform: reset target by mode | Uncontrolled: after the Root re-renders with a new `defaultValue` (inside a transition), `form.reset()` returns the group to the new default and dispatches it; controlled: reset returns to the mount-time `value` and the parent is notified. |
+| `details.event` is virtual | Toggle row 21 verbatim on an Item click, plus `JSON.stringify(details) === '{"reason":"activate"}'`; a fake Server Function (plain async spy) receives `(next, details)` with the same shape. |
+| Function props | `className` / `style` on Root, Label, Item receive the documented state (`checked` optimistic, `pending` per Item); `children` on Root and Label receive Root state; Item has no `children`. |
+| `render` element | `render={<input id="x" className="y" />}` on Item keeps `type="radio"`, `name`, `checked` and the library's handler, concatenates `className`, forwards `ref`; `render={<fieldset />}` on Root; dev warning when the mounted tag is not `INPUT` / `FIELDSET`. |
+| Post-await rule | Controlled wrapper that awaits then `startTransition(setValue)` works end to end. |
+| `transition` prop | Item renders with and without `transition`; Root and Label have none. Browser: an Item mounted in a `startTransition` with `transition` absent calls `document.startViewTransition` zero times. |
+| Directive | Built `dist/radio-group/*.mjs` for Root, Label, Item and context begin with `"use client"`. |
+| Dev warnings | `value` together with `defaultValue`, and switching `value` between `undefined` and a value, warn once each (shared hook). **No** warning when neither is given. |
+
+jsdom facts the tests rely on (user-event 14.6.8, jsdom 30, react-dom 19.3.1): user-event's
+`walkRadio` focuses and clicks the next same-`name` radio on arrow keys, wrapping and skipping
+disabled radios, without RTL awareness; `input.click()` on a radio flips the group and React's
+`onChange` fires; `form.reset()` fires `reset` and restores `defaultChecked` (probe 07); React's
+automatic reset after `<form action>` works in jsdom (probe 07). Browser-only checks: RTL, the
+accessibility tree (`radiogroup` named by the legend, probed via CDP), `:user-invalid` after a
+submit attempt, `:indeterminate` on an empty group.
+
+## 13. Implementation notes
+
+### 13.1 Files
+
+```
+packages/ui/src/radio-group/
+  index.ts                   # no directive; namespace + type re-exports; imports platform-attributes for side effects
+  radio-group-context.ts     # "use client"; createContext<RadioGroupContextValue | null>
+  radio-group-root.tsx       # "use client"; state owner, fieldset, reset listener, mount reconciliation
+  radio-group-label.tsx      # "use client"; <legend>, reads context for state (function props)
+  radio-group-item.tsx       # "use client"; <input type="radio">
+  radio-group.test.tsx
+  radio-group.browser.test.tsx
+packages/ui/src/internal/
+  use-form-reset.ts                    # "use client"; stable reset subscription (conventions 3.8)
+  use-native-checked.ts                # "use client"; per input, `group: true` here (conventions 3.8)
+  use-native-group-reconciliation.ts   # "use client"; the Root's one-dispatch-per-group adapter
+  use-fieldset-group.ts                # "use client"; the Root's fieldset wiring: useFieldControl, the fallback name, fieldset ref + element check, rootRef (conventions 3.8; shared with CheckboxGroup)
+  group-member.ts                      # "use client"; groupMemberProps, the Item's owned input layer (conventions 3.8; shared with CheckboxGroup)
+  sync-presence.ts                     # "use client"; syncPresences, the Item's hydration-time attribute sync
+```
+
+### 13.2 Context
+
+```ts
+interface RadioGroupContextValue {
+  readonly name: string;
+  readonly form: string | undefined;
+  readonly required: boolean;
+  /** Optimistic value: Items render `checked` from it. */
+  readonly optimistic: string | null;
+  readonly pending: boolean;
+  readonly disabled: boolean;
+  /** The Root state (`RadioGroup.Label`'s function props read it). */
+  readonly state: RadioGroupRootState;
+  /** No-op if `value === optimistic`, or if `event.defaultPrevented` (section 4.3). Never checks `disabled`; a disabled radio never fires. */
+  readonly select: (value: string, event: Event) => void;
+  /** From `useNativeGroupReconciliation`; an Item calls it from its mount effect so a late-mounting Item is reconciled (5.1). */
+  readonly onItemMounted: () => void;
+}
+```
+
+One context; every Item re-renders on a dispatch anyway (`checked` props change). Committed state
+is not in the context: no part renders it.
+
+### 13.3 Root
+
+- `useFieldsetGroup({ component: "RadioGroup.Root", name, disabled, required })` (conventions
+  3.8): the fallback `name` (own, else the Field's, else `useId()`), "own or the Field's"
+  `disabled` / `required`, the fieldset ref with its element check, and `rootRef` to merge into
+  the element's ref.
+- `useControllableAction<string | null, RadioGroupValueChangeDetails>({ controlled: value,
+  defaultValue, initialValue: null, action: valueChangeAction, transitionTypes: () =>
+  transitionTypes("radio-group"), warn: { component: "RadioGroup.Root", prop: "value" } })`.
+  Default reducer (replace). No `useDevWarning` for the missing-both case (decision 2).
+- `select(value, event)`: return if `event.defaultPrevented` or `value === optimistic`; else
+  `dispatch(value, createActionDetails(event, { reason: "activate" }))`; then, in development,
+  if `event.defaultPrevented` is now true, warn once (the action's sync prefix cancelled it).
+- `dispatchFromDom(next, event | undefined)`: `const base = intendedValue(latestInFlight, optimistic);`
+  (an explicit null check: with `T = string | null`, `?.next ?? optimistic` would drop an in-flight
+  dispatch to `null`, conventions 3.8 rule 1);
+  return if `next === base`; else `dispatch(next, createActionDetails(event, { reason: "platform" }))`.
+- `readGroup()`: `fieldset.querySelectorAll('input[type="radio"]')`, filter by `.name === name`,
+  return the checked one's `.value` or `null`.
+- Residual paths: one call,
+  `useNativeGroupReconciliation({ element: fieldsetRef, readCurrent: readGroup, readDefault: readGroupDefault, base: () => { const f = latestInFlight(); return f === null ? optimistic : f.next; }, onPlatformChange: dispatchFromDom })`
+  (conventions 3.8). It runs the mount reconciliation once in a layout effect and owns the
+  stable `reset` subscription on `fieldsetRef.current.form` via `useFormReset`; a changed `form`
+  prop or a moved fieldset re-subscribes because the owner is re-read after every commit.
+  `readGroupDefault()` is `readGroup()` over `defaultChecked` instead of `checked`.
+- Context additionally carries `defaultValue` (uncontrolled mode only) so each Item can mirror
+  its reset target (13.5).
+- Renders `<fieldset role="radiogroup" aria-required={required ? "true" : undefined}
+  disabled={disabled} form={form} data-pending data-disabled>` through `use-render` with
+  `RadioGroupRootState`; dev warning when the mounted `tagName` is not `FIELDSET`.
+- Owned keys: `role`, `aria-required`, `disabled`, `form`, `data-pending`, `data-disabled`.
+
+### 13.4 Label
+
+- Reads context for `{ value: optimistic, pending, disabled }`; renders `<legend>` through
+  `use-render`. Owns no keys. Documented as "must be the first child of Root".
+
+### 13.5 Item
+
+- Reads context; `checked = ctx.optimistic === value`; `pending = ctx.pending && checked`;
+  `disabled = ctx.disabled || disabledProp`. The input's owned layer is `groupMemberProps({ type:
+  "radio", ... })` (`internal/group-member.ts`, conventions 3.8); the hydration-time attribute
+  sync is `syncPresences`.
+- `useNativeChecked({ type: "radio", component: "RadioGroup.Item", checked, group: true,
+  onItemMounted: ctx.onItemMounted,
+  defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value })`
+  (conventions 3.8): tag check, re-apply of `defaultChecked` then `checked` after every commit
+  except the mount commit; no residual-path reporting (the Root does it once per group), but the
+  mount effect calls `ctx.onItemMounted()` so a late-mounting Item is reconciled (5.1).
+  `onChange` goes through `guardCheckableChange(event, dispatch, "RadioGroup.Item")` before
+  calling `ctx.select`.
+- Renders through `use-render` with `defaultElement: "input"`; pass-through `props` are `rest`
+  plus `disabled: disabledProp` (native, own prop only); `libraryProps`:
+  `type: "radio"`, `name: ctx.name`, `value`, `checked`, `form: ctx.form`, `required: ctx.required`,
+  `data-checked`, `data-pending`, `data-disabled`, `onChange: (e) => ctx.select(value, e.nativeEvent)`.
+  Dev warning when the mounted `tagName` is not `INPUT`.
+- Output: `element`, wrapped in `<ViewTransition default={transition}>` only when `transition` is given.
+- Owned keys: `type`, `name`, `value`, `checked`, `disabled`, `form`, `required`, `data-checked`,
+  `data-pending`, `data-disabled`, `onChange`.
+- No `defaultChecked` is ever rendered as a prop (react-dom derives the mount-time value from the
+  initial `checked` prop); in uncontrolled mode the hook keeps `el.defaultChecked` equal to
+  `defaultValue === value` so the reset target follows the latest `defaultValue` (section 5.2).
+
+### 13.6 Dev warnings
+
+Wrong `tagName` behind `render` (Root, Item); `preventDefault()` inside the action; `Item` or
+`Label` outside a Root (throw, as Tabs does); the shared hook's controlled/uncontrolled warnings;
+Items hydrating after the Root (the late-mount path), because partial hydration of a group is
+unsupported (5.1); it fires for every Item behind any Suspense boundary between Root and Items,
+and the message has no link (section 6, "Hydration").
+Deliberately absent: neither `value` nor `defaultValue` given; a controlled `value` that matches no
+Item (nothing checked is a valid, native state and the tab stop still works).
