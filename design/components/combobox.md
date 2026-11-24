@@ -1130,7 +1130,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
    a transition held until `save` settles: the input shows `data-open` /
    `data-pending` (`aria-expanded="false"`, #118) and no popup until then (React entanglement; Menu walkthrough 11; documented).
 7. **Escape, then Tab.** Escape → the close watcher hides the popup; focus stays in the input;
-   `toggle` → `openChangeAction(false, { reason: "dismiss" })`; `A=null`; `T` unchanged
+   `toggle` → `onOpenChange(false, { reason: "dismiss" })`; `A=null`; `T` unchanged
    ("Jamaicax"). Tab → `focusout` with `relatedTarget` the next field → the popup is already
    hidden; without `allowCustomValue` the text reverts to the committed value's label
    ("Jamaica"); with it, `valueChangeAction("Jamaicax", { custom: true })` is dispatched with
@@ -1171,7 +1171,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
     `A=null`, `Empty` shows.
 14. **Clear while open.** The listbox is open; the user clicks Clear. `pointerdown` prevented
     (focus stays); the press is outside the popup, so the browser light-dismisses the listbox
-    (`toggle` → `openChangeAction(false, { reason: "dismiss" })`); `click` → `T=""`,
+    (`toggle` → `onOpenChange(false, { reason: "dismiss" })`); `click` → `T=""`,
     `valueChangeAction(null)`; the listbox is not re-opened (3.3). The Trigger, by contrast, is
     never light-dismissed by its own press (it is an invoker of the popup, 3.3): its click closes
     through `requestClose` and the listbox stays shown until the action settles (walkthrough 17).

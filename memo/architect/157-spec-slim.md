@@ -138,3 +138,12 @@ size, for a follow-up step:
 - CHANGELOG.md is 10,645 lines in one file. The audit offered `design/history/` with one file
   per document as the alternative; splitting it is mechanical.
 - CLAUDE.md does not mention `design/CHANGELOG.md` or the new lint step (I do not edit it).
+
+## Review fixes (memo/reviewer/review-157-spec-slim.md)
+
+M1 (five leftover `openChangeAction(false)` dismissal mentions), M2 (popover.md 2.5 as bullets
+from `use-popover-popup.ts`), M3 (conventions 4.1 `open` row: no `aria-expanded` on an invoker,
+JS-free mode writes `data-open`), L1 (broken leftover text), L2 (button.md 17.1 Form.Submit row
+from `form-submit.tsx`) and L3 (the cut and the `refusedFact` reset in dialog.md 2.5) are fixed.
+PO decision: the "Docs page" sections stay in the changelog. L7 (check section citations from
+source comments) and L8 (remaining inline history) are follow-ups.

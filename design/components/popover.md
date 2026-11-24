@@ -91,7 +91,7 @@ Rendered HTML (JS-free mode; ids come from one `useId` in Root):
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.open` (optimistic), `state.pending` in `children(state)` | Owns `useId`, mode, the state hook, refs and context. No `ref`, `className`, `style`. |
-| `Trigger` | `button` | button | `data-open` (optimistic in library mode; DOM-synced from `toggle` in JS-free mode), `data-pending` (library mode), `data-disabled` whenever disabled, in every mode (wave 9, 5fc05d5); `aria-expanded` only on a non-button `render` (the shown popup, from the Root's `shown` mirror /) | `popoverTarget` (the Popup's id; default action `toggle`). No `aria-expanded` on the invoker (ARIA in HTML #514; the engines expose the popover's state). No `aria-haspopup` (APG disclosure has none; Menu adds `"menu"`). |
+| `Trigger` | `button` | button | `data-open` (optimistic in library mode; DOM-synced from `toggle` in JS-free mode), `data-pending` (library mode), `data-disabled` whenever disabled, in every mode; `aria-expanded` only on a non-button `render` (the shown popup, from the Root's `shown` mirror) | `popoverTarget` (the Popup's id; default action `toggle`). No `aria-expanded` on the invoker (ARIA in HTML #514; the engines expose the popover's state). No `aria-haspopup` (APG disclosure has none; Menu adds `"menu"`). |
 | `Popup` | `dialog` | `dialog` (explicit) | `data-side`, `data-align`; no `data-open` (`:popover-open`) | Carries `id`, `popover="auto"`, `aria-modal="false"`, `aria-labelledby`, `aria-describedby`, inline placement. The content region: children render from committed state in library mode. |
 | `Close` | `button` | button | `data-pending` (when `action` runs), `data-disabled` | `command="hide-popover"`. |
 | `Title` | `h2` | heading | none | `id` wiring. `render={<h3 />}` changes the level. |
@@ -127,7 +127,7 @@ Why these parts, where they differ from Dialog:
 Element constraints for `render`: `Trigger` and `Close` should render a `<button>` for the
 command path (a non-button `render` works in library mode through the click handler, never in
 JS-free mode; dev warning in both modes, as Dialog: in library mode a non-button Trigger's
-close while open is a light dismiss, not the library-owned close, 2.7 and). `Popup` may render a `<dialog>` (default) or a `<div>`
+close while open is a light dismiss, not the library-owned close, 2.7). `Popup` may render a `<dialog>` (default) or a `<div>`
 (section 6.1, focus stays on the trigger); anything else warns. The library's `[popover]`,
 `role`, `aria-modal` and ids go on whichever element renders.
 
@@ -337,30 +337,26 @@ the action rejects, the apply effect hides it. Focus is not moved when the conte
 The Popup re-applies committed state to the DOM in a layout effect after every commit, only
 while nothing is in flight (Dialog 2.5):
 
-```ts
-useLayoutEffect(() => {
-  if (!isLibrary) return;
-  const popup = popupRef.current;
-  if (popup === null || !popup.isConnected) return;
-  if (!root.pending && root.latestInFlight() === null) {
-    const shown = popup.matches(":popover-open");
-    if (committedOpen && !shown) {
-      if (!awaitingClose.current) {             // hidden, but its `toggle` has not arrived yet: wait
-        applyInitialFocus(popup, initialFocus); // writes `autofocus`, section 6.1
-        opening.current = true;                 // the beforetoggle listener lets this one through
-        try { popup.showPopover({ source: triggerRef.current ?? undefined }); }
-        finally { opening.current = false; removeInitialFocus(); }
-      }
-    } else if (!committedOpen && shown) {
-      root.recordCloseIntent(undefined);
-      popup.hidePopover();                      // marked as the library's own: its `toggle` is an echo
-      if (focusWasInside.current) returnFocus(popup); // the close commit may have unmounted the focused content (6.2 rule 1)
-    }
-  }
-  if (committedOpen && popup.matches(":popover-open")) contentHadFocus.current = false; // content left while open: not a close
-  if (held && !committedOpen && !waiting() && !awaitingClose.current && !popup.matches(":popover-open")) release(); // 4.4
-});
-```
+- **Show** (committed `true`, popup hidden, no `toggle` outstanding: `awaitingClose`):
+  - initial focus (6.1): the `initialFocus` target gets `autofocus` for the duration of the
+    call, so the popover focusing steps focus it; a component's resolver may instead return a
+    **quiet** target (Menu's first item after a pointer open), which is focused after the show
+    with `focus({ focusVisible: false })`. Never `.focus()` otherwise;
+  - `showPopover({ source })` under the `opening` flag (the `beforetoggle` listener lets this
+    one through). `source` is the Trigger, or what the component supplies (Combobox: the
+    input), and is passed only when it is connected;
+  - when the Popup has `transition`, the call runs inside `withCssTransitionCut` (10.2);
+  - **the re-show of a refused fact** (`refusedFact`, conventions 3.9.4): no initial focus
+    target, and the popup is `inert` for the duration of the call (unless the consumer set
+    `inert`), so the focusing steps find nothing. The flag is set when a fact hides the popup,
+    cleared by any commit with committed `false` and consumed by this show.
+- **Hide** (committed `false`, popup shown): set the `libraryHide` marker, so the `toggle`
+  listener recognises the library's own hide and reports nothing (2.3); `hidePopover()`,
+  inside the same cut when `transition` is set; then return focus if the close commit
+  unmounted the focused content (6.2 rule 1).
+- **After every commit, in flight or not**: forget "content had focus" while the popup is
+  shown (content that left while open is not a close), and release a `held` that no animation
+  is going to release (4.4).
 
 The re-open race is the same as Dialog's: a native hide is synchronous but `toggle` arrives a
 task later, so a commit landing in between would see committed `true`, a hidden popup and nothing
@@ -608,12 +604,12 @@ export interface PopoverTriggerProps
 
 Owned keys: `type` (`"button"`, on a `<button>` only), `popoverTarget` (on a `<button>` or a
 component render only: another element is no invoker; `popoverTargetAction` is owned too
-and never written: the default `toggle`, which a `render` element cannot change;), `disabled`, `aria-expanded`, `data-open`, `data-pending`,
+and never written: the default `toggle`, which a `render` element cannot change), `disabled`, `aria-expanded`, `data-open`, `data-pending`,
 `data-disabled`, and `onClick` only when installed (library mode; in JS-free mode the Trigger
 installs no handler and a `render` element's own `onClick` passes through). `commandfor` and
 `command` are omitted from the type as reserved keys and owned as `undefined` at runtime, so a
 `render` element's own values are stripped too (a second activation behaviour on the Trigger's
-button would conflict with its `popovertarget`, and Invoker Commands win over it;). `aria-haspopup` is not rendered
+button would conflict with its `popovertarget`, and Invoker Commands win over it). `aria-haspopup` is not rendered
 and passes through (a consumer may set `"dialog"`; Menu's trigger sets `"menu"`). `aria-expanded`
 is owned in both modes and **rendered only when no `popoverTarget` is** (a non-button `render`):
 there it is the shown state (the Root's `shown` mirror of the popup's `toggle`) in library
@@ -1096,7 +1092,7 @@ and every prior-art library opens it below the trigger.
 | --- | --- | --- |
 | Enter / Space on Trigger | toggles (JS-free: the command; library: the intercepted click) | browser / Trigger |
 | Tab / Shift+Tab | moves through the popup's content; the popup follows the Trigger in focus order; Tab past the end leaves, the popup stays open | browser |
-| Escape | closes the innermost open popover (or an open Tooltip first); focus returns to the Trigger (first in stack: platform; nested: library, 6.2); `openChangeAction(false, { reason: "dismiss" })` in library mode | browser / Popup listener |
+| Escape | closes the innermost open popover (or an open Tooltip first); focus returns to the Trigger (first in stack: platform; nested: library, 6.2); `onOpenChange(false, { reason: "dismiss" })` in library mode | browser / Popup listener |
 | Escape inside a modal Dialog opened from the popup | closes the Dialog only (its close watcher is on top); a second Escape closes the popover | browser |
 
 | Part | ARIA |

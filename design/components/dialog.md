@@ -26,7 +26,7 @@ when the content is ready.
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Anatomy | `Dialog.Root` (no DOM), `Dialog.Trigger` (`button[commandfor][command="show-modal"]`), `Dialog.Popup` (the `<dialog>`), `Dialog.Close` (`button[commandfor][command="request-close"]`), `Dialog.Form` (`form`, closes on successful submit), `Dialog.Title` (`h2`), `Dialog.Description` (`p`). No Portal, no Backdrop part (`::backdrop` is CSS), no Positioner. |
-| 2 | Two modes, one anatomy | **JS-free mode** (Root has none of `open` / `defaultOpen` / `openChangeAction` / `onOpenChange`): the browser owns everything through Invoker Commands; content is always mounted; works from a Server Component and before hydration. **Library mode** (any of the three present): **open is library-owned** (Trigger click intercepted, `openChangeAction(true)` awaited, content rendered from committed state, `showModal()` in a layout effect); **part-initiated closes are library-owned** (`Dialog.Close`, a `Dialog.Form` submit or settle, a foreign close command, a controlled `open={false}`: `openChangeAction(false)` awaited, `close(returnValue)` in the layout effect of the commit that ends it, so `<ViewTransition>` animates the exit in every engine, #46); **dismissals are browser-owned** (Escape, Android back, AT dismiss, light dismiss: closed at once; `openChangeAction(false)` is a notification from the `close` event). |
+| 2 | Two modes, one anatomy | **JS-free mode** (Root has none of `open` / `defaultOpen` / `openChangeAction` / `onOpenChange`): the browser owns everything through Invoker Commands; content is always mounted; works from a Server Component and before hydration. **Library mode** (any of the four present): **open is library-owned** (Trigger click intercepted, `openChangeAction(true)` awaited, content rendered from committed state, `showModal()` in a layout effect); **part-initiated closes are library-owned** (`Dialog.Close`, a `Dialog.Form` submit or settle, a foreign close command, a controlled `open={false}`: `openChangeAction(false)` awaited, `close(returnValue)` in the layout effect of the commit that ends it, so `<ViewTransition>` animates the exit in every engine); **dismissals are browser-owned facts** (Escape, Android back, AT dismiss, light dismiss: closed at once, committed `false` urgently, reported to `onOpenChange(false)` from the `close` event, never to `openChangeAction`; 2.7). |
 | 3 | Modal | `modal` on Root, default `true`. `modal={false}` uses `show()`; it needs one click handler because there is no `show` command, so a non-modal dialog is never JS-free. |
 | 4 | Reason vocabulary | `details.reason` is `"activate"` (Trigger, Close, Form submit), `"dismiss"` (Escape, back, light dismiss, assistive-technology dismiss: a close the user requested without a part), or `"platform"` (mount reconciliation of a pre-hydration open). `"dismiss"` is now part of the shared `ChangeReason` (conventions 2.2, accepted 2026-10-16). `details.returnValue` carries `dialog.returnValue` on close. |
 | 5 | Pending UI | Trigger: `data-open` (optimistic) and `data-pending` in library mode. The `<dialog>` emits no `data-open`: `:open` and `:modal` are exact. Root has no DOM, so `pending` lives on the Trigger and in Root's `children(state)`. |
@@ -388,11 +388,12 @@ commit, **only while nothing is in flight** (Root not pending and no dispatch un
 Accordion rule):
 
 - committed `true`, dialog closed, and no `close` event outstanding (`awaitingClose`): write
-  `autofocus` on the `initialFocus` target (section 6) and call `showModal()` or `show()`. For
-  the re-show of a refused fact on a non-modal dialog: no `autofocus`, `inert` for the call
-  (conventions 3.9.4).
+  `autofocus` on the `initialFocus` target (section 6) and call `showModal()` or `show()`,
+  inside `withCssTransitionCut` when the Popup has `transition` (10.3). For the re-show of a
+  refused fact on a non-modal dialog: no `autofocus`, `inert` for the call (conventions 3.9.4);
+  the `refusedFact` flag is cleared by any commit with committed `false`.
 - committed `false`, dialog open: set the `libraryClose` marker (2.3) and call
-  `close(returnValue)` with the part's value, `""` for a controlled close; not
+  `close(returnValue)`, inside the same cut when `transition` is set, with the part's value, `""` for a controlled close; not
   `requestClose()`: the veto point was `openChangeAction`. Then return focus if the close commit
   unmounted the focused content (6.2).
 - after every commit, in flight or not: forget "content had focus" while the dialog is shown
@@ -1349,7 +1350,7 @@ library surfaces it as `details.returnValue` (on the request and on the fact) an
 | --- | --- | --- |
 | Enter / Space on Trigger | opens (JS-free: the command; library: the intercepted click) | browser / Trigger |
 | Tab / Shift+Tab inside a modal dialog | cycles through the dialog's focusable content and the browser UI; the page is inert | browser |
-| Escape (modal) | closes via a close request; focus returns to the opener; `openChangeAction(false, { reason: "dismiss" })` | browser |
+| Escape (modal) | closes via a close request; focus returns to the opener; `onOpenChange(false, { reason: "dismiss" })` | browser |
 | Escape (non-modal) | closes via `requestClose()` | Popup listener (or `closedby` with the flag) |
 | Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal: the dialog's JS `keydown` listener **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. A `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher and does not take Escape: Escape inside it closes the dialog | browser / Popup listener |
 | Enter in a form field | submits the Form: closes (`method="dialog"`) or runs the action then closes | browser / Form |
