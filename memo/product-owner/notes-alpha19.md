@@ -17,7 +17,7 @@ This release is mostly an internal refactoring wave (#157): shared cores replace
 ### Fixes
 
 - A Dialog, Popover, Menu or Combobox whose popup element remounts in the middle of a close (e.g. `transition` changes) no longer gets stuck; a user dismissal lost to the remount is still reported to `onOpenChange` (#159).
-- `whilePending`-related: `Form.Submit` with a non-button host render gets `aria-disabled` instead of a meaningless native `disabled` (#157).
+- `Form.Submit` with a non-button host render gets `aria-disabled` instead of a meaningless native `disabled` (#157).
 - Select's development warning texts no longer ship in production builds (#161).
 - A replaced `Toast.Viewport` (key change, moved between parents) no longer warns about a second Viewport.
 
