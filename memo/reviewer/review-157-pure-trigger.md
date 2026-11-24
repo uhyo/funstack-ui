@@ -128,3 +128,68 @@ should follow M1. The CHANGELOG entries are accurate apart from the M1 sentence 
 format. Conventions 1.2 / 3.6 are amended and the review-157-align M1 ask (no own expression in
 Form.Submit/Button) is met. Docs pages for Button/Dialog/Popover are updated, and the props
 tables match the code.
+
+---
+
+# Follow-up review: head 475b5a9 (424093c = master merge)
+
+**Verdict: mergeable.** M1, L1, L2 (user decision), L4 and the nits are addressed correctly.
+One optional test gap is listed below. It does not block.
+
+## Verification
+- jsdom tests for button, dialog, popover, menu, toast, form, internal, toolbar, slider and
+  number-field: 43 files, 2027 pass. `tsc --noEmit` (ui): clean.
+- Scratch composition tests (removed afterwards): Dialog.Trigger (modal JS-free), Dialog.Close,
+  Popover.Trigger and Popover.Close, each JS-free, action-less, rendered as `<a href onClick>`.
+  When disabled, the element's own onClick runs once, the click is defaultPrevented and the
+  element is aria-disabled. When enabled, the own onClick runs and the click is **not**
+  cancelled. A disabled action+submit Button with focusableWhenDisabled and a component render,
+  and one inside a Toolbar: both aria-disabled, the click cancelled, no action, no submit. An
+  enabled action+submit component Button runs the action once and submits once.
+- Mutations (reverted):
+  - Popover and Dialog Trigger without cancelClick: 1 fail each.
+  - Close without cancelClick: 2 fail.
+  - Close or Popover cancelling also when enabled: 6 and 13 fail.
+  - Restoring the `action === undefined` gate for submit/reset/commandfor: 3 fail.
+  - Ignoring the input's own type: 2 fail.
+
+## M1: correct
+`cancelClick` is installed only under `!installClick && !disabledProps.invoker` (Dialog.Trigger,
+useOverlayClose) and under `!isLibrary && !invoker` (usePopoverTrigger). `!invoker` implies
+`disabled`, so an enabled link is never cancelled. The installed key is the library onClick,
+which mergeProps composes with the render element's own, so the component's handler still runs.
+usePopoverTrigger also chains `handlers.onClick` first. Form.Submit's behaviour is unchanged
+(the handler is now the shared function).
+
+## L2: correct, no double-handling
+With native `disabled` the element gets no click at all, so Button's onClick (the disabled
+early-return and the action) never runs: nothing is handled twice. Toolbar and
+focusableWhenDisabled still win through `alwaysFocusable`: aria-disabled, the Button's handler
+cancels the click, no action, no submit. A component Button whose click only the Button acts on
+(action, type=button, no invoker attributes) keeps the aria branch; the existing "unchanged"
+test pins this. A side effect worth knowing: a disabled Button used as the render of a
+library-mode Popover.Trigger / Dialog.Trigger receives popoverTarget / commandfor, and is now
+natively disabled with or without `action`. That is safe and matches the rule.
+
+## L4: correct
+The input's own `type` is read: submit, image and reset count as browser-run. `type="button"`
+and an absent type (text) are not.
+
+## Merge resolution
+CHANGELOG: the branch's two entries are now `## 2026-11-24: ...` under `# Entries`, after
+master's entries (append order kept). Conventions 9.1 lists both `use-pure-trigger.ts` and
+`use-step-commit.ts`. Master (b4cf52b) is an ancestor of the branch.
+
+## Docs
+These are accurate against the code:
+- button.md rows 8, 8.1 (`disabled` / `aria-disabled`), 4 and 17.1
+- conventions 1.2 (cancelClick paragraph, 9.1 listing)
+- the Button, Dialog and Popover pages
+- the Roadmap entry (now "with or without action", `<input>`, link click cancelled)
+- the SKILL.md native-wins clause
+- the CHANGELOG #158 entry (L2 decision and L4 recorded)
+
+## Remaining (optional)
+- overlay-disabled-render-suite.tsx, "enabled link renders" test: it only asserts on the
+  Close part, although its comment names the Trigger too. Add `trigger()` for the modal Dialog
+  and the Popover harnesses. My scratch test shows they pass. Not blocking.
