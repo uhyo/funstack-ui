@@ -5287,3 +5287,56 @@ About sixty guard assertions exist today (most in `button.test.tsx` and
   `src/__tests__/overlay-close-part-suite.tsx` (library and JS-free mode);
   `menu.test.tsx` "whilePending (#146)"; `toast.test.tsx` "whilePending (#146)";
   `use-action-trigger.test.tsx` H1 flipped; type rows in `internal/types.test.ts`.
+
+---
+
+# checkbox.md: test plan, implementation notes, review corrections, decisions
+
+## 11. Test plan (`src/checkbox/checkbox.test.tsx`, `checkbox.browser.test.tsx`)
+
+Every row of the Switch plan (its section 11) is repeated with `role` absent instead of
+`"switch"` and the `fsui-checkbox-*` types; rows 1 to 25 there map one to one. Additional rows:
+
+| # | Area | Env | Test |
+| --- | --- | --- | --- |
+| C1 | Roles and ARIA | jsdom | No `role` attribute by default; `role="menuitemcheckbox"` passes through; `aria-checked="mixed"` through props or a `render` element is removed. |
+| C2 | Indeterminate | jsdom | `indeterminate` → after mount `el.indeterminate === true`, `data-indeterminate=""`, `el.checked === false`; `indeterminate={false}` → both absent; toggling the prop updates both. |
+| C3 | Indeterminate, SSR | jsdom | `renderToString(<Checkbox indeterminate />)` contains `data-indeterminate=""` and no `aria-checked`; after `hydrateRoot`, `el.indeterminate === true` and no console error. |
+| C4 | Indeterminate, click (both) | jsdom | Mixed box, deferred action: click dispatches `(true, …)`; while pending `el.checked === true`, `el.indeterminate === false`, no `data-indeterminate`, `data-pending`. Resolve with the parent setting `indeterminate={false}`: no dash, checked. |
+| C5 | Indeterminate, rollback (both) | jsdom | Same, reject (caught inside, parent unchanged): after settle `el.checked === false`, `el.indeterminate === true`, `data-indeterminate=""`. Uncontrolled `checked` with `indeterminate`: commits `true`, dash returns (the prop is still true) — documents that the parent is expected to recompute. |
+| C6 | Indeterminate, pseudo-class | browser | `:indeterminate` matches after mount, not while pending after a click, and again after a rollback, in Chromium, Firefox and WebKit (jsdom's selector engine support for `:indeterminate` is not relied on). |
+| C7 | Indeterminate, forms | jsdom | A checked + indeterminate box still contributes `name=on` to `FormData`. |
+| C8 | Indeterminate, reset | jsdom | Mixed box in a form, reset: dispatch `"platform"`; `el.indeterminate` false while pending and true after settle with the parent's prop unchanged. |
+| C9 | Function props | jsdom | `className`/`style`/`render` receive `{ checked, indeterminate, pending, disabled }`; `indeterminate` is `false` in the pending render. |
+| C10 | Directive | build | `dist/checkbox/checkbox.mjs` starts with `"use client"`; `dist/checkbox/index.mjs` does not. |
+
+---
+
+## 12. Implementation notes
+
+```
+packages/ui/src/checkbox/
+  index.ts                 # no directive
+  checkbox.tsx             # "use client"
+  checkbox.test.tsx
+  checkbox.browser.test.tsx
+packages/ui/src/internal/use-checkable-input.ts   # "use client": shared with Switch (conventions 3.8)
+```
+
+`checkbox.tsx` and `switch.tsx` share `useCheckableInput` (`internal/use-checkable-input.ts`,
+conventions 3.8): the Field wiring, the controllable action, `useNativeChecked` and the input's
+owned layer; each component keeps its props, state, `useRender` call and transition boundary.
+Checkbox's call passes no `role`, passes `indeterminate` (the hook shows `indeterminate &&
+!pending`, emits `data-indeterminate` from the same expression and owns `indeterminate:
+undefined` on the element to strip a `render` element's prop), `transitionTypes("checkbox", next
+? "check" : "uncheck")` and `component: "Checkbox"` (the warning tag; the prop is `checked`).
+`useNativeChecked`'s `indeterminate` option is as specified in Switch section 7.
+
+Dev warnings: the shared ones (both/mode switch, `preventDefault()`, wrong element) plus none
+specific to `indeterminate` (an uncontrolled `checked` with `indeterminate` is allowed, see
+section 3).
+
+Example app: the select-all list of 2.4 against a fake 800 ms API with a failure toggle, so the
+rollback-to-mixed path of 6.2 can be seen in real engines; the CSS of 2.6 and 2.7.
+
+---
