@@ -751,7 +751,7 @@ src/meter/
   meter.test.tsx, meter.browser.test.tsx
 src/internal/
   range-value.ts           # no directive: clamp, isDegenerate, fraction, percentage, getNumberFormat (the cache) and formatRangeValue (2.1, 2.2)
-  render-element.ts        # no directive: the pure half of use-render: resolveStateValue, rendersButton, mergeRenderRef, renderElement (14.1)
+  render-element.ts        # no directive: the pure half of use-render: resolveStateValue, rendersButton, mergeRenderRef, renderElement
   dev-warn.ts              # no directive: warnOnce(key, message) with console.error in development; resetWarnOnce() for tests
 ```
 
