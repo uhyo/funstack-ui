@@ -26,6 +26,7 @@ import {
   expectPending,
   setupUser,
   flushMicrotasks,
+  PlainButton,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
@@ -660,14 +661,21 @@ describe("Toast", () => {
       expect(action).not.toHaveBeenCalled();
     });
 
-    // #157: the library disabled rule (conventions 3.6), as on Popover.Close and Button.
-    it.each(["Action", "Close"] as const)(
-      "a disabled %s with a link render: aria-disabled, data-disabled, state, cancelled click",
-      async (part) => {
+    // #157: the library disabled rule (conventions 1.2), as on Popover.Close and Button.
+    // A component is not certainly a host <button>: the part's handler acts, so it takes the
+    // aria branch too (unlike Form.Submit, whose click is the browser's submission).
+    it.each([
+      ["Action", "link"],
+      ["Close", "link"],
+      ["Action", "component"],
+      ["Close", "component"],
+    ] as const)(
+      "a disabled %s with a %s render: aria-disabled, data-disabled, state, cancelled click",
+      async (part, kind) => {
         const action = vi.fn();
         const onClose = vi.fn();
         const states: boolean[] = [];
-        const renderProp = <a href="#elsewhere" />;
+        const renderProp = kind === "link" ? <a href="#elsewhere" /> : <PlainButton />;
         const className = (s: { disabled: boolean }) => {
           states.push(s.disabled);
           return undefined;
@@ -795,7 +803,7 @@ describe("Toast", () => {
         expect(screen.getByTestId(id)).not.toHaveAttribute("data-disabled");
         expect(screen.getByTestId(id)).not.toBeDisabled();
       }
-      expect(states.every((s) => !s.disabled)).toBe(true);
+      for (const s of states) expect(s.disabled).toBe(false);
       expect(states.some((s) => s.part === "close")).toBe(true);
     });
 

@@ -11,7 +11,7 @@ import {
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
-import { compareDocumentOrder } from "../internal/dom-order.js";
+import { compareDocumentOrder, sortByDocumentOrder } from "../internal/dom-order.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
   ActionDetails,
@@ -265,7 +265,7 @@ export function AccordionRoot(props: AccordionRootProps) {
   const triggers = useRef(new Set<HTMLElement>());
   /** The registered Items in document order. Reads the DOM: handlers and effects only. */
   const sortedItems = (): [HTMLDetailsElement, string][] =>
-    [...items.current].sort(([a], [b]) => compareDocumentOrder(a, b));
+    sortByDocumentOrder([...items.current], ([element]) => element);
   const registeredValues = () => sortedItems().map(([, v]) => v);
 
   const { committed, optimistic, pending, dispatch, latestInFlight } = useControllableAction<

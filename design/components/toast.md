@@ -859,7 +859,7 @@ export interface ToastActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonEl
 ```
 
 `disabled` on `Toast.Action` and `Toast.Close` follows the library rule of every button-like part
-(conventions 3.6, `disabledButton`; #157): native `disabled` on a host `<button>`,
+(conventions 1.2, `disabledButton`; #157): native `disabled` on a host `<button>`,
 `aria-disabled="true"` and a cancelled click on a link or component `render`, `data-disabled`
 always, `state.disabled` the prop (never set by pending); a disabled part never dispatches.
 

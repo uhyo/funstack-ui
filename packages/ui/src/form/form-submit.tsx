@@ -56,7 +56,8 @@ export interface FormSubmitProps extends Omit<
  * repeat clicks with CSS on `[data-pending]` if you need to.
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>`), `disabled`, `aria-disabled` (a host
- * element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`, `data-disabled`.
+ * element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`,
+ * `data-disabled`.
  *
  * @see https://ui.funstack.work/components/field
  */
@@ -86,7 +87,7 @@ export function FormSubmit({
   // `<input>`, or a component (assumed to render a `<button>`, `rendersButton`): it is the only
   // thing that stops a submitter before hydration and blocks implicit submission. A host element
   // of another tag (`<a>`, `<div>`) cannot be natively disabled: `aria-disabled` and a cancelled
-  // click instead (conventions 3.6).
+  // click instead (conventions 1.2).
   const submitter = rendersButton(render) || (isValidElement(render) && render.type === "input");
   const disabledProps = submitter
     ? { disabled }

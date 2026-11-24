@@ -29,6 +29,33 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          Three alignments with the library-wide rules (<a href={issue(157)}>#157</a>):
+          <ul>
+            <li>
+              Accordion in multiple mode passes <code>valueChangeAction</code> its open items in
+              document order also when an Item mounted later (inserted between others, or behind a
+              Suspense boundary); such an Item used to sort last. In exclusive mode, of several
+              items opened before hydration the first in the document wins.
+            </li>
+            <li>
+              <code>Toast.Action</code> and <code>Toast.Close</code> render{" "}
+              <code>data-disabled</code> when <code>disabled</code>, and on a link or component{" "}
+              <code>render</code> <code>aria-disabled="true"</code> with a cancelled click (a
+              disabled link no longer navigates); their state has a new <code>disabled</code> field.{" "}
+              <code>Form.Submit</code> with a host element that is not a <code>&lt;button&gt;</code>{" "}
+              or <code>&lt;input&gt;</code> (<code>render={"{<a />}"}</code>) renders{" "}
+              <code>aria-disabled</code> with a cancelled click instead of a meaningless{" "}
+              <code>disabled</code> attribute.
+            </li>
+            <li>
+              <code>Form.Root</code> passes the rejection of a submission that a later one
+              superseded, or of one that settles after the form unmounted or was hidden, to{" "}
+              <code>reportError</code> (a window <code>error</code> event) instead of dropping it.
+              The latest submission&apos;s rejection still reaches the Error Boundary.
+            </li>
+          </ul>
+        </li>
+        <li>
           A popup with both a CSS exit and <code>transition</code> no longer needs the rule{" "}
           <code>html:active-view-transition .my-popup {"{ transition: none; }"}</code> (
           <a href={issue(147)}>#147</a>;{" "}
@@ -277,7 +304,9 @@ export function RoadmapPage() {
           ToggleGroup.Item, Menu.Trigger, Combobox.Trigger and Clear, NumberField.Increment and
           Decrement, and the Dialog and Popover Trigger and Close parts where they handle the click;
           a disabled link ToggleGroup.Item is reached by the arrow keys. Form.Submit keeps native{" "}
-          <code>disabled</code> (<a href={issue(83)}>#83</a>).
+          <code>disabled</code> (<a href={issue(83)}>#83</a>; since <a href={issue(157)}>#157</a>{" "}
+          except on a host element that is not a <code>&lt;button&gt;</code> or{" "}
+          <code>&lt;input&gt;</code>).
         </li>
         <li>
           <code>Dialog.Close</code>, <code>Popover.Close</code>, <code>Menu.Item</code> and{" "}
