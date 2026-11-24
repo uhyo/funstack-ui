@@ -717,6 +717,59 @@ describe("Form: function props and render", () => {
     expect(action).not.toHaveBeenCalled();
   });
 
+  // #157: the library disabled rule for an element that cannot be natively disabled.
+  it("Form.Submit disabled with a link render gets aria-disabled and a cancelled click", async () => {
+    const clicks: boolean[] = [];
+    render(
+      <Form.Root action={() => {}}>
+        <Form.Submit
+          disabled
+          render={<a href="#elsewhere" onClick={(e) => clicks.push(e.isDefaultPrevented())} />}
+        >
+          Save
+        </Form.Submit>
+      </Form.Root>,
+    );
+    const link = screen.getByRole("link", { name: "Save" });
+    expect(link).not.toHaveAttribute("disabled");
+    expect(link).not.toHaveAttribute("type");
+    expect(link).toHaveAttribute("aria-disabled", "true");
+    expect(link).toHaveAttribute("data-disabled", "");
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    act(() => {
+      link.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(clicks).toHaveLength(1);
+  });
+
+  it("Form.Submit enabled with a link render has no aria-disabled and no click handler", () => {
+    render(
+      <Form.Root action={() => {}}>
+        <Form.Submit render={<a href="#elsewhere" aria-disabled="true" />}>Save</Form.Submit>
+      </Form.Root>,
+    );
+    const link = screen.getByRole("link", { name: "Save" });
+    expect(link).not.toHaveAttribute("aria-disabled");
+    expect(link).not.toHaveAttribute("data-disabled");
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    act(() => {
+      link.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("Form.Submit disabled with an input render stays natively disabled", () => {
+    render(
+      <Form.Root action={() => {}}>
+        <Form.Submit disabled render={<input type="submit" value="Go" />} />
+      </Form.Root>,
+    );
+    const input = screen.getByRole("button", { name: "Go" });
+    expect(input).toBeDisabled();
+    expect(input).not.toHaveAttribute("aria-disabled");
+  });
+
   it("Form.Submit works in a plain React form (useFormStatus of the nearest form)", async () => {
     const d = deferred();
     render(

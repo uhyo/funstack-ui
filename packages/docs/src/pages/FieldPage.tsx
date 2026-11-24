@@ -429,7 +429,7 @@ import { Form } from "@funstack/ui/form";
             type: "boolean",
             default: "false",
             description:
-              "Native `disabled`. Never set by the library while pending. Always native `disabled`, also with a component `render`: a submitter has no handler to honour `aria-disabled`.",
+              'Native `disabled`; owned, so a `render` element cannot re-enable it. Never set by the library while pending. Native also with a component `render` (assumed to render a submit button: only native `disabled` stops a submitter before hydration). With a host element of another tag (`render={<a />}`), `aria-disabled="true"` instead and the click is cancelled.',
           },
           ...functionProps("FormSubmitState"),
           renderProp("button", "FormSubmitState"),
@@ -439,7 +439,9 @@ import { Form } from "@funstack/ui/form";
         state={
           "`FormSubmitState` is `{ pending, disabled }`; `pending` is `useFormStatus().pending` of the enclosing form, so it works in any React form (`Dialog.Form`, a plain `<form action>`)."
         }
-        owned={'`type` (`"submit"`, on a `<button>`), `disabled`, `data-pending`, `data-disabled`.'}
+        owned={
+          '`type` (`"submit"`, on a `<button>`), `disabled`, `aria-disabled` (a host element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`, `data-disabled`.'
+        }
         note={"`name`, `value` and `formAction` pass through."}
       />
 
@@ -454,6 +456,11 @@ import { Form } from "@funstack/ui/form";
             "`Field.Root required` or the control's own `required`.",
           ],
           ["`data-disabled`", "every Field part, Form.Submit", "Disabled by prop."],
+          [
+            "`aria-disabled`",
+            "Form.Submit",
+            "`disabled` with a `render` element that cannot be natively disabled (`<a>`).",
+          ],
           [
             "`data-pending`",
             "every Field part, Form.Root, Form.Submit",

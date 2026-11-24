@@ -5,7 +5,7 @@ import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
 import { useActionTrigger } from "../internal/use-action-trigger.js";
-import { rendersButton, useRender } from "../internal/use-render.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastActionDetails, ToastItem } from "./toast.js";
 import { useToastRootContext } from "./toast-context.js";
@@ -17,6 +17,8 @@ import { useToastRootContext } from "./toast-context.js";
 export interface ToastActionState {
   /** This part's action is in flight. */
   readonly pending: boolean;
+  /** The `disabled` prop. Not set by pending. */
+  readonly disabled: boolean;
   /** The toast this Action belongs to. */
   readonly toast: ToastItem;
 }
@@ -57,6 +59,14 @@ export interface ToastActionProps extends Omit<
    */
   whilePending?: WhilePending;
   /**
+   * Never runs the action. Native `disabled` on a `<button>` (owned; a `render` element cannot
+   * re-enable it) and `data-disabled`. With a link or component `render`, `aria-disabled="true"`
+   * instead and the click is cancelled (a disabled link does not navigate).
+   *
+   * @defaultValue `false`
+   */
+  disabled?: boolean;
+  /**
    * The button's content, or a function of the part's state.
    *
    * @defaultValue the toast's `action.label`
@@ -76,8 +86,8 @@ export interface ToastActionProps extends Omit<
  * disabled while pending: a second click meanwhile is ignored and the Action is `aria-disabled`,
  * unless `whilePending` is `"run"` (the default with `closeOnSettle={false}`).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `onClick`, `aria-disabled`,
- * `data-pending`.
+ * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `onClick`,
+ * `aria-disabled`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/toast
  */
@@ -85,6 +95,7 @@ export function ToastAction({
   action,
   closeOnSettle = true,
   whilePending,
+  disabled = false,
   children,
   className,
   style,
@@ -107,10 +118,16 @@ export function ToastAction({
     return () => setActionPending(token, false);
   }, [pending, setActionPending, token]);
 
-  const state: ToastActionState = { pending, toast: root.toast };
+  const disabledProps = disabledButton(render, disabled).props;
+  const state: ToastActionState = { pending, disabled, toast: root.toast };
 
   const onClick = (event: MouseEvent<HTMLElement>): void => {
-    if (effective === undefined || rest.disabled === true) return;
+    if (disabled) {
+      // A disabled link must not navigate either.
+      event.preventDefault();
+      return;
+    }
+    if (effective === undefined) return;
     const native = event.nativeEvent;
     const details = createActionDetails(native, { id: root.toast.id });
     // When ignoring, a second click while this Action's own run is in flight starts nothing and
@@ -127,11 +144,13 @@ export function ToastAction({
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),
+    disabled: disabledProps.disabled,
     onClick,
-    // Exactly while `data-pending` when ignoring. Owned, so an idle Action removes a render
-    // element's own.
-    "aria-disabled": pending && ignoring ? true : undefined,
+    // While `data-pending` exactly when ignoring (conventions 3.6), and when disabled on a link
+    // or component `render`. Owned, so an idle Action removes a render element's own.
+    "aria-disabled": (pending && ignoring) || disabledProps["aria-disabled"] ? true : undefined,
     "data-pending": dataAttr(pending),
+    "data-disabled": dataAttr(disabled),
   };
 
   const element = useRender<ComponentPropsWithRef<"button">, ToastActionState>({

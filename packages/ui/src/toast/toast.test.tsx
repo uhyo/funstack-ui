@@ -652,8 +652,151 @@ describe("Toast", () => {
         />,
       );
       await call(() => manager({ title: "x" }));
-      await user.click(screen.getByTestId("act"));
+      const button = screen.getByTestId("act");
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("data-disabled", "");
+      expect(button).not.toHaveAttribute("aria-disabled");
+      await user.click(button);
       expect(action).not.toHaveBeenCalled();
+    });
+
+    // #157: the library disabled rule (conventions 3.6), as on Popover.Close and Button.
+    it.each(["Action", "Close"] as const)(
+      "a disabled %s with a link render: aria-disabled, data-disabled, state, cancelled click",
+      async (part) => {
+        const action = vi.fn();
+        const onClose = vi.fn();
+        const states: boolean[] = [];
+        const renderProp = <a href="#elsewhere" />;
+        const className = (s: { disabled: boolean }) => {
+          states.push(s.disabled);
+          return undefined;
+        };
+        render(
+          <Harness
+            manager={manager}
+            list={({ toasts }) =>
+              toasts.map((t) => (
+                <Toast.Root key={t.id} toast={t}>
+                  {part === "Action" ? (
+                    <Toast.Action
+                      data-testid="part"
+                      action={action}
+                      disabled
+                      render={renderProp}
+                      className={className}
+                    >
+                      Retry
+                    </Toast.Action>
+                  ) : (
+                    <Toast.Close
+                      data-testid="part"
+                      disabled
+                      render={renderProp}
+                      className={className}
+                    >
+                      Close
+                    </Toast.Close>
+                  )}
+                </Toast.Root>
+              ))
+            }
+          />,
+        );
+        await call(() => manager({ title: "x", onClose }));
+        const link = screen.getByTestId("part");
+        expect(link).toHaveAttribute("aria-disabled", "true");
+        expect(link).toHaveAttribute("data-disabled", "");
+        expect(link).not.toHaveAttribute("disabled");
+        expect(states.at(-1)).toBe(true);
+        const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+        act(() => {
+          link.dispatchEvent(event);
+        });
+        await flushMicrotasks(2);
+        expect(event.defaultPrevented).toBe(true);
+        expect(action).not.toHaveBeenCalled();
+        expect(onClose).not.toHaveBeenCalled();
+        expect(screen.getByTestId("part")).toBeInTheDocument();
+      },
+    );
+
+    it("a disabled Close on its button is natively disabled and never dismisses", async () => {
+      const user = setupUser();
+      const onClose = vi.fn();
+      const states: boolean[] = [];
+      render(
+        <Harness
+          manager={manager}
+          list={({ toasts }) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t}>
+                <Toast.Close
+                  data-testid="part"
+                  disabled
+                  render={<button disabled={false} />}
+                  className={(s) => {
+                    states.push(s.disabled);
+                    return undefined;
+                  }}
+                >
+                  Close
+                </Toast.Close>
+              </Toast.Root>
+            ))
+          }
+        />,
+      );
+      await call(() => manager({ title: "x", onClose }));
+      const button = screen.getByTestId("part");
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute("data-disabled", "");
+      expect(button).not.toHaveAttribute("aria-disabled");
+      expect(states.at(-1)).toBe(true);
+      await user.click(button);
+      await flushMicrotasks(2);
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it("an enabled Action and Close report disabled: false and no data-disabled", async () => {
+      const states: { part: string; disabled: boolean }[] = [];
+      render(
+        <Harness
+          manager={manager}
+          list={({ toasts }) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t}>
+                <Toast.Action
+                  data-testid="act"
+                  action={vi.fn()}
+                  className={(s) => {
+                    states.push({ part: "action", disabled: s.disabled });
+                    return undefined;
+                  }}
+                >
+                  Retry
+                </Toast.Action>
+                <Toast.Close
+                  data-testid="close"
+                  className={(s) => {
+                    states.push({ part: "close", disabled: s.disabled });
+                    return undefined;
+                  }}
+                >
+                  Close
+                </Toast.Close>
+              </Toast.Root>
+            ))
+          }
+        />,
+      );
+      await call(() => manager({ title: "x" }));
+      for (const id of ["act", "close"]) {
+        expect(screen.getByTestId(id)).not.toHaveAttribute("data-disabled");
+        expect(screen.getByTestId(id)).not.toBeDisabled();
+      }
+      expect(states.every((s) => !s.disabled)).toBe(true);
+      expect(states.some((s) => s.part === "close")).toBe(true);
     });
 
     it("Close dispatches dismiss with the click", async () => {

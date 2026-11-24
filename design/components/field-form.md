@@ -754,7 +754,11 @@ export interface FormSubmitProps
 ```
 
 Owned keys: `type` (`"submit"`, when the rendered element is a `<button>`), `disabled`,
-`data-pending`, `data-disabled`. `name`, `value`, `formAction`, `formNoValidate` pass through;
+`aria-disabled`, `onClick` (while disabled), `data-pending`, `data-disabled`. `disabled` is native
+on a submitter: no `render`, a host `<button>` or `<input>`, or a component (assumed to render a
+`<button>`, `rendersButton`; only native `disabled` stops a submitter before hydration). A host
+element of another tag (`<a>`) gets `aria-disabled="true"` and a cancelled click instead
+(conventions 3.6; #157). `name`, `value`, `formAction`, `formNoValidate` pass through;
 `formAction` as a function takes the submission out of the Form's hands (3.1). `Form.Submit` may
 be used in any React-rendered form (`Dialog.Form`, a plain `<form action>`): `useFormStatus`
 reads the nearest form, Form.Root or not.

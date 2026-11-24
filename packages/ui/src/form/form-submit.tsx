@@ -1,5 +1,6 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import { isValidElement } from "react";
+import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -29,8 +30,11 @@ export interface FormSubmitProps extends Omit<
   "type" | "className" | "style" | "children"
 > {
   /**
-   * Native `disabled`; owned. Never set by the library (conventions 3.6). Always native, also
-   * with a component `render`: a submitter has no handler to honour `aria-disabled`.
+   * Native `disabled` (owned; a `render` element cannot re-enable it) and `data-disabled`. Never
+   * set by the library (conventions 3.6). Native also with a component `render`, assumed to
+   * render a submit button: only native `disabled` stops a submitter before hydration. With a
+   * host element of another tag (`render={<a />}`), `aria-disabled="true"` instead and the click
+   * is cancelled.
    *
    * @defaultValue `false`
    */
@@ -51,8 +55,8 @@ export interface FormSubmitProps extends Omit<
  * (`Form.Root`, `Dialog.Form`, a plain `<form action>`). Never disabled while pending: block
  * repeat clicks with CSS on `[data-pending]` if you need to.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>`), `disabled`, `data-pending`,
- * `data-disabled`.
+ * Owned keys (conventions 1.2): `type` (on a `<button>`), `disabled`, `aria-disabled` (a host
+ * element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/field
  */
@@ -78,6 +82,15 @@ export function FormSubmit({
       }),
   );
   const state: FormSubmitState = { pending, disabled };
+  // Native `disabled` where the element is a submitter: no `render`, a host `<button>` or
+  // `<input>`, or a component (assumed to render a `<button>`, `rendersButton`): it is the only
+  // thing that stops a submitter before hydration and blocks implicit submission. A host element
+  // of another tag (`<a>`, `<div>`) cannot be natively disabled: `aria-disabled` and a cancelled
+  // click instead (conventions 3.6).
+  const submitter = rendersButton(render) || (isValidElement(render) && render.type === "input");
+  const disabledProps = submitter
+    ? { disabled }
+    : { disabled: undefined, "aria-disabled": disabled ? (true as const) : undefined };
   return useRender<ComponentPropsWithRef<"button">, FormSubmitState>({
     defaultElement: "button",
     render,
@@ -88,7 +101,14 @@ export function FormSubmit({
     props: rest,
     libraryProps: {
       ...(rendersButton(render) && { type: "submit" as const }),
-      disabled,
+      ...disabledProps,
+      // Only while disabled: an enabled submitter's click is the browser's (and React's).
+      ...(disabled && {
+        onClick: (event: MouseEvent<HTMLButtonElement>) => {
+          // Cancelling the click cancels the submission and a link's navigation.
+          event.preventDefault();
+        },
+      }),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
     },
