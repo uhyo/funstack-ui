@@ -103,22 +103,22 @@ export interface UsePopoverTriggerOptions<State> {
   readonly handlers?: PopoverTriggerHandlers;
   /**
    * What a click does in library mode, after the command has been cancelled and `disabled`
-   * checked, replacing the default toggle against `intended()` (`requestOpen` / `requestClose`).
-   * Menu's SubmenuTrigger opens, or moves focus into an already open submenu, and never closes;
-   * so with `activate` the library-mode non-button warning says a press while open dismisses the
-   * popup instead of moving focus into it.
+   * checked. Default: `toggleFromTrigger(ctx, event.nativeEvent)`, the toggle against
+   * `intended()` (`requestOpen` / `requestClose`). Menu.Trigger toggles with its open cause;
+   * Menu.SubmenuTrigger opens, or moves focus into an already open submenu.
    */
-  readonly activate?: (event: MouseEvent<HTMLElement>) => void;
-  /** Runs right before the default toggle's `requestOpen` (Menu.Trigger: the open cause). */
-  readonly beforeOpen?: (event: MouseEvent<HTMLElement>) => void;
+  readonly onActivate?: (event: MouseEvent<HTMLElement>) => void;
   /**
-   * How `disabled` is rendered. `"native"` (default): the `disabled` attribute, so the button is
-   * no invoker at all; in library mode a link or component `render` still gets the `"aria"`
-   * branch, because native `disabled` means nothing on a link and the installed click handler is
-   * what refuses. `"aria"`: `aria-disabled="true"` and no `disabled` (a menu item stays
-   * focusable); the click handler still refuses.
+   * Menu.SubmenuTrigger: the Trigger is also an item of the parent menu, whose click
+   * (`onActivate`) never closes the popup. `disabled` renders `aria-disabled="true"` and no
+   * `disabled` attribute, so the item stays focusable (the click handler still refuses); without
+   * it `disabled` is the native attribute, so the button is no invoker at all (in library mode a
+   * link or component `render` still gets `aria-disabled`, because native `disabled` means
+   * nothing on a link and the installed click handler is what refuses). And the library-mode
+   * non-button warning says a press while open dismisses the popup instead of moving focus into
+   * it.
    */
-  readonly disabledAs?: "native" | "aria";
+  readonly submenuItem?: boolean;
 }
 
 export interface PopoverTriggerHook {
@@ -145,7 +145,7 @@ export function usePopoverTrigger<State>(
   ctx: PopoverRootValue,
   options: UsePopoverTriggerOptions<State>,
 ): PopoverTriggerHook {
-  const { part, disabled, render, handlers, activate, beforeOpen, disabledAs = "native" } = options;
+  const { part, disabled, render, handlers, onActivate, submenuItem = false } = options;
   const isLibrary = ctx.mode === "library";
   const { ids, triggerRef, popupRef } = ctx;
 
@@ -164,7 +164,7 @@ export function usePopoverTrigger<State>(
         const tag = element.tagName.toLowerCase();
         // Library mode: the click handler works, but only an invoker button is spared by the
         // popover's light dismiss, so a press while open hides the popup before the click.
-        if (isLibrary && activate !== undefined) {
+        if (isLibrary && submenuItem) {
           return (
             `${part}: rendered a <${tag}>. Only a <button> is the popover's invoker: a press on ` +
             "this element while its popup is open dismisses the popup through light dismiss " +
@@ -197,11 +197,8 @@ export function usePopoverTrigger<State>(
     // behaviour, only if the click was not cancelled). Enter and Space synthesise the same click.
     event.preventDefault();
     if (disabled) return;
-    if (activate !== undefined) {
-      activate(event);
-      return;
-    }
-    toggleFromTrigger(ctx, event.nativeEvent, beforeOpen && (() => beforeOpen(event)));
+    if (onActivate !== undefined) onActivate(event);
+    else toggleFromTrigger(ctx, event.nativeEvent);
   };
 
   // The component's handlers first, then the Trigger's (design/components/menu.md 14). The click
@@ -222,7 +219,7 @@ export function usePopoverTrigger<State>(
   // native `disabled` to stop it.
   const disabledProps = disabledButton(render, disabled, {
     handlesClick: isLibrary,
-    alwaysFocusable: disabledAs === "aria",
+    alwaysFocusable: submenuItem,
   });
   if (!isLibrary && !disabledProps.invoker) {
     // JS-free mode, disabled in the `aria-disabled` branch (a host link): nothing native stops the

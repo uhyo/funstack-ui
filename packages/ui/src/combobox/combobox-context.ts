@@ -13,7 +13,7 @@ export interface ComboboxOptionEntry {
 
 /** One Combobox: what its Root provides to every part (design 14, `combobox-context.ts`). */
 export interface ComboboxContextValue {
-  /** The shared popover machinery (`useOverlayRoot`, library mode). */
+  /** The shared popover machinery (`usePopoverRoot`, library mode). */
   readonly popover: PopoverRootValue;
   readonly ids: {
     readonly input: string;

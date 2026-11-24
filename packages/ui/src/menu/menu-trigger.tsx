@@ -10,7 +10,7 @@ import { isPopoverOpen } from "../internal/popover-open.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { usePopoverTrigger } from "../internal/use-popover-trigger.js";
+import { toggleFromTrigger, usePopoverTrigger } from "../internal/use-popover-trigger.js";
 import type { PopoverTriggerHookState } from "../internal/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
@@ -156,7 +156,11 @@ export function MenuTrigger({
         if (event.button === 0 && menu.popover.intended()) event.preventDefault();
       },
     },
-    beforeOpen: (event) => menu.setOpenCause("first", isPointerClick(event.nativeEvent)),
+    // The default toggle, with the open cause recorded right before an open.
+    onActivate: (event) =>
+      toggleFromTrigger(menu.popover, event.nativeEvent, () =>
+        menu.setOpenCause("first", isPointerClick(event.nativeEvent)),
+      ),
   });
 
   return useRender<ComponentPropsWithRef<"button">, MenuTriggerState>({

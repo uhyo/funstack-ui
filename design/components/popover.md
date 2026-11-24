@@ -915,7 +915,7 @@ descendant, else the first sequentially focusable descendant, else the popup its
 behaviour (focus moves in; Escape returns it), and it means the `initialFocus` prop works exactly
 as Dialog's: the library writes `autofocus` on the resolved element right before `showPopover()`
 and removes it after; it never calls `.focus()` on open, with **one exception**: a
-`resolveInitialFocus` resolver (Menu) may return a `QuietFocusTarget`
+resolver function as the hook's `initialFocus` (Menu) may return a `QuietFocusTarget`
 (`{ element, focusVisible: false }`) for a pointer-initiated open, and where the engine reads
 the `focusVisible` option (a getter probe on a detached element, `internal/focus-visible.ts`;
 Chromium 145, Firefox 104, Safari 18.4) the hook skips the `autofocus` write and calls `element.focus({ focusVisible:
@@ -1447,12 +1447,12 @@ Moved to `design/CHANGELOG.md` (part "popover.md"). Not part of the contract: th
 
 Reused as is, through the internal hooks (`internal/use-overlay-root.ts`, `use-popover-popup.ts`, `use-popover-trigger.ts`):
 
-- The two modes and the Root state (`useOverlayRoot` with `component: "menu"`), including
+- The two modes and the Root state (`usePopoverRoot` with `component: "menu"`), including
   `intended()`, `requestOpen` / `requestClose`, the fact route (`adoptFact`), close intents, and the
   `"activate"` / `"dismiss"` / `"platform"` reasons.
 - The Popup machinery (`usePopoverPopup`): apply effect with `showPopover({ source })` and the
   `autofocus` write, or the quiet `focus({ focusVisible: false })` for a `QuietFocusTarget`
-  (Menu passes `resolveInitialFocus(popup)`, returning its first or last item from the open
+  (Menu passes an `initialFocus(popup)` function, returning its first or last item from the open
   cause in its own ref, quiet for a pointer open), `beforetoggle` open interception, the `toggle` fact report,
   `awaitingClose`, the `held` deferred unmount, the JS-free `aria-expanded` sync, the
   **nested focus-return rule** (6.2), which is exactly "focus the parent item when a submenu

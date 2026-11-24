@@ -5,7 +5,7 @@ amendments, implementation notes, the test plan): `design/CHANGELOG.md`, parts "
 context menu (`Menu.ContextTrigger`) is `design/components/context-menu.md`. Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` first** (accepted): Menu is built on its internal hooks
-(`useOverlayRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
+(`usePopoverRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
 open and part-initiated closes, browser-owned dismissals), its apply effect, close intents,
 nested focus-return rule, deferred unmount, `aria-expanded` handling, positioning helper and
 `<ViewTransition>` wiring around the top-layer element. This document repeats only what differs
@@ -124,7 +124,7 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
-| `Root` | none | | `state.open` (optimistic), `state.pending`, `state.submenu` in `children(state)` | `useOverlayRoot({ component: "menu", mode: "library", details: popoverDetails })`. A Root under a `MenuContext` is a submenu. |
+| `Root` | none | | `state.open` (optimistic), `state.pending`, `state.submenu` in `children(state)` | `usePopoverRoot({ component: "menu", mode: "library", details: popoverDetails })`. A Root under a `MenuContext` is a submenu. |
 | `Trigger` | `button` | button | `data-open` (optimistic), `data-pending`, `data-disabled`; no `aria-expanded` (a `popovertarget` invoker, #121) | `usePopoverTrigger` plus `id`, `aria-haspopup="menu"` and the open-with-focus keys. Only valid in a top-level Root (dev warning otherwise). |
 | `Popup` | `div` | `menu` | `data-side`, `data-align` (the resolved placement while shown, conventions 13.2) | `usePopoverPopup` with Menu's initial-focus resolver, keyboard handling, typeahead, `focusout`, `focusgroup`; `useResolvedPlacement` for the attributes. |
 | `Item` | `button` | `menuitem` | `data-pending`, `data-disabled` | `action`, `closeOnActivate` (default `true`). |
@@ -179,7 +179,7 @@ if not an `<hr>`. Dev warnings as Popover.
 
 ### 2.1 Open is library-owned, always
 
-`Menu.Root` calls `useOverlayRoot` with `mode: "library"` unconditionally. Without `open` /
+`Menu.Root` calls `usePopoverRoot` with `mode: "library"` unconditionally. Without `open` /
 `defaultOpen` / `openChangeAction` it is an uncontrolled, action-less state owner (no mode
 switch to warn about). Everything in Popover 2.2, 2.4 and 2.5 applies: Trigger click intercepted
 (`preventDefault()` cancels the command; toggle against `intended()`), foreign opens cancelled at

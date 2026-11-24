@@ -10959,3 +10959,47 @@ for unrelated nodes". They never differ. For the same node both return 0. For tw
 disconnected nodes (DOM spec: DISCONNECTED and IMPLEMENTATION_SPECIFIC come with one of the two,
 chosen consistently). So `useToastFocus`'s switch to `compareDocumentOrder` is an exact
 replacement, as was Combobox's in #157.
+
+## 2026-11-24, #157: the popover `shown` mirror is `usePopoverRoot`'s
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 11, rule map row 6). Internal
+only. `useOverlayRoot` returned the popover `shown` mirror (`shown`, `setShown`) and
+`hiddenBeforeToggle` to Dialog too, whose context type omitted the first two and never called
+the third. They now come from `usePopoverRoot` (same module), which Popover, Menu and Combobox
+call: `useOverlayRoot` with `isShown: isPopoverOpen` plus the mirror. `PopoverRootValue` is an
+interface extending `OverlayRootValue<HTMLElement, []>` with the three members;
+`DialogContextValue` extends `OverlayRootValue` without an `Omit`. `isShown` is a required
+option of `useOverlayRoot` (it defaulted to `:popover-open`, which only `usePopoverRoot` needs).
+The popover value still changes only with the open state, pending and `shown`. Sections
+changed: conventions 3.2's `shown` row and the 9.1 file listing, menu.md (intro, 1, 2.1),
+combobox.md (intro, decisions table, 1, 2, 5.1), popover.md 15 (hook names only).
+
+## 2026-11-24, #157: `usePopoverTrigger`'s `onActivate` and `submenuItem`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 11). Internal only; no rendered
+attribute, handler order or warning text changed. `usePopoverTrigger` took three options that
+only Menu passed: `activate` (Menu.SubmenuTrigger's click, which also picked the wording of the
+non-button warning), `beforeOpen` (Menu.Trigger's open cause) and `disabledAs: "aria"`
+(Menu.SubmenuTrigger). Now:
+
+- `onActivate(event)`: what a library-mode click does after the cancel and the `disabled` check;
+  default `toggleFromTrigger(ctx, event.nativeEvent)`. Menu.Trigger passes the same toggle with
+  its open cause as `toggleFromTrigger`'s `beforeOpen` (the call it made before);
+  Menu.SubmenuTrigger passes its open.
+- `submenuItem: true` (Menu.SubmenuTrigger): `disabled` renders `aria-disabled` (the
+  `alwaysFocusable` branch of `disabledButton`) and the non-button warning says a press while
+  open dismisses the popup instead of moving focus into it. The two followed different options
+  but always come together: the Trigger that is an item of a parent menu and never closes.
+
+Sections changed: conventions 1.2 (the `alwaysFocusable` sentence names `submenuItem`).
+
+## 2026-11-24, #157: `usePopoverPopup` has one `initialFocus` option
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 11). Internal only.
+`usePopoverPopup` took `initialFocus` (a ref or selector: Popover's prop) and
+`resolveInitialFocus` (a function, Menu and Combobox), the second replacing the first. They are
+one option, `initialFocus`, that is a ref, a selector or a resolver function; a function is
+called right before each library open, as before, and is never written as `autofocus` in JS-free
+mode (Menu and Combobox have none) nor a dependency of the Popup's callback ref, so an inline
+resolver does not re-attach the listeners. Sections changed: popover.md 6.1 and 15 (the name of
+the option).

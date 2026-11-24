@@ -65,7 +65,7 @@ export interface MenuOpenAtOptions {
 
 /** One menu level: what its Root provides to its Trigger, Popup and items. */
 export interface MenuContextValue {
-  /** The shared popover machinery (`useOverlayRoot`). */
+  /** The shared popover machinery (`usePopoverRoot`). */
   readonly popover: PopoverRootValue;
   /** This Root is nested in a `Menu.Popup`. */
   readonly submenu: boolean;

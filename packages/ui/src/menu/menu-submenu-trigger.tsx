@@ -150,7 +150,7 @@ export function MenuSubmenuTrigger({
     part: "Menu.SubmenuTrigger",
     disabled,
     render,
-    disabledAs: "aria",
+    submenuItem: true,
     // Item first (Enter / Space activation, pointer focus), then the submenu keys.
     handlers: {
       onKeyDown: (event) => {
@@ -166,7 +166,7 @@ export function MenuSubmenuTrigger({
       },
     },
     // A click opens (or moves focus into the open submenu); it never closes.
-    activate: (event) => open(event.nativeEvent),
+    onActivate: (event) => open(event.nativeEvent),
   });
   const ref = useMergedRefs(triggerRef, hoverRef);
 

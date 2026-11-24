@@ -1,5 +1,5 @@
 // The extension points of the shared popover hooks that Menu (#39, design/components/menu.md 14)
-// uses and Popover does not: a forced library mode, `onDispatch`, `resolveInitialFocus`, a
+// uses and Popover does not: a forced library mode, `onDispatch`, a function `initialFocus`, a
 // `<div popover>` popup (no dialog focusing steps), `renderContent` with a Menu-style
 // `requestClose`, and `whileShown` (Menu and Combobox). Popover's own behaviour is covered by
 // src/popover/popover.test.tsx.
@@ -13,7 +13,7 @@ import { resetFocusVisibleOption } from "./focus-visible.js";
 import type { QuietFocusTarget } from "./focus-visible.js";
 import type { ChangeReason } from "./types.js";
 import { usePopoverPopup } from "./use-popover-popup.js";
-import { popoverDetails, useOverlayRoot } from "./use-overlay-root.js";
+import { popoverDetails, usePopoverRoot } from "./use-overlay-root.js";
 import type { OverlayDetails, PopoverRootValue } from "./use-overlay-root.js";
 import { usePopoverTrigger } from "./use-popover-trigger.js";
 
@@ -39,7 +39,7 @@ function Mini({
   /** Render the Trigger as a link (no invoker) instead of a `<button>`. */
   link?: boolean;
 }) {
-  const ctx = useOverlayRoot<OverlayDetails>({
+  const ctx = usePopoverRoot<OverlayDetails>({
     component: "menu",
     part: "Mini.Root",
     mode: "library",
@@ -59,8 +59,7 @@ function Mini({
   });
   const { setElement, renderContent } = usePopoverPopup(ctx, {
     part: "Mini.Popup",
-    initialFocus: undefined,
-    resolveInitialFocus: resolve,
+    initialFocus: resolve,
     keepMounted: undefined,
     transition,
     whileShown,
@@ -153,7 +152,7 @@ describe("shared popover hooks: Menu's extension points", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("resolveInitialFocus writes autofocus on its result right before showPopover()", async () => {
+  it("a function initialFocus writes autofocus on its result right before showPopover()", async () => {
     const user = setupUser();
     let autofocused: string | null | undefined;
     const show = HTMLElement.prototype.showPopover;
@@ -169,6 +168,18 @@ describe("shared popover hooks: Menu's extension points", () => {
     await flushTasks();
     expect(autofocused).toBe("two");
     expect(screen.getByTestId("two")).not.toHaveAttribute("autofocus");
+  });
+
+  it("a function initialFocus that returns undefined leaves the choice to the platform", async () => {
+    const user = setupUser();
+    const resolve = vi.fn(() => undefined as unknown as null);
+    render(<Mini resolve={resolve} />);
+    await user.click(screen.getByTestId("trigger"));
+    await flushTasks();
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("popup").matches(":popover-open")).toBe(true);
+    expect(screen.getByTestId("popup").querySelector("[autofocus]")).toBeNull();
+    expect(screen.getByTestId("trigger")).toHaveFocus();
   });
 
   it("a <div popover> keeps focus on the Trigger without autofocus", async () => {
@@ -231,13 +242,13 @@ describe("shared popover hooks: Menu's extension points", () => {
   });
 
   // #48
-  it("useOverlayRoot returns the same value across re-renders with unchanged state", async () => {
+  it("usePopoverRoot returns the same value across re-renders with unchanged state", async () => {
     const user = setupUser();
     const values: PopoverRootValue[] = [];
     const first = vi.fn();
     const second = vi.fn();
     function Root({ onDispatch }: { onDispatch: () => void }) {
-      const ctx = useOverlayRoot<OverlayDetails>({
+      const ctx = usePopoverRoot<OverlayDetails>({
         component: "menu",
         part: "Stable.Root",
         mode: "library",
