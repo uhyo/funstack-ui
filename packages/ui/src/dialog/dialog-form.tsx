@@ -217,7 +217,7 @@ function DialogFormSettle({
   useDevWarning(
     form !== null && missingAction,
     isDev &&
-      "`Dialog.Form` rendered as a `Form.Root` needs a function `action`; without one the form " +
+      "Dialog.Form: rendered as a `Form.Root`, it needs a function `action`; without one the form " +
         "navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a " +
         '`method="dialog"` form.',
   );

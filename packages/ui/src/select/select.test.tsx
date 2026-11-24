@@ -327,6 +327,26 @@ describe("Select", () => {
       );
     });
 
+    it("warns once per Select.Value outside the <select> under StrictMode", () => {
+      const error = silenceErrors();
+      render(
+        <StrictMode>
+          <Select.Root aria-label="x" defaultValue="a">
+            <Select.Option value="a">A</Select.Option>
+            {createPortal(<Select.Value />, document.body)}
+          </Select.Root>
+          <Select.Root aria-label="y" defaultValue="b">
+            <Select.Option value="b">B</Select.Option>
+            {createPortal(<Select.Value />, document.body)}
+          </Select.Root>
+        </StrictMode>,
+      );
+      const warnings = error.mock.calls.filter(([m]) =>
+        String(m).startsWith("Select.Value: rendered outside"),
+      );
+      expect(warnings).toHaveLength(2);
+    });
+
     it("types: no multiple / size on Root, no children on Value, no transition anywhere", () => {
       // Compile-time assertions; rendering is incidental.
       render(

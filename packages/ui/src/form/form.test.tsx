@@ -1141,7 +1141,9 @@ describe("Form: Dialog.Form render={<Form.Root errors />}", () => {
     );
     await flushMicrotasks();
     const warnings = error.mock.calls.filter((args) =>
-      String(args[0]).includes("`Dialog.Form` rendered as a `Form.Root` needs a function `action`"),
+      String(args[0]).startsWith(
+        "Dialog.Form: rendered as a `Form.Root`, it needs a function `action`",
+      ),
     );
     expect(warnings).toHaveLength(1);
     unmount();

@@ -10874,3 +10874,88 @@ no-Track warnings, Combobox's duplicate option value, RadioGroup's partial hydra
 `Menu.ContextTrigger`'s missing Popup, `useInitialFocusTarget`), the ones that read the DOM or a
 ref in an effect (`Field.Root`'s "no form control", `useItemOrder`'s duplicate values, Tooltip's
 three checks), and the two in `toast/toast-viewport.tsx` (left for the branch that splits it).
+
+## 2026-11-24, #157 follow-up: the helpers in the files skipped for the split
+
+Follow-up to the two #157 helper entries above (`memo/reviewer/review-157-helpers.md` finding 3).
+The files that branch left alone because #160 was splitting them now use the shared helpers:
+
+- `Combobox.Root` resolves `name` and `disabled` with `resolveFieldDefaults` (same values).
+- `useToastFocus` sorts the Roots with `compareDocumentOrder` instead of its own
+  `byDocumentPosition` (the same order; the two differ only for unrelated nodes, which open
+  toasts in one region never are).
+- `Toast.Viewport`'s "another Toast.Viewport already renders this manager" is a
+  `useDevWarning(rejected, ...)` call instead of a `console.error` in the subscription effect. It
+  fires one commit later and once per instance (it fired twice under StrictMode). "toast.update:
+  no toast" warns from a call and stays as it is.
+
+This corrects and supersedes the "hand-rolled dev warnings through the shared helpers" entry
+above, where the two `toast/toast-viewport.tsx` sites are "left for the branch that splits it":
+that split (#160) was already on master, and the sites are converted here.
+
+## 2026-11-24, #157 follow-up: every development warning starts with its part's name
+
+Follow-up to "Tooltip's warnings use the `Part.Name: ` form" above
+(`memo/reviewer/review-157-helpers.md` finding 2). Conventions 7.2's message rule did not hold
+for two sites; the code now matches the rule, which is unchanged:
+
+- `Dialog.Form`'s warning read "`` `Dialog.Form` rendered as a `Form.Root` needs a function
+  `action`; ...``". It now reads "`` Dialog.Form: rendered as a `Form.Root`, it needs a function
+  `action`; ... ``" (the rest of the text is unchanged).
+- `useControllableAction` fell back to "A component:" when a caller passed no `warn` names. The
+  `warn` option is now required (every component already passed it; only internal tests did not),
+  so its two warnings always start with the public part name.
+
+Development console only.
+
+## 2026-11-24, #161: Select's position-check texts left out of production builds
+
+GitHub issue #161 (`memo/reviewer/review-157-helpers.md` finding 7, pre-existing).
+`Select.Trigger`'s `firstChildOfSelect` and `Select.GroupLabel`'s `firstChildOfGroup` are
+module-level functions returning development warning texts. They were passed to
+`useSelectPartRef` unguarded: the check is a no-op in production, but the functions stayed
+referenced, so their texts ("must be the first child of Select.Root's <select> ...") shipped in a
+production bundle. Both are now passed as `isDev ? fn : undefined`.
+
+`src/__tests__/production-bundle.test.ts` missed it because the texts were not inside a warning
+call's arguments. It now collects `useSelectPartRef`'s `position` argument (the part-name
+argument is a production string) and follows any name in the collected arguments to the module's
+top-level function or constant of that name; it also asserts that the two Select texts are
+collected, so the collector cannot silently stop seeing this class. Without the guard it fails on
+three pieces (both files). Sections changed: conventions 7.2 states that the check reads the
+named module-level helpers and how to pass one.
+
+## 2026-11-24, #157 follow-up: the second-Viewport warning follows the refused subscription
+
+Corrects the "#157 follow-up: the helpers in the files skipped for the split" entry above
+(`memo/reviewer/review-157-helpers-followup.md` major 1). Its `useDevWarning(rejected, ...)` keyed
+off `rejected`, whose first value is read during render (`isTaken`). When a Viewport is replaced
+in one commit (a `key` change, a move between two parents) the new instance renders while the old
+one is still subscribed, so it warned "another Toast.Viewport already renders this manager" for a
+single Viewport. The warning now reads a `duplicate` state set only when the subscription is
+refused, as the former `console.error` in that branch did; it still fires once per instance.
+Development console only.
+
+## 2026-11-24, #161 follow-up: the production-bundle check follows nested functions
+
+Extends the "#161: Select's position-check texts left out of production builds" entry above
+(`memo/reviewer/review-157-helpers-followup.md` minor 2). The check followed a name in a dev
+argument only to the file's top-level declarations, so a message-building closure inside a
+component (`const message = () => "..."` passed to or called in a warning) leaked unnoticed. It now
+also follows functions declared at any depth in the file (function declarations, and variables
+initialised with an arrow or function expression). Nested variables of other kinds are not
+followed: indexing them pulled runtime strings (CSS selectors, part names, attribute names) that
+a warning merely reads into the dev set, ten false positives. Verified with two planted leaks in
+`Toast.Viewport` (a local arrow and a local function declaration called in `useDevWarning`), both
+reported, then removed. Helpers imported from another module are still not followed (none exist
+today); conventions 7.2 now says so and asks to keep message helpers in the file that warns.
+
+## 2026-11-24, #157 follow-up: `compareDocumentOrder` is exactly `byDocumentPosition`
+
+Corrects the "#157 follow-up: the helpers in the files skipped for the split" entry above
+(`memo/reviewer/review-157-helpers-followup.md` nit 3), which says the two comparators "differ only
+for unrelated nodes". They never differ. For the same node both return 0. For two distinct nodes
+`compareDocumentPosition` always sets exactly one of PRECEDING and FOLLOWING, also for
+disconnected nodes (DOM spec: DISCONNECTED and IMPLEMENTATION_SPECIFIC come with one of the two,
+chosen consistently). So `useToastFocus`'s switch to `compareDocumentOrder` is an exact
+replacement, as was Combobox's in #157.

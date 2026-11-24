@@ -433,6 +433,49 @@ describe("Menu", () => {
       ]);
     });
 
+    // The Trigger records a pointer click as the open cause before it requests the open
+    // (`usePopoverTrigger`'s `beforeOpen`, design 6.1). jsdom's `focus()` ignores `focusVisible`,
+    // so the spy reads the option: the library then takes the quiet-focus path a pointer open
+    // takes in an engine (the detection is forgotten after each test).
+    function watchQuietFocus() {
+      const quiet: Element[] = [];
+      const original = HTMLElement.prototype.focus;
+      vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function (
+        this: HTMLElement,
+        options?: FocusOptions,
+      ) {
+        const visible = (options as { focusVisible?: boolean } | undefined)?.focusVisible;
+        if (this.isConnected && visible === false) quiet.push(this);
+        original.call(this, options);
+      });
+      return quiet;
+    }
+
+    it("a pointer click opens quietly: focus({ focusVisible: false }) on the first item", async () => {
+      const user = setupUser();
+      const quiet = watchQuietFocus();
+      const { calls } = watchShow();
+      render(<Harness />);
+      await openMenu(user);
+      // No `autofocus` write (that path shows a focus ring), one quiet focus after the show.
+      expect(calls[0]!.autofocus).toBeNull();
+      expect(quiet).toEqual([item("rename")]);
+      expect(item("rename")).toHaveFocus();
+    });
+
+    it("a keyboard activation of the Trigger opens with the autofocus write, not quietly", async () => {
+      const user = setupUser();
+      const quiet = watchQuietFocus();
+      const { calls } = watchShow();
+      render(<Harness />);
+      trigger().focus();
+      await user.keyboard("{Enter}");
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(calls[0]!.autofocus).toBe(item("rename"));
+      expect(quiet).toEqual([]);
+    });
+
     it("a menu with no items autofocuses the popup itself", async () => {
       const user = setupUser();
       const { calls } = watchShow();

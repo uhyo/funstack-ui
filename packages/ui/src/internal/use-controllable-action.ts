@@ -41,8 +41,11 @@ export interface UseControllableActionOptions<T, Details extends ActionDetails> 
    * `{ whole: true }` bypasses the reducer: its `next` replaces the value in both places.
    */
   reducer?: (prev: T, next: T, details: Details) => T;
-  /** Names used in development warnings. */
-  warn?: { readonly component: string; readonly prop: string };
+  /**
+   * Names used in development warnings: `component` is the public part name the messages start
+   * with (`"Select.Root"`, conventions 7.2), `prop` the controlled prop (`"value"`, `"open"`).
+   */
+  warn: { readonly component: string; readonly prop: string };
 }
 
 export interface ControllableAction<T, Details extends ActionDetails> {
@@ -274,11 +277,10 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
 function useDevWarnings(
   isControlled: boolean,
   hasDefault: boolean,
-  warn: { readonly component: string; readonly prop: string } | undefined,
+  warn: { readonly component: string; readonly prop: string },
 ): void {
   const [initialMode] = useState(isControlled);
-  const component = warn?.component ?? "A component";
-  const prop = warn?.prop ?? "value";
+  const { component, prop } = warn;
   const defaultProp = isDev && `default${capitalize(prop)}`;
 
   useDevWarning(

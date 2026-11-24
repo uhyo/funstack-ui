@@ -569,9 +569,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // --- Residual browser paths: mount reconciliation and form reset (design 4.5, 6.4) ----------
 
-  const resetBase = useResetTarget(value, defaultValue) ?? null;
-  const resetTarget = (): number | null => resetBase;
-  const resetTargetText = hiddenText(resetTarget());
+  const resetTarget = useResetTarget(value, defaultValue) ?? null;
+  const resetTargetText = hiddenText(resetTarget);
 
   const { onItemMounted } = useNativeGroupReconciliation<number | null>({
     element: hiddenRef as RefObject<FormAssociatedElement | null>,
@@ -583,7 +582,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     readDefault: () => {
       // A reset clears an open draft whatever the target.
       clearDraft();
-      return resetTarget();
+      return resetTarget;
     },
     base: () => shownRef.current,
     onPlatformChange: (next, event) => {
@@ -595,7 +594,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       // react-dom rewrites a controlled text input's `defaultValue` after every update; the
       // visible text's reset target is written right before the reset algorithm reads it.
       const visible = visibleRef.current;
-      if (visible !== null) visible.defaultValue = formatter.format(resetTarget());
+      if (visible !== null) visible.defaultValue = formatter.format(resetTarget);
     },
   });
 

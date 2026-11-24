@@ -35,6 +35,7 @@ export interface RovingFocusHandlers {
   readonly onPointerDown: (event: PointerEvent<HTMLElement>) => void;
 }
 
+// What may hold the roving tab stop; narrower than Menu's and Tooltip's selectors on purpose.
 const FOCUSABLE = [
   "button",
   "a[href]",

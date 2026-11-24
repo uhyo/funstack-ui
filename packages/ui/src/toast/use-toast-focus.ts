@@ -1,14 +1,9 @@
 "use client";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
+import { compareDocumentOrder } from "../internal/dom-order.js";
 import { matchesHotkey } from "./toast-hotkey.js";
 import type { Entry } from "./toast-queue.js";
-
-/** Document order. */
-function byDocumentPosition(a: Element, b: Element): number {
-  if (a === b) return 0;
-  return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-}
 
 export interface ToastFocusOptions {
   /** The Viewport's latest queue. */
@@ -41,7 +36,7 @@ export function useToastFocus({ entriesRef, roots, regionRef }: ToastFocusOption
       if (!open.has(id) || exclude?.has(id) || !element.isConnected) continue;
       list.push({ id, element });
     }
-    return list.sort((a, b) => byDocumentPosition(a.element, b.element));
+    return list.sort((a, b) => compareDocumentOrder(a.element, b.element));
   };
 
   const moveFocusOut = (closing: ReadonlySet<string>): void => {
