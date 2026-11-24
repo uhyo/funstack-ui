@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -355,17 +355,28 @@ export function DialogPopup({
     handleClose(element, event);
   });
 
+  // Whether the Popup is mounted, for the #159 replay. A passive effect: a Suspense hide detaches
+  // the element's ref (and runs layout cleanups) but keeps passive effects, so a hidden Popup
+  // still counts as mounted.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, [mounted]);
+
   const libraryRef = useCallback(
     (element: HTMLDialogElement) => {
       checkElement?.(element);
       popupRef.current = element;
       // A new element (a remount mid-close): the old one's `close` event never comes (#159). A
-      // lost fact is replayed a task later, unless the Popup unmounted meanwhile. Here, not in the
+      // lost fact is replayed a timer task later, unless the Popup unmounted meanwhile; also while
+      // a Suspense boundary hides it (the fact happened before the hide). Here, not in the
       // listener effect's cleanup: that passive cleanup runs after the remount's layout effects,
       // and no apply follows it.
       flags.attach(element, (lost) => {
-        if (popupRef.current !== null)
-          latestHandleClose.current(lost as HTMLDialogElement, undefined);
+        if (mounted.current) latestHandleClose.current(lost as HTMLDialogElement, undefined);
       });
       setDialog(element);
       return () => {
@@ -373,7 +384,7 @@ export function DialogPopup({
         setDialog(null);
       };
     },
-    [checkElement, popupRef, flags, latestHandleClose],
+    [checkElement, popupRef, flags, latestHandleClose, mounted],
   );
 
   const onBeforeToggle = useEffectEvent((event: Event) => {

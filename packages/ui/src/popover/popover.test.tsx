@@ -2338,6 +2338,50 @@ describe("Popover: a remount during a hide (#159)", () => {
     expect(fact).not.toHaveBeenCalled();
   });
 
+  it("a dismissal, then a Suspense hide before the replay: still reported, not stuck after the reveal", async () => {
+    const user = setupUser();
+    const fact = vi.fn<ActionFn>();
+    let resolve!: () => void;
+    const pending = new Promise<void>((r) => {
+      resolve = r;
+    });
+    function Suspend(): null {
+      use(pending);
+      return null;
+    }
+    const ui = (props: { popup?: typeof withTransition; suspend?: boolean }) => (
+      <Harness
+        mode="uncontrolled"
+        suspense
+        fact={fact}
+        popup={props.popup}
+        outside={props.suspend ? () => <Suspend /> : undefined}
+      />
+    );
+    const { rerender } = render(ui({}));
+    await openThroughTrigger(user);
+    const first = popup();
+    // One task: a script hide, a remount, then a sync update that suspends the boundary above the
+    // Root (the Popup stays mounted, its element's ref detaches).
+    first.hidePopover();
+    rerender(ui({ popup: withTransition }));
+    rerender(ui({ popup: withTransition, suspend: true }));
+    expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    await flushTasks(2);
+    // The replay ran while hidden: the fact is reported.
+    expect(fact).toHaveBeenCalledTimes(1);
+    expect(fact).toHaveBeenCalledWith(false, expect.objectContaining({ reason: "dismiss" }));
+    await act(async () => resolve());
+    await flushTasks(2);
+    expect(screen.queryByTestId("fallback")).toBeNull();
+    expect(popup()).not.toBe(first);
+    expect(committedText()).toBe("false");
+    expect(isOpen()).toBe(false);
+    // Not stuck: the Trigger opens it.
+    await openThroughTrigger(user);
+    expect(content()).not.toBeNull();
+  });
+
   it("a controlled close: the hold is released, and the popup re-opens and reports a dismissal", async () => {
     const user = setupUser();
     const fact = vi.fn<ActionFn>();

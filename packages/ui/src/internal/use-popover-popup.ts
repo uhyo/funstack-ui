@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
 import { withCssTransitionCut } from "./css-transition-cut.js";
@@ -328,12 +328,26 @@ export function usePopoverPopup(
     }
   };
 
-  // A fact whose element remounted before its `toggle` (#159): what that `toggle` would have
-  // done. The lost element is hidden; its shown mirror and `whileShown` listeners went at detach.
+  // A fact whose element remounted before its `toggle` (#159), in a timer task: the work that
+  // `toggle` would have done. The lost element is hidden; its shown mirror and `whileShown` listeners went at detach.
   const replayLostHide = (element: HTMLElement): void => {
     flags.endClose();
+    // Echo `false`: only facts are replayed. `lostInterest` `false`: the detach's `interest.reset()`
+    // dropped the mark, as `takeLostInterest()` would read now; a lost-interest hide never has
+    // focus inside (interest is lost once focus left), so no focus return follows from it.
     handleHidden(element, undefined, false, false);
   };
+
+  // Whether the Popup is mounted, for the #159 replay. A passive effect: a Suspense hide detaches
+  // the element's ref (and runs layout cleanups) but keeps passive effects, so a hidden Popup
+  // still counts as mounted.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const onToggle = (event: Event): void => {
     const element = popupRef.current;
@@ -403,9 +417,10 @@ export function usePopoverPopup(
       checkElement?.(element);
       popupRef.current = element;
       // A new element (a remount mid-hide): the old one's `toggle` never comes (#159). A lost
-      // fact is replayed a task later, unless the Popup unmounted meanwhile.
+      // fact is replayed a timer task later, unless the Popup unmounted meanwhile; also while a
+      // Suspense boundary hides it (the fact happened before the hide).
       flags.attach(element, (lost) => {
-        if (popupRef.current !== null) handlers.current.replayLostHide(lost as HTMLElement);
+        if (mounted.current) handlers.current.replayLostHide(lost as HTMLElement);
       });
       const listeners: [string, EventListener][] = [
         ["beforetoggle", (event) => handlers.current.onBeforeToggle(event)],

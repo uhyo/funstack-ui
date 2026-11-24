@@ -23,7 +23,12 @@ the last one during a close:
 - fact (review finding 1): keep the wait set, `setTimeout(0)` replay of the lost event's handler
   on the old element (Dialog `handleClose(lost, undefined)`, Popover `endClose` +
   `handleHidden(lost, undefined, false, false)`). At most one replay queued (`replaying`); the
-  callers skip it when `popupRef.current === null` (Popup unmounted). Reported details: intent's
+  callers skip it once the Popup unmounted (a `mounted` ref set by a passive effect). Not
+  `popupRef.current === null` (second review, finding A): a Suspense hide detaches the ref while
+  the Popup stays mounted, and skipping there left the wait set for good. A hidden Popup gets the
+  replay and reports the fact (the dismissal happened before the hide); the reveal follows
+  committed state. The replay is a timer task, not the event's task (finding B): it can run later
+  and an input task can come first. Reported details: intent's
   `event` / `reason` if recorded, else `"dismiss"` and `event: undefined` (documented gap);
   Dialog's `returnValue` is the old element's.
 - same element: no-op.
@@ -74,7 +79,8 @@ dialog.test.tsx "a remount during a close (#159)": foreign show + dismissal (rep
 close + foreign show (hold released), inline-ref re-attach (no re-open), dismissal (reported a
 task later with `returnValue`, no `event`, stays closed, re-opens), refused dismissal (reported,
 new element re-opens), unmount before replay (nothing reported), controlled close (hold released,
-re-open, next dismissal reported). popover.test.tsx: the same set minus the foreign-show rows.
+re-open, next dismissal reported), Suspense hide before the replay (reported while hidden, closed
+after the reveal, Trigger opens it). popover.test.tsx: the same set minus the foreign-show rows.
 menu.test.tsx and combobox.test.tsx: one dismissal row each (review nit 4). overlay-show.test.ts:
 two attach rows (library close; fact replay, one per lost close).
 

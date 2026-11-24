@@ -11056,3 +11056,26 @@ the entry "2026-11-24, #159: a remount during a close ends the close's wait" abo
 
 Sections changed: dialog.md 2.5 and popover.md 2.5 (the re-open race: what a remount does).
 Developer notes: `memo/developer/issue-159.md`.
+
+## 2026-11-24, #159 second review: the replay and a Suspense hide
+
+Follow-up review of `fix/159-remount-mid-close` (memo/reviewer/review-159.md, findings A-C),
+coordinator decision. Corrects the entry "2026-11-24, #159 review: a fact lost to a remount is
+replayed" above.
+
+- **A Suspense hide does not cancel the replay.** The replay was skipped when `popupRef` was
+  `null`, meant as "the Popup unmounted"; but a Suspense boundary that hides the Popup detaches
+  the element's ref too while the Popup stays mounted. A hide, a remount and a suspending update
+  in one task left `awaitingClose` set for good and the fact unreported. Each Popup now tracks
+  "mounted" in a passive effect (a Suspense hide runs layout cleanups and ref detaches, not
+  passive cleanups) and replays whenever it is mounted. Reporting, rather than only ending the
+  wait, is what happens to a fact today: a dismissal that happened before the hide is reported
+  (committed `false`, `onOpenChange(false)`), and the reveal's apply effect then follows committed
+  state (uncontrolled: stays closed; a refusing parent: the refused fact's re-open). The handler's
+  work does not need the popup ref: it runs on the old element.
+- **Wording.** The replay is a timer task (`setTimeout(0)`), not "where the lost event would have
+  run": it is a different task from the event's, can run later, and an input task can come before
+  it (a Trigger click in between toggles as it does between a hide and its `toggle` today).
+
+Sections changed: dialog.md 2.5 and popover.md 2.5 (the remount paragraph). Developer notes:
+`memo/developer/issue-159.md`.

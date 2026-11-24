@@ -45,9 +45,12 @@ export interface PopupFlags {
    * element went away with its listeners and its queued `toggle` / `close` event never reaches the
    * Popup:
    * - a library close (echo set): nothing to report; the wait and the echo end here;
-   * - a fact: `replayLostFact(old element)` runs a task later, where the lost event would have
-   *   run, and must do what its handler does (end the wait, report the fact). The wait stays set
-   *   until then, so no apply shows the new element first. At most one replay is queued.
+   * - a fact: `replayLostFact(old element)` runs in a timer task (`setTimeout(0)`), not in the
+   *   lost event's own task: it can run later than that event would have, and an input task can
+   *   come first. It must do what the event's handler does (end the wait, report the fact). The
+   *   wait stays set until then, so no apply shows the new element first. At most one replay is
+   *   queued. The caller skips it once the Popup has unmounted, not when a Suspense hide only
+   *   detached the ref.
    *
    * Called at the ref's attach. Refs attach in the layout phase, children first, so this runs
    * before the Popup's own layout effects (the element is its descendant): the apply effect must

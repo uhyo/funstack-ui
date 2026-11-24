@@ -365,10 +365,12 @@ synchronous `beforetoggle(closed)` listener and cleared in `toggle`. `beforetogg
 the hide steps in every engine and in the jsdom shim. As Dialog's, the flag and the `libraryHide`
 marker belong to the element. When the callback ref attaches a different element (a remount
 during a hide, such as a change of `transition`), the old element's `toggle` never reaches the
-Popup: a library hide has nothing to report and both are cleared there; a fact is replayed a task
-later (the closed `toggle`'s work on the old element: `onOpenChange(false)` with the recorded
-intent's `event` and `reason`, else `"dismiss"` and no `event`), with the wait held until then and
-no replay once the Popup has unmounted. The attach runs in the layout phase before the Popup's
+Popup: a library hide has nothing to report and both are cleared there; a fact is replayed in a
+timer task (`setTimeout(0)`, not the `toggle`'s own task: it can run later, and an input task can
+come first), doing the closed `toggle`'s work on the old element: `onOpenChange(false)` with the
+recorded intent's `event` and `reason`, else `"dismiss"` and no `event`. The wait is held until
+then. No replay once the Popup has unmounted; a Popup a Suspense boundary hides (ref detached,
+still mounted) still gets it. The attach runs in the layout phase before the Popup's
 apply effect (the element is its descendant). The same element attached again (a new merged ref)
 changes nothing.
 
