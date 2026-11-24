@@ -188,7 +188,10 @@ import { Form } from "@funstack/ui/form";
         </li>
         <li>
           An action that throws reaches the nearest Error Boundary above <code>Form.Root</code>;
-          nothing is reset. Return errors from the action to keep the form.
+          nothing is reset. Return errors from the action to keep the form. The rejection of a
+          submission a later one superseded, or of one that settles after the form unmounted or was
+          hidden, goes to <code>reportError</code> instead, like every other action (see{" "}
+          <a href="/concepts/action-props">Action props</a>).
         </li>
         <li>
           A second submit while one is pending is not dropped: a <code>useActionState</code>{" "}
