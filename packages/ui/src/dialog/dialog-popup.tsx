@@ -25,6 +25,7 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
+import { useLatest } from "../internal/use-latest.js";
 import { useModalRegistration } from "../internal/use-modal-registration.js";
 import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -195,23 +196,6 @@ export function DialogPopup({
             "Top layer, backdrop, focus and Escape all come from a real <dialog>."
           : null),
   );
-  const libraryRef = useCallback(
-    (element: HTMLDialogElement) => {
-      checkElement?.(element);
-      popupRef.current = element;
-      // A new element (a remount mid-close): the old one's `close` event never comes (#159). Here,
-      // not in the listener effect's cleanup: that passive cleanup runs after the remount's
-      // layout effects, and no apply follows it.
-      flags.attach(element);
-      setDialog(element);
-      return () => {
-        if (popupRef.current === element) popupRef.current = null;
-        setDialog(null);
-      };
-    },
-    [checkElement, popupRef, flags],
-  );
-
   // --- Opening -----------------------------------------------------------------------------
 
   const openDialog = (element: HTMLDialogElement): void => {
@@ -336,9 +320,9 @@ export function DialogPopup({
     ctx.requestClose(event, "activate", valueOf(submitter));
   });
 
-  const onClose = useEffectEvent((event: Event) => {
-    const element = popupRef.current;
-    if (element === null || event.target !== element) return;
+  // The `close` listener's work, also replayed for an element that remounted before its `close`
+  // event (#159; `event` is `undefined` there: no event fired).
+  const handleClose = (element: HTMLDialogElement, event: Event | undefined): void => {
     flags.endClose();
 
     // Focus return is the platform's; it leaves focus inside the hidden dialog only when the
@@ -362,7 +346,35 @@ export function DialogPopup({
     // A fact, also while a part's close is in flight: it supersedes that request (committed
     // `false` now) and `onOpenChange(false)` is called (conventions 3.9.5, dialog.md 2.7).
     ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
+  };
+  const latestHandleClose = useLatest(handleClose);
+
+  const onClose = useEffectEvent((event: Event) => {
+    const element = popupRef.current;
+    if (element === null || event.target !== element) return;
+    handleClose(element, event);
   });
+
+  const libraryRef = useCallback(
+    (element: HTMLDialogElement) => {
+      checkElement?.(element);
+      popupRef.current = element;
+      // A new element (a remount mid-close): the old one's `close` event never comes (#159). A
+      // lost fact is replayed a task later, unless the Popup unmounted meanwhile. Here, not in the
+      // listener effect's cleanup: that passive cleanup runs after the remount's layout effects,
+      // and no apply follows it.
+      flags.attach(element, (lost) => {
+        if (popupRef.current !== null)
+          latestHandleClose.current(lost as HTMLDialogElement, undefined);
+      });
+      setDialog(element);
+      return () => {
+        if (popupRef.current === element) popupRef.current = null;
+        setDialog(null);
+      };
+    },
+    [checkElement, popupRef, flags, latestHandleClose],
+  );
 
   const onBeforeToggle = useEffectEvent((event: Event) => {
     const element = popupRef.current;

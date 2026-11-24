@@ -11028,3 +11028,31 @@ handled at the attach; the branch was observable only through #159 (#157 review 
 
 Sections changed: dialog.md 2.5 (the re-open race), popover.md 2.5 (the re-open race).
 Developer notes: `memo/developer/issue-159.md`.
+
+## 2026-11-24, #159 review: a fact lost to a remount is replayed
+
+Review of `fix/159-remount-mid-close` (memo/reviewer/review-159.md), coordinator decision. Corrects
+the entry "2026-11-24, #159: a remount during a close ends the close's wait" above in two points.
+
+1. **A lost fact is reported.** That entry cleared the wait for every remount mid-close, so a
+   dismissal (Escape, light dismiss, script `close()` / `hidePopover()`) whose element remounted
+   before its event was undone silently: the apply effect showed the new element and
+   `onOpenChange(false)` never came, against the fact rule (conventions 3.9.2). Now
+   `PopupFlags.attach` tells the two apart: a library close (echo set) is still cleared at once;
+   a fact keeps the wait set and is replayed a task later, where the lost event would have run,
+   by the same code as the `close` / `toggle` listener (Dialog: `handleClose`; usePopoverPopup:
+   `handleHidden`) on the old element. So an uncontrolled popup stays closed, a controlled parent
+   decides (a refusal gets the refused fact's re-open, 3.9.4), and Dialog reports the old
+   element's `returnValue`. `details.event` is the recorded intent's event, else `undefined`
+   (the platform event never fired: a documented gap). At most one replay is queued per lost
+   close; none runs once the Popup has unmounted. No double report: the old element's event, if
+   it fired, reaches no listener (Popover's are removed at detach; Dialog's `onClose` checks the
+   target against `popupRef`).
+2. **Refs attach in the layout phase**, not the mutation phase as that entry said (only the
+   detach is in the mutation phase). Layout work runs children first and the popup element is a
+   descendant of the Popup component, so the attach still runs before the Popup's
+   `useApplyOpenState` layout effect in the same commit. The apply effect must stay in an
+   ancestor of the popup element for this to hold.
+
+Sections changed: dialog.md 2.5 and popover.md 2.5 (the re-open race: what a remount does).
+Developer notes: `memo/developer/issue-159.md`.

@@ -363,10 +363,14 @@ task later, so a commit landing in between would see committed `true`, a hidden 
 in flight and would call `showPopover()` again. The guard is `awaitingClose`, set in the
 synchronous `beforetoggle(closed)` listener and cleared in `toggle`. `beforetoggle` fires inside
 the hide steps in every engine and in the jsdom shim. As Dialog's, the flag and the `libraryHide`
-marker belong to the element: when the callback ref attaches a different element (a remount
+marker belong to the element. When the callback ref attaches a different element (a remount
 during a hide, such as a change of `transition`), the old element's `toggle` never reaches the
-Popup, so both are cleared there, before that commit's apply effect; the same element attached
-again (a new merged ref) keeps them.
+Popup: a library hide has nothing to report and both are cleared there; a fact is replayed a task
+later (the closed `toggle`'s work on the old element: `onOpenChange(false)` with the recorded
+intent's `event` and `reason`, else `"dismiss"` and no `event`), with the wait held until then and
+no replay once the Popup has unmounted. The attach runs in the layout phase before the Popup's
+apply effect (the element is its descendant). The same element attached again (a new merged ref)
+changes nothing.
 
 One effect covers: the normal open, `defaultOpen` on mount, a controlled open without a Trigger,
 a controlled close, a library-driven close after `openChangeAction(false)` settled, the re-show

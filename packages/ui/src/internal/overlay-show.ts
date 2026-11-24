@@ -40,14 +40,21 @@ export interface PopupFlags {
    */
   readonly takeRefusedFact: () => boolean;
   /**
-   * The popup element the callback ref attached. A different element than the last one ends the
-   * close and drops the echo (#159): the old element went away with its listeners, so its queued
-   * `toggle` / `close` event never reaches the Popup, and the new element has no close pending
-   * (a remount mid-close, such as a change of `transition`). Called at the ref's attach, before
-   * the commit's layout effects, so that commit's apply already sees it. The same element
-   * attached again (a new merged ref, StrictMode) keeps both: its event still comes.
+   * The popup element the callback ref attached (#159). When it is a different element than the
+   * last one during a close (a remount mid-close, such as a change of `transition`), the old
+   * element went away with its listeners and its queued `toggle` / `close` event never reaches the
+   * Popup:
+   * - a library close (echo set): nothing to report; the wait and the echo end here;
+   * - a fact: `replayLostFact(old element)` runs a task later, where the lost event would have
+   *   run, and must do what its handler does (end the wait, report the fact). The wait stays set
+   *   until then, so no apply shows the new element first. At most one replay is queued.
+   *
+   * Called at the ref's attach. Refs attach in the layout phase, children first, so this runs
+   * before the Popup's own layout effects (the element is its descendant): the apply effect must
+   * stay in an ancestor of the popup element to see it. The same element attached again (a new
+   * merged ref, StrictMode) changes nothing: its event still comes.
    */
-  readonly attach: (element: Element) => void;
+  readonly attach: (element: Element, replayLostFact: (lost: Element) => void) => void;
 }
 
 /** A fresh set of flags, all clear. Keep one per Popup instance (`useState(createPopupFlags)`). */
@@ -56,6 +63,8 @@ export function createPopupFlags(): PopupFlags {
   let libraryClose = false;
   let refusedFact = false;
   let attached: Element | null = null;
+  // A lost fact's replay is queued: its wait stays set until it runs.
+  let replaying = false;
   return {
     awaitingClose: () => awaitingClose,
     beginClose: () => {
@@ -83,10 +92,20 @@ export function createPopupFlags(): PopupFlags {
       refusedFact = false;
       return refused;
     },
-    attach: (element) => {
+    attach: (element, replayLostFact) => {
       if (element === attached) return;
+      const lost = attached;
       attached = element;
-      awaitingClose = false;
+      if (lost !== null && awaitingClose && !libraryClose) {
+        if (replaying) return;
+        replaying = true;
+        setTimeout(() => {
+          replaying = false;
+          replayLostFact(lost);
+        }, 0);
+        return;
+      }
+      if (!replaying) awaitingClose = false;
       libraryClose = false;
     },
   };

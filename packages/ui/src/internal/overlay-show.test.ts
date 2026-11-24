@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createPopupFlags, showWithFocus } from "./overlay-show.js";
 
 describe("createPopupFlags", () => {
@@ -37,22 +37,46 @@ describe("createPopupFlags", () => {
     expect(flags.takeRefusedFact()).toBe(false);
   });
 
-  it("a different element ends the close and drops the echo; the same one keeps them (#159)", () => {
+  it("a different element ends a library close and drops the echo; the same one keeps them (#159)", () => {
     const flags = createPopupFlags();
+    const replay = vi.fn();
     const first = document.createElement("dialog");
-    flags.attach(first);
+    flags.attach(first, replay);
     flags.beginClose();
     flags.markLibraryClose();
     flags.markFact();
     // Re-attached: its event still comes.
-    flags.attach(first);
+    flags.attach(first, replay);
     expect(flags.awaitingClose()).toBe(true);
-    // A new element: the old one's event never comes.
-    flags.attach(document.createElement("dialog"));
+    // A new element: the old one's event never comes, and an echo has nothing to report.
+    flags.attach(document.createElement("dialog"), replay);
     expect(flags.awaitingClose()).toBe(false);
     expect(flags.takeLibraryClose()).toBe(false);
+    expect(replay).not.toHaveBeenCalled();
     // The refused fact is about state, not the element.
     expect(flags.takeRefusedFact()).toBe(true);
+  });
+
+  it("a different element during a fact's close queues one replay a task later; the wait stays until then (#159)", () => {
+    vi.useFakeTimers();
+    try {
+      const flags = createPopupFlags();
+      const replay = vi.fn(() => flags.endClose());
+      const first = document.createElement("div");
+      flags.attach(first, replay);
+      flags.beginClose();
+      flags.attach(document.createElement("div"), replay);
+      // A second remount before the replay queues no second one.
+      flags.attach(document.createElement("div"), replay);
+      expect(flags.awaitingClose()).toBe(true);
+      expect(replay).not.toHaveBeenCalled();
+      vi.runAllTimers();
+      expect(replay).toHaveBeenCalledTimes(1);
+      expect(replay).toHaveBeenCalledWith(first);
+      expect(flags.awaitingClose()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps each instance's flags apart", () => {

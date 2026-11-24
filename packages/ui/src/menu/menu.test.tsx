@@ -2808,3 +2808,25 @@ describe("right- and middle-click (context-menu.md 5, every menu)", () => {
     expect(isOpen()).toBe(false);
   });
 });
+
+// #159 (usePopoverPopup, as Popover's): a dismissal whose popup element remounts before its
+// `toggle` (a change of `transition`) is replayed a task later and reported.
+describe("Menu: a remount during a hide (#159)", () => {
+  it("a dismissal is reported, and the menu stays closed", async () => {
+    const user = setupUser();
+    const onOpenChange = vi.fn();
+    const { rerender } = render(<Harness root={{ onOpenChange }} />);
+    await openMenu(user);
+    const first = screen.getByTestId("popup");
+    first.hidePopover();
+    rerender(<Harness root={{ onOpenChange }} popup={{ transition: { default: "none" } }} />);
+    await flushTasks(2);
+    expect(screen.getByTestId("popup")).not.toBe(first);
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).toHaveBeenCalledWith(
+      false,
+      expect.objectContaining({ reason: "dismiss" }),
+    );
+    expect(isOpen()).toBe(false);
+  });
+});
