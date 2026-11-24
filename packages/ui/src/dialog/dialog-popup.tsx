@@ -214,8 +214,10 @@ export function DialogPopup({
     // A refused re-open of a non-modal dialog never moves focus (#156): no initial focus target,
     // and the dialog is `inert` for the duration of `show()`, so the dialog focusing steps focus
     // nothing (a consumer's own `inert` is left alone). A modal dialog must hold focus: its
-    // re-open is a normal open.
-    const refused = flags.takeRefused() && !modal;
+    // re-open is a normal open. Two steps on purpose: the flag is taken (and cleared) on every
+    // show, a modal one included; `!modal && take()` would leave it set for a modal dialog.
+    const wasRefused = flags.takeRefusedFact();
+    const refused = wasRefused && !modal;
     // Otherwise the platform's dialog focusing steps honour `autofocus` (design 6.1).
     showWithFocus(element, {
       refused,

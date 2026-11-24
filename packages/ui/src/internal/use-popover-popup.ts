@@ -175,7 +175,7 @@ export function usePopoverPopup(
     // A refused re-open never moves focus (#155, #156): no initial focus target, and the popup is
     // `inert` for the call (showWithFocus), whether the focusing steps are the dialog focusing
     // steps of a `<dialog>` (Popover's default) or a consumer's own `autofocus` in any popup.
-    const refused = flags.takeRefused();
+    const refused = flags.takeRefusedFact();
     const focus = refused ? null : resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps
     // for a <dialog>, in every engine). Never `.focus()` (6.1) except for the quiet target above.
