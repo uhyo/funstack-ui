@@ -110,7 +110,7 @@ export interface PopoverPopupProps extends Omit<
    * click outside) are the browser's and animate with CSS only. Ignored (dev warning) in JS-free
    * mode. While a view transition runs, the popup's CSS transitions are turned off for the moment
    * of the library's own show or hide (an inline `transition: none !important`, restored right
-   * after), so a CSS exit for dismissals never overlaps it.
+   * after), so that show or hide runs no CSS transition (a `@keyframes` animation is not cut).
    *
    * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
    * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms

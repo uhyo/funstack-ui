@@ -175,7 +175,7 @@ export function TransitionsPage() {
         <code>transition-behavior: allow-discrete</code>) can animate it; it is a fact, reported to{" "}
         <code>onOpenChange</code> in an urgent commit, which starts no view transition at all. Write
         both: the <code>transition</code> prop animates what the library does, CSS animates what the
-        browser does, and they never overlap.
+        browser does, and the library&apos;s own show or hide never runs a CSS transition.
       </p>
       <p>
         While a view transition runs, the library turns off the popup&apos;s CSS transitions for the
@@ -183,9 +183,12 @@ export function TransitionsPage() {
         rendering through its CSS fade and capture it in the close&apos;s new snapshot as well as
         the old one (a double image), and the CSS enter would run under the view transition&apos;s
         enter. To do this, the library writes an inline <code>transition: none !important</code> on
-        the popup for the length of that one call and then puts your inline style back exactly as it
-        was. A dismissal is never cut, so its CSS fade runs even when another view transition of the
-        page starts during it.
+        the popup for the length of that one call and then puts your inline <code>transition</code>{" "}
+        back. A dismissal is never cut, so its CSS fade runs even when another view transition of
+        the page starts during it (a dismissal while the library&apos;s own view transition runs
+        fades inside that transition&apos;s new image). Only CSS transitions are cut: an exit
+        written as a <code>@keyframes</code> animation on the closed state still runs during a
+        library close, and Chromium captures it twice. Write the exit as a <code>transition</code>.
       </p>
       <ConceptExample component="Dialog" href="/components/dialog">
         <p>

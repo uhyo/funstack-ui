@@ -64,8 +64,8 @@ export interface ComboboxPopupProps extends Omit<
    * boundary** (React: updates from `useDeferredValue` animate), so use a type map with
    * `default: "none"` unless every result change should cross-fade. Static. While a view
    * transition runs, the popup's CSS transitions are turned off for the moment of the library's
-   * own show or hide (an inline `transition: none !important`, restored right after), so a CSS
-   * exit for dismissals never overlaps it.
+   * own show or hide (an inline `transition: none !important`, restored right after), so that
+   * show or hide runs no CSS transition (a `@keyframes` animation is not cut).
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */

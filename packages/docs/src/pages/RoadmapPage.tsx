@@ -35,9 +35,9 @@ export function RoadmapPage() {
           <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>
           ). While a view transition runs, the library turns the popup&apos;s CSS transitions off
           for the moment of its own show or hide, with an inline{" "}
-          <code>transition: none !important</code> that it removes right after. You can delete the
-          rule; if you keep it, an unrelated view transition of the page still cuts a
-          dismissal&apos;s CSS fade, which the library alone no longer does.
+          <code>transition: none !important</code> that it removes right after. The rule is not
+          needed: remove it. Keeping it breaks nothing, but an unrelated view transition of the page
+          then still cuts a dismissal&apos;s CSS fade.
         </li>
         <li>
           <strong>Breaking:</strong> requests and facts (<a href={issue(148)}>#148</a>;{" "}

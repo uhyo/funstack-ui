@@ -100,7 +100,8 @@ export interface DialogPopupProps extends Omit<
    * browser's and animate with CSS only, never with a view transition. Ignored (dev warning) in
    * JS-free mode. While a view transition runs, the dialog's CSS transitions are turned off for
    * the moment of the library's own show or close (an inline `transition: none !important`,
-   * restored right after), so a CSS exit for dismissals never overlaps it.
+   * restored right after), so that show or close runs no CSS transition (a `@keyframes`
+   * animation is not cut).
    *
    * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
    * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms

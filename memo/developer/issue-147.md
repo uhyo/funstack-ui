@@ -49,3 +49,20 @@ The backdrop labelling is a WebKit quirk worth a GitHub issue in this repo if it
 - Popover: consumer `style={{ transition }}` row. Combobox: the accept-close row and an open row.
 - Mutation check: with the gate forced off, 9 rows fail in Chromium (close, open and inline rows of
   Dialog, Popover, Combobox).
+
+## Review fixes (memo/reviewer/review-147-155.md)
+
+- H1: the restore wrote `setAttribute("style")`, which a CSP without `'unsafe-inline'` for styles
+  blocks (Chromium kept `none !important`, Firefox dropped every inline declaration). Now CSSOM
+  only: `removeProperty("transition")`, then the saved shorthand with its priority, or the saved
+  longhands when the consumer set only some (the shorthand reads "" then); `removeAttribute` if
+  the attribute was absent and is empty. jsdom's cssstyle does not expand the `transition`
+  shorthand, hence the shorthand-first restore and the "ours" check on both shorthand and
+  `transition-property`. Row: `internal/css-transition-cut.browser.test.tsx`
+  (`style-src-attr 'none'` meta, own file); fails on the old code in both engines with exactly
+  the reviewer's two symptoms.
+- L1: restore only while `none !important` is still ours.
+- M1: Popover row "a library close with no view transition: the CSS exit runs (the cut is
+  gated)": controlled `open={false}` from a plain onClick (urgent). Fails in Chromium with the
+  gate removed.
+- No other library code writes or restores the `style` attribute (grep).

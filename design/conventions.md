@@ -1925,9 +1925,13 @@ the moment of the library's **own** `showPopover()` / `hidePopover()` / `showMod
 / `close()`, the library wraps that call in one synchronous step (`internal/css-transition-cut.ts`):
 an inline `transition: none !important` on the popup, the call, a forced style recalculation
 (`getComputedStyle(popup).opacity`; without it Chromium sees the restored value and the fade
-runs), and the inline `style` restored exactly as it was (the attribute byte for byte, absent
-included; only the `transition` declaration when something else wrote inline style during the
-call). The view transition animates the show or hide; without the cut Chromium keeps a closing
+runs), and the inline `transition` restored through CSSOM (the shorthand with its priority,
+or the longhands a consumer set on their own; the `style` attribute removed again if it was
+absent and is empty). Never through the attribute: a CSP without `'unsafe-inline'` for styles
+blocks `setAttribute("style")` (Chromium then kept the cut for good, Firefox dropped every inline
+declaration; review H1 of #147). The restore runs only while the cut's own `none !important` is
+still there, so a `transition` a listener wrote during the call is kept. Only CSS transitions are
+cut: a `@keyframes` exit still runs during a library close and double-images in Chromium. The view transition animates the show or hide; without the cut Chromium keeps a closing
 box rendered through its `display` / `overlay` fade and the new snapshot holds it next to the old
 image (a double image, #46, #132), and in every engine the open's `@starting-style` enter runs
 under the view transition's enter. **Dismissals (facts since #148) never go through it**: their

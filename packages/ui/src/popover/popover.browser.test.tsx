@@ -43,8 +43,10 @@ import { deferred, silenceErrors } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import {
+  addExitStyle,
   describeOverlayInBrowser,
   setUpViewTransitionRows,
+  watchExit,
 } from "../__tests__/overlay-browser-suite.js";
 import type {
   OverlayBrowserHarnessProps,
@@ -54,6 +56,7 @@ import { Popover } from "./index.js";
 import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
 import {
   addStyle,
+  animationsFinished,
   flushFor,
   leaveActEnvironment,
   quietPeriod,
@@ -830,6 +833,49 @@ describe("Popover (browser)", () => {
 
   describe("ViewTransition", () => {
     const vt = setUpViewTransitionRows((element) => element.matches(":popover-open"));
+
+    // #147, review M1: the cut is gated on a running view transition, not on the prop alone. A
+    // library close in an urgent commit (a controlled `open={false}` set outside a transition)
+    // starts no view transition, so the CSS exit is its only animation and must run.
+    it('transition="pop", a library close with no view transition: the CSS exit runs (the cut is gated)', async () => {
+      addExitStyle("gate-fade", "300ms", { openPseudo: ":popover-open", instantEnter: true });
+      function Urgent() {
+        const [open, setOpen] = useState(true);
+        return (
+          <Popover.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>
+            <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+            <Popover.Popup
+              data-testid="popup"
+              aria-label="Filters"
+              transition="pop"
+              className="gate-fade"
+              style={box(200, 100)}
+            >
+              {/* A plain handler: an urgent update, not a transition. */}
+              <button type="button" data-testid="urgent" onClick={() => setOpen(false)}>
+                Close now
+              </button>
+            </Popover.Popup>
+          </Popover.Root>
+        );
+      }
+      render(<Urgent />);
+      await expect.poll(() => isOpen()).toBe(true);
+      await animationsFinished(popup());
+      const opens = vt.calls.length;
+      const exit = watchExit(popup(), "toggle");
+      screen.getByTestId("urgent").click();
+      const animations = await exit;
+      expect(isOpen()).toBe(false);
+      // Chromium animates the exit; Firefox animates none (bug 1834877), WebKit as Chromium.
+      if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
+      if (animations.length > 0) {
+        expect(getComputedStyle(popup()).display).not.toBe("none");
+        expect(popup().style.getPropertyValue("transition")).toBe("");
+      }
+      await quietPeriod(50, "an urgent close starts no view transition");
+      expect(vt.calls.length).toBe(opens);
+    });
 
     // #147: the library's cut of the CSS transition around its own show / hide also overrides a
     // consumer's inline `style={{ transition }}` (it is `!important`), and puts it back as React

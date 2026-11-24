@@ -39,17 +39,32 @@ describe("withCssTransitionCut", () => {
     expect(element.hasAttribute("style")).toBe(false);
   });
 
-  it("restores a consumer's inline transition byte for byte", () => {
+  it("restores a consumer's inline transition and its priority, through CSSOM only", () => {
     activeViewTransition(true);
-    const raw = "width:10px;transition:opacity 1s   ease  !important";
-    const element = popup(raw);
+    const element = popup("width: 10px; transition: opacity 1s ease 0s !important;");
+    const before = element.style.getPropertyValue("transition");
+    // A CSP without 'unsafe-inline' blocks attribute writes: the helper must never make one.
+    const setAttribute = vi.spyOn(element, "setAttribute");
     withCssTransitionCut(element, true, () => {
       expect(element.style.getPropertyValue("transition")).toBe("none");
     });
-    expect(element.getAttribute("style")).toBe(raw);
+    expect(setAttribute).not.toHaveBeenCalled();
+    expect(element.style.getPropertyValue("transition")).toBe(before);
+    expect(element.style.getPropertyPriority("transition")).toBe("important");
+    expect(element.style.getPropertyValue("width")).toBe("10px");
   });
 
-  it("restores the transition alone when something else wrote inline style during the call", () => {
+  it("restores longhands a consumer set on their own", () => {
+    activeViewTransition(true);
+    const element = popup("transition-property: opacity; transition-duration: 2s;");
+    withCssTransitionCut(element, true, () => {});
+    expect(element.style.getPropertyValue("transition-property")).toBe("opacity");
+    expect(element.style.getPropertyValue("transition-duration")).toBe("2s");
+    expect(element.style.getPropertyValue("transition-delay")).toBe("");
+    expect(element.style.getPropertyValue("transition-timing-function")).toBe("");
+  });
+
+  it("keeps other inline style written during the call", () => {
     activeViewTransition(true);
     const element = popup("transition: opacity 1s;");
     withCssTransitionCut(element, true, () => {
@@ -58,6 +73,15 @@ describe("withCssTransitionCut", () => {
     expect(element.style.getPropertyValue("transition")).toBe("opacity 1s");
     expect(element.style.getPropertyPriority("transition")).toBe("");
     expect(element.style.getPropertyValue("width")).toBe("5px");
+  });
+
+  it("leaves a transition written during the call alone (the cut is no longer its own)", () => {
+    activeViewTransition(true);
+    const element = popup("transition: opacity 1s;");
+    withCssTransitionCut(element, true, () => {
+      element.style.setProperty("transition", "color 3s");
+    });
+    expect(element.style.getPropertyValue("transition")).toBe("color 3s");
   });
 
   it("restores even when the call throws", () => {

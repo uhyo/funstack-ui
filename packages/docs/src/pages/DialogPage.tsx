@@ -615,8 +615,8 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
           <li>
             Dismissals (Escape, a click outside) animate with the CSS exit only: keep it next to{" "}
             <code>transition</code>. The library turns the dialog&apos;s CSS transitions off for the
-            moment of its own show and hide while a view transition runs, so the two never overlap
-            and you need no extra rule (
+            moment of its own show and hide while a view transition runs, so you need no extra rule
+            (
             <a href="/concepts/transitions#css-exit">
               A popup with a CSS exit and a view transition
             </a>

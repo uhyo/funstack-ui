@@ -726,8 +726,8 @@ export function ComboboxPage() {
       <p>
         Keep the CSS exit above next to <code>transition</code>: it animates the dismissals (focus
         leaving, Escape, a click outside). The library turns the popup&apos;s CSS transitions off
-        for the moment of its own show and hide while a view transition runs, so the two never
-        overlap and you need no extra rule (
+        for the moment of its own show and hide while a view transition runs, so you need no extra
+        rule (
         <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>).
       </p>
 

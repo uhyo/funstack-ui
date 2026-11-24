@@ -2721,8 +2721,8 @@ User decision 2026-11-24 (option B of `memo/architect/147-reevaluation.md`). The
 docs stylesheet and the playground. Instead, when `Dialog.Popup` has `transition` and a view
 transition is running at the moment of the library's own `showModal()` / `show()` /
 `close(returnValue)`, the call runs inside `withCssTransitionCut` (conventions 5.1): inline
-`transition: none !important`, the call, a forced style recalculation, the inline style restored
-exactly. Effects: no double image on a library close (Chromium), no CSS enter under the view
+`transition: none !important`, the call, a forced style recalculation, the inline `transition`
+restored through CSSOM (never the attribute, which a strict CSP blocks). Effects: no double image on a library close (Chromium), no CSS enter under the view
 transition's enter on a library open (every engine), and a dismissal's CSS fade is never cut, not
 even by an unrelated page view transition. The `::backdrop` is not cut: its enter fade runs on
 open, as with the old rule. 13.3's rows changed with it (see there).

@@ -806,7 +806,8 @@ export function MenuPage() {
       <p>
         Keep the CSS exit next to <code>transition</code>: it animates the dismissals. The library
         turns the popup&apos;s CSS transitions off for the moment of its own show and hide while a
-        view transition runs, so the two never overlap and you need no extra rule (
+        view transition runs, so its show or hide never runs a CSS transition and you need no extra
+        rule (
         <a href="/concepts/transitions#css-exit">A popup with a CSS exit and a view transition</a>).
       </p>
 

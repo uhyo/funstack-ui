@@ -1,5 +1,14 @@
 // No directive: a DOM helper (conventions 7.1).
 
+/** What `transition: none` sets, each restored on its own. */
+const LONGHANDS = [
+  "transition-property",
+  "transition-duration",
+  "transition-timing-function",
+  "transition-delay",
+  "transition-behavior",
+] as const;
+
 /** Elements inside a cut right now: a nested call (Menu's `reshow`) runs inside the outer one. */
 const cutting = new WeakSet<HTMLElement>();
 
@@ -23,8 +32,11 @@ function viewTransitionActive(element: HTMLElement): boolean {
  *
  * One synchronous step: an inline `transition: none !important`, the call, a forced style
  * recalculation (without it Chromium sees the restored value and the fade runs), and the inline
- * declaration restored exactly as it was, so nothing is left for React's `style` diffing.
- * Dismissals (Escape, light dismiss) never come here: their CSS exit plays.
+ * `transition` longhands restored as they were, so nothing is left for React's `style` diffing.
+ * Everything goes through CSSOM, never the `style` attribute: a CSP without `'unsafe-inline'`
+ * for styles blocks an attribute write (React's `style` prop is CSSOM too). Only CSS
+ * transitions are cut, not a `@keyframes` animation. Dismissals (Escape, light dismiss) never
+ * come here: their CSS exit plays.
  */
 export function withCssTransitionCut<T>(
   element: HTMLElement,
@@ -33,27 +45,37 @@ export function withCssTransitionCut<T>(
 ): T {
   if (!hasTransition || cutting.has(element) || !viewTransitionActive(element)) return run();
   const { style } = element;
-  const attribute = element.getAttribute("style");
-  const previous = style.getPropertyValue("transition");
-  const priority = style.getPropertyPriority("transition");
+  const hadAttribute = element.hasAttribute("style");
+  // The shorthand, and the longhands for a consumer who set only some of them (the shorthand
+  // then reads as "").
+  const shorthand = style.getPropertyValue("transition");
+  const shorthandPriority = style.getPropertyPriority("transition");
+  const longhands = LONGHANDS.map(
+    (name) => [name, style.getPropertyValue(name), style.getPropertyPriority(name)] as const,
+  );
   cutting.add(element);
   style.setProperty("transition", "none", "important");
-  const cut = element.getAttribute("style");
   try {
     return run();
   } finally {
     // The show or hide's style change is processed while the cut is in place.
     void getComputedStyle(element).opacity;
-    if (element.getAttribute("style") === cut) {
-      // Nothing else wrote inline style meanwhile: put the attribute back byte for byte (absent
-      // included), not a CSSOM re-serialisation of it.
-      if (attribute === null) element.removeAttribute("style");
-      else element.setAttribute("style", attribute);
-    } else if (previous === "") {
+    // Only while the cut is still ours: a listener inside the call that wrote its own
+    // `transition` keeps it.
+    const ours = (name: string) =>
+      style.getPropertyValue(name) === "none" && style.getPropertyPriority(name) === "important";
+    if (ours("transition-property") || ours("transition")) {
       style.removeProperty("transition");
-    } else {
-      style.setProperty("transition", previous, priority);
+      if (shorthand !== "") {
+        style.setProperty("transition", shorthand, shorthandPriority);
+      } else {
+        for (const [name, value, priority] of longhands) {
+          if (value !== "") style.setProperty(name, value, priority);
+        }
+      }
     }
+    // `removeAttribute` parses nothing, so CSP does not block it.
+    if (!hadAttribute && style.length === 0) element.removeAttribute("style");
     cutting.delete(element);
   }
 }
