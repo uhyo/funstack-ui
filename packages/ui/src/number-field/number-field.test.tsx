@@ -939,6 +939,26 @@ describe("NumberField", () => {
       expect(new FormData(screen.getByTestId("form") as HTMLFormElement).get("price")).toBe("1.01");
     });
 
+    it("a step that rounds to the shown value is a no-op: no valueChangeAction, no commit", async () => {
+      const onChange = vi.fn<Fn>();
+      const onCommit = vi.fn<Fn>();
+      render(
+        <Fixture
+          mode="uncontrolled"
+          onChange={onChange}
+          onCommit={onCommit}
+          rootProps={{ step: 0.4, format: { maximumFractionDigits: 0 } }}
+        />,
+      );
+      // 1 + 0.4 = 1.4, which the format shows as 1: the shown value, so nothing happened.
+      key("ArrowUp");
+      await flushMicrotasks();
+      expect(onChange).not.toHaveBeenCalled();
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(input().value).toBe("1");
+      expect(hidden().value).toBe("1");
+    });
+
     it("invalid on the hidden input is always cancelled; on the visible not (bare)", () => {
       const ref = { current: null as HTMLInputElement | null };
       render(
