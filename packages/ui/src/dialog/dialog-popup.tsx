@@ -20,7 +20,6 @@ import {
 } from "../internal/overlay-popup.js";
 import { createPopupFlags, showWithFocus } from "../internal/overlay-show.js";
 import { eventSource } from "../internal/invokers.js";
-import { isPopoverOpen } from "../internal/popover-open.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -30,6 +29,7 @@ import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import { listenDialogDismiss } from "./dialog-dismiss.js";
 
 /**
  * State of `Dialog.Popup`, passed to the function forms of `className`, `style`, `children` and
@@ -120,59 +120,6 @@ export interface DialogPopupProps extends Omit<
 }
 
 const isDev = process.env.NODE_ENV !== "production";
-
-/** The nearest `<dialog>` around a node (the dialog itself counts). */
-function closestDialog(target: EventTarget | null): Element | null {
-  return target instanceof Element ? target.closest("dialog") : null;
-}
-
-/**
- * An open popover that takes Escape before the dialog: `auto` or `hint` (they have a close
- * watcher). A `manual` popover, or `hint` where the engine maps it to `manual`, does not.
- */
-function isOpenLightPopover(element: Element): boolean {
-  if (!element.hasAttribute("popover")) return false;
-  // The IDL attribute reflects the state the engine applies; jsdom has none.
-  const reflected: unknown = (element as HTMLElement).popover;
-  const state =
-    typeof reflected === "string" ? reflected : element.getAttribute("popover")!.toLowerCase();
-  if (state === "manual") return false;
-  return isPopoverOpen(element);
-}
-
-/**
- * Whether Escape belongs to a layer inside `dialog` that sits above it (design 9: "closes the
- * innermost one only"): the target is inside an open nested `<dialog>` or popover, or an open
- * `auto` / `hint` popover inside the dialog would take the close request (close watchers are
- * per document, not per focus).
- */
-function escapeBelongsToInnerLayer(dialog: HTMLDialogElement, target: EventTarget | null): boolean {
-  for (
-    let node = target instanceof Element ? target : null;
-    node !== null && node !== dialog;
-    node = node.parentElement
-  ) {
-    if (node instanceof HTMLDialogElement && node.open) return true;
-    if (isOpenLightPopover(node)) return true;
-  }
-  for (const element of dialog.querySelectorAll("[popover]")) {
-    if (isOpenLightPopover(element)) return true;
-  }
-  return false;
-}
-
-/** Whether a pointer event on the dialog itself lies outside its border box (the `::backdrop`). */
-function onBackdrop(dialog: HTMLDialogElement, event: Event): boolean {
-  if (event.target !== dialog) return false;
-  const { clientX, clientY } = event as MouseEvent;
-  const rect = dialog.getBoundingClientRect();
-  return !(
-    rect.top <= clientY &&
-    clientY <= rect.bottom &&
-    rect.left <= clientX &&
-    clientX <= rect.right
-  );
-}
 
 /** The submitter's or invoker's `value` (`""` without one, or where the engine gives no source). */
 function valueOf(element: unknown): string {
@@ -449,7 +396,6 @@ export function DialogPopup({
 
   useEffect(() => {
     if (dialog === null) return;
-    const doc = dialog.ownerDocument;
     // The document, or the shadow root the dialog lives in (`submit` does not cross it).
     const root = dialog.getRootNode();
     // Feature detection only with the flag on, inside an effect (conventions 8).
@@ -463,102 +409,18 @@ export function DialogPopup({
       [dialog, "beforetoggle", onBeforeToggle, false],
     ];
 
-    if (!modal && !nativeClosedBy) {
-      // Non-modal dialogs get no close watcher Escape from the platform (design 2.6).
-      listeners.push([
-        dialog,
-        "keydown",
-        (event) => {
-          const keyboardEvent = event as KeyboardEvent;
-          if (keyboardEvent.key !== "Escape" || keyboardEvent.defaultPrevented) return;
-          if (!dialog.open || closestDialog(keyboardEvent.target) !== dialog) return;
-          // A popover or nested dialog inside takes this Escape (its close watcher); leave the
-          // event alone so that it can.
-          if (escapeBelongsToInnerLayer(dialog, keyboardEvent.target)) return;
-          keyboardEvent.preventDefault();
-          dialog.requestClose();
-        },
-        false,
-      ]);
-    }
-
-    // Light dismiss needs both the press and the click outside, like native `closedby="any"`: a
-    // drag that starts inside (selecting text in an input) and ends on the backdrop or outside
-    // fires `click` on the common ancestor and must not close (it would lose a half-filled form).
-    let pressedOutside = false;
-
-    const isOutside = (target: EventTarget | null): boolean => {
-      // The Trigger counts as outside, as native `closedby="any"` treats it.
-      return !(target instanceof Node) || !dialog.contains(target);
-    };
-    let outsideAttached = false;
-    const onOutsidePointerDown = (event: Event) => {
-      pressedOutside = dialog.open && isOutside(event.target);
-    };
-    const onOutsideClick = (event: Event) => {
-      const pressed = pressedOutside;
-      pressedOutside = false;
-      if (!dialog.open || !pressed || !isOutside(event.target)) return;
-      dialog.requestClose();
-    };
-    const syncOutside = () => {
-      const want = dialog.open;
-      if (want === outsideAttached) return;
-      outsideAttached = want;
-      pressedOutside = false;
-      if (want) {
-        doc.addEventListener("pointerdown", onOutsidePointerDown, true);
-        doc.addEventListener("click", onOutsideClick, true);
-      } else {
-        doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
-        doc.removeEventListener("click", onOutsideClick, true);
-      }
-    };
-
-    if (lightDismiss && !nativeClosedBy) {
-      if (modal) {
-        // A press or click on the ::backdrop targets the dialog itself, outside its border box.
-        listeners.push(
-          [
-            dialog,
-            "pointerdown",
-            (event) => {
-              pressedOutside = dialog.open && onBackdrop(dialog, event);
-            },
-            false,
-          ],
-          [
-            dialog,
-            "click",
-            (event) => {
-              const pressed = pressedOutside;
-              pressedOutside = false;
-              if (!dialog.open || !pressed || !onBackdrop(dialog, event)) return;
-              dialog.requestClose();
-            },
-            false,
-          ],
-        );
-      } else {
-        // A document listener only while open, following the native `toggle` (the React
-        // `onToggle` prop never fires on a hydrated <dialog>); reads `dialog.open`, not
-        // `newState` (coalescing).
-        listeners.push([dialog, "toggle", syncOutside, false]);
-        syncOutside();
-      }
-    }
-
     for (const [target, type, listener, capture] of listeners) {
       target.addEventListener(type, listener, capture);
     }
+    // Escape on a non-modal dialog and light dismiss, where native `closedby` does not do them.
+    const stopDismiss = nativeClosedBy
+      ? null
+      : listenDialogDismiss(dialog, { modal, lightDismiss });
     return () => {
       for (const [target, type, listener, capture] of listeners) {
         target.removeEventListener(type, listener, capture);
       }
-      if (outsideAttached) {
-        doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
-        doc.removeEventListener("click", onOutsideClick, true);
-      }
+      stopDismiss?.();
     };
   }, [dialog, modal, lightDismiss, experimental_closedBy]);
 
