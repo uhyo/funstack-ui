@@ -8,6 +8,7 @@ import { transitionTypes } from "./transition-types.js";
 import type { ActionDetails, ChangeAction, ChangeReason, UrgentChangeHandler } from "./types.js";
 import { intendedValue, useControllableAction } from "./use-controllable-action.js";
 import { useDevWarning } from "./use-dev-warning.js";
+import { useMountFixed } from "./use-mount-fixed.js";
 import { useLatest } from "./use-latest.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -226,15 +227,14 @@ export function useOverlayRoot<
     defaultOpen !== undefined ||
     openChangeAction !== undefined ||
     onOpenChange !== undefined;
-  const [mode] = useState<OverlayMode>(isLibraryNow ? "library" : "static");
-  const isLibrary = mode === "library";
-  useDevWarning(
-    isLibrary !== isLibraryNow,
+  const mode = useMountFixed<OverlayMode>(
+    isLibraryNow ? "library" : "static",
     isDev &&
       `${part}: the mode changed after mount (\`open\`, \`defaultOpen\`, \`openChangeAction\` ` +
         "and `onOpenChange` were all absent on one render and present on another). Switching " +
         "between JS-free and library mode is not supported.",
   );
+  const isLibrary = mode === "library";
   // W1 (conventions 3.9.13): React's `value` without `onChange`. Static only: a handler
   // that adopts late (in a transition, after an `await`) cannot be told from an intentional
   // re-open, so nothing at runtime warns.

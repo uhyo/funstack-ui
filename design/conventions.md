@@ -2649,6 +2649,7 @@ packages/ui/src/
     use-value-set.ts        # a set-valued `value` / `defaultValue` prop as a set
     use-hydrated-mount.ts   # whether this mount is the hydration render (useSyncExternalStore)
     use-register-count.ts   # how many parts of a kind are registered
+    use-mount-fixed.ts      # useMountFixed(value, isDev && message): a prop read once at mount (the JS-free / library mode, `exclusive`), with its dev warning
     use-delayed-pair.ts     # an open timer and a close timer that exclude each other
     use-until-found.ts      # hidden="until-found" (section 7.4)
     modal-registry.ts, use-modal-registration.ts  # the stack of open modal dialogs (section 3.5); the registry is directive-free

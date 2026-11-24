@@ -10805,3 +10805,15 @@ option is optional). Dialog.Root calls `intendedValue(latestInFlight, optimistic
 `intended()`, which reads the optimistic value through `useLatest`: the same value at that point,
 but only by insertion-effect order. Sections changed: the conventions 3.8 helper table
 (`intendedValue` row).
+
+## 2026-11-24, #157: `useMountFixed`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 7, helper 1). Internal only, no
+behaviour change, the warning texts unchanged. The four "read once at mount, warn when it
+changes" sites (the overlay Roots' and Accordion's JS-free / library mode, Accordion's and
+ToggleGroup's `exclusive`) call `useMountFixed(value, isDev && message)` in the new
+`internal/use-mount-fixed.ts`. The audit's second step, a shared `useLibraryMode`, was not done:
+with `useMountFixed` each mode detection is one call whose only other content is the component's
+own prop list and message, so a second helper would only move those. `production-bundle.test.ts`
+collects the texts passed to `useMountFixed` too. Sections changed: the conventions 9.1 file
+listing.

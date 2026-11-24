@@ -1,13 +1,5 @@
 "use client";
-import {
-  useCallback,
-  useEffectEvent,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffectEvent, useId, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -21,7 +13,7 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { intendedValue, useControllableAction } from "../internal/use-controllable-action.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { useValueSet } from "../internal/use-value-set.js";
@@ -234,9 +226,8 @@ export function AccordionRoot(props: AccordionRootProps) {
   // Mode is decided once, from the first render's props (design 12).
   const isLibraryNow =
     value !== undefined || defaultValue !== undefined || valueChangeAction !== undefined;
-  const [mode] = useState<AccordionMode>(isLibraryNow ? "library" : "static");
-  useDevWarning(
-    (mode === "library") !== isLibraryNow,
+  const mode = useMountFixed<AccordionMode>(
+    isLibraryNow ? "library" : "static",
     isDev &&
       "Accordion.Root: the mode changed after mount (`value`, `defaultValue` and `valueChangeAction` " +
         "were all absent on one render and present on another). Switching between JS-free and " +
@@ -245,9 +236,8 @@ export function AccordionRoot(props: AccordionRootProps) {
 
   // Exclusive or multiple is decided once too, like ToggleGroup's mode (design 12): the reducer,
   // the value shape handed to the action and the static `name` all follow the mounted mode.
-  const [exclusive] = useState(exclusiveProp);
-  useDevWarning(
-    exclusive !== exclusiveProp,
+  const exclusive = useMountFixed(
+    exclusiveProp,
     isDev &&
       "Accordion.Root: `exclusive` changed after mount. Switching between exclusive and " +
         "multiple mode is not supported; the accordion keeps the mode it mounted with.",
