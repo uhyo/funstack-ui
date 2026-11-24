@@ -18,7 +18,7 @@ c658d0e). Tests only; no library code changed.
 | Gap | Rows added (file) | Mutation | Killed by |
 | --- | --- | --- | --- |
 | CTC3 longhand restore | "restores a longhand the consumer set without the shorthand, with its priority" (internal/css-transition-cut-cssom.browser.test.ts) | restore loop for longhands removed | Chromium + Firefox. jsdom cannot: its CSSOM treats `transition` as a plain property (setting it does not touch the longhands), so a jsdom row passes with the mutation |
-| CTC6 forced recalc | browser: "a style change made inside the call starts no CSS transition once the cut is restored"; jsdom: "forces a style recalculation of the element after the call, before restoring" (getComputedStyle spy) | `void getComputedStyle(element).opacity` removed | jsdom (spy row) + Chromium + Firefox (behavioural row: a class change inside the cut, `getAnimations()` empty). Note: the reviewer saw Firefox pass the VT rows under CTC6; this direct row fails in Firefox too |
+| CTC6 forced recalc | browser: "a style change made inside the call starts no CSS transition once the cut is restored" (the jsdom getComputedStyle-spy row was removed after review: pin the effect, not the call) | `void getComputedStyle(element).opacity` removed | Chromium + Firefox (a class change inside the cut, `getAnimations()` empty). Note: the reviewer saw Firefox pass the VT rows under CTC6; this direct row fails in Firefox too. jsdom has no row for it |
 | CTC7 `cutting` cleared | jsdom: "two cuts of the same element in sequence both cut", "a cut after a throwing cut still cuts"; browser: "a second cut of the same element ... starts no transition either" | `cutting.delete(element)` removed | jsdom 2 rows, Chromium + Firefox |
 | RF6 observer attributes | use-roving-focus.test.tsx: it.each disabled / hidden / inert written on the node; aria-disabled flip with an entry that skips it; re-enable outside React | (a) `attributes` + `attributeFilter` removed; (b) callback ignores non-childList records; (c) each attribute dropped from the filter | (a) and (b): the new rows plus the existing "re-applies on observer records" row (so in my runs that row already caught the full removal); (c): only the new rows, one per attribute |
 | RF single rows | hook rows for RF2 (memory survives a later commit after blur), RF3 (popover items), RF8 (radio Tab), RF9 (alt / ctrl / meta) | RF2 `if (!options.memory)` -> `if (true)`; RF3 popover check removed; RF8 checked-sibling block off; RF9 `altKey` check removed | each now has the hook row plus its component row (Toolbar / itemsOf / Toolbar / ToggleGroup). RF4 had 3 hook rows already, RF11 now 5 |
@@ -58,3 +58,12 @@ c658d0e). Tests only; no library code changed.
   touched. OP7 jsdom row and PT4 jsdom row: not added.
 - UCA6 / UCA12: the reviewer's own priority 10, not needed unless callers widen.
 - WebKit not run locally (no DEPENDENCIES_VALIDATED); the new browser rows need a CI run.
+
+## Review follow-up (memo/reviewer/review-157-safety-net.md)
+
+- Removed the jsdom CTC6 spy row; the CSSOM browser row covers the rule by its effect.
+- UOR8 hook row compares `reason` and `event` of the dispatch and the fact (not object identity);
+  the order assertion stays.
+- UPP2 hook row asserts the quiet path ran on the first open (the spy recorded
+  `focusVisible: false` on "two") before the focus assertions; checked by forcing
+  `supportsFocusVisibleOption` to `false`: the row fails at the guard.
