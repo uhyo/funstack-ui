@@ -1303,4 +1303,63 @@ describe("Dialog", () => {
       expect(popup().open).toBe(true);
     });
   });
+
+  // A native open that lands between a close's `beforetoggle` and its `close` event (a foreign
+  // `show()` in the same task as the close) ends the close's wait (`awaitingClose`, design 2.5)
+  // at its own `beforetoggle`. The `close` event normally ends it a task later as well; these rows
+  // lose that event (the `<dialog>` remounts in between, as setting `transition` does, and the
+  // old element's `close` event reaches no listener), so only the open's `beforetoggle` can end
+  // the wait. #157 review M3.
+  describe("a native open between a close and its close event", () => {
+    const withTransition = { transition: { default: "none" } } as const;
+
+    it("a dismissal and a foreign show(): the next apply is not blocked, the remounted dialog opens", async () => {
+      const user = setupUser();
+      const { rerender } = render(<Harness mode="uncontrolled" modal={false} />);
+      await openThroughTrigger(user);
+      const first = popup();
+      // One task: a script dismissal (`beforetoggle` now, `close` queued), a foreign `show()`,
+      // and a render that remounts the element before the `close` event runs.
+      first.close();
+      first.show();
+      rerender(<Harness mode="uncontrolled" modal={false} popup={withTransition} />);
+      await flushTasks(2);
+      expect(popup()).not.toBe(first);
+      // Committed state is still open (the dismissal's fact never arrived): the apply effect of
+      // the remount commit shows the new element.
+      expect(popup().open).toBe(true);
+      expect(content()).not.toBeNull();
+    });
+
+    it("a library close and a foreign show(): the hold is released once the dialog is hidden", async () => {
+      const user = setupUser();
+      let setOpen!: (open: boolean) => void;
+      const outside = (set: (open: boolean) => void) => {
+        setOpen = set;
+        return null;
+      };
+      const { rerender } = render(<Harness mode="controlled" modal={false} outside={outside} />);
+      await openThroughTrigger(user);
+      const first = popup();
+      // A controlled close: the close commit holds the content (no `transition`, design 4.4) and
+      // its apply effect calls `close()`; a foreign `show()` follows in the same task.
+      const nativeClose = first.close.bind(first);
+      vi.spyOn(first, "close").mockImplementation((returnValue) => {
+        nativeClose(returnValue);
+        first.show();
+      });
+      act(() => setOpen(false));
+      expect(first.open).toBe(true);
+      expect(content()).not.toBeNull();
+      // Still the same task: the remount drops the old element (and its queued `close` event).
+      rerender(
+        <Harness mode="controlled" modal={false} outside={outside} popup={withTransition} />,
+      );
+      await flushTasks(2);
+      expect(popup()).not.toBe(first);
+      expect(popup().open).toBe(false);
+      expect(committedText()).toBe("false");
+      expect(content()).toBeNull();
+    });
+  });
 });

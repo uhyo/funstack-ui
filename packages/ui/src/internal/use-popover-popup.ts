@@ -15,6 +15,7 @@ import {
   useInitialFocusTarget,
 } from "./overlay-popup.js";
 import { createPopupFlags, showWithFocus } from "./overlay-show.js";
+import { useApplyOpenState } from "./use-apply-open-state.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { useElementCheck } from "./use-element-check.js";
 import { useInterestDismiss } from "./use-interest-dismiss.js";
@@ -174,7 +175,7 @@ export function usePopoverPopup(
     // A refused re-open never moves focus (#155, #156): no initial focus target, and the popup is
     // `inert` for the call (showWithFocus), whether the focusing steps are the dialog focusing
     // steps of a `<dialog>` (Popover's default) or a consumer's own `autofocus` in any popup.
-    const refused = flags.takeRefused();
+    const refused = flags.takeRefusedFact();
     const focus = refused ? null : resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps
     // for a <dialog>, in every engine). Never `.focus()` (6.1) except for the quiet target above.
@@ -237,40 +238,21 @@ export function usePopoverPopup(
     reconcileOnMount();
   }, []);
 
-  // The apply effect (design 2.5): after every commit that re-renders the Popup, once nothing is
-  // in flight, the DOM follows committed state. One effect covers the normal open, `defaultOpen`,
-  // a controlled open or close, a library-driven close after `openChangeAction(false)` settled,
-  // the re-open of a dismissal a controlled parent refused (in the fact's own commit, or once the
-  // requests it superseded settled: conventions 3.9.4), and the close after a refused or
-  // failed pre-hydration open. The Root's value is memoised, so an unrelated Root render does not
-  // re-render the Popup and does not run this; every path that makes the DOM diverge from state
-  // goes through a dispatch, whose `pending` flips do, or a fact, whose `epoch` does. Do not rely
-  // on an unrelated render to re-apply state.
-  useLayoutEffect(() => {
-    if (!isLibrary) return;
-    const element = popupRef.current;
-    if (element === null || !element.isConnected) return;
-    // The fact was adopted (or anything else closed the popup in state): a later show is a new
-    // open, with initial focus.
-    if (!ctx.committed) flags.factAdopted();
-    if (!ctx.pending && ctx.latestInFlight() === null) {
-      const shown = isPopoverOpen(element);
-      if (ctx.committed && !shown) {
-        if (!flags.awaitingClose()) showPopup(element);
-      } else if (!ctx.committed && shown) {
-        // The library's own hide: the `toggle` listener recognises it by the echo marker
-        // (`libraryHide`) and reports nothing.
-        ctx.recordCloseIntent(undefined);
-        flags.markLibraryClose();
-        withCssTransitionCut(element, hasTransition, () => element.hidePopover());
-        // The close commit may have unmounted the focused content before the hide: the
-        // platform restores focus only from inside the popover, so do it now.
-        if (focusWasInside.current) returnFocus(element);
-      }
-    }
-    // Content that unmounted while the popup stays open (not a close): forget it.
-    if (ctx.committed && isPopoverOpen(element)) contentProbe.forget();
-    exit.releaseIfIdle(ctx.committed, flags.awaitingClose(), isPopoverOpen(element));
+  // The apply effect (design 2.5). Keep this call right after mount reconciliation (as in
+  // Dialog.Popup): layout effects run in call order, and at mount the reconciliation's dispatch
+  // must come first, so that the first apply sees it in flight and waits.
+  useApplyOpenState(ctx, {
+    flags,
+    exit,
+    probe: contentProbe,
+    isShown: isPopoverOpen,
+    show: showPopup,
+    hide: (element) => {
+      withCssTransitionCut(element, hasTransition, () => element.hidePopover());
+      // The close commit may have unmounted the focused content before the hide: the platform
+      // restores focus only from inside the popover, so do it now.
+      if (focusWasInside.current) returnFocus(element);
+    },
   });
 
   // --- Native listeners (conventions 7.4; filtered on target: React 19.3.1 emulates bubbling

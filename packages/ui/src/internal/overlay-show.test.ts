@@ -6,7 +6,7 @@ describe("createPopupFlags", () => {
     const flags = createPopupFlags();
     expect(flags.awaitingClose()).toBe(false);
     expect(flags.takeLibraryClose()).toBe(false);
-    expect(flags.takeRefused()).toBe(false);
+    expect(flags.takeRefusedFact()).toBe(false);
   });
 
   it("awaitingClose follows beginClose / endClose", () => {
@@ -29,12 +29,12 @@ describe("createPopupFlags", () => {
   it("the refused fact is consumed by the next show, or cleared once adopted", () => {
     const flags = createPopupFlags();
     flags.markFact();
-    expect(flags.takeRefused()).toBe(true);
-    expect(flags.takeRefused()).toBe(false);
+    expect(flags.takeRefusedFact()).toBe(true);
+    expect(flags.takeRefusedFact()).toBe(false);
 
     flags.markFact();
     flags.factAdopted();
-    expect(flags.takeRefused()).toBe(false);
+    expect(flags.takeRefusedFact()).toBe(false);
   });
 
   it("keeps each instance's flags apart", () => {
@@ -45,7 +45,7 @@ describe("createPopupFlags", () => {
     a.markFact();
     expect(b.awaitingClose()).toBe(false);
     expect(b.takeLibraryClose()).toBe(false);
-    expect(b.takeRefused()).toBe(false);
+    expect(b.takeRefusedFact()).toBe(false);
   });
 });
 

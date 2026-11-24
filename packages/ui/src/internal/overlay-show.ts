@@ -1,8 +1,9 @@
-// The two pieces of the popup state machine that usePopoverPopup (Popover, Menu, Combobox) and
-// Dialog.Popup share word for word: the close / echo / refused-fact flags, and the show wrapper
-// (the refused re-open's `inert` guard and the `autofocus` write around the show call). No
-// "use client" directive: no hook, no React (conventions 7.1); a Popup keeps its flags with
-// `useState(createPopupFlags)`.
+// Two pieces of the popup state machine that usePopoverPopup (Popover, Menu, Combobox) and
+// Dialog.Popup share: the close / echo / refused-fact flags, and the show wrapper (the refused
+// re-open's `inert` guard and the `autofocus` write around the show call). What differs stays
+// with the caller: whether a refused fact applies to the show (Dialog: non-modal dialogs only),
+// the initial focus target, the show call itself. No "use client" directive: no hook, no React
+// (conventions 7.1); a Popup keeps its flags with `useState(createPopupFlags)`.
 
 /**
  * The bookkeeping flags of one Popup between a platform event and the apply effect
@@ -33,8 +34,11 @@ export interface PopupFlags {
    */
   readonly markFact: () => void;
   readonly factAdopted: () => void;
-  /** Reads and clears the refused-fact flag; call once per show. */
-  readonly takeRefused: () => boolean;
+  /**
+   * Reads and clears the refused-fact flag; call once per show, also when the caller does not
+   * apply it (a modal dialog).
+   */
+  readonly takeRefusedFact: () => boolean;
 }
 
 /** A fresh set of flags, all clear. Keep one per Popup instance (`useState(createPopupFlags)`). */
@@ -64,7 +68,7 @@ export function createPopupFlags(): PopupFlags {
     factAdopted: () => {
       refusedFact = false;
     },
-    takeRefused: () => {
+    takeRefusedFact: () => {
       const refused = refusedFact;
       refusedFact = false;
       return refused;

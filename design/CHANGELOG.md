@@ -10755,3 +10755,22 @@ restated (resolve the default, `ignoreWhilePending`, `aria-disabled` iff `pendin
 `data-pending`, `preventDefault()` of an ignored activation) is one hook,
 `internal/use-pure-trigger.ts`. Sections changed: button.md 16.2 and 18.4 (which helper the parts
 call), the conventions 9.1 file listing.
+
+## 2026-11-24, #157: shared apply effect
+
+Refactoring wave #157, overlay step 3 (user decision 2026-11-24: share only the "apply open
+state" effect of the two Popups; the `toggle` / `close` and `beforetoggle` handlers stay
+separate). Internal only, no behaviour change.
+
+- `design/conventions.md` 9.1: the `internal/` listing gains `use-apply-open-state.ts`
+  (`useApplyOpenState(ctx, { flags, exit, probe, isShown, show, hide })`), which
+  `internal/use-popover-popup.ts` and `dialog/dialog-popup.tsx` now both call for the apply
+  effect (popover.md 2.5, dialog.md 2.5). The hook keeps the shared steps (`factAdopted()` on
+  committed `false`, the in-flight check, the `awaitingClose` wait, the close intent and the
+  echo before the library's own hide, forgetting the content probe while shown, `releaseIfIdle`);
+  the driver holds what differs: `isShown` (`:popover-open` vs `open`), `show` (`showPopup` vs
+  `openDialog`) and `hide` (`hidePopover()` vs `close(returnValue)`, each with its focus-return
+  fallback).
+- Mount reconciliation stays in each Popup. The hook is called right after it in both, because
+  layout effects run in call order and the reconciliation's dispatch must precede the first
+  apply.
