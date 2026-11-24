@@ -159,9 +159,9 @@ properties, `touch-action`) land on whichever element renders (owned keys, conve
 | State | Owner | Kind | Lane | Library-owned or browser-owned |
 | --- | --- | --- | --- | --- |
 | `value` (committed, optimistic) | Root, `useControllableAction<T>` with `valueCommitAction` as its action | the value of the slider | **transition** (optimistic through `useOptimistic`) | Library-owned; residual browser paths: pre-hydration keys and Firefox restoration (mount reconciliation), form reset. Uncontrolled state is written when a gesture's commit resolves (2.3). |
-| `live` | Root, `useState<readonly number[] \| null>` | the value a gesture has reached | **urgent** (written in the DOM event, never in a transition) | Library-owned, internal: it is the thumb under the pointer, or the value a key press produced, before anything has committed. Not controllable, not in the public vocabulary; it shows up only as the value the thumbs render. |
+| `live` | Root, `useState<{ value: readonly number[] } \| null>` (boxed, as NumberField's) | the value a gesture has reached | **urgent** (written in the DOM event, never in a transition) | Library-owned, internal: it is the thumb under the pointer, or the value a key press produced, before anything has committed. Not controllable, not in the public vocabulary; it shows up only as the value the thumbs render. |
 | step transition | Root, `useActionTrigger` | `valueChangeAction` in flight | transition | One `run` per step; latest run's rejection goes to React, older ones are surfaced (conventions 3.4). No state of its own. |
-| `gesture` | Root, `useState<{ thumb: number } \| null>` | a pointer is captured on a thumb | urgent | `dragging = gesture !== null`; `data-dragging`. Keyboard is never "dragging". |
+| `gestureThumb` | Root, `useState<number \| null>` | the thumb a captured pointer moves (`null`: no pointer captured) | urgent | `dragging = gestureThumb !== null`; `data-dragging`, and `data-dragging` on that Thumb. Keyboard is never "dragging". |
 | `stepHeld` | Root, `useState<boolean>` | a step was taken and its gesture's commit has not been dispatched yet | urgent | Library-owned, internal. Set by every step except the `"dismiss"` revert, cleared by the commit (in the same batch as the dispatch, whose pending state takes over). Keeps `live` on screen between a key's native `input` and `change` when no step transition runs (2.2). |
 | `pendingThumb` | Root, `useState<number \| null>` | the thumb the latest step or commit was for | urgent | `data-pending` on that Thumb while the Root is pending; `null` for platform dispatches. |
 | `pending` | Root | step or commit transition in flight | | `stepPending || commitPending`. Includes the Suspense wait of a step's render (a controlled parent's list loading). |
@@ -202,8 +202,8 @@ await user input (conventions 2.3 item 6) and a pending async action entangles t
 So the Root keeps the gesture's value in the urgent lane and derives what to show:
 
 ```ts
-const held = gesture !== null || stepHeld || stepPending || commitPending;
-const shown: readonly number[] = held && live !== null ? live : toArray(optimistic);
+const held = gestureThumb !== null || stepHeld || stepPending || commitPending;
+const shown: readonly number[] = held && live !== null ? live.value : toArray(optimistic);
 ```
 
 - `live` is written synchronously in the event by every step (2.4), like Combobox's active
@@ -254,53 +254,45 @@ the gesture's commit resolves, not per step. Consequences, documented on the com
 
 ### 2.4 Step, commit, and the "dismiss" revert
 
-The Root has two internal entry points; every path (pointer, keyboard, platform) uses them.
-They are implemented once for Slider and NumberField, in `internal/use-step-commit.ts`; what
-differs (the array shape, `equalValues`, NumberField's rounding, draft and hidden input) is
-passed in as options:
+The Root has two internal entry points, `step` and `commit`; every path (pointer, keyboard,
+platform) uses them. They are implemented once for Slider and NumberField, in
+`internal/use-step-commit.ts`; what differs (the array shape, `equalValues`, NumberField's
+rounding, draft, hidden input and announcement) is passed in as options. Values are arrays
+inside the Root; `fromArray` restores the prop's shape for the actions.
 
-```ts
-// Inside Slider.Root. `values` are always arrays internally; `fromArray` restores the prop shape.
-function step(next: readonly number[], thumb: number | null, reason: ChangeReason, event: Event | undefined): boolean {
-  if (equal(next, shownRef.current)) return false;                 // no-op against what is shown
-  liveRef.current = next; shownRef.current = next;                 // a commit in the same event reads these
-  setLive(next);                                                   // urgent
-  setPendingThumb(thumb);
-  if (reason !== "dismiss") setStepHeld(true);                     // a revert has no commit after it
-  if (valueChangeAction === undefined) return true;                // nothing to run: no transition (M2)
-  runStep(() => {                                                  // useActionTrigger: own transition
-    addTransitionType("fsui-slider"); addTransitionType("fsui-slider-change");
-    return valueChangeAction?.(fromArray(next), createActionDetails(event, { reason, thumb }));
-  });
-  return true;
-}
+`step(next, thumb, reason, event)`:
 
-function commit(thumb: number | null, reason: ChangeReason, event: Event | undefined): void {
-  setStepHeld(false);                                              // the commit's own pending state holds `live` from here
-  const next = liveRef.current;                                    // the gesture's last step
-  if (next === null || equal(next, gestureStart.current)) return;  // nothing changed since the gesture began
-  gestureStart.current = next;                                     // a trailing native `change` must not re-commit
-  setPendingThumb(thumb);
-  dispatch(fromArray(next), createActionDetails(event, { reason, thumb }));  // useControllableAction
-}
-```
+- Returns `false` and does nothing when `next` equals the shown value (`equalValues`): no-op
+  against what the user sees (conventions 2.3 item 8).
+- Otherwise writes the reached value synchronously (a commit in the same event reads it), sets
+  `live` (urgent), `pendingThumb` and the reason the Field notification reads (9.4.4), and sets
+  `stepHeld` unless the reason is `"dismiss"` (a revert has no commit after it).
+- Runs `valueChangeAction` in the step transition (`useActionTrigger`, no in-flight guard; types
+  `fsui-slider`, `fsui-slider-change`) with `{ reason, thumb }`. Without a `valueChangeAction`
+  it starts no transition (2.2).
 
-The commit's wrapped action, as Combobox wraps its value action:
+A gesture records the shown value it began at:
 
-```ts
-async (next, details) => {
-  const id = ++commitId.current;
-  try {
-    await valueCommitAction?.(next, details);
-  } catch (error) {
-    if (!isControlled && id === commitId.current) {
-      await undefined;                                             // leave the transition (conventions 2.6)
-      step(toArray(committedRef.current), null, "dismiss", undefined);   // tell the preview channel
-    }
-    throw error;
-  }
-}
-```
+- A key the Root normalises, a platform change and a pointer capture open a gesture at the
+  shown value before their first step. A capture also sets `live` to the shown value, so a
+  press that steps nothing shows the current value, not what an earlier gesture left behind.
+- A native `input` opens a gesture after its step, and only when none is open: its `change`
+  commits later, and several `input` events before one `change` are one gesture from the value
+  shown before the first.
+
+`commit(thumb, reason, event)`:
+
+- Closes the open gesture: the gesture start is cleared (`null`) and `stepHeld` with it, in the
+  same batch as the dispatch, whose pending state holds `live` from here.
+- Dispatches nothing when no gesture was open (a trailing native `change`) or the reached value
+  equals the value the gesture began at (a drag out and back).
+- Otherwise sets `pendingThumb` and dispatches `fromArray(reached)` through
+  `useControllableAction` with `{ reason, thumb }`.
+
+The commit's wrapped action, as Combobox wraps its value action: it awaits
+`valueCommitAction`; on a rejection in uncontrolled mode, for the latest commit only, it yields
+once (`await undefined`, which leaves the transition, conventions 2.6), runs
+`step(committed, null, "dismiss", undefined)` and rethrows.
 
 The `"dismiss"` step exists so that a `valueChangeAction` consumer whose preview followed the
 drag follows the rollback too (the Combobox text-revert precedent). It is dispatched in

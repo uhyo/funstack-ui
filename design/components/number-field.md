@@ -157,7 +157,7 @@ is emitted for a `<button>` only); `Root` any element. Library-controlled attrib
 | --- | --- | --- | --- | --- |
 | `value` (committed, optimistic) | Root, `useControllableAction<number \| null>` with `valueCommitAction` as its action | the number the field holds | **transition** (optimistic through `useOptimistic`) | Library-owned; residual browser paths: text typed before hydration and Firefox restoration (mount reconciliation), form reset. Uncontrolled state is written when a gesture's commit resolves (2.3). |
 | `draft` | Root, `useState<string \| null>` | the text the user is editing, `null` when the input shows the formatted value | **urgent** (written in the `input` event) | Library-owned, internal: the text of a controlled text input, which React requires to be urgent (conventions 2.6). Not controllable, no action: it is not a number until it is parsed. Cleared by every commit, every step, a reset and a rollback. |
-| `live` | Root, `useState<number \| null>` plus a ref | the value the current gesture has reached | **urgent** | Library-owned, internal (Slider 2.2): the value under a held button or the value a key press produced, before anything has committed. Shown while `held`. |
+| `live` | Root, `useState<{ value: number \| null } \| null>` (boxed: `null` is a value) plus a ref | the value the current gesture has reached | **urgent** | Library-owned, internal (Slider 2.2): the value under a held button or the value a key press produced, before anything has committed. Shown while `held`. |
 | step transition | Root, `useActionTrigger` | `valueChangeAction` in flight | transition | One `run` per step; the latest run's rejection goes to React, older ones are surfaced (conventions 3.4). |
 | `hold` | Root, `useState<"increment" \| "decrement" \| null>` | a button is held (pointer captured, timers running) | urgent | Internal; not exposed (`:active` on the button is the platform's). |
 | `stepHeld` | Root, `useState<boolean>` | a step was taken and its gesture's commit has not been dispatched yet | urgent | Slider's flag: keeps `live` on screen between a step and its commit when no step transition runs. |
@@ -206,7 +206,7 @@ Two layers, both urgent, over the optimistic value:
 
 ```ts
 const held = hold !== null || stepHeld || stepPending || commitPending;
-const shown: number | null = held && liveSet ? live : optimistic;       // the value (Slider 2.2)
+const shown: number | null = held && live !== null ? live.value : optimistic; // the value (Slider 2.2)
 const text = draft ?? format(shown);                                     // the text
 ```
 
@@ -251,44 +251,36 @@ the gesture's commit resolves (Slider 2.3). Consequences, documented on the comp
 
 ### 2.4 Step, commit, and the `"dismiss"` revert
 
-The Root has two internal entry points, Slider's, with the draft folded in (the shared
-`internal/use-step-commit.ts`; the rounding, the draft, the hidden input and the announcement
-are its options):
+The Root has two internal entry points, Slider's (slider.md 2.4, the shared
+`internal/use-step-commit.ts`), with these differences passed in as its options:
 
-```ts
-function step(next: number | null, source: Source, reason: ChangeReason, event: Event | undefined): boolean {
-  if (next !== null) next = formatter.round(next);                  // 5.4 for stepped values too (review N1)
-  if (next === shownRef.current) return false;                      // no-op against what is shown
-  liveRef.current = next; shownRef.current = next;
-  setLive(next); setDraft(null);                                     // urgent
-  setPendingSource(source);
-  syncHidden(next);                                                  // the hidden input, synchronously (section 6)
-  if (reason !== "dismiss") setStepHeld(true);
-  if (valueChangeAction === undefined) return true;
-  runStep(() => {
-    addTransitionType("fsui-number-field"); addTransitionType("fsui-number-field-change");
-    return valueChangeAction(next, createActionDetails(event, { reason, source }));
-  });
-  return true;
-}
+- `step(next, source, reason, event)` rounds a non-null `next` to what the format shows (5.4)
+  **before** the no-op test, which is `Object.is` against the shown value. A step that changes
+  the value also clears the draft and writes the hidden input synchronously (section 6), before
+  `valueChangeAction` runs with `{ reason, source }` (types `fsui-number-field`,
+  `fsui-number-field-change`).
+- `commit(source, reason, event)` clears the gesture start (`null`) and `stepHeld`, dispatches
+  nothing when no gesture was open or the value is back where it began, and otherwise
+  dispatches with `{ reason, source }`; an `"activate"` commit from a key, the wheel or a button
+  then announces the value (8.3).
+- `live` is boxed (`{ value }`): `null` is an empty value, not "no value reached".
 
-function commit(source: Source, reason: ChangeReason, event: Event | undefined): void {
-  setStepHeld(false);
-  const next = liveRef.current;
-  if (!liveSet.current || next === gestureStart.current) return;    // nothing changed since the gesture began
-  gestureStart.current = next;
-  setPendingSource(source);
-  dispatch(next, createActionDetails(event, { reason, source }));    // useControllableAction
-}
-```
+The paths:
 
-Typed text (`commitDraft(event)`): parse the draft (5.3); unparsable → `setDraft(null)` and
-return (the input re-formats the committed value; nothing is dispatched); otherwise
-`gestureStart = shown`, `step(parsed, "input", "activate", event)`, `commit("input", …)`. A key
-press: `gestureStart = base`, `step`, `commit`. A hold: `gestureStart = base` at the press, a
-`step` per tick, `commit` at release. The wrapped commit action is Combobox's / Slider's: on a
-rejection in uncontrolled mode, for the latest commit only, `await undefined` (leave the
-transition, conventions 2.6) then `step(committed, null, "dismiss", undefined)`, then rethrow.
+- Typed text (`commitDraft(event)`): the draft is parsed (5.3). Unparsable, or equal to the
+  shown value: the draft is cleared and nothing is dispatched (the input re-formats the value).
+  Otherwise a gesture opens at the shown value, then `step(parsed, "input", "activate", event)`
+  and `commit("input", …)`.
+- A key, a wheel event, a click activation: the base is resolved first (an open draft is parsed
+  and cleared), a gesture opens at the shown value, then one `step` from the base and one
+  `commit`.
+- A hold: at the press the base is resolved and a gesture opens at the shown value with `live`
+  set to it (a press whose first tick steps nothing shows the current value); a `step` per tick,
+  `commit` at the release.
+- The wrapped commit action is Slider's: on a rejection in uncontrolled mode, for the latest
+  commit only, `await undefined` (leave the transition, conventions 2.6), then
+  `step(committed, null, "dismiss", undefined)`, then rethrow.
+
 `details.source` is `null` for `"platform"` and `"dismiss"` dispatches. `details.event` is the
 DOM event of the gesture where one exists: the `focusout` or Enter `keydown` of a typed value,
 the `keydown` of a key, the `wheel` event, the `pointerdown` of a press and the `pointerup` /
@@ -523,7 +515,8 @@ the buttons (they are not focusable).
    `focus()` (research §2.2: the button is a control for the field, not a field).
 2. `setPointerCapture(pointerId)`; `hold = "increment" | "decrement"`.
 3. The base is the Root's `stepBase` (2.4): the parsed draft if one is open (unparsable → the
-   shown value, draft cleared), else the shown value; `gestureStart = base`.
+   shown value, draft cleared), else the shown value. The gesture opens at the shown value,
+   with `live` set to it (2.4).
 4. One `step` now (`source` the button, `event` the `pointerdown`). Then a 400 ms timer, then a
    step every 60 ms (Base UI 1.9 and React Aria 3.53; the touch variant's 600 ms is not
    adopted). The repeats carry **`details.event === undefined`**: a timer has no DOM event
