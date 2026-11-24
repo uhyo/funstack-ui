@@ -4,7 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from
 import { createActionDetails } from "../internal/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
+import { usePureTrigger } from "../internal/use-pure-trigger.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastActionDetails, ToastItem } from "./toast.js";
@@ -105,8 +105,11 @@ export function ToastAction({
   const root = useToastRootContext("Toast.Action");
   // Mixed ownership (conventions 2.5.1): ignore while the library closes the toast after the
   // action; a toast that stays makes the Action a user-owned trigger.
-  const ignoring = (whilePending ?? (closeOnSettle ? "ignore" : "run")) === "ignore";
-  const { pending, run } = useActionTrigger({ ignoreWhilePending: ignoring });
+  const trigger = usePureTrigger({
+    whilePending,
+    defaultWhilePending: closeOnSettle ? "ignore" : "run",
+  });
+  const { pending } = trigger;
   const [token] = useState(() => ({}));
   const effective = action ?? root.toast.action?.action;
   const { setActionPending } = root;
@@ -132,14 +135,14 @@ export function ToastAction({
     const details = createActionDetails(native, { id: root.toast.id });
     // When ignoring, a second click while this Action's own run is in flight starts nothing and
     // is cancelled (the hook's guard): one Undo, one Retry.
-    const started = run(
+    trigger.runActivation(
+      event,
       () => effective(details),
       () => {
         // Closing is idempotent: a dismissal meanwhile already closed it.
         if (closeOnSettle) root.close("activate", native);
       },
     );
-    if (!started) event.preventDefault();
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -147,9 +150,9 @@ export function ToastAction({
     disabled: disabledProps.disabled,
     onClick,
     // While `data-pending` exactly when ignoring (conventions 3.6), and when disabled on a link
-    // or component `render`. Owned, so an idle Action removes a render element's own.
-    "aria-disabled": (pending && ignoring) || disabledProps["aria-disabled"] ? true : undefined,
-    "data-pending": dataAttr(pending),
+    // or component `render`; native `disabled` wins. Owned, so an idle Action removes a render
+    // element's own.
+    ...trigger.pendingProps(disabledProps),
     "data-disabled": dataAttr(disabled),
   };
 

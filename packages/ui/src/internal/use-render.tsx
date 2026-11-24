@@ -6,6 +6,7 @@ import { renderElement } from "./render-element.js";
 import type { ElementLikeProps, RenderElementOptions } from "./render-element.js";
 
 export {
+  cancelClick,
   disabledButton,
   isHostButton,
   rendersButton,

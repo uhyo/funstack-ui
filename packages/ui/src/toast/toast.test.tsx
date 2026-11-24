@@ -1140,6 +1140,36 @@ describe("Toast", () => {
       expect(errors).toEqual([failure]);
     });
 
+    // #158: native `disabled` wins over the pending `aria-disabled`.
+    it("pending and then disabled: native disabled, no aria-disabled", async () => {
+      const d = deferred();
+      const undo = vi.fn(() => d.promise);
+      const ui = (disabled: boolean) => (
+        <Harness
+          manager={manager}
+          list={({ toasts }) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t}>
+                <Toast.Action data-testid="act" disabled={disabled} />
+              </Toast.Root>
+            ))
+          }
+        />
+      );
+      const { rerender } = render(ui(false));
+      await call(() => manager({ title: "A", action: { label: "Undo", action: undo } }));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("act"));
+      });
+      expect(screen.getByTestId("act")).toHaveAttribute("aria-disabled", "true");
+      rerender(ui(true));
+      expectPending(screen.getByTestId("act"));
+      expect(screen.getByTestId("act")).toBeDisabled();
+      expect(screen.getByTestId("act")).not.toHaveAttribute("aria-disabled");
+      await act(async () => d.resolve());
+      expect(undo).toHaveBeenCalledTimes(1);
+    });
+
     // T4
     it("a render element's aria-disabled is removed while the Action is idle (owned)", async () => {
       render(

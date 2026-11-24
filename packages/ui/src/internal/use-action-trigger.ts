@@ -14,7 +14,8 @@ export interface ActionTriggerOptions {
    * two activations in one task, before React re-rendered); the last render's `pending` is not
    * consulted, so a click in a settled-but-held commit window runs. Default `false`: runs
    * overlap, as with React's own `useTransition`. A pure trigger passes
-   * `(whilePending ?? <its default>) === "ignore"`, read per render (#146).
+   * `(whilePending ?? <its default>) === "ignore"`, read per render (#146), through
+   * `usePureTrigger`.
    */
   readonly ignoreWhilePending?: boolean | undefined;
 }

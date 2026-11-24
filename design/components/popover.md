@@ -758,7 +758,7 @@ owns (it hides the popover with no user code), so the default is `"ignore"`, als
 that is given an `action` (mixed ownership: the consumer's function, then the library's close):
 a repeated click while the Close's own action is pending is ignored (click
 `preventDefault()`ed) and the button renders `aria-disabled="true"` while it shows
-`data-pending` (the action and the hide commit). With `whilePending="run"` every click runs the
+`data-pending` (the action and the hide commit; not while natively disabled, conventions 1.2). With `whilePending="run"` every click runs the
 action again in the part's transition: `data-pending` until every run has settled, **no**
 `aria-disabled` from pending. The close is requested once, when the last run in flight settles,
 and only if the latest run resolved, in library and JS-free mode alike, and still dropped for a

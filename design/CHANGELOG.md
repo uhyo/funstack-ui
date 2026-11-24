@@ -10702,3 +10702,56 @@ no behaviour change.
   (`libraryHide` / `libraryClose`) and `refusedFact`, and for the `inert` + `autofocus` +
   `try/finally` around the show. The rules (3.9.2, 3.9.4, popover.md 2.5, dialog.md 2.3) are
   unchanged; Dialog still applies the refused re-open to non-modal dialogs only.
+
+## 2026-11-24: `disabled` follows who runs the click (#158)
+
+Decided by the user (2026-11-24, GitHub issue #158), from the ruling in
+`memo/reviewer/review-157-align.md`. Sections changed: conventions 1.2 (the `disabled` rule, the
+helper paragraph) and 3.6 (the last paragraph, and the file listing in 9.1); button.md decisions
+row 8, sections 3 (`disabled`, `focusableWhenDisabled` JSDoc), 4, 8.1, 17 (intro), 17.1 (the
+Close rows and a new `Button` row), 17.2, 18.2; one sentence each in popover.md, dialog.md and
+toast.md on the pending `aria-disabled`.
+
+- **The rule.** Native `disabled` where the click's effect is the browser's own (a submit, a
+  reset, a JS-free invoker command) and the element may be a button (a host `<button>` /
+  `<input>`, or a component / function render). `aria-disabled` with a cancelled click only
+  where the element certainly cannot be natively disabled (`<a>`, `<div>`), where the part's own
+  handler is the action, or where the consumer opts in (Toolbar, `focusableWhenDisabled`, a
+  submenu trigger). Before: `Button` took the `aria-disabled` branch for every component
+  render, so a disabled `Button type="submit"` (or `"reset"`, or the `formAction` default)
+  rendered through a component submitted before hydration; with a Server Function `formAction`
+  that sends the request. `Form.Submit` already kept native `disabled` for this reason (#83).
+- **Why native is the harmless guess here.** For a submitter or an invoker the action is the
+  browser's activation behaviour, which `aria-disabled` does not stop before hydration. A
+  component that renders a link cannot submit or invoke, so native `disabled` on it costs
+  nothing the part had not already lost.
+- **`Button`** counts as browser-run when its resolved `type` is `"submit"` / `"reset"` (for a
+  host `<input>` render, the input's own `type`: the Button owns `type` on a button only; review
+  L4) or it carries `commandfor` / `popoverTarget` (the rule's "JS-free invoker"; the issue
+  named submit and reset, the user's wording covers invokers too). **With or without `action`**
+  (user decision 2026-11-24 on review L2 of `memo/reviewer/review-157-pure-trigger.md`): a
+  disabled `<Button action type="submit" render={<Comp />}>` or one with `commandfor` would
+  otherwise submit or invoke before hydration, since the browser acts on that click besides the
+  Button's handler. Toolbar and `focusableWhenDisabled` still opt into `aria-disabled`.
+- **Sections also changed by the review fixes:** conventions 1.2 (`cancelClick`), button.md
+  8.1 (`disabled` row).
+- **Pending and disabled at once.** Native `disabled` wins: a natively disabled pure trigger
+  renders no `aria-disabled` from pending (Button, Dialog.Close / Popover.Close, Toast.Action;
+  `pendingAriaDisabled`). Before, both attributes rendered. `whilePending="ignore"` alone is
+  unchanged (`aria-disabled`, focus kept).
+- **One helper.** `disabledButton`'s `handlesClick: false` now means "native unless the element
+  is a host element other than `<button>` / `<input>`" (Form.Submit's expression, moved into the
+  helper). Side effect on the JS-free command parts (Dialog / Popover Trigger and Close without
+  a handler): a host link render there renders `aria-disabled` instead of a meaningless
+  `disabled` attribute, and while disabled the part installs a click handler that cancels the
+  click (after hydration a disabled link does not navigate; review M1 of
+  `memo/reviewer/review-157-pure-trigger.md`). It is no invoker, as before. `Button` now calls the helper instead of its own expression.
+
+## 2026-11-24: `usePureTrigger` (#157 candidate 4)
+
+Internal refactoring, no behaviour change (refactoring wave #157, `memo/architect/refactor-audit.md`
+rank 4). The `whilePending` wiring that Button, `useOverlayClose`, Menu.Item and Toast.Action each
+restated (resolve the default, `ignoreWhilePending`, `aria-disabled` iff `pending && ignoring`,
+`data-pending`, `preventDefault()` of an ignored activation) is one hook,
+`internal/use-pure-trigger.ts`. Sections changed: button.md 16.2 and 18.4 (which helper the parts
+call), the conventions 9.1 file listing.

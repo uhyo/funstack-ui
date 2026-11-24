@@ -291,6 +291,37 @@ export function describeOverlayDisabledRenders<D, P extends object>(
       }
     });
 
+    // #158: a host link cannot be natively disabled, so even the browser-run parts take
+    // `aria-disabled` there (a link is no invoker anyway), and the part cancels the click while
+    // disabled, so the link does not navigate (review M1 of #158).
+    it("JS-free mode, link renders: aria-disabled on the Trigger and an action-less Close, no invoker, the click is cancelled", () => {
+      render(
+        <Harness
+          mode="static"
+          trigger={{ disabled: true, render: <a href="#x" /> }}
+          {...close.props({ disabled: true, render: <a href="#x" /> })}
+        />,
+      );
+      for (const el of [trigger(), closePart()]) {
+        expectAriaDisabled(el);
+        expectNoInvoker(el);
+        expect(cancelled(el)).toBe(true);
+      }
+    });
+
+    it("JS-free mode, enabled link renders: no cancelling click handler of the library's", () => {
+      render(
+        <Harness
+          mode="static"
+          trigger={{ render: <a href="#x" /> }}
+          {...close.props({ render: <a href="#x" /> })}
+        />,
+      );
+      // The modal Dialog Trigger and the Popover Trigger install no handler in JS-free mode, nor
+      // does an action-less Close: an enabled link click is not cancelled by the library.
+      expect(cancelled(closePart())).toBe(false);
+    });
+
     // Review M1 of #83.
     it("JS-free mode with action, a disabled component-render Close is no invoker", async () => {
       const user = setupUser();

@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { isValidElement, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -19,9 +19,9 @@ import type {
   StateValue,
   WhilePending,
 } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { isHostButton, rendersButton, useRender } from "../internal/use-render.js";
+import { usePureTrigger } from "../internal/use-pure-trigger.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -88,19 +88,24 @@ export interface ButtonProps extends Omit<
   type?: "button" | "submit" | "reset";
   /**
    * Native `disabled` (owned; a `render` element cannot re-enable it) and `data-disabled`.
-   * Never dispatches. With `focusableWhenDisabled`, inside a `Toolbar.Root`, or when the
-   * rendered element is not a host `<button>` (`render={<a href />}`, a component), renders
-   * `aria-disabled="true"` instead.
+   * Never dispatches. With `focusableWhenDisabled` or inside a `Toolbar.Root`, renders
+   * `aria-disabled="true"` instead and cancels the click. So does a host element of another tag
+   * (`render={<a href />}`), and a component `render` whose click only the Button acts on. A
+   * component or `<input>` `render` whose click the browser also acts on (`type="submit"` /
+   * `"reset"`, the `formAction` default, `commandfor` / `popoverTarget`; with or without
+   * `action`) keeps native `disabled`: only that stops a submission or command before
+   * hydration. Native `disabled`
+   * wins over the pending `aria-disabled`.
    *
    * @defaultValue `false`
    */
   disabled?: boolean;
   /**
    * Keep a disabled Button focusable: `aria-disabled="true"` instead of native `disabled`, so
-   * keyboard and screen-reader users still find it and a Tooltip on it still opens.
+   * keyboard and screen-reader users still find it and a Tooltip on it still opens. Before
+   * hydration a focusable disabled submitter still submits (nothing native stops it).
    *
-   * @defaultValue `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar) and for a `render`
-   * element that is not a host `<button>`
+   * @defaultValue `false`; implied `true` inside a `Toolbar.Root` (APG Toolbar)
    */
   focusableWhenDisabled?: boolean;
   /**
@@ -150,13 +155,30 @@ export function Button({
   ...rest
 }: ButtonProps) {
   const toolbar = useToolbarContext();
-  // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
-  // browser and hide the state from AT, so the focusable-disabled branch.
-  const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
+  const resolvedType = type ?? (formAction !== undefined ? "submit" : "button");
+  // The browser acts on the click (with or without `action`) when it submits, resets or runs a
+  // JS-free invoker command. Then an element that may be a button keeps native `disabled`, the
+  // only state that stops it before hydration (conventions 1.2, #158). Otherwise the Button's
+  // handler is all the click does, and a link or component render takes `aria-disabled` with
+  // the cancelled click. A host `<input>` render keeps its own `type` (the Button owns `type` on
+  // a button only), so that is the type the browser acts on.
+  const clickType =
+    isValidElement<{ type?: unknown }>(render) && render.type === "input"
+      ? ["submit", "image", "reset"].includes(String(render.props.type))
+        ? "submit"
+        : "button"
+      : resolvedType;
+  const browserRun =
+    clickType !== "button" || rest.commandfor !== undefined || rest.popoverTarget !== undefined;
+  // `focusableWhenDisabled` and a Toolbar opt into the focusable disabled control (APG Toolbar).
+  const disabledProps = disabledButton(render, disabled, {
+    handlesClick: !browserRun,
+    alwaysFocusable: focusableWhenDisabled || toolbar !== null,
+  }).props;
   // Button is the fully user-owned trigger: every activation runs unless the consumer opts in
   // (conventions 2.5.1, design 18).
-  const ignoring = (whilePending ?? "run") === "ignore";
-  const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: ignoring });
+  const trigger = usePureTrigger({ whilePending, defaultWhilePending: "run" });
+  const { ignoring } = trigger;
 
   // Per-submitter pending (design 6.2): React reports the latest submitter's function as
   // `status.action`. `submittedWith` keeps the function this Button last submitted with, so an
@@ -180,7 +202,7 @@ export function Button({
   // Gated as a whole: a latch left from a function `formAction` that became a URL or `action`
   // must not keep the Button pending (a URL has no pending and no guard, 6.2).
   const formPending = typeof formAction === "function" && (named || (status.pending && submitted));
-  const pending = ownPending || formPending;
+  const pending = trigger.pending || formPending;
 
   useDevWarning(
     action !== undefined && formAction !== undefined,
@@ -207,15 +229,13 @@ export function Button({
     children,
     props: formAction === undefined ? rest : { ...rest, formAction },
     libraryProps: {
-      ...(rendersButton(render) && {
-        type: type ?? (formAction !== undefined ? "submit" : "button"),
-      }),
-      // `undefined` (not `false`) in the focusable case, so the owned key removes a render
-      // element's `disabled` too.
-      disabled: disabled && !focusable ? true : undefined,
-      // While pending only when ignoring: a Button that still acts is not unavailable (3.6).
-      "aria-disabled": (pending && ignoring) || (disabled && focusable) ? true : undefined,
-      "data-pending": dataAttr(pending),
+      ...(rendersButton(render) && { type: resolvedType }),
+      // `undefined` (not `false`) when enabled or in the focusable branch, so the owned key
+      // removes a render element's `disabled` too.
+      disabled: disabledProps.disabled === true ? true : undefined,
+      // `aria-disabled` while pending only when ignoring: a Button that still acts is not
+      // unavailable (3.6). Native `disabled` wins over it. Both channels' pending.
+      ...trigger.pendingProps(disabledProps, pending),
       "data-disabled": dataAttr(disabled),
       onClick: (event: MouseEvent<HTMLButtonElement>) => {
         // `event.defaultPrevented` is never read: an outer part (`Dialog.Trigger`) cancels the
@@ -236,7 +256,7 @@ export function Button({
         }
         const details: ButtonActionDetails = createActionDetails(event.nativeEvent, {});
         // Ignored while pending (`"ignore"` only): do not navigate, submit or run a command either.
-        if (!run(() => action(details))) event.preventDefault();
+        trigger.runActivation(event, () => action(details));
       },
     },
   });
