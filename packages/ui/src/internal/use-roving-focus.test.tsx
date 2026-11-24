@@ -177,7 +177,7 @@ describe("useRovingFocus", () => {
     expect(stops()).toEqual(["b"]);
   });
 
-  // #157 safety net (refactor-test-safety.md 2.9): rules the reviewer found guarded by one row
+  // #157 safety net (memo/reviewer/refactor-test-safety.md 2.9): rules the reviewer found guarded by one row
   // in one component file (RF2 Toolbar, RF3 itemsOf, RF8 Toolbar, RF9 ToggleGroup) get a
   // hook-level row too, so a consolidation of the component suites cannot drop the only guard.
   it("memory: the stop survives a later commit of the container after focus left (RF2)", () => {
