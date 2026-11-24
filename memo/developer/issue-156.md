@@ -7,11 +7,12 @@ Option (d) of `memo/architect/156-refused-reopen-focus.md`, chosen by the user. 
 
 - `packages/ui/src/internal/use-popover-popup.ts` `showPopup`: the `tagName !== "DIALOG"`
   exclusion on `refusedFact` is gone (a refused re-show of any element resolves no initial focus,
-  writes no `autofocus`). For a `<dialog>` popup only, and only when it has no `inert` already,
-  `inert` is set before `showPopover()` and removed in the same `finally` that removes the
-  `autofocus`. `<div>` popups (Menu, Combobox, `render={<div />}`) are not given `inert`: they
-  focus nothing anyway without `autofocus`, so their show stays bit-identical to before and the
-  attribute is observable for the fewest consumers. Dialog (`dialog-popup.tsx`) untouched.
+  writes no `autofocus`). For every popup element (`<dialog>`, `<div>`, Menu, Combobox), and
+  only when it has no `inert` already, `inert` is set before `showPopover()` and removed in the
+  same `finally` that removes the `autofocus`. First version did it for `<dialog>` only; the
+  coordinator asked for every element so a consumer's own `autofocus` in a `<div>` popup cannot
+  break the rule (jsdom row added, verified failing with the dialog-only condition). Dialog
+  (`dialog-popup.tsx`) untouched.
 - jsdom popover shim: the focusing steps return early when the popover is inside `[inert]`
   (jsdom ignores `inert`).
 
@@ -19,7 +20,9 @@ Option (d) of `memo/architect/156-refused-reopen-focus.md`, chosen by the user. 
 
 - jsdom `popover.test.tsx` focus: refused dismissal re-shows the dialog with `inert` during the
   call only, outside input keeps focus, no blur; with the consumer's `inert` prop the attribute
-  stays.
+  stays; a `<div>` popup with a consumer `autofocus` child (set by ref, React drops `autoFocus`)
+  keeps focus on the outside input (plus a shim check that the open itself focuses that child).
+  The shim models `autofocus` for non-dialog popovers and `inert`, so no browser row was needed.
 - browser `popover.browser.test.tsx` focus: the refused-Escape row now expects the Trigger for
   both `<div>` and `<dialog>`; new row: click an outside input, fact `false`, re-show, focus on
   the input, events exactly `inner:blur, outside:focus`, selection set at `click` (before the

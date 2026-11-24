@@ -180,14 +180,14 @@ export function usePopoverPopup(
   };
 
   const showPopup = (element: HTMLElement): void => {
-    // A refused re-open never moves focus (#155, #156): no initial focus target. A `<dialog>`
-    // (Popover's default) runs the dialog focusing steps on every show anyway; with the popup
-    // `inert` for the duration of the call they find nothing focusable and do nothing, so the
-    // element the dismissal focused sees no blur. Other popups focus nothing without `autofocus`.
+    // A refused re-open never moves focus (#155, #156): no initial focus target, and the popup is
+    // `inert` for the duration of the call, so the popover focusing steps find nothing focusable
+    // and do nothing: neither the dialog focusing steps of a `<dialog>` (Popover's default) nor a
+    // consumer's own `autofocus` in any popup. The element the dismissal focused sees no blur.
     // A consumer's own `inert` is left alone.
     const refused = refusedFact.current;
     refusedFact.current = false;
-    const inerted = refused && element.tagName === "DIALOG" && !element.hasAttribute("inert");
+    const inerted = refused && !element.hasAttribute("inert");
     if (inerted) element.setAttribute("inert", "");
     const focus = refused ? null : resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps

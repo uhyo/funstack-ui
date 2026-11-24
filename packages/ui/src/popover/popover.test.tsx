@@ -1649,15 +1649,25 @@ describe("Popover", () => {
   });
 
   describe("focus", () => {
-    // #156: a refused re-open of the default <dialog> is shown `inert`, so the dialog focusing
-    // steps focus nothing; a consumer's own `inert` is not touched.
-    function Refusing({ inert }: { inert?: boolean }) {
+    // #156: a refused re-open is shown `inert`, so the popover focusing steps focus nothing (the
+    // dialog focusing steps of the default <dialog>, a consumer's `autofocus` in a <div>); a
+    // consumer's own `inert` is not touched.
+    function Refusing({ inert, div }: { inert?: boolean; div?: boolean }) {
       return (
         <>
           <Popover.Root open openChangeAction={() => {}} onOpenChange={() => {}}>
             <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
-            <Popover.Popup data-testid="popup" aria-label="Filters" inert={inert}>
-              <input data-testid="inner" />
+            <Popover.Popup
+              data-testid="popup"
+              aria-label="Filters"
+              inert={inert}
+              render={div ? <div /> : undefined}
+            >
+              {/* The consumer's `autofocus` (React drops `autoFocus` on client renders). */}
+              <input
+                data-testid="inner"
+                ref={div ? (el) => el?.setAttribute("autofocus", "") : undefined}
+              />
             </Popover.Popup>
           </Popover.Root>
           <input data-testid="outside" />
@@ -1665,13 +1675,21 @@ describe("Popover", () => {
       );
     }
 
+    it("a <div> popup with a consumer's autofocus child: the open focuses it (shim check)", async () => {
+      render(<Refusing div />);
+      await flushTasks(2);
+      expect(screen.getByTestId("popup").tagName).toBe("DIV");
+      expect(screen.getByTestId("inner")).toHaveFocus();
+    });
+
     it.each([
-      ["without a consumer inert", undefined],
-      ["with the consumer's inert", true],
+      ["the default <dialog>", undefined, false],
+      ["the default <dialog> with the consumer's inert", true, false],
+      ["a <div> with a consumer's autofocus child", undefined, true],
     ] as const)(
-      "a refused dismissal re-shows the <dialog> without moving focus (#156), %s",
-      async (_, inert) => {
-        render(<Refusing inert={inert} />);
+      "a refused dismissal re-shows %s without moving focus (#156)",
+      async (_, inert, div) => {
+        render(<Refusing inert={inert} div={div} />);
         await flushTasks(2);
         const popupEl = screen.getByTestId("popup");
         expect(popupEl.matches(":popover-open")).toBe(true);

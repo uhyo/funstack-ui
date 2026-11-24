@@ -202,10 +202,11 @@ the DOM after every commit, shows it again (`showPopover({ source })` / `showMod
   un-migrated controlled Menu cannot trap the keyboard (review-148 L3). `usePopoverPopup` keeps a
   `refusedFact` flag: set when a fact hides the popup, cleared by any commit with `committed`
   false (the fact adopted), consumed by the next show. The rule holds for every popover element:
-  **a refused re-open never moves focus.** A `<dialog popover>` (Popover's default) runs the
-  dialog focusing steps on every `showPopover()`; for a refused re-show the library sets `inert`
-  on it for the duration of the synchronous call (only when the consumer has not set `inert`
-  themselves) and removes it right after, so the steps find nothing focusable and do nothing:
+  **a refused re-open never moves focus.** For a refused re-show the library sets `inert` on the
+  popup (any element) for the duration of the synchronous `showPopover()` call (only when the
+  consumer has not set `inert` themselves) and removes it right after, so the popover focusing
+  steps find nothing focusable and do nothing, whether they are the dialog focusing steps of a
+  `<dialog popover>` (Popover's default) or a consumer's own `autofocus` in a `<div>` popup:
   the element the user clicked outside keeps focus with no `blur` / `focus` event and its
   selection, and after a refused Escape focus stays on the Trigger (#156, user decision
   2026-11-24, option (d) of `memo/architect/156-refused-reopen-focus.md`). Dialog is not
