@@ -208,3 +208,28 @@ later entry or in the design text.
 - Wording: "layout phase, children first ... must stay in an ancestor" is now in overlay-show.ts,
   both 2.5 sections, the CHANGELOG correction entry and the developer memo. Finding 3 is
   corrected in the memo. Menu and Combobox rows have been added.
+
+---
+
+# Third check: 2f9d0a2 plus the master merge 61efccb
+
+Verdict: **mergeable.**
+
+- **Minor A is fixed.** Both replay callbacks now check a `mounted` ref that a passive effect
+  sets (Dialog and usePopoverPopup). My Suspense probe (Popover, scratch jsdom) now reports the
+  fact once while the Popup is hidden. After the reveal the popup is closed with committed
+  `false`, and the Trigger opens it. Unmount before the replay still reports nothing (probe, and
+  the Dialog and Popover rows). New Suspense rows were added on Dialog and Popover. Mutations:
+  going back to the `popupRef.current !== null` guard is killed by the Dialog Suspense row, and
+  `true` is killed by the Dialog unmount row.
+- **Low B and Nit C:** the "timer task, input can come first" wording is now in the JSDoc,
+  dialog.md 2.5 and popover.md 2.5, plus a new CHANGELOG entry. The `replayLostHide` comment
+  explains `echo` / `lostInterest`.
+- **Merge 61efccb:** CHANGELOG kept both sides, with no conflict markers. Against master it adds
+  76 lines and removes 0. Against 2f9d0a2 it adds 1396 (master's #157 entries) and removes 0.
+- **Runs on 61efccb:**
+  - jsdom, dialog/popover/menu/combobox/overlay-show: 1216 passed.
+  - Browser, chromium and firefox: 562 passed, 16 skipped.
+  - tsc, lint (with 1083 citations resolving) and format:check pass.
+- **Nit, cosmetic:** the first comment line of `replayLostHide` in use-popover-popup.ts runs past
+  100 columns after the rewrap. oxfmt does not flag it.
