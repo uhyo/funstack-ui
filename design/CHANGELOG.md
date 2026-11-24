@@ -11011,7 +11011,7 @@ is at 3,161 lines"). No rule changed. Sections of `design/conventions.md` were r
 probe evidence, measurements, rejected options and the step-by-step algorithms of internal
 helpers left the rules, which now state the rule and name the helper or the research note that
 holds the rest. Every section keeps its number. The parts below are the text each rewritten
-section had before, **verbatim** (without its heading), so nothing is lost; where a part and the
+section had before, **verbatim** (with its heading), so nothing is lost; where a part and the
 section now disagree, the section is the rule. Notes: `memo/architect/157-spec-slim-2.md`.
 
 ### conventions.md 13.2, as it stood before the second pass
@@ -12343,3 +12343,30 @@ Part vocabulary (reuse these names; invent a new one only when none fits):
   reviewer" and "tooltip.md's #93 amendment" (7.4; now `tooltip.md` 6), "#113 A1" and the
   "former `role="status"` fallback region" of `internal/announce.ts` (8), "since #148" and
   "review M1" (10.1), "as before" / "(new)" / "now mirrored" / "unchanged" (13.1).
+
+### Component documents: inline history removed (number-field, slider, select, combobox, toast)
+
+Not moved: these were references, not rules. `git show 92fe01d:design/components/<doc>.md` has
+the text as it was.
+
+- Pointers into finished reviews and developer notes, dropped where the sentence reads without
+  them: "(review M1)" to "(review S3)", "(deviation 1)" to "(deviation 11)", "developer
+  deviation N", and bare issue numbers after a rule ("conventions 2.4, #145", "#96", "#112",
+  "#118", "#121", "#123", "#126", "#132", "#147", "#148", "#53", "#60", "#67", "#129"). 75
+  places in the four documents. Issue numbers that name open work stay (#52, #77, #124, #19's
+  decision, Mozilla 2019601).
+- number-field.md 8.3: the story of the dropped `role="status"` fallback region (#113 A1,
+  2026-10-24) and of the migration onto `internal/announce.ts` (#129) is now the rule: no
+  fallback region, one `announce` module. 4.5, 5.2, 5.4: "review M1 / N1 / N3: ..." became the
+  reason without the review.
+- slider.md 9.4: the "proposed, needs product-owner acceptance (2026-10-18)" status and the
+  acceptance note are one sentence ("Accepted ..."); decision 14 lost the same status; 4.4:
+  "Until #145 the error was thrown from render ..." is gone (conventions 2.4 is the rule);
+  walkthrough 12: "Before review M1 ..." is stated as the reason.
+- combobox.md: "since #112" / "before #112" / "since #121 / #123 / #132" in 3.2, 3.3, 9,
+  walkthrough 17 and 11; "since wave 11 (#53)" and "v1" in 7.2; decision 5's "replacing v1's
+  `inputValueChangeAction`"; the struck-through "Container-level `dir="rtl"`" item of 13 is
+  now the Firefox gap it left.
+- select.md 6.2: "developer deviation 1, accepted", "review P1b".
+- toast.md 4.4: "(GitHub issue #63; accepted and implemented 2026-10-18, ada1cba)".
+- slider.md's heading "9.4 Inside a `Field` (issue #60)" is "9.4 Inside a `Field`".

@@ -36,13 +36,13 @@ with a `<select>` (hydrating `<selectedcontent>`, options that mount late, a sta
 | --- | --- | --- |
 | 1 | Element | `Select.Root` renders `<select>` (product-owner decision 1). There is **no open state**: no `open`, `defaultOpen`, `openChangeAction`, `data-open`, `Popup` part or `transition` for open/close. The picker is the UA's `::picker(select)` pseudo-element, opened and closed by the browser with no events (`select-combobox.md` §5); `:open` and `::picker(select)` are the styling hooks and are documented (section 7). A best-effort `data-open` from focus heuristics is rejected: it would be wrong in Chromium (focus moves to the option while open) and could not be promised anywhere. |
 | 2 | Anatomy | `Select.Root` (`select`), `Select.Trigger` (`button`, first child), `Select.Value` (`selectedcontent`), `Select.Option` (`option`), `Select.Group` (`optgroup`), `Select.GroupLabel` (`legend`), `Select.Separator` (`hr`). `Trigger` and `Value` are optional: without them an engine with customizable select renders its UA button with the selected option's text. `::picker-icon` and `::checkmark` are pseudo-elements, not parts. |
-| 3 | State | One library-owned state, `value: string`, as `value` / `defaultValue` / `valueChangeAction(next, details)`. The value is **always a string** and never `null`: a single `<select>` always has a value (`select.value` is a string), and "nothing chosen" is the HTML idiom of a first `<Select.Option value="">` placeholder, which is also what `required` rejects (section 5). With neither `value` nor `defaultValue` the Select **follows the browser** (product-owner decision 4, native-first as RadioGroup): the initial value is the option the browser selects, the first enabled option (a first `value=""` placeholder counts), adopted silently at mount and while options are still loading, **until any dispatch has established the value**; after that, late options only get the re-apply (review H1); **no dev warning** (section 5). |
+| 3 | State | One library-owned state, `value: string`, as `value` / `defaultValue` / `valueChangeAction(next, details)`. The value is **always a string** and never `null`: a single `<select>` always has a value (`select.value` is a string), and "nothing chosen" is the HTML idiom of a first `<Select.Option value="">` placeholder, which is also what `required` rejects (section 5). With neither `value` nor `defaultValue` the Select **follows the browser** (product-owner decision 4, native-first as RadioGroup): the initial value is the option the browser selects, the first enabled option (a first `value=""` placeholder counts), adopted silently at mount and while options are still loading, **until any dispatch has established the value**; after that, late options only get the re-apply; **no dev warning** (section 5). |
 | 4 | Rendered DOM state | `Root` renders `value={optimistic}` (React problem 3). react-dom restores a controlled select's options to its props after every event (`restoreControlledSelectState` → `updateOptions`), and only the sync-lane optimistic update is flushed before that restore; a transition-only value snaps back, and `<selectedcontent>` with it, for the whole pending time (`select-combobox.md` §4, probe B). |
 | 5 | `Select.Value` | Renders `<selectedcontent suppressHydrationWarning dangerouslySetInnerHTML={{ __html: "" }} />` (product-owner decision 2, the verified workaround for React problem 1). The browser fills it; it has **no `children` prop**. It works before hydration and in a Server Component tree. |
 | 6 | Stale `<selectedcontent>` | **The library refreshes it automatically** (product-owner decision 3, my call): `Select.Value` observes the `<select>` subtree with a `MutationObserver` and, when a mutation lands inside the currently selected option, re-assigns `select.value = select.value`, which re-clones the option in Chromium and is spec-conformant for Safari. Verified cheap (one small clone per batch of mutations) and safe (no events, selection unchanged, the open picker and its focused option are untouched). Section 6.3 has the justification and the filter. |
 | 7 | Late options | Options revealed inside the select by Suspense, `use()` or lazy loading are **re-applied** (React problem 2): the Root selects the option matching the intended value when it mounts, through the Option's mount report. An option that **hydrated** (its element came from the server) is reconciled first, because a user may have picked it before hydration; an option React **created** is only re-applied, because the browser's automatic first-option selection on insertion is not a user intent. The Option tells them apart with `useSyncExternalStore`'s server snapshot (section 6.2). |
 | 8 | Residual browser paths (`reason: "platform"`) | Mount reconciliation (pre-hydration picks, Firefox form-state restoration) and form reset (`<button type=reset>`, `form.reset()`, React's automatic reset after `<form action>`, React problem 5) dispatch once per Select through `useNativeGroupReconciliation` on the `<select>` (conventions 3.8). A platform dispatch happens only when the **intended option exists in the DOM** and a different option is selected; a value that matches no option is never "reconciled" to the browser's fallback. |
-| 9 | Reset target | The library mirrors the reset target into `option.defaultSelected` itself (uncontrolled: the latest `defaultValue`; controlled: the Root's mount-time `value`; adopt mode: the value adopted at mount, review M1), because react-dom writes `defaultSelected` only for an uncontrolled `defaultValue` (so a client-rendered controlled select would otherwise reset to its first option, while an SSR'd one resets to the server value). The mirror is written before the selection is re-applied in the same synchronous step, since `defaultSelected = true` on a non-dirty option moves the selection (probe, section 6.1). |
+| 9 | Reset target | The library mirrors the reset target into `option.defaultSelected` itself (uncontrolled: the latest `defaultValue`; controlled: the Root's mount-time `value`; adopt mode: the value adopted at mount), because react-dom writes `defaultSelected` only for an uncontrolled `defaultValue` (so a client-rendered controlled select would otherwise reset to its first option, while an SSR'd one resets to the server value). The mirror is written before the selection is re-applied in the same synchronous step, since `defaultSelected = true` on a non-dirty option moves the selection (probe, section 6.1). |
 | 10 | Keyboard | Entirely engine-defined; the library installs no key handler. Chromium's customizable select, Firefox's native select and Safari differ (section 8); the library contract is "one dispatch per committed change, optimistic value", not a key map. |
 | 11 | Pending and state exposure | `data-pending` on `Root` (the owner), on `Trigger` (the trigger the user acted on) and on the `Option` whose value is the optimistic target; `data-selected` (optimistic) on `Option`, equal to `:checked`; `data-disabled` on `Root` and `Option`. Never natively disabled while pending (and `disabled` would also drop the value from form submission). |
 | 12 | Form props | `name`, `required`, `disabled`, `form`, `autoComplete` on `Root`, all native. `multiple` and `size` are **omitted from the type**: multi-select is deferred (product-owner decision 7, section 13). |
@@ -307,7 +307,7 @@ against**: Chromium names the option from `label` while the combobox value and
 WebKit ignores it on native-appearance selects; filtering is Combobox's job. The Option emits
 `data-selected` (optimistic), `data-pending`, `data-disabled`. `disabled` includes a disabled
 `Select.Group` (passed down through the Group's context), so `data-disabled` and `:disabled`
-agree (review L6).
+agree.
 
 ### 3.5 `Select.Group`, `Select.GroupLabel`, `Select.Separator`
 
@@ -412,11 +412,11 @@ controlled mode (RadioGroup 9.5).
   rather than against the not-yet-adopted `""`, so a pre-hydration pick of another option is
   still dispatched with `reason: "platform"`. The same adoption runs when options mount later
   while the state's option does not exist (the fallback-only case), **but only until a dispatch
-  of any reason has established the value** (review H1): once the user has picked, or a
+  of any reason has established the value**: once the user has picked, or a
   platform path has dispatched, late options get the re-apply of 6.1 only, so a boundary that
   re-suspends after a pick (a keyed `<Suspense>` reload, a refetch with `use()`) shows its
   fallback and then restores the pick instead of silently replacing it with the first option.
-  **The reset target in adopt mode is the value adopted at mount** (review M1), mirrored into
+  **The reset target in adopt mode is the value adopted at mount**, mirrored into
   `defaultSelected` like a controlled mount-time value; when that value is `""` it is mirrored
   only when it came from a `""` option (a disabled placeholder that react-dom or Fizz selected),
   not from a select with nothing selectable. Without the mirror a client-rendered tree with a
@@ -468,7 +468,7 @@ Facts the order relies on (Chromium probe, `memo/architect/select-notes.md`):
 
 `resetTarget` is the latest `defaultValue` in uncontrolled mode (re-read every commit), the
 value captured at the Root's mount in controlled mode, and in adopt mode (neither prop) the
-value adopted at mount (section 5, review M1), so that an untouched form resets to what it
+value adopted at mount (section 5), so that an untouched form resets to what it
 showed; `""` is mirrored only when a `""` option exists.
 
 ### 6.2 Late-mounting options (React problem 2)
@@ -495,7 +495,7 @@ render with Suspense-loaded options (wrong) or overwrite a real pre-hydration pi
   the Option, captured in its mount effect: React uses the server snapshot for the render that
   hydrates a server-rendered subtree, including a Suspense boundary hydrated after the Root, and
   the client snapshot for a client-created subtree. Verified at implementation: the mount
-  layout effect sees the server snapshot's render. The cost (review L8): every **hydrated**
+  layout effect sees the server snapshot's render. The cost: every **hydrated**
   Option re-renders once more after hydration, when the two snapshots differ, one extra sync
   pass over N options for a long server-rendered list (countries); accepted, since it happens
   once per hydration and the Option's render is tiny.
@@ -561,10 +561,10 @@ Justification against "cheap and safe":
   even when the user had moved focus to another option. The `selectedIndex` guard keeps it from
   selecting the placeholder when nothing is selected (case 7). Mutation records produced by the
   clone target `<selectedcontent>` and are filtered, so there is no loop. Setting `.value`
-  **does set the matching option's dirtiness** (the spec's setter step; verified in Chromium,
-  review P1b), which is benign and even helpful: a refreshed option is not moved by a later
+  **does set the matching option's dirtiness** (the spec's setter step; verified in
+  Chromium), which is benign and even helpful: a refreshed option is not moved by a later
   `defaultSelected` mirror, exactly as React's `updateOptions` already dirties it. It leaves
-  `defaultSelected` alone and does **not** clear `:user-invalid` (verified, review P1), so
+  `defaultSelected` alone and does **not** clear `:user-invalid` (verified), so
   validity styling survives a refresh.
 - **Alternatives rejected.** (a) Document "option content is static once rendered; change the
   `key` to refresh": a remount of the selected option while the picker is open drops focus to
@@ -573,7 +573,7 @@ Justification against "cheap and safe":
   the option and any memoised subtree. (c) Re-insert `<selectedcontent>`: moves a React-owned
   node. The observer covers every case with one mechanism.
 
-**Refresh after a form reset** (developer deviation 1, accepted; review P2). The spec's select
+**Refresh after a form reset.** The spec's select
 reset algorithm ends with "update a select's descendant selectedcontent elements"
 unconditionally, but Chromium 156 re-clones only when no option carries `selected` /
 `defaultSelected`; when the reset restores a `defaultSelected` option, which is the library's
@@ -581,7 +581,7 @@ normal case (both modes mirror the reset target), the value moves and the button
 old option. Recorded as a Chromium bug for a human to report in #52. `Select.Value` therefore
 also listens to `reset` on **`select.form`** (re-read per commit, as `useFormReset`; not on
 `ownerDocument` with a target filter, which a consumer's `stopPropagation()` or a shadow root
-would defeat, review L3) and, in a microtask after the reset, runs the same
+would defeat) and, in a microtask after the reset, runs the same
 `select.value = select.value` refresh.
 
 What is not covered, documented: the clone is a snapshot, so CSS inside `<selectedcontent>` must
@@ -721,7 +721,7 @@ failure-prone saves add an `aria-live` region.
 `ArrowDown` three times on the closed select: three `change` events, three dispatches (b, c, d),
 `O` re-based each time, the pending option always the latest, `P` true until all settle, the
 latest-dispatch guard commits only d; a rejection of b's or c's save is passed to `reportError`,
-not to the boundary (conventions 2.4, #145). In Chromium's customizable select the same presses open the
+not to the boundary (conventions 2.4). In Chromium's customizable select the same presses open the
 picker and move focus, and only `Enter` dispatches once. The guidance is the conventions' own:
 await only what the UI must wait for (`(next) => { void save(next); }` for a preference), or
 leave `valueChangeAction` off and let the form carry the value. There is no manual activation
@@ -748,7 +748,7 @@ Uncontrolled, `defaultValue=""`, placeholder first, inside `<form action={order}
    `fruit=banana` from the DOM.
 2. Success: React calls `form.reset()` during commit. The browser restores selectedness from
    `defaultSelected` (the library's mirror: the placeholder); `<selectedcontent>` should
-   re-clone the placeholder, and in Chromium 156 does not for a `defaultSelected` option (#52),
+   re-clone the placeholder, and in Chromium 156 does not for a `defaultSelected` option,
    so `Select.Value`'s own `reset` listener refreshes it in a microtask (6.3). The Root's
    `reset` listener schedules a microtask; by then the Root's layout
    effect has already re-applied `O="banana"` to the DOM, so the microtask reads the reset target

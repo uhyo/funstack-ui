@@ -33,7 +33,7 @@ pointer is, like focus).
 | --- | --- | --- |
 | 1 | Anatomy | `Slider.Root` (`div`; `role="group"` only with several thumbs), `Slider.Label` (`label`), `Slider.Track` (`div`, owns pointer interaction), `Slider.Indicator` (`span`, the fill), `Slider.Thumb` (`span` **plus** a visually hidden `<input type="range">`, one per value; explicit `index`), `Slider.Value` (`span`, not `<output>`). No `HiddenInput`, `Control`, `Marker` or `Output` parts. |
 | 2 | Two actions | `valueChangeAction(next, details)` on every **step** (each `input` event, each pointer move) and `valueCommitAction(next, details)` once per **gesture** (pointer release, each key press, a platform reset). Both are ordinary `ChangeAction`s: awaited inside the Root's transitions, `data-pending` while in flight, errors to the boundary. The save belongs in `valueCommitAction`; a per-step network call is documented against. |
-| 3 | Lanes | A step is a **transition** (through `useActionTrigger`): a controlled parent adopting `setPrice(v)` in the sync prefix gets an interruptible render, and content that suspends keeps the old UI with `data-pending`. The gesture's commit is the state owner's dispatch (`useControllableAction`: optimistic, latest wins). The thumb under the pointer is driven by a **`live` value in the urgent lane** (`useState`, written in the event); what the thumbs render is `live` while a gesture or a dispatch is in flight, else the optimistic value (section 2.2). No `UrgentChangeHandler` (Combobox's `onInputValueChange`, #96): React does not require urgency here, and the urgent state is library-internal. A step without a `valueChangeAction` starts no transition (nothing to run, nothing to keep interruptible), so a drag with only a commit action is never pending; `live` is held from a step to its gesture's commit by an internal `stepHeld` flag (2.2). |
+| 3 | Lanes | A step is a **transition** (through `useActionTrigger`): a controlled parent adopting `setPrice(v)` in the sync prefix gets an interruptible render, and content that suspends keeps the old UI with `data-pending`. The gesture's commit is the state owner's dispatch (`useControllableAction`: optimistic, latest wins). The thumb under the pointer is driven by a **`live` value in the urgent lane** (`useState`, written in the event); what the thumbs render is `live` while a gesture or a dispatch is in flight, else the optimistic value (section 2.2). No `UrgentChangeHandler` (Combobox's `onInputValueChange`): React does not require urgency here, and the urgent state is library-internal. A step without a `valueChangeAction` starts no transition (nothing to run, nothing to keep interruptible), so a drag with only a commit action is never pending; `live` is held from a step to its gesture's commit by an internal `stepHeld` flag (2.2). |
 | 4 | Uncontrolled commit | Uncontrolled committed state is written when the **commit** action resolves, not per step. A rejected save therefore rolls the thumb back to the value before the gesture (the vision's "optimistic + rollback"), and a `valueChangeAction` consumer is told with one `"dismiss"` step (2.4). The slide-back itself is visible only while the Root stays mounted: the rejection reaches the boundary above the Root, which replaces it (2.3). |
 | 5 | Value shape | `value: number \| readonly number[]` (one thumb or several), inferred from `value` / `defaultValue`; the shape is fixed at mount. Thumbs cannot cross: each hidden input's native `min` / `max` are its neighbours' values (plus `minStepsBetweenThumbs × step`), so Home / End / PageUp / PageDown and the accessibility tree respect the neighbours natively. |
 | 6 | Platform first | `min`, `max`, `step`, `name`, `form`, `disabled`, `aria-valuetext` (from `getAriaValueText`) go on the native inputs; never `aria-valuemin` / `aria-valuemax` / `aria-valuenow`. Values snap and clamp exactly as the platform sanitises them (an unreachable `max` stays unreachable; dev warning). The default value is the platform's midpoint. |
@@ -44,7 +44,7 @@ pointer is, like focus).
 | 11 | ViewTransition | **No `transition` prop on any part** (Select precedent): nothing mounts from library state and every move is urgent or optimistic. Types `fsui-slider`, `fsui-slider-change` (step), `fsui-slider-commit` (gesture) for consumers' own boundaries. Thumb motion and rollback animate with a CSS transition on the registered custom property, disabled under `[data-dragging]`. |
 | 12 | SSR | Every part file is `"use client"`. Server HTML carries the inputs with their values; before hydration keyboard and form submission work natively (the visuals catch up at mount through reconciliation); pointer does nothing. A plain `<input type="range">` from a Server Component remains the JS-free form slider (#19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant; a recipe on the docs page, conventions 7.3). |
 | 13 | Not in v1 | `largeStep` / Shift+Arrow, `step="any"`, `list` / tick marks, per-thumb `disabled`, `inverted`, a value tooltip, `<rangegroup>`, `appearance: base` (section 13). |
-| 14 | Inside a Field (#60, **proposed**, needs product-owner acceptance) | `Slider.Root` calls `useFieldControl` with `labelable: count === 1`: one thumb registers its input (the Field's control id becomes `thumbId(0)`, `Field.Label` gets `for`); several register the Root `div` (`aria-labelledby` → `Field.Label`, as CheckboxGroup). `aria-invalid` on every Thumb input, never on the group; `aria-describedby` on the input (one) or the Root (several). `name` / `disabled` from the Field; `required` not applicable (dev warning). The slot and `:user-invalid` live on the first Thumb's input. `useFieldValueChange` keyed on the optimistic values with `edit = true` for `"activate"` commits, because pointer and normalised-key gestures fire no native `input` / `change`. Section 9.4. |
+| 14 | Inside a Field | `Slider.Root` calls `useFieldControl` with `labelable: count === 1`: one thumb registers its input (the Field's control id becomes `thumbId(0)`, `Field.Label` gets `for`); several register the Root `div` (`aria-labelledby` → `Field.Label`, as CheckboxGroup). `aria-invalid` on every Thumb input, never on the group; `aria-describedby` on the input (one) or the Root (several). `name` / `disabled` from the Field; `required` not applicable (dev warning). The slot and `:user-invalid` live on the first Thumb's input. `useFieldValueChange` keyed on the optimistic values with `edit = true` for `"activate"` commits, because pointer and normalised-key gestures fire no native `input` / `change`. Section 9.4. |
 
 ---
 
@@ -226,11 +226,11 @@ const shown: readonly number[] = held && live !== null ? live.value : toArray(op
 - A step runs the step transition **only when a `valueChangeAction` exists**. Without one
   there is nothing to run and no consumer update to keep interruptible, and a transition per
   pointer move would toggle `data-pending` on every step (two renders per `pointermove`, about
-  120 a second during a drag, review M2) although nothing is in flight. With a synchronous
+  120 a second during a drag) although nothing is in flight. With a synchronous
   `valueChangeAction` each step is still a real transition and the blink is inherent; the 6.2
   recipe therefore styles the spinner on `[data-pending]:not([data-dragging])`.
 
-This is **not** the urgent lane of conventions 2.6 (an `on<State>Change: UrgentChangeHandler` prop, #96): no consumer-facing
+This is **not** the urgent lane of conventions 2.6 (an `on<State>Change: UrgentChangeHandler` prop): no consumer-facing
 action is urgent, and a controlled `value` still gates committed state. It is the library's
 third urgent state after Combobox's text and active option, used, as the rule says, only where
 React's timing requires it.
@@ -250,7 +250,7 @@ the gesture's commit resolves, not per step. Consequences, documented on the com
 - `valueChangeAction` resolving changes no library state; it is the preview channel.
 - Overlapping gestures (a new drag while a save is pending) follow latest intent: the last
   commit's value is what lands; the earlier save's result is ignored, its rejection passed to
-  `reportError` (conventions 2.4, #145; section 4.4).
+  `reportError` (conventions 2.4; section 4.4).
 
 ### 2.4 Step, commit, and the "dismiss" revert
 
@@ -514,7 +514,7 @@ type parameter, so their `T` defaults to `SliderValue` (`number | readonly numbe
 `number`: `state.value` must be narrowed (`<Slider.Value<number>>`, or a `typeof` check) or
 `state.values` read instead, which is what the examples do. A `number` default would let
 `<Slider.Value>{({ value }) => value.toFixed(0)}</Slider.Value>` type-check inside an array
-slider and throw at runtime (review L2).
+slider and throw at runtime.
 
 ### 3.4 Namespace
 
@@ -539,10 +539,10 @@ when the last step differs from it.
 
 | Event | Where | Behaviour |
 | --- | --- | --- |
-| `pointerdown` (primary button, not `disabled`) | Thumb | `preventDefault()` (no text selection, no focus change through the compat `mousedown`); `setPointerCapture` on the Thumb; `gestureThumb = index`; `gestureStart` = shown; the input is focused (`:focus-visible` does not match after a pointer press, so no ring appears, as on a native range); `step` with the value under the pointer if it differs. **Stacked thumbs**: when the pressed thumb shares its value with neighbours, the Track's tie rule applies to the stack: a pointer above the value picks the last thumb of the stack, below it the first; exactly on it the press is undecided (the pressed thumb shows `data-dragging` and takes focus) until the first move off the value picks, moving `data-dragging` and focus to the chosen thumb. Without this a stack at `max` could never be pulled apart: the top thumb's bounds are its neighbour's value (review M1). `pointermove`, `pointerup`, `pointercancel` and `lostpointercapture` listeners are attached to the captured element for the gesture's duration (`addEventListener`, removed at its end). |
+| `pointerdown` (primary button, not `disabled`) | Thumb | `preventDefault()` (no text selection, no focus change through the compat `mousedown`); `setPointerCapture` on the Thumb; `gestureThumb = index`; `gestureStart` = shown; the input is focused (`:focus-visible` does not match after a pointer press, so no ring appears, as on a native range); `step` with the value under the pointer if it differs. **Stacked thumbs**: when the pressed thumb shares its value with neighbours, the Track's tie rule applies to the stack: a pointer above the value picks the last thumb of the stack, below it the first; exactly on it the press is undecided (the pressed thumb shows `data-dragging` and takes focus) until the first move off the value picks, moving `data-dragging` and focus to the chosen thumb. Without this a stack at `max` could never be pulled apart: the top thumb's bounds are its neighbour's value. `pointermove`, `pointerup`, `pointercancel` and `lostpointercapture` listeners are attached to the captured element for the gesture's duration (`addEventListener`, removed at its end). |
 | `pointerdown` | Track (no gesture already begun for this pointer) | Same, with the **nearest thumb** by value distance to the pointer's value; on a tie (two thumbs at one value) the thumb that can move toward the pointer. Capture on the Track. |
 | `pointermove` (the captured `pointerId` only) | captured element | `step(thumb, valueFromPointer)`. |
-| `pointerup`, `pointercancel`, `lostpointercapture` | captured element | `pointerup` first takes a last `step` at the release position when it differs from the last move (an engine may coalesce the final move into the `pointerup`; `details.event` is then the `pointerup`, review L3); `pointercancel` / `lostpointercapture` keep the last move's value. Then `gesture = null`; `commit(thumb, "activate", event)`; listeners removed. A cancelled gesture commits where it stopped (the user's last intent; leaving the value uncommitted would strand the preview). |
+| `pointerup`, `pointercancel`, `lostpointercapture` | captured element | `pointerup` first takes a last `step` at the release position when it differs from the last move (an engine may coalesce the final move into the `pointerup`; `details.event` is then the `pointerup`); `pointercancel` / `lostpointercapture` keep the last move's value. Then `gesture = null`; `commit(thumb, "activate", event)`; listeners removed. A cancelled gesture commits where it stopped (the user's last intent; leaving the value uncommitted would strand the preview). |
 
 Value from the pointer: the Track's `getBoundingClientRect()` at the step; horizontal
 `fraction = (clientX - left) / width`, mirrored (`1 - fraction`) when the Track's computed
@@ -567,7 +567,7 @@ The native input handles every key (section 7). What arrives:
 | --- | --- |
 | `input` (React `onChange` on the input) | `step(index, Number(input.value), "activate", nativeEvent)`; `gestureStart` = the shown value before this press if no gesture is open (a key press is a one-step gesture) |
 | `change` (a native listener through the input's ref: React surfaces no `onChange` for it, research finding 2) | `commit(index, "activate", event)` |
-| `keydown` ArrowLeft / ArrowRight while `orientation="vertical"`, or horizontal with the input's computed `direction` `rtl` (read at each `keydown` from `event.currentTarget`, so a direction set on any ancestor at any time counts; no `instanceof`, the pre-hydration row runs in an iframe realm) | `preventDefault()`; `step` to `value ± step`, then `commit`, both with the `keydown`. Vertical: Right increases (APG; Firefox decreases natively, Chromium increases). RTL: Left increases (the track is mirrored, `min` on the right; Chromium and Firefox mirror a native range, WebKit does not: `RangeInputType::handleKeydownEvent` maps Left to −step with no direction check, review H1). A press with Alt, Ctrl or Meta is left to the browser. No native `input` / `change` fires for these keys. Horizontal LTR keys are never touched. |
+| `keydown` ArrowLeft / ArrowRight while `orientation="vertical"`, or horizontal with the input's computed `direction` `rtl` (read at each `keydown` from `event.currentTarget`, so a direction set on any ancestor at any time counts; no `instanceof`, the pre-hydration row runs in an iframe realm) | `preventDefault()`; `step` to `value ± step`, then `commit`, both with the `keydown`. Vertical: Right increases (APG; Firefox decreases natively, Chromium increases). RTL: Left increases (the track is mirrored, `min` on the right; Chromium and Firefox mirror a native range, WebKit does not: `RangeInputType::handleKeydownEvent` maps Left to −step with no direction check). A press with Alt, Ctrl or Meta is left to the browser. No native `input` / `change` fires for these keys. Horizontal LTR keys are never touched. |
 
 Because `input` and `change` fire back to back in one task, the thumb renders the new value in
 the `input` event's sync flush and the commit's optimistic render in the next microtask flush;
@@ -605,11 +605,9 @@ acted on the whole form).
   then the commit's alone.
 - A superseded rejection, on either channel, is reported the moment it arrives, in every mode
   (uncontrolled, update on success, adopting parent) and whatever the other channel is doing:
-  `reportError` is a plain call from the action's continuation, not a render. (Until #145 the
-  error was thrown from render, and with an **adopting** controlled parent it reached the
-  boundary only after the newer commit settled, developer deviation 5. That mode difference no
-  longer exists.) The **latest** commit's rejection still reaches the boundary, after every
-  older overlapping action has settled (conventions 2.4).
+  `reportError` is a plain call from the action's continuation, not a render. The **latest**
+  commit's rejection reaches the boundary, after every older overlapping action has settled
+  (conventions 2.4).
 
 ---
 
@@ -654,7 +652,7 @@ renders is the number the DOM holds and `FormData` posts (research §1):
 A drag with no `valueChangeAction` never sets `data-pending` (no step transition runs). With
 one, even a synchronous one, every pointer move is a short pending render: a spinner on
 `[data-pending]` alone blinks throughout the drag, so the recipe below gates it on
-`:not([data-dragging])` (review M2).
+`:not([data-dragging])`.
 
 Platform pseudo-classes next to them: `:disabled` on the input; focus on the thumb through
 `:has(:focus-visible)` (the input is the focused element); `:active` is not meaningful (the
@@ -739,9 +737,9 @@ the pointer axis is the Track's block axis, and the custom properties count from
 **Direction.** A horizontal slider inherits the page's or container's `direction`: the
 Track's computed `direction` mirrors the pointer math and logical insets mirror the CSS, so
 `min` is drawn on the right. The arrow keys are **not** left to the browser under RTL: Chromium
-and Firefox mirror ArrowLeft / ArrowRight on a native range, WebKit does not (review H1: in
-Safari ArrowRight increased the value and moved the thumb **left**, the opposite of the key and
-of the same page in Chrome and Firefox). The library reads `getComputedStyle(input).direction`
+and Firefox mirror ArrowLeft / ArrowRight on a native range, WebKit does not (left to the
+browser, ArrowRight in Safari increases the value and moves the thumb **left**, the opposite of
+the key and of the same page in Chrome and Firefox). The library reads `getComputedStyle(input).direction`
 at each `keydown` and, when it is `rtl`, handles ArrowLeft (+ step) and ArrowRight (− step)
 itself through the vertical normalisation's path, so every engine behaves as Chromium and
 Firefox did natively and LTR stays fully native. The cost is the vertical row's: those two keys
@@ -827,15 +825,13 @@ No per-commit re-apply effect is needed for `value` (react-dom's `updateInput` r
 every render of the input), unlike `checked` / `indeterminate` in `useNativeChecked`; the only
 DOM write the library makes outside render is the reset mirror of 9.2.
 
-### 9.4 Inside a `Field` (issue #60)
+### 9.4 Inside a `Field`
 
-**Accepted by the product owner** (2026-10-18): section 9.4 is accepted as proposed, including the dev warning for `Field.Root required` around a Slider. If the screen-reader pass finds group descriptions unread, moving `aria-describedby` onto each thumb input is pre-approved as a follow-up.
-
-Status: **proposed, needs product-owner acceptance** (2026-10-18). Slider was implemented in
-parallel with Field, so this wiring was deferred to #60. It follows Field 7.1 / 7.2 as corrected
-by the Field review (ae4640d: `useFieldValueChange`, no `data-pending` from the hook, per-item
-`aria-invalid` for a `group`) and the review's M4 notes. Everything below is the Root's and the
-Thumb's; no new part, no new public prop.
+Accepted, including the dev warning for `Field.Root required` around a Slider. If a
+screen-reader pass finds group descriptions unread, moving `aria-describedby` onto each thumb
+input is pre-approved as a follow-up. The wiring follows Field 7.1 / 7.2 (`useFieldValueChange`,
+no `data-pending` from the hook, per-item `aria-invalid` for a `group`). Everything below is
+the Root's and the Thumb's; no new part, no new public prop.
 
 ```tsx
 <Field.Root name="volume">
@@ -964,7 +960,7 @@ Field dismisses a shown server error and re-runs `validate` from the control's n
 the library fires no synthetic events, product-owner item 8), and neither do the JS-normalised
 keys (ArrowLeft / ArrowRight on a vertical or RTL slider, 4.2). With
 `Form.Root errors={{ volume: "Too loud" }}` a drag to a quieter value would otherwise leave the
-error shown and the slot set, so the next submit is blocked by a stale custom error (review M4).
+error shown and the slot set, so the next submit is blocked by a stale custom error.
 
 **Decision: the direct Field hook, not `BubbleInput`.** The Root calls
 
@@ -1064,9 +1060,9 @@ Type test: `required` is still not a `Slider.Root` prop; no new public prop.
   forwarded prop and `ctx.field?.describedBy`.
 - `slider-label.tsx`: unchanged (`htmlFor: single ? ctx.thumbId(0) : undefined` already yields
   the Field's id).
-- Conventions 3.8's `useFieldControl` and `useFieldValueChange` rows already list Slider with
-  "#60"; no conventions change. The Field docs page's "FUNSTACK controls" list gains Slider; the
-  Slider page gets an "Inside a Field" example (the price range with `validate`).
+- Conventions 3.8's `useFieldControl` and `useFieldValueChange` rows list Slider. The Field
+  docs page's "FUNSTACK controls" list includes Slider; the Slider page has an "Inside a Field"
+  example (the price range with `validate`).
 
 ---
 
@@ -1126,7 +1122,7 @@ Notation: `L` = `live`, `O` = optimistic, `C` = committed, `S` = shown (2.2), `P
    here). `C` was never written, so a retry that remounts the slider shows `defaultValue`
    (`[40]`). The visible slide-back (the 6.2 CSS transition on `--slider-value`) belongs to
    walkthrough 4's handled failure and to a non-adopting parent's release; the docs must not
-   promise it for uncontrolled mode (developer deviation 4).
+   promise it for uncontrolled mode.
 3. **Controlled live filter, `value={price}` `valueChangeAction={(v) => setPrice(v)}`, the
    list under it suspends for 300 ms per value.** Each move: `L` follows at once;
    `setPrice(v)` is a transition update held while the list loads (the old list stays, Root
@@ -1176,8 +1172,8 @@ Notation: `L` = `live`, `O` = optimistic, `C` = committed, `S` = shown (2.2), `P
     so the gesture is undecided: Thumb 1 shows `data-dragging` and its input has focus, nothing
     steps. The first move, to 90, is below the value, so the first thumb of the stack is picked:
     `data-dragging` and focus move to Thumb 0, `step([90, 100])`, and the drag continues on it.
-    Before review M1 the pressed Thumb was always the one moved, with bounds `[100, 100]`:
-    nothing moved and nothing committed.
+    (Were the pressed Thumb always the one moved, its bounds would be `[100, 100]`: nothing
+    would move and nothing commit.)
 13. **Horizontal RTL in Safari, ArrowLeft.** `keydown` on the input, whose computed
     `direction` is `rtl`: prevented; `step([41])` + `commit([41])` with the `keydown`; no
     native `input` / `change`. The thumb moves left, toward `max` on the left, as in Chrome and
@@ -1199,7 +1195,7 @@ Notation: `L` = `live`, `O` = optimistic, `C` = committed, `S` = shown (2.2), `P
 - **Synthetic `input` / `change` on the hidden input for pointer gestures** (Radix's
   `BubbleInput`): a follow-up if consumer form-level listeners turn out to matter (product-owner
   item 8). Field, the first library listener, is served by the direct hook instead
-  (`useFieldValueChange`, 9.4.4, proposed for #60), so this stays out.
+  (`useFieldValueChange`, 9.4.4), so this stays out.
 - **`<rangegroup>`** (Open UI, Chromium Intent to Prototype) and **`appearance: base` with
   `::slider-*`** (CSS Forms 1, Chromium flag only): both could replace the hidden inputs or the
   styled parts without changing the state API; revisit at Intent to Ship (research §7 item 9).
