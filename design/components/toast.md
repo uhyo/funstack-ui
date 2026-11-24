@@ -846,16 +846,22 @@ export interface ToastRootProps extends Omit<HTMLAttributes<HTMLDivElement>, "ch
 
 // Title, Description: HTMLAttributes of their element, children defaulting to the toast's field.
 // Action
-export interface ToastActionState { readonly pending: boolean; readonly toast: ToastItem; }
+export interface ToastActionState { readonly pending: boolean; readonly disabled: boolean; readonly toast: ToastItem; }
 export interface ToastActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "className" | "style" | "onClick"> {
   readonly action?: Action<[ToastActionDetails]>;  // default toast.action?.action
   readonly closeOnSettle?: boolean;                 // default true
   readonly whilePending?: WhilePending;             // #146, section 3.2: default closeOnSettle ? "ignore" : "run"
+  readonly disabled?: boolean;                      // default false; the library disabled rule (below)
   readonly children?: StateValue<ReactNode, ToastActionState>; // default toast.action?.label
   // className / style / render / ref as above
 }
-// Close: ButtonHTMLAttributes minus onClick; state { toast }.
+// Close: ButtonHTMLAttributes minus onClick, plus `disabled`; state { disabled, toast }.
 ```
+
+`disabled` on `Toast.Action` and `Toast.Close` follows the library rule of every button-like part
+(conventions 1.2, `disabledButton`; #157): native `disabled` on a host `<button>`,
+`aria-disabled="true"` and a cancelled click on a link or component `render`, `data-disabled`
+always, `state.disabled` the prop (never set by pending); a disabled part never dispatches.
 
 Viewport handlers the library uses (`onPointerEnter`, `onPointerLeave`, `onFocus`, `onBlur`,
 `onKeyDown`) and the Root's `onKeyDown`, the buttons' `onClick`, are removed from the part types

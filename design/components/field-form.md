@@ -515,7 +515,10 @@ renders that message and decides.
   and the error reaches the nearest Error Boundary above `Form.Root`. Nothing is reset, no
   settle effect runs, `pending` ends with the boundary's commit. A boundary inside the page
   shell replaces the form; a consumer who wants the form to survive catches inside the action and
-  returns errors, which is what `useActionState` is for.
+  returns errors, which is what `useActionState` is for. This is the **latest** submission's
+  rejection while the Form is mounted and visible; a superseded submission's (a plain function
+  action run twice), or one that settles after the Form unmounted or was hidden, goes to
+  `reportError` (`reportDropped` / `useConnected`, conventions 2.4; #157).
 - **The action redirects** (a framework `redirect()` throws a special error): same as above from
   the Form's point of view; the framework's boundary handles it.
 - **Children suspend after the settle** (the result re-renders a suspending list): the settle
@@ -754,7 +757,11 @@ export interface FormSubmitProps
 ```
 
 Owned keys: `type` (`"submit"`, when the rendered element is a `<button>`), `disabled`,
-`data-pending`, `data-disabled`. `name`, `value`, `formAction`, `formNoValidate` pass through;
+`aria-disabled`, `onClick` (while disabled), `data-pending`, `data-disabled`. `disabled` is native
+on a submitter: no `render`, a host `<button>` or `<input>`, or a component (assumed to render a
+`<button>`, `rendersButton`; only native `disabled` stops a submitter before hydration). A host
+element of another tag (`<a>`) gets `aria-disabled="true"` and a cancelled click instead
+(conventions 1.2; #157). `name`, `value`, `formAction`, `formNoValidate` pass through;
 `formAction` as a function takes the submission out of the Form's hands (3.1). `Form.Submit` may
 be used in any React-rendered form (`Dialog.Form`, a plain `<form action>`): `useFormStatus`
 reads the nearest form, Form.Root or not.
@@ -1355,7 +1362,7 @@ browser mode if jsdom silently returns `false` instead of throwing).
 | Server errors | `Form.Root errors={{ email: "Taken" }}` at mount: shown, `setCustomValidity` applied, no focus; after a settled submission with errors: shown and the first errored Field focused; `input` dismisses (error gone, custom validity `""`, `aria-invalid="false"`); the next settle re-shows identical strings; an error for a value changed during the flight is suppressed; an error whose name has no Field focuses nothing; a Field outside `Form.Root` ignores nothing (no channel). |
 | Submission (intercept) | With a function `action`: `submit` is `defaultPrevented`, the action is called once with a `FormData` that includes the submitter's `name` / `value`, `Form.Root` and `Form.Submit` and `Field.Root` carry `data-pending` while a deferred action is unresolved (the watcher through `useFormStatus`), gone after; `useActionState`'s dispatch as `action` works end to end; a string `action` is not intercepted; a submitter with `formAction` is not intercepted. |
 | Reset policy | After a settle with no errors and `autoReset` default: `form.reset()` happened (values back to defaults, a `reset` event seen by a Checkbox inside, which dispatches `"platform"`); with errors: nothing reset, the typed value is still there; `autoReset={false}`: never. |
-| Rejection | The action rejects: an `ErrorCatcher` above `Form.Root` catches; no reset; no focus; `Field` state unchanged. |
+| Rejection | The action rejects: an `ErrorCatcher` above `Form.Root` catches; no reset; no focus; `Field` state unchanged. A superseded submission's rejection (both settle orders), one after unmount and one while an `<Activity>` hides the Form: `reportError` once, the boundary never (#157). |
 | Overlap | Two submits with a deferred `useActionState` action: both run in order, one settle, the last errors shown. |
 | Suspending content | The result re-renders a suspending sibling: `data-pending` stays until it resolves; the error and the content appear in the same commit (no fallback from a boundary above). |
 | Function props and `render` | Every part's `className` / `style` / `children` / `render` receive `FieldState` (or `FormRootState`, `FormSubmitState`) and the attributes agree; `render` keeps the handlers and the ref. |
@@ -1367,7 +1374,7 @@ browser mode if jsdom silently returns `false` instead of throwing).
 | Announcement (M2) | `form.test.tsx`: a server error for the focused field (Enter in it) is announced on the control through a stubbed `ariaNotify`; focus moving to the errored field announces nothing extra; a failed attempt from the focused, first invalid field announces its message; nothing where `ariaNotify` is missing. |
 | Veto (L3) | `form.test.tsx`: a `render` element's `onSubmit` calling `preventDefault()` cancels the submission (the action is not called, nothing pending). |
 | `Dialog.Form` as `Form.Root` (walkthrough 11) | `form.test.tsx`: `<Dialog.Form render={<Form.Root errors />} action={dispatch}>`: errors shown and focused, the value not reset, the dialog stays open; a clean settle resets and closes the dialog (`reason: "activate"`, the submitter's `value`); a hidden stale error neither closes, resets nor focuses; `closeOnSettle={false}` never closes; the reverse orientation is detected the same way; the composition without a function `action` warns (#59). |
-| N/A rows | Sync / async action, optimistic, controlled parity, post-await, superseded rejection, urgent action: no action props and no `x` / `defaultX` triple on any Field or Form part (the form's `action` is React's channel, and the display state has no consumer-facing urgent action), listed at the top of each test file. |
+| N/A rows | Sync / async action, optimistic, controlled parity, post-await, urgent action (superseded rejection applies to `Form.Root`'s submissions since #157, row Rejection): no action props and no `x` / `defaultX` triple on any Field or Form part (the form's `action` is React's channel, and the display state has no consumer-facing urgent action), listed at the top of each test file. |
 
 ### 13.2 Browser mode (`field.browser.test.tsx`, `form.browser.test.tsx`, Chromium, Firefox, WebKit)
 
