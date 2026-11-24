@@ -403,3 +403,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #156 user chose (d): popup `inert` during refused re-show → "a refused re-open never moves focus". PO extended to every popup element (consumer autofocus in <div>) and non-modal Dialog show() (reviewer found same symptom); modal Dialog unchanged. MERGED 7e7e770. Reviews in memo/reviewer/review-156.md. WebKit only checked in CI; fallback if it fails = assert old behaviour on WebKit (not .focus()).
 - Optional test gaps left (review-156 follow-up): Dialog "adopted dismissal then open gets initial focus" not pinned; no Dialog browser row for non-modal re-show.
 - RELEASED 0.1.0-alpha.18 (b53c883; Publish + Deploy Docs green; npm alpha = 0.1.0-alpha.18). Notes: memo/product-owner/notes-alpha18.md. WAVE 21 DONE; dev backlog empty, only human/upstream tasks open.
+
+## Wave 22: refactoring (user request 2026-11-24, #157)
+- User: subtle behaviours have grown; look for refactoring opportunities. Plan agreed: (1) read-only audit — architect rule map + candidates (memo/architect/refactor-audit.md), reviewer test safety + mutation checks (memo/reviewer/refactor-test-safety.md); (2) present ranked list A internal / B behaviour-aligning / C API to user; (3) small reviewed steps; (4) slim conventions.md, history to changelog. No API/behaviour change without user OK.
