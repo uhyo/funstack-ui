@@ -5,6 +5,9 @@ import { useFormReset } from "./use-form-reset.js";
 import type { FormAssociatedElement } from "./use-form-owner-event.js";
 import { useLatest } from "./use-latest.js";
 
+/** Which residual path found the change: mount reconciliation (Root or late member) or form reset. */
+export type NativeGroupPath = "mount" | "reset";
+
 export interface UseNativeGroupReconciliationOptions<T> {
   /**
    * The group's form-associated element: `RadioGroup.Root`'s / `CheckboxGroup.Root`'s
@@ -25,12 +28,13 @@ export interface UseNativeGroupReconciliationOptions<T> {
   readonly base: () => T;
   /**
    * The browser changed the group's value on a residual path and it differs from `base()` (for a
-   * form reset, also when equal while `dispatchEqualReset()` holds). `event` is the `reset` event,
-   * or `undefined` for mount reconciliation (the Root's mount, or a member mounting later): an
-   * event is set exactly for a form reset, which CheckboxGroup's reducer relies on to treat the
-   * dispatch as absolute. The Root dispatches once for the whole group with `reason: "platform"`.
+   * form reset, also when equal while `dispatchEqualReset()` holds). `path` names the path:
+   * `"mount"` for mount reconciliation (the Root's mount, or a member mounting later; `event` is
+   * `undefined`), `"reset"` for a form reset (`event` is the `reset` event). CheckboxGroup reads
+   * `path`, not `event`, to dispatch a reset as absolute (`DispatchOptions.whole`). The Root
+   * dispatches once for the whole group with `reason: "platform"`.
    */
-  readonly onPlatformChange: (next: T, event: Event | undefined) => void;
+  readonly onPlatformChange: (next: T, event: Event | undefined, path: NativeGroupPath) => void;
   /**
    * Form reset only: dispatch the reset target even when it equals `base()`, while this returns
    * `true`. A set-valued group (CheckboxGroup) passes "a dispatch is in flight"
@@ -99,7 +103,7 @@ export function useNativeGroupReconciliation<T>(
 
   const reconcileMount = useEffectEvent(() => {
     if (element.current === null) return;
-    reconcile(options, options.readCurrent());
+    reconcile(options, options.readCurrent(), "mount");
   });
   useLayoutEffect(() => {
     reconcileMount();
@@ -117,7 +121,7 @@ export function useNativeGroupReconciliation<T>(
       if (!rootReconciled.current) return;
       const current = latest.current;
       if (current.element.current === null) return;
-      reconcile(current, current.readCurrent());
+      reconcile(current, current.readCurrent(), "mount");
     });
   }, [latest]);
 
@@ -126,8 +130,8 @@ export function useNativeGroupReconciliation<T>(
     (event) => {
       if (element.current === null) return;
       const next = options.readDefault();
-      if (options.dispatchEqualReset?.()) options.onPlatformChange(next, event);
-      else reconcile(options, next, event);
+      if (options.dispatchEqualReset?.()) options.onPlatformChange(next, event, "reset");
+      else reconcile(options, next, "reset", event);
     },
     (event) => {
       if (element.current === null) return;
@@ -138,7 +142,12 @@ export function useNativeGroupReconciliation<T>(
   return { onItemMounted };
 }
 
-function reconcile<T>(options: UseNativeGroupReconciliationOptions<T>, next: T, event?: Event) {
+function reconcile<T>(
+  options: UseNativeGroupReconciliationOptions<T>,
+  next: T,
+  path: NativeGroupPath,
+  event?: Event,
+) {
   const equals = options.equals ?? Object.is;
-  if (!equals(next, options.base())) options.onPlatformChange(next, event);
+  if (!equals(next, options.base())) options.onPlatformChange(next, event, path);
 }

@@ -419,7 +419,7 @@ describe("useControllableAction: uncontrolled reducer commits", () => {
       const details = { event: undefined, item, on } as Toggle;
       hook.dispatch(apply(hook.optimistic, details), details);
     };
-    return { runs, toggle, value: () => view.getByTestId("value").textContent };
+    return { runs, toggle, value: () => view.getByTestId("value").textContent, hook: () => hook };
   }
 
   it.each([
@@ -455,6 +455,38 @@ describe("useControllableAction: uncontrolled reducer commits", () => {
     expect(value()).toBe("|b,c");
     await act(async () => runs[3]!.resolve());
     expect(value()).toBe("c|c");
+  });
+
+  // #153: `{ whole: true }` bypasses the reducer, in the optimistic step and in the replay. A patch
+  // replay of the whole dispatch below ("z" on) would keep the earlier resolved "a".
+  it("a whole dispatch replaces the value in the optimistic step and in the replay", async () => {
+    const { runs, toggle, value, hook } = setupSet();
+    act(() => toggle("a", true));
+    act(() =>
+      hook().dispatch(["z"], { event: undefined, item: "z", on: true } as Toggle, { whole: true }),
+    );
+    expect(value()).toBe("|z");
+    act(() => toggle("b", true));
+    expect(value()).toBe("|b,z");
+    await act(async () => runs[0]!.resolve());
+    await act(async () => runs[1]!.resolve());
+    await act(async () => runs[2]!.resolve());
+    expect(value()).toBe("b,z|b,z");
+  });
+
+  it("a whole dispatch that rejects leaves no trace; the others still fold", async () => {
+    const { runs, toggle, value, hook } = setupSet();
+    act(() => toggle("a", true));
+    act(() =>
+      hook().dispatch(["z"], { event: undefined, item: "z", on: true } as Toggle, { whole: true }),
+    );
+    act(() => toggle("b", true));
+    expect(value()).toBe("|b,z");
+    // Superseded, so reported rather than thrown (conventions 2.4).
+    await act(async () => runs[1]!.reject(new Error("z failed")));
+    await act(async () => runs[0]!.resolve());
+    await act(async () => runs[2]!.resolve());
+    expect(value()).toBe("a,b|a,b");
   });
 
   it("controlled: never writes", async () => {

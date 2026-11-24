@@ -536,13 +536,13 @@ function reduce(set: ReadonlySet<string>, patch: Patch): ReadonlySet<string> {
 }
 ```
 
-`useControllableAction` gets this reducer (conventions 3.4) with one exception, the form reset:
+`useControllableAction` gets this reducer (conventions 3.4) with one exception, the form reset,
+which is dispatched with the hook's internal `whole` option and bypasses it:
 
 ```ts
-reducer: (prev, next, details) =>
-  details.reason === "platform" && details.event !== undefined
-    ? next                    // form reset: absolute, replaces the value whole
-    : reduce(prev, details),  // everything else: the patch is `details` itself
+reducer: (prev, _next, details) => reduce(prev, details), // the patch is `details` itself
+// form reset: absolute, replaces the value whole (optimistic step and uncontrolled replay)
+dispatch(next, details, { whole: true });
 ```
 
 The reducer has two jobs (conventions 3.3, #150). As the **optimistic reducer**, stacked
@@ -557,13 +557,14 @@ and late-mount reconciliations are applied as that patch. The **form reset** is 
 whole. As a patch it would miss a value that an earlier in-flight dispatch had already removed
 from `base()`: check A (committed), uncheck A (its save will reject), check B, reset
 (`removed: [b]`), then A's uncheck rejects; replaying `removed: [b]` onto `{a}` leaves A checked
-in a form that was reset to nothing (review finding 2 of #150). The test for "this is the reset"
-is `reason === "platform"` with `details.event` set: `useNativeGroupReconciliation` passes an
-event to `onPlatformChange` only from its `reset` listener (the reset button, `form.reset()`,
-React's automatic reset after a form action); the mount and late-mount paths pass none. **That
-contract is load-bearing**: a new platform path that carries an event would be treated as
-absolute. (Accordion's rule is the mirror image: its event-less mount dispatch is the absolute
-one, accordion.md 4.1.)
+in a form that was reset to nothing (review finding 2 of #150). Which dispatch is the reset is
+said explicitly (#153): `useNativeGroupReconciliation` names the path in `onPlatformChange`'s
+third argument (`"reset"` from its `reset` listener: the reset button, `form.reset()`, React's
+automatic reset after a form action; `"mount"` from the mount and late-mount reconciliations),
+and the Root dispatches a `"reset"` with `{ whole: true }`. Before #153 the reducer inferred it
+from `details.event` being set, which rested on which platform paths happen to pass an event.
+(Accordion's mount reconciliation is dispatched whole the same way, accordion.md 4.1.) The
+option is internal: the public details type is unchanged.
 
 ```ts
 // Root: Item toggle

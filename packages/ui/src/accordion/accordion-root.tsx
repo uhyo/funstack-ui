@@ -219,7 +219,7 @@ function nextTrigger(
  */
 export function AccordionRoot(props: AccordionRootProps) {
   const {
-    exclusive = false,
+    exclusive: exclusiveProp = false,
     value,
     defaultValue,
     valueChangeAction,
@@ -242,6 +242,16 @@ export function AccordionRoot(props: AccordionRootProps) {
       "Accordion.Root: the mode changed after mount (`value`, `defaultValue` and `valueChangeAction` " +
         "were all absent on one render and present on another). Switching between JS-free and " +
         "library mode is not supported.",
+  );
+
+  // Exclusive or multiple is decided once too, like ToggleGroup's mode (design 12): the reducer,
+  // the value shape handed to the action and the static `name` all follow the mounted mode.
+  const [exclusive] = useState(exclusiveProp);
+  useDevWarning(
+    exclusive !== exclusiveProp,
+    isDev &&
+      "Accordion.Root: `exclusive` changed after mount. Switching between exclusive and " +
+        "multiple mode is not supported; the accordion keeps the mode it mounted with.",
   );
 
   // Both prop variants are narrowed by `exclusive` at the call site; internally one signature.
@@ -272,19 +282,16 @@ export function AccordionRoot(props: AccordionRootProps) {
     // single-valued: no reducer, so the optimistic value is `next` and the latest dispatch
     // commits it, like Tabs.
     //
-    // The mount reconciliation (reason "platform", no event) folds every pre-hydration click into
-    // one `next` and is adopted whole. It never sits in a burst behind a click whose action later
-    // rejects: it runs only from the Root's mount layout effect, the Root's first possible
-    // dispatch (children do not dispatch from layout effects, and no user event can run between
-    // a commit and its layout effects). It runs again only when an `<Activity>` re-shows the
-    // Root; a pending click's item then has DOM `open` equal to the optimistic value, so `next`
-    // equals the intended value and nothing is dispatched.
+    // The mount reconciliation folds every pre-hydration click into one `next` and is dispatched
+    // with `whole` (adopted whole, bypassing the reducer). It never sits in a burst behind a
+    // click whose action later rejects: it runs only from the Root's mount layout effect, the
+    // Root's first possible dispatch (children do not dispatch from layout effects, and no user
+    // event can run between a commit and its layout effects). It runs again only when an
+    // `<Activity>` re-shows the Root; a pending click's item then has DOM `open` equal to the
+    // optimistic value, so `next` equals the intended value and nothing is dispatched.
     reducer: exclusive
       ? undefined
-      : (prev, next, details) =>
-          details.reason === "platform" && details.event === undefined
-            ? next
-            : reduce(prev, details.item, details.open, false),
+      : (prev, _next, details) => reduce(prev, details.item, details.open, false),
     warn: { component: "Accordion.Root", prop: "value" },
   });
 
@@ -309,8 +316,9 @@ export function AccordionRoot(props: AccordionRootProps) {
       open: boolean,
       reason: ChangeReason,
       event: Event | undefined,
+      whole = false,
     ): void => {
-      dispatch(next, createActionDetails(event, { reason, item, open }));
+      dispatch(next, createActionDetails(event, { reason, item, open }), { whole });
     },
     [dispatch],
   );
@@ -368,7 +376,7 @@ export function AccordionRoot(props: AccordionRootProps) {
       ? new Set([opened.item])
       : mismatches.reduce((set, m) => reduce(set, m.item, m.open, exclusive), base);
     if (setsEqual(next, base)) return;
-    dispatchChange(next, chosen.item, chosen.open, "platform", undefined);
+    dispatchChange(next, chosen.item, chosen.open, "platform", undefined, true);
   });
   useLayoutEffect(() => {
     if (isLibrary) reconcileOnMount();

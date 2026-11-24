@@ -90,7 +90,7 @@ export function AccordionPage() {
             type: "boolean",
             default: "false",
             description:
-              "At most one item open. Also decides the value type: string | null when exclusive, string[] otherwise.",
+              "At most one item open. Also decides the value type: string | null when exclusive, string[] otherwise. Fixed at mount: a later change is ignored (development warning).",
           },
           {
             name: "value",

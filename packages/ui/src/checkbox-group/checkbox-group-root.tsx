@@ -265,12 +265,10 @@ export function CheckboxGroupRoot({
       ...(details.removed.length > 0 ? ["fsui-checkbox-group-uncheck"] : []),
     ],
     // A patch, re-based on the committed set; it is also how the uncontrolled commit is folded
-    // over the resolved dispatches (#150). A form reset (reason "platform" with the `reset`
-    // event) is absolute: adopted whole, so a change rejected after it cannot survive the reset.
-    reducer: (prev, next, details) =>
-      details.reason === "platform" && details.event !== undefined
-        ? next
-        : applyPatch(prev, details),
+    // over the resolved dispatches (#150). A form reset is absolute: `dispatchPatch` dispatches
+    // it with `whole`, so it bypasses this reducer and a change rejected after it cannot survive
+    // the reset.
+    reducer: (prev, _next, details) => applyPatch(prev, details),
     warn: { component: "CheckboxGroup.Root", prop: "value" },
   });
   // Deliberately no warning when neither `value` nor `defaultValue` is given: an empty group is
@@ -280,20 +278,24 @@ export function CheckboxGroupRoot({
 
   /** The latest dispatch was a form reset (the absolute one, see `reducer`); for #151 below. */
   const latestIsReset = useRef(false);
-  /** Dispatches `patch` on top of `from`, with the details of design 3.1. */
+  /**
+   * Dispatches `patch` on top of `from`, with the details of design 3.1. `reset`: a form reset,
+   * dispatched whole (absolute, see `reducer`).
+   */
   const dispatchPatch = (
     from: ValueSet,
     patch: CheckboxGroupPatch,
     reason: ChangeReason,
     event: Event | undefined,
+    reset = false,
   ): void => {
     const details = createActionDetails(event, {
       reason,
       added: sortByDocument(patch.added),
       removed: sortByDocument(patch.removed),
     });
-    latestIsReset.current = reason === "platform" && event !== undefined;
-    dispatch(applyPatch(from, details), details);
+    latestIsReset.current = reset;
+    dispatch(applyPatch(from, details), details, { whole: reset });
   };
 
   /**
@@ -362,11 +364,11 @@ export function CheckboxGroupRoot({
     // repeated resets stay one dispatch. Controlled: no replay, the parent decides.
     dispatchEqualReset: () =>
       value === undefined && latestInFlight() !== null && !latestIsReset.current,
-    onPlatformChange: (next, event) => {
+    onPlatformChange: (next, event, path) => {
       const from = base();
       const added = [...next].filter((v) => !from.has(v));
       const removed = [...from].filter((v) => !next.has(v));
-      dispatchPatch(from, { added, removed }, "platform", event);
+      dispatchPatch(from, { added, removed }, "platform", event, path === "reset");
     },
   });
 
