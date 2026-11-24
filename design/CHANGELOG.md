@@ -10892,3 +10892,18 @@ The files that branch left alone because #160 was splitting them now use the sha
 
 The earlier entry's "left for the branch that splits it" is corrected in place to say the split
 was already on master.
+
+## 2026-11-24, #157 follow-up: every development warning starts with its part's name
+
+Follow-up to "Tooltip's warnings use the `Part.Name: ` form" above
+(`memo/reviewer/review-157-helpers.md` finding 2). Conventions 7.2's message rule did not hold
+for two sites; the code now matches the rule, which is unchanged:
+
+- `Dialog.Form`'s warning read "`` `Dialog.Form` rendered as a `Form.Root` needs a function
+  `action`; ...``". It now reads "`` Dialog.Form: rendered as a `Form.Root`, it needs a function
+  `action`; ... ``" (the rest of the text is unchanged).
+- `useControllableAction` fell back to "A component:" when a caller passed no `warn` names. The
+  `warn` option is now required (every component already passed it; only internal tests did not),
+  so its two warnings always start with the public part name.
+
+Development console only.

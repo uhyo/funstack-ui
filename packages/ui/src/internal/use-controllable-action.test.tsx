@@ -26,6 +26,7 @@ function Probe({
     defaultValue: undefined,
     initialValue: "",
     action,
+    warn: { component: "Probe", prop: "value" },
   });
   onHook(hook);
   return (
@@ -263,6 +264,7 @@ describe("useControllableAction: superseded rejections", () => {
         defaultValue: undefined,
         initialValue: "",
         action: () => runs[call++]!.promise,
+        warn: { component: "BurstProbe", prop: "value" },
       });
       onHook(h);
       return <output data-testid="value">{h.committed}</output>;
@@ -405,6 +407,7 @@ describe("useControllableAction: uncontrolled reducer commits", () => {
         initialValue: [],
         action: () => runs[call++]!.promise,
         reducer: (prev, _next, details) => apply(prev, details),
+        warn: { component: "SetProbe", prop: "value" },
       });
       onHook(h);
       return (

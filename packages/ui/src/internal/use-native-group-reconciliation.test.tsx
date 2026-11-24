@@ -65,6 +65,7 @@ function Group({
     defaultValue,
     initialValue: null,
     action,
+    warn: { component: "Group", prop: "value" },
   });
   const read = (prop: "checked" | "defaultChecked") => {
     const radios = fieldset.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]');
