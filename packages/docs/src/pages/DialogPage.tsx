@@ -227,7 +227,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`: a disabled button is not an invoker and never opens. With a link or component `render` where the Trigger handles the click (library mode, or a non-modal dialog), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode: it cannot be natively disabled.',
+              'Native `disabled`: a disabled button is not an invoker and never opens. With a link or component `render` where the Trigger handles the click (library mode, or a non-modal dialog), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode (it cannot be natively disabled), and its click is cancelled.',
           },
           ...functionProps(
             "DialogTriggerState",
@@ -361,7 +361,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render` where the Close handles the click (library mode, or with `action`), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode: it cannot be natively disabled.',
+              'Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render` where the Close handles the click (library mode, or with `action`), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode (it cannot be natively disabled), and its click is cancelled.',
           },
           ...functionProps("DialogCloseState"),
           renderProp("button", "DialogCloseState"),

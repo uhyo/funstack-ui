@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { isValidElement, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -90,10 +90,11 @@ export interface ButtonProps extends Omit<
    * Native `disabled` (owned; a `render` element cannot re-enable it) and `data-disabled`.
    * Never dispatches. With `focusableWhenDisabled` or inside a `Toolbar.Root`, renders
    * `aria-disabled="true"` instead and cancels the click. So does a host element of another tag
-   * (`render={<a href />}`), and a component `render` when the Button has an `action`. A
-   * component `render` without `action` whose click the browser runs (`type="submit"` /
-   * `"reset"`, the `formAction` default, `commandfor` / `popoverTarget`) keeps native
-   * `disabled`: only that stops a submission or command before hydration. Native `disabled`
+   * (`render={<a href />}`), and a component `render` whose click only the Button acts on. A
+   * component or `<input>` `render` whose click the browser also acts on (`type="submit"` /
+   * `"reset"`, the `formAction` default, `commandfor` / `popoverTarget`; with or without
+   * `action`) keeps native `disabled`: only that stops a submission or command before
+   * hydration. Native `disabled`
    * wins over the pending `aria-disabled`.
    *
    * @defaultValue `false`
@@ -155,15 +156,20 @@ export function Button({
 }: ButtonProps) {
   const toolbar = useToolbarContext();
   const resolvedType = type ?? (formAction !== undefined ? "submit" : "button");
-  // The click's effect is the browser's own when there is no `action`: a submit or reset, or a
-  // JS-free invoker. Then a component render keeps native `disabled`, the only state that stops
-  // it before hydration (conventions 1.2, #158). With `action` the Button's handler is the
-  // action, and a link or component render takes `aria-disabled` with the cancelled click.
+  // The browser acts on the click (with or without `action`) when it submits, resets or runs a
+  // JS-free invoker command. Then an element that may be a button keeps native `disabled`, the
+  // only state that stops it before hydration (conventions 1.2, #158). Otherwise the Button's
+  // handler is all the click does, and a link or component render takes `aria-disabled` with
+  // the cancelled click. A host `<input>` render keeps its own `type` (the Button owns `type` on
+  // a button only), so that is the type the browser acts on.
+  const clickType =
+    isValidElement<{ type?: unknown }>(render) && render.type === "input"
+      ? ["submit", "image", "reset"].includes(String(render.props.type))
+        ? "submit"
+        : "button"
+      : resolvedType;
   const browserRun =
-    action === undefined &&
-    (resolvedType !== "button" ||
-      rest.commandfor !== undefined ||
-      rest.popoverTarget !== undefined);
+    clickType !== "button" || rest.commandfor !== undefined || rest.popoverTarget !== undefined;
   // `focusableWhenDisabled` and a Toolbar opt into the focusable disabled control (APG Toolbar).
   const disabledProps = disabledButton(render, disabled, {
     handlesClick: !browserRun,

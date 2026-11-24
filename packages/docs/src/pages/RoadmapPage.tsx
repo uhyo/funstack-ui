@@ -29,18 +29,20 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
-          A disabled <code>Button</code> without <code>action</code> whose click the browser runs (
-          <code>type="submit"</code> or <code>"reset"</code>, the <code>formAction</code> default,{" "}
-          <code>commandfor</code> / <code>popoverTarget</code>) keeps native <code>disabled</code>{" "}
-          also with a component <code>render</code>, as <code>Form.Submit</code> does; it used to
-          render <code>aria-disabled</code>, which does not stop a submission before hydration (
-          <a href={issue(158)}>#158</a>). With <code>action</code>, inside a{" "}
-          <code>Toolbar.Root</code> or with <code>focusableWhenDisabled</code> nothing changes. A
-          natively disabled <code>Button</code>, <code>Dialog.Close</code>,{" "}
-          <code>Popover.Close</code> or <code>Toast.Action</code> that is also pending no longer
-          adds <code>aria-disabled</code>: native <code>disabled</code> wins. A JS-free Trigger or
-          Close of a Dialog or Popover rendered as a host link renders <code>aria-disabled</code>{" "}
-          instead of a meaningless <code>disabled</code> attribute.
+          A disabled <code>Button</code> whose click the browser acts on (<code>type="submit"</code>{" "}
+          or <code>"reset"</code>, the <code>formAction</code> default, <code>commandfor</code> /{" "}
+          <code>popoverTarget</code>, with or without <code>action</code>) keeps native{" "}
+          <code>disabled</code> also with a component or <code>&lt;input&gt;</code>{" "}
+          <code>render</code>, as <code>Form.Submit</code> does; it used to render{" "}
+          <code>aria-disabled</code>, which does not stop a submission or command before hydration (
+          <a href={issue(158)}>#158</a>). Inside a <code>Toolbar.Root</code> or with{" "}
+          <code>focusableWhenDisabled</code> nothing changes. A natively disabled{" "}
+          <code>Button</code>, <code>Dialog.Close</code>, <code>Popover.Close</code> or{" "}
+          <code>Toast.Action</code> that is also pending no longer adds <code>aria-disabled</code>:
+          native <code>disabled</code> wins. A disabled JS-free Trigger or Close of a Dialog or
+          Popover rendered as a host link renders <code>aria-disabled</code> instead of a
+          meaningless <code>disabled</code> attribute, and its click is cancelled (the link no
+          longer navigates after hydration).
         </li>
         <li>
           Three alignments with the library-wide rules (<a href={issue(157)}>#157</a>):

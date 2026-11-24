@@ -10725,9 +10725,16 @@ toast.md on the pending `aria-disabled`.
   browser's activation behaviour, which `aria-disabled` does not stop before hydration. A
   component that renders a link cannot submit or invoke, so native `disabled` on it costs
   nothing the part had not already lost.
-- **`Button` without `action`** counts as browser-run when its resolved `type` is `"submit"` /
-  `"reset"` or it carries `commandfor` / `popoverTarget` (the rule's "JS-free invoker"; the
-  issue named submit and reset, the user's wording covers invokers too).
+- **`Button`** counts as browser-run when its resolved `type` is `"submit"` / `"reset"` (for a
+  host `<input>` render, the input's own `type`: the Button owns `type` on a button only; review
+  L4) or it carries `commandfor` / `popoverTarget` (the rule's "JS-free invoker"; the issue
+  named submit and reset, the user's wording covers invokers too). **With or without `action`**
+  (user decision 2026-11-24 on review L2 of `memo/reviewer/review-157-pure-trigger.md`): a
+  disabled `<Button action type="submit" render={<Comp />}>` or one with `commandfor` would
+  otherwise submit or invoke before hydration, since the browser acts on that click besides the
+  Button's handler. Toolbar and `focusableWhenDisabled` still opt into `aria-disabled`.
+- **Sections also changed by the review fixes:** conventions 1.2 (`cancelClick`), button.md
+  8.1 (`disabled` row).
 - **Pending and disabled at once.** Native `disabled` wins: a natively disabled pure trigger
   renders no `aria-disabled` from pending (Button, Dialog.Close / Popover.Close, Toast.Action;
   `pendingAriaDisabled`). Before, both attributes rendered. `whilePending="ignore"` alone is

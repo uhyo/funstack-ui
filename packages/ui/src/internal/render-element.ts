@@ -110,9 +110,9 @@ function certainlyNotDisableable<Props, State>(
  * honours by cancelling the click, otherwise: on an element that certainly cannot be natively
  * disabled (a host `<a>`, `<div>`), on a component or other non-button render whose own handler
  * is the action (`handlesClick: true`, the default), and with `alwaysFocusable` (an opt-in
- * focusable disabled control: a menu item, a Toolbar or `focusableWhenDisabled` Button). A
- * JS-free part on a host link has no handler to cancel the click; it is no invoker either, so
- * `aria-disabled` is only the honest state there.
+ * focusable disabled control: a menu item, a Toolbar or `focusableWhenDisabled` Button). A part
+ * that installs no click handler of its own (`Form.Submit`, a JS-free command part on a host
+ * link) installs `cancelClick` while `invoker` is `false`, so the click is cancelled there too.
  *
  * When `disabled` and the part's pending `aria-disabled` meet, the native `disabled` wins:
  * `pendingAriaDisabled` below.
@@ -132,6 +132,16 @@ export function disabledButton<Props, State>(
     },
     invoker: !(focusable && disabled),
   };
+}
+
+/**
+ * The click handler of a disabled part in the `aria-disabled` branch that has no click handler
+ * of its own (`Form.Submit`, a JS-free command Trigger / Close on a host link): cancels the
+ * click, so a disabled link does not navigate after hydration (conventions 1.2). Installed only
+ * while disabled: an enabled render element keeps its own `onClick` as the only one.
+ */
+export function cancelClick(event: { preventDefault(): void }): void {
+  event.preventDefault();
 }
 
 /**

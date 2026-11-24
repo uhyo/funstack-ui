@@ -149,6 +149,8 @@ export function MenuItem({
       // Also while pending when ignoring: an item that will not act is unavailable to AT. The
       // item is never natively disabled (`useMenuItem`'s focusable branch). Navigation keys on
       // `data-disabled` (the `disabled` prop), so a pending item is still an enabled item.
+      // `libraryProps` stands in for a `disabledButton` result: its `disabled` (always
+      // `undefined`) and `aria-disabled` (the `disabled` prop) are the item's disabled branch.
       ...trigger.pendingProps(libraryProps),
     },
   });

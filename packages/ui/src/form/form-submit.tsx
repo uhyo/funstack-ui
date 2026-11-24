@@ -1,10 +1,10 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
-import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
+import { cancelClick, disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -100,10 +100,8 @@ export function FormSubmit({
       ...disabledProps,
       // Only while disabled: an enabled submitter's click is the browser's (and React's).
       ...(disabled && {
-        onClick: (event: MouseEvent<HTMLButtonElement>) => {
-          // Cancelling the click cancels the submission and a link's navigation.
-          event.preventDefault();
-        },
+        // Cancelling the click cancels the submission and a link's navigation.
+        onClick: cancelClick,
       }),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),

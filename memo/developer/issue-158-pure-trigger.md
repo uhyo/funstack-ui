@@ -47,3 +47,16 @@ Added `internal/render-element.test.tsx`, a table test of `disabledButton` / `pe
 typecheck, lint, format:check, test:jsdom (3799 + docs 14 after commit 1), build, design refs,
 browser tests (Chromium + Firefox) for button, form, menu, toast, popover, dialog: 507 passed,
 15 skipped (engine-gated rows).
+
+## Review fixes (memo/reviewer/review-157-pure-trigger.md)
+
+- Merged origin/master; CHANGELOG entries moved under `# Entries` as `##`; conventions 9.1 keeps
+  use-pure-trigger, use-step-commit and overlay-show.
+- M1: `cancelClick` (render-element.ts) installed while `!disabledProps.invoker` by the JS-free
+  parts with no handler (Dialog.Trigger modal JS-free, Popover.Trigger JS-free, action-less
+  JS-free Close); Form.Submit uses it too. Suite row asserts the cancelled click, plus an
+  enabled-link row (no library cancel).
+- L2 (user decision): `browserRun` no longer requires `action === undefined`. Tests for action +
+  submit / reset / commandfor / popoverTarget with a component render, pre- and post-hydration.
+- L4: a host `<input>` render's own `type` decides `browserRun`. Test without a `type` prop.
+- L1, nits: button.md 8.1 `disabled` row, SKILL.md "native wins", Menu.Item comment.

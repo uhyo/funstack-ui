@@ -1737,6 +1737,89 @@ describe("Button", () => {
       }
     });
 
+    // Review L4: the Button owns no `type` on an `<input>`, so the input's own type decides.
+    it("a host <input type=submit> render with no type prop: native disabled before and after hydration", async () => {
+      const error = silenceErrors();
+      let before: string[] = [];
+      const ui = (
+        <form>
+          <Button disabled render={<input type="submit" value="Input" />} />
+          <Button disabled render={<input type="button" value="Plain" />} />
+        </form>
+      );
+      const { container } = await hydrateFromServer(ui, {
+        mutate: (container) => {
+          const el = container.querySelector('input[type="submit"]')!;
+          expect(el).toBeDisabled();
+          expect(el).not.toHaveAttribute("aria-disabled");
+          const events = listen(container);
+          (el as HTMLInputElement).click();
+          before = [...events];
+        },
+      });
+      expect(before).toEqual([]);
+      const events = listen(container);
+      expect(button("Input")).toBeDisabled();
+      expect(button("Input")).not.toHaveAttribute("aria-disabled");
+      await setupUser().click(button("Input"));
+      expect(events).toEqual([]);
+      // An `<input type="button">` does nothing native: the Button's own branch (aria-disabled).
+      expect(button("Plain")).toHaveAttribute("aria-disabled", "true");
+      expect(button("Plain")).not.toBeDisabled();
+      expect(error).not.toHaveBeenCalled();
+    });
+
+    // #158 L2 (user decision): with `action` too, a click the browser also acts on is browser-run.
+    it.each([
+      ['type="submit"', { type: "submit" }],
+      ['type="reset"', { type: "reset" }],
+      ["commandfor / command", { commandfor: "x", command: "show-modal" }],
+      ["popoverTarget", { popoverTarget: "y" }],
+    ] as const satisfies readonly (readonly [string, ButtonProps])[])(
+      "action with %s, component render: native disabled before and after hydration, never runs",
+      async (_, props) => {
+        silenceErrors(); // action + a submitting type warns in development
+        const action = vi.fn();
+        let before: string[] = [];
+        const { container } = await hydrateFromServer(
+          inForm({ ...props, action, disabled: true }),
+          {
+            mutate: (container) => {
+              const el = container.querySelector("button")!;
+              expect(el).toBeDisabled();
+              expect(el).not.toHaveAttribute("aria-disabled");
+              const events = listen(container);
+              el.click();
+              before = [...events];
+            },
+          },
+        );
+        expect(before).toEqual([]);
+        const events = listen(container);
+        const el = button("Go");
+        expect(el).toBeDisabled();
+        expect(el).not.toHaveAttribute("aria-disabled");
+        expect(el).toHaveAttribute("data-disabled", "");
+        await setupUser().click(el);
+        await flushMicrotasks();
+        expect(events).toEqual([]);
+        expect(action).not.toHaveBeenCalled();
+      },
+    );
+
+    it("an enabled action Button with type=submit, component render, submits before hydration (the control)", async () => {
+      silenceErrors();
+      let before: string[] = [];
+      await hydrateFromServer(inForm({ type: "submit", action: () => {} }), {
+        mutate: (container) => {
+          const events = listen(container);
+          container.querySelector("button")!.click();
+          before = [...events];
+        },
+      });
+      expect(before).toEqual(["submit"]);
+    });
+
     it("a JS-free invoker (commandfor, popoverTarget), component render: native disabled", () => {
       render(
         <>

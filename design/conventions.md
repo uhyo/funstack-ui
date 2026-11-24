@@ -177,13 +177,17 @@ Rules for the element passed to `render` (same as Base UI):
   disabled control (APG: a `Button` inside a Toolbar or with `focusableWhenDisabled`, a menu
   item). The handler is what makes `aria-disabled` safe (it returns before dispatch and
   `preventDefault()`s), so the browser-run parts (`Form.Submit`; a JS-free command Trigger /
-  Close; a `Button` without `action` whose `type` is `"submit"` / `"reset"`, by default with
-  `formAction`, or that carries `commandfor` / `popoverTarget`) keep native `disabled` on any
-  element that may be a button. The parts whose handler acts (`Button` with `action`, Toggle,
+  Close; a `Button` whose `type` is `"submit"` / `"reset"`, by default with `formAction`, or
+  that carries `commandfor` / `popoverTarget`, with or without `action`: the browser acts on
+  that click too) keep native `disabled` on any element that may be a button. The parts whose
+  handler is all the click does (`Button` with `action` and none of those, Toggle,
   ToggleGroup.Item, Menu.Trigger, Combobox.Trigger / Clear, NumberField.Increment / Decrement,
   Toast.Action / Close, and the Close and Trigger parts of Dialog and Popover in the modes
   where they handle the click; `design/components/button.md` 17.1) take the `aria-disabled`
-  branch on a link or component render. When `disabled` and a pending pure trigger's
+  branch on a link or component render. A part with no click handler of its own (`Form.Submit`,
+  a JS-free command Trigger / Close) that lands in the `aria-disabled` branch on a host link
+  installs one while disabled that only cancels the click (`cancelClick`), so a disabled link
+  never navigates after hydration; before hydration nothing stops a link. When `disabled` and a pending pure trigger's
   `aria-disabled` (3.6) meet on a natively disabled element, native `disabled` wins and no
   `aria-disabled` is rendered. In that `aria-disabled` branch an **invoker also
   owns its invoker attributes (`popoverTarget`, `commandfor`, `command`) as `undefined`**: `aria-disabled` has no
@@ -2592,7 +2596,7 @@ packages/ui/src/
     use-step-commit.ts      # the step / commit core of the continuous controls, Slider and NumberField (2.3; slider.md 2.4)
     report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; useConnected(); both hooks call them
     use-render.tsx          # resolves render / className / style / children against state
-    render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, pendingAriaDisabled (1.2)
+    render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
     merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
     use-merged-refs.ts      # useMergedRefs(...refs): the memoised ref merge of every part with a library ref (1.4)
     use-latest.ts           # useLatest(value): a ref written in an insertion effect

@@ -6,7 +6,7 @@ import { isPopoverOpen } from "./popover-open.js";
 import { registerTrigger } from "./trigger-ref.js";
 import type { RenderProp } from "./types.js";
 import { useElementCheck } from "./use-element-check.js";
-import { disabledButton, rendersButton } from "./use-render.js";
+import { cancelClick, disabledButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-overlay-root.js";
 
@@ -207,6 +207,19 @@ export function usePopoverTrigger<State>(
     handlesClick: isLibrary,
     alwaysFocusable: disabledAs === "aria",
   });
+  if (!isLibrary && !disabledProps.invoker) {
+    // JS-free mode, disabled in the `aria-disabled` branch (a host link): nothing native stops the
+    // click, so cancel it (a disabled link must not navigate). Only while disabled, after the
+    // component's own handler.
+    const extra = handlers?.onClick;
+    merged.onClick =
+      extra === undefined
+        ? cancelClick
+        : (event) => {
+            extra(event);
+            cancelClick(event);
+          };
+  }
 
   const invoker = disabledProps.invoker && rendersButton(render);
 

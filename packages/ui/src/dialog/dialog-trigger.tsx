@@ -5,7 +5,7 @@ import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { registerTrigger } from "../internal/trigger-ref.js";
 import { useElementCheck } from "../internal/use-element-check.js";
-import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
+import { cancelClick, disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 
@@ -165,6 +165,9 @@ export function DialogTrigger({
     // Only owned when installed, so a render element keeps its own `onClick` in modal JS-free
     // mode (Accordion's rule).
     ...(installClick && { onClick }),
+    // Modal JS-free mode, disabled in the `aria-disabled` branch (a host link): nothing native
+    // stops the click, so it is cancelled (a disabled link must not navigate).
+    ...(!installClick && !disabledProps.invoker && { onClick: cancelClick }),
     ...(installPress && { onPointerDown }),
     "data-open": dataAttr(state.open),
     "data-pending": dataAttr(state.pending),

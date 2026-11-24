@@ -4,7 +4,7 @@ import { dataAttr } from "./data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "./types.js";
 import { useElementCheck } from "./use-element-check.js";
 import { usePureTrigger } from "./use-pure-trigger.js";
-import { disabledButton, rendersButton, useRender } from "./use-render.js";
+import { cancelClick, disabledButton, rendersButton, useRender } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -105,6 +105,9 @@ export function useOverlayClose<Details extends ActionDetails>(
     command: disabledProps.invoker && rendersButton(render) ? command : undefined,
     ...options.ownProps,
     ...(installClick && { onClick }),
+    // JS-free mode without `action`, disabled in the `aria-disabled` branch (a host link):
+    // nothing native stops the click, so it is cancelled (a disabled link must not navigate).
+    ...(!installClick && !disabledProps.invoker && { onClick: cancelClick }),
     // Exactly while `data-pending` when ignoring: a Close that will not act is unavailable to
     // AT; one that runs again is not; native `disabled` wins. Owned, so an idle Close removes a
     // render element's own.
