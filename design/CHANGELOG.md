@@ -10949,3 +10949,13 @@ a warning merely reads into the dev set, ten false positives. Verified with two 
 `Toast.Viewport` (a local arrow and a local function declaration called in `useDevWarning`), both
 reported, then removed. Helpers imported from another module are still not followed (none exist
 today); conventions 7.2 now says so and asks to keep message helpers in the file that warns.
+
+## 2026-11-24, #157 follow-up: `compareDocumentOrder` is exactly `byDocumentPosition`
+
+Corrects the "#157 follow-up: the helpers in the files skipped for the split" entry above
+(`memo/reviewer/review-157-helpers-followup.md` nit 3), which says the two comparators "differ only
+for unrelated nodes". They never differ. For the same node both return 0. For two distinct nodes
+`compareDocumentPosition` always sets exactly one of PRECEDING and FOLLOWING, also for
+disconnected nodes (DOM spec: DISCONNECTED and IMPLEMENTATION_SPECIFIC come with one of the two,
+chosen consistently). So `useToastFocus`'s switch to `compareDocumentOrder` is an exact
+replacement, as was Combobox's in #157.

@@ -6,9 +6,12 @@ Branch `refactor/157-helpers-followup` on master f0a7fac. Source: `memo/reviewer
 ## Items
 
 1. Skipped files: Combobox.Root `resolveFieldDefaults(field, { name, disabled: props.disabled ?? false,
-   required: false })`; `useToastFocus` uses `compareDocumentOrder` (old `byDocumentPosition` returned
-   1 for unrelated nodes, new returns 0; roots are filtered `isConnected` in one region, so no change);
-   Toast.Viewport's second-Viewport warning is `useDevWarning(rejected, ...)` (placed before the
+   required: false })`; `useToastFocus` uses `compareDocumentOrder` (exactly equivalent to
+   `byDocumentPosition`: for distinct nodes, even disconnected ones, `compareDocumentPosition`
+   always sets PRECEDING or FOLLOWING; an earlier version of this note said otherwise);
+   Toast.Viewport's second-Viewport warning is `useDevWarning(duplicate, ...)` (first
+   `rejected`, which warned falsely for a Viewport replaced in one commit: review major 1; now a
+   state set only when the subscription is refused, with keyed-remount and parent-swap tests) (placed before the
    `if (rejected) return null`). New StrictMode test counts it: master warned twice (verified by
    reverting the viewport file), now once. CHANGELOG: new entry only; it states that it supersedes
    the earlier "left for the branch that splits it" remark (an in-place edit was made first, then
@@ -28,7 +31,9 @@ Branch `refactor/157-helpers-followup` on master f0a7fac. Source: `memo/reviewer
    calls `focus({ focusVisible: false })` on the first item and writes no `autofocus`. Dropping
    `beforeOpen` in `usePopoverTrigger` fails the new test (1 of 375 menu jsdom tests).
 6. #161: `isDev ? firstChildOfSelect : undefined` / `firstChildOfGroup`. Test follows Identifiers in
-   dev arguments to same-file top-level function / const declarations, and asserts both Select
+   dev arguments to same-file top-level function / const declarations and to functions at any depth
+   (review minor 2; nested non-function variables gave 10 false positives, so they are left out;
+   two planted local-closure leaks were reported, then removed), and asserts both Select
    fragments are collected. Before the guard: 3 leaked pieces from the two files; no false positives
    anywhere else. Conventions 7.2 sentence added; CHANGELOG entry.
 
