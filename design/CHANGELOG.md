@@ -4850,3 +4850,440 @@ restored through CSSOM (never the attribute, which a strict CSP blocks). Effects
 transition's enter on a library open (every engine), and a dismissal's CSS fade is never cut, not
 even by an unrelated page view transition. The `::backdrop` is not cut: its enter fade runs on
 open, as with the old rule. 13.3's rows changed with it (see there).
+
+---
+
+# button.md: starting decisions, test plan, docs page, implementation notes, review folds, test rows and docs of 16 to 18
+
+## 0. Product-owner decisions this design starts from
+
+1. A Button **ignores activation while its own action is pending**, by default. It renders
+   `aria-disabled="true"` meanwhile and never native `disabled`, so focus stays and a Tooltip
+   still works. Conventions 2.5 and 3.6 are amended.
+2. **No `aria-busy` by default, no built-in announcement** in v1.
+3. **Forms**: default `type="button"`, `"submit"` when `formAction` is given; `formAction` shows
+   pending for this button's own submissions only (from its own submission until the form's
+   submissions have all finished, a latch since #154, 6.2); `Form.Submit` stays; a plain `type="submit"`
+   Button does not read `useFormStatus`.
+4. **Composition**: an already-cancelled click does not block the action
+   (`Dialog.Trigger render={<Button />}` works); focus and hover listeners keep working while
+   pending; the Toolbar question is decided here (section 7.3).
+5. The module is `"use client"`; the cost to Server Component callers is documented (section 11).
+
+## 13. Test plan
+
+`packages/ui/src/button/button.test.tsx` (jsdom) and `button.browser.test.tsx` (Chromium,
+Firefox, WebKit). Top-of-file comment (conventions 10.1): "Button: no controlled state, so the
+controlled-parity, optimistic, platform-path, urgent-action, continuous-control and inside-a-Field
+rows are N/A; the **overlap and superseded-rejection rows are N/A because the re-entry guard means
+a Button never has two of its own runs in flight** (rows 5 and 6 replace them)."
+
+| # | Area | Project | Test |
+| --- | --- | --- | --- |
+| 1 | Roles and ARIA | jsdom | Default `<button type="button">`, no `role`; `type="submit"` with a function `formAction`; a consumer `type="submit"` / `"reset"` wins; `render={<a href>}` gets no `type`; `render={<MyButton />}` (a component spreading onto a `<button>`) **gets** `type="button"` and, inside a `<form>`, does not submit on click (review item 2); `render={<button type="submit">}` is overridden by the Button's computed `type` (owned); `disabled` renders native `disabled` + `data-disabled`, no `aria-disabled`; `focusableWhenDisabled` renders `aria-disabled="true"`, no `disabled`, `data-disabled`; `disabled` with `render={<a href>}` and with `render={<MyButton />}` renders `aria-disabled="true"` and **no** `disabled` attribute (review must-fix 1); a consumer `aria-disabled` prop is not accepted (type) and a render element's is removed (owned). |
+| 2 | Sync action | jsdom | Click, Enter and Space each call `action` once with `details.event` the native event; disabled (every spelling, the link and component renders included) never dispatches and a disabled `render={<a href>}` click is `defaultPrevented`; a Button without `action` starts no transition (no `data-pending` flicker: assert no `data-pending` after a click, synchronously). |
+| 3 | Async action | jsdom | Deferred action: `data-pending`, `aria-disabled="true"`, **no** `data-disabled`, `state.disabled === false` in `children(state)`; `document.activeElement` stays the button from click through resolve; after resolve all three facts invert, focus still on the button. |
+| 4 | Rejection | jsdom | Reaches `<ErrorCatcher>` above the Button; pending ended. Caught inside: resolves; the next click runs again (no stuck guard). |
+| 5 | Re-entry ★ | jsdom | While a deferred action pends: a second click, an Enter and a Space each leave `action` at one call and are `defaultPrevented`; two `fireEvent.click`s inside one `act` (same task, before any re-render) call it once (the ref); after resolve a click calls it again; `render={<a href>}`: the second click while pending is `defaultPrevented`, the first was not; with `commandfor` / `command` attributes present the second click is `defaultPrevented` (jsdom runs no command; the browser row 22 covers the command itself). |
+| 6 | Settled-but-held commit ★ | jsdom | A second, unrelated `useTransition` action (deferred) is pending; the Button's action resolves; the button still shows `data-pending` and `aria-disabled` (entangled commit) and a click in that window **runs the action again** (two calls; the guard is the in-flight counter only); the reviewer's probe as a row: a non-awaiting `action` clicked three times while the unrelated action pends is called three times; when the unrelated action resolves, one commit clears the attributes. |
+| 7 | Two Buttons | jsdom | A pending; B clicked: B's action called at once, B `data-pending`; both clear after both resolve. |
+| 8 | Suspending content | jsdom | The action sets a value that makes sibling content suspend (`createSuspender`): old content stays, `data-pending` on until it resolves, clicks ignored meanwhile. |
+| 9 | Function props, `render` | jsdom | `className` / `style` / `children` receive `{ pending, disabled }` and agree with the attributes; element form merges `className` / `style`, keeps dispatch and the guard, forwards `ref`; function form gets `(props, state)`; `render={<MyButton />}` (a component that spreads props) works; a pass-through `onFocus` / `onPointerEnter` / `onKeyDown` fires while pending. |
+| 10 | Consumer state after await | jsdom | `action={async () => { await d.promise; startTransition(() => setCount(c => c + 1)); }}` commits once per accepted click (guards the documented post-await pattern). |
+| 11 | `formAction`, per-submitter pending ★ | jsdom | A `<form>` with `Form.Submit` and two `Button formAction` (deferred functions `a`, `b`): click A → A `data-pending` + `aria-disabled`, B neither, `Form.Submit` `data-pending`; `useFormStatus().action === a` observed through a probe; click A again → `a` called once, click `defaultPrevented`; click B while A pends → `b` called, both pending (A stays `aria-disabled`); resolve A → all still pending (React holds the form status); resolve B → all clear. #154 rows: two Buttons with different functions, both settle orders, each pending until both settled, then B alone leaves A idle; the form's own `action` submitted while A runs keeps A pending; `"ignore"` A, B, A again: `a` called once, the third click `defaultPrevented`, also after `b` settled; a click on A cancelled by constraint validation, then B: A never pending. `type` on both is `"submit"`. |
+| 12 | `formAction` inside `Form.Root` ★ | jsdom | `Form.Root action={formAction}` with a `Button formAction={mine}`: clicking the Button calls `mine`, not `formAction`; `Form.Root` shows `data-pending` meanwhile (form channel); the button element has a `formaction` attribute (react-dom's URL for a function), which is what `Form.Root`'s submitter check keys on; `Form.Submit` in the same form still runs `formAction`. |
+| 13 | `formAction` identity | jsdom | An inline `formAction={(fd) => …}` whose parent re-renders (state change) during the submission keeps the Button `data-pending` until it settles (the `submittedWith` ref); a stable function works without the ref (sanity). |
+| 14 | Dev warnings | jsdom | `action` + `formAction` logs an error once; `action` + `type="submit"` and `+ "reset"` warn once; no warning for `formAction` alone, `type="submit"` alone, `commandfor` + `action`. |
+| 15 | Trigger-wrapped ★ | jsdom | `Dialog.Trigger render={<Button action={a} />}` in library mode: one click calls `a` (the click arrives `defaultPrevented`) and dispatches the open; with a **deferred** `a` the Trigger shows `data-open` and `data-pending`, `showModal` is not yet called, a second click leaves `a` at one call, and resolving `a` calls `showModal` once (entanglement, review deviation 1); with a **non-awaiting** `a` the dialog opens in the same commit; `Button render={<Dialog.Trigger />}` likewise. |
+| 16 | Toolbar ★ | jsdom | Inside `Toolbar.Root`: `Button disabled` renders `aria-disabled="true"` and no `disabled`, is reached by the arrows and never dispatches; `Toolbar` has no `Button` member (type and runtime); `ToolbarEditor`-style mixed children with `<Button>` in place of `Toolbar.Button` still pass the toolbar's row 12; a `Button` with `tabIndex={-1}` is skipped by the arrows (pass-through, as any item). |
+| 17 | `details.event` is virtual | jsdom | As Toggle row 21 for `ButtonActionDetails`: `details.event` is the click, `"event" in details`, `Object.keys(details)` is `[]`, a Server-Function-shaped `action` receives it. |
+| 18 | Types | jsdom (`expectTypeOf`) | `onClick`, `aria-disabled` not accepted; `type` is the three-way union; `formAction` accepts a `(formData: FormData) => Promise<void>` and a string; `ButtonProps` / `ButtonState` / `ButtonActionDetails` exported from `@funstack/ui/button` and the root. |
+| 19 | SSR markup | jsdom | `renderToString`: `type="button"`, no `aria-disabled`, no `data-pending`; with a function `formAction`: `type="submit"` and a `formaction` attribute; `hydrateRoot` over it logs no mismatch. |
+| 20 | Directive | script | `dist/button/button.mjs` starts with `"use client"`; `dist/button/index.mjs` does not; `dist/toolbar/toolbar-button.mjs` no longer exists. |
+| 21 | Focus retention | browser | All three engines: focus the Button, click (Enter), action pending: `document.activeElement` is the Button after two animation frames (the probe's window in which native `disabled` would have blurred it in Chromium / Firefox), and still after resolve. |
+| 22 | Invoker Command + action | browser | `<Button commandfor="p" command="toggle-popover" action={slow}>`: first click runs the action and the popover is `:popover-open`; second click while pending: action still one call and the popover still open (the command did not run); after settle a click closes it. Same engines (Invoker Commands are Baseline on all three). |
+| 23 | Tooltip while pending | browser | `Tooltip.Trigger render={<Button action={slow} />}`: hover during pending opens the popup (`:popover-open`), leave closes it; focus during pending opens it. Chromium with `experimental_interestFor` on takes the native path (branch on `src/__tests__/engine.ts`). |
+| 24 | Implicit submission | browser | A form with a text field and a `Button formAction={slow}` as its only submit button: Enter in the field submits once; Enter again while pending submits nothing (the guard cancelled the synthetic click); with `Form.Submit` as the default button and a pending `Button formAction` elsewhere in the form, Enter submits the form's action. |
+| 25 | ViewTransition | browser | `{show && <Button />}` mounted in a `startTransition`: `document.startViewTransition` called zero times without `transition`, once with `transition="none"` (conventions 10.1 mount row); a settle that swaps `children(state)` calls it **zero** times under `transition="none"` (React starts a document view transition for a `"none"` boundary only on mount / reveal) and **once** under `transition="auto"` (review deviation 2). |
+| 26 | Accessibility tree | browser (Chromium, CDP) | The pending Button's name is unchanged and the node has the `disabled`-equivalent state from `aria-disabled` (whatever CDP reports for it; the row records the value, `memo/developer/cross-engine.md`); after settle the state is gone. |
+
+★ rows are the ones this design adds beyond conventions 10.1.
+
+---
+
+## 14. Docs page
+
+`packages/docs/src/pages/ButtonPage.tsx` at `/components/button`, first in `componentNavItems`
+(it is the most basic component), routed in `App.tsx`. Sections:
+
+1. Intro: a button whose click is a transition; what it adds over `<button onClick>` (pending
+   state, re-entry guard, errors to a boundary, Server Functions as actions).
+2. Examples (`src/examples/`, source shown):
+
+   | Example | Directive | Shows |
+   | --- | --- | --- |
+   | `ButtonSave.tsx` | `"use client"` | 2.1: fake async save (`fake-api.ts`), `children(state)` spinner, the re-entry guard made visible (a call counter), a rejecting variant inside `DemoErrorBoundary`, a caught-inside variant with a toast. |
+   | `ButtonFormActions.tsx` | `"use client"` | 2.2: `Form.Root` with `Form.Submit` "Publish" and two `Button formAction` ("Save draft", "Discard"), each with its own pending; the form-channel pending on `Form.Submit` contrasted. |
+   | `ButtonCompose.tsx` | `"use client"` | 2.3: `Dialog.Trigger render={<Button />}` and `Tooltip.Trigger render={<Button />}` (hover a pending button). |
+   | `ButtonInvoker.tsx` | **none (Server Component)** | 2.5's second button: `commandfor` / `command` opening a Dialog with no JS, plus a `Button` styled by `[data-pending]` CSS only; the page says the file has no directive and which props a Server Component cannot pass. (The docs site has no Server Functions, so `action` from a Server Component is shown as code, not run.) |
+   | `button.css` | | 2.6 recipes, reduced motion. |
+
+3. Anatomy (one element), props table (`ButtonProps`, with `type`'s default rule and the
+   `formAction` identity note), `ButtonState`, data attributes (and the "pending is not disabled"
+   sentence), owned keys.
+4. "Pending and re-entry": what is ignored, `aria-disabled`, why not `disabled`, the
+   non-awaiting spelling for concurrent clicks, `useActionState` for a queue.
+5. "Forms": `type` defaults, `formAction` vs `Form.Submit` (the 6.4 table), implicit submission.
+6. "Which button?": the 1. list (`Form.Submit`, `Dialog.Close`, `Menu.Item`, `Toggle`, `Toolbar`),
+   as a callout.
+7. Keyboard (8.2), "What assistive technology hears" with the outcome pattern (8.3) and the
+   `aria-busy` note.
+8. Server Components (11), before hydration.
+9. The reduced-motion block.
+
+Also: `ToolbarPage.tsx` drops the `Toolbar.Button` props table, uses `<Button>` in its examples
+and links here, with a **migration callout** ("`Toolbar.Button` was removed in this release; use
+`Button` from `@funstack/ui/button`, which behaves the same inside a toolbar and also ignores a
+second click while pending"); `RoadmapPage.tsx`'s changelog entry marks the removal as a
+breaking change; `MenuPage.tsx` gains a one-line "a Button inside a Menu
+is not an item"; `ActionPropsPage.tsx` / `GettingStartedPage.tsx` may use `<Button action>` as
+the first example of an action prop; `ServerComponentsPage.tsx` lists Button under "client
+modules you can render from a Server Component" with the Server Function `action` / `formAction`
+note; `RoadmapPage.tsx` changelog entry; `packages/example` gets a demo page; `index.ts`,
+`tsdown.config.ts` and `package.json` exports gain `button`.
+
+---
+
+## 15. Implementation notes
+
+### 15.1 Files
+
+```
+packages/ui/src/button/
+  index.ts              # no directive
+  button.tsx            # "use client"
+  button.test.tsx
+  button.browser.test.tsx
+packages/ui/src/internal/use-action-trigger.ts   # gains the guard option, `run` returns boolean
+packages/ui/src/toolbar/index.ts                 # Toolbar = { Root, Separator } (7.3)
+packages/ui/src/toolbar/toolbar-button.tsx       # removed (7.3), with its types and root-entry exports
+```
+
+### 15.2 `useActionTrigger` change
+
+```ts
+export interface ActionTriggerOptions {
+  /** Open generation of the overlay a `then` belongs to (unchanged). */
+  readonly openGeneration?: () => number;
+  /**
+   * Ignore `run` while a run is in flight (conventions 2.5 as amended): `run` returns `false`
+   * and starts nothing. In flight means the hook's synchronous in-flight counter is non-zero;
+   * the last render's `pending` is **not** consulted (design 5.2). Default `false` until #81
+   * flips it.
+   */
+  readonly ignoreWhilePending?: boolean;
+}
+
+export interface ActionTrigger {
+  readonly pending: boolean;
+  /** Returns `false` when the run was ignored (so the part can `preventDefault()`). */
+  readonly run: (work: () => unknown, then?: () => void) => boolean;
+}
+
+export function useActionTrigger(options?: ActionTriggerOptions | (() => number)): ActionTrigger;
+```
+
+The positional `openGeneration` form may stay accepted for the three existing call sites, or they
+may be edited to the object form (three one-line changes); the developer's choice. Inside:
+`inFlight` is a `useRef(0)`; `run` does `if (ignoreWhilePending && inFlight.current > 0) return false; inFlight.current++;` before `startOwnTransition`, and decrements in a
+`finally` around `await work()`. The superseded-rejection handling stays (it is reachable for the
+unguarded parts and stays correct for guarded ones). **Since #145 (2026-11-23)** that handling is
+one call: a run that is no longer the latest passes its rejection to `reportError`
+(`internal/report-dropped.ts`, conventions 2.4) instead of throwing it from the part's
+render; the latest run's rejection is rethrown inside the transition as before, unless the part
+unmounted or is hidden by `<Activity>` by then, when it is reported too (#152). The hook's
+options are `{ openGeneration?, ignoreWhilePending? }`; the `captureSuperseded` option that #100
+added is gone.
+
+### 15.3 `Button` sketch
+
+```tsx
+export function Button({ action, formAction, type, disabled = false, focusableWhenDisabled = false,
+  transition, className, style, children, render, ...rest }: ButtonProps) {
+  const toolbar = useToolbarContext();
+  // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
+  // browser and hide the state from AT, so the focusable-disabled branch (review must-fix 1).
+  const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
+  const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: true });
+  const status = useFormStatus();
+  const submittedWith = useRef<unknown>(undefined);
+  // Since #154 `formPending` also holds through a `submitted` latch (6.2).
+  const formPending = status.pending && typeof formAction === "function"
+    && (status.action === formAction || status.action === submittedWith.current);
+  const pending = ownPending || formPending;
+  useDevWarning(...); // action + formAction (error), action + submitting type (warn)
+  const state: ButtonState = { pending, disabled };
+  const element = useRender<ComponentPropsWithRef<"button">, ButtonState>({
+    defaultElement: "button", render, state, className, style, children,
+    props: { ...rest, formAction },
+    libraryProps: {
+      ...(rendersButton(render) && { type: type ?? (formAction !== undefined ? "submit" : "button") }),
+      disabled: disabled && !focusable ? true : undefined,
+      "aria-disabled": pending || (disabled && focusable) ? true : undefined,
+      "data-pending": dataAttr(pending),
+      "data-disabled": dataAttr(disabled),
+      onClick: (event: MouseEvent<HTMLElement>) => {
+        if (disabled) { event.preventDefault(); return; }
+        if (action === undefined) {
+          if (formPending) { event.preventDefault(); return; }
+          submittedWith.current = formAction;
+          return;
+        }
+        const details: ButtonActionDetails = createActionDetails(event.nativeEvent, {});
+        if (!run(() => action(details))) event.preventDefault();
+      },
+    },
+  });
+  return useTransitionBoundary("Button", transition, element);
+}
+```
+
+`useFormStatus` is imported from `react-dom` as in `form-submit.tsx`. `disabled` is passed as
+`undefined` (not `false`) in the focusable case so the owned key removes a render element's
+`disabled` (conventions 1.2, owned keys).
+
+`render-element.ts` after review items 1 and 2: `rendersButton(render)` (the `type` predicate,
+library-wide) returns `true` for no `render`, the function form, a host `"button"` **and any
+component element**, `false` only for a host element of another tag; a new `isHostButton(render)`
+keeps today's strict meaning (no `render`, function form, host `"button"`) for the `disabled`
+branch. Every part that emits `type="button"` through `rendersButton` (Toggle, Tabs.Tab, the
+Menu items, the Close and Trigger parts, …) gains the component case at once, which is the same
+footgun fixed everywhere (`<Toggle render={<MyButton />}>` inside a form is the Getting Started
+page's own example); the existing "no `type`" assertions all use host `<a>` renders and keep
+passing. The other parts' `disabled` on a link render is a separate follow-up (fold, item F3).
+
+### 15.4 Toolbar
+
+`toolbar/index.ts`: `export const Toolbar = { Root: ToolbarRoot, Separator: ToolbarSeparator } as const;`
+with the `ToolbarButton*` type exports removed there and in `src/index.ts`. The `toolbar.test.tsx`
+rows that test `Toolbar.Button`'s own action (sync / async / rejection / "pending stays until both
+overlapping runs settle") move to `button.test.tsx` in their guarded form; the keyboard rows
+render `<Button>` from `../button/button.js` instead of `Toolbar.Button` and are otherwise
+unchanged. `packages/example` and the docs examples follow the same rename.
+
+---
+
+## Implementation and review fold (#79, 2026-10-22)
+
+Implementation d8136b4 (library, `Toolbar.Button` removed), 465d106 (playground), 0201cec
+(docs); review `memo/reviewer/button.md` (c8e09d1, "acceptable with minor fixes"). Decisions on
+the review's open items and the developer's deviations, folded into the sections above:
+
+| # | Item | Decision | Where |
+| --- | --- | --- | --- |
+| F1 | Must-fix 1: `disabled` on `render={<a href>}` outside a Toolbar rendered a meaningless `disabled=""` and no `aria-disabled`. | **Fix in code.** `focusable` includes `!isHostButton(render)`; a link or component render takes the `aria-disabled` branch. | 3 (`disabled` doc), 4, 8.1, 15.3, rows 1 and 2 |
+| F2 | Item 2: `render={<MyButton />}` got no `type`, so inside a form it submitted. | **Fix in code, library-wide**: `rendersButton` returns `true` for a component element; `isHostButton` is the new strict predicate for the `disabled` branch. No `nativeButton` prop: host elements are detectable statically, and the "harmless if wrong" rule covers components. Affects every part that emits `type` through `rendersButton` (the same footgun); conventions 1.2 amended. | 4, 15.3, conventions 1.2 |
+| F3 | Review's note that other parts (`Dialog.Close`, `Popover.Close`, `Dialog.Trigger`, `Form.Submit`) render native `disabled` on a link `render` too. | **Follow-up issue** (not #79): apply `isHostButton` to their `disabled` branch; `Form.Submit` must stay a submitter anyway. | proposal for the PO |
+| F4 | Item 3: the rendered-`pending` guard source dropped clicks under entanglement (probe: three clicks, one call). | **Guard on the in-flight counter only.** The held window accepts a new run; `aria-disabled` may outlast the guard. `formAction` keeps its render-value guard (React's own status). | 5.2, 5.4, walkthroughs 5 and 7, row 6, 15.2, conventions 2.5 / 3.4 / 10.1 |
+| F5 | Item 4: row 11 intermediate assertion ("resolve A → only A clears"). | Developer adds it. | row 11 (unchanged) |
+| F6 | Item 5: playground `.tb-item[aria-disabled="true"]` styles a pending Button as disabled. | Developer switches to `[data-disabled]` as the docs CSS did. | 2.6 |
+| F7 | Minor 6: two Buttons sharing one `formAction` function both show pending. | Documented; inherent to `useFormStatus`. | 6.2 |
+| F8 | Minors 7 and 8 (`ButtonInvoker` CSS-only Button, `ButtonSave` counter updates on settle). | Developer's call; optional. | 14 |
+| D1 | Trigger-wrapped **awaited** action holds `showModal()` until it settles (entanglement). | **Accepted; the design was wrong.** 2.3 uses a non-awaiting prefetch and names the awaited behaviour; 7.1 and row 15 describe it. | 2.3, 7.1, row 15 |
+| D2 | Row 25: a `transition="none"` content swap starts no view transition; `"auto"` starts one. | **Accepted**; row 25 rewritten. | row 25 |
+| D3 | Hyphenated `aria-disabled` cannot be type-checked away; `expectTypeOf().not.toHaveProperty` plus the owned-key removal test cover it. | Accepted. | row 18 |
+| D4 | Playwright `force: true` for clicks on an `aria-disabled` Button (row 22): Playwright's actionability treats it as disabled; the real pointer click still dispatches. | Accepted. | row 22 |
+| D5 | `useDevWarning` (`console.error`, once per instance, in an effect) where the design says "warns". | Accepted; the library's one warning channel. | 6.1 |
+| D6 | oxlint disable for reading `submittedWith` in render. | Accepted; written only by the click handler before the submission whose status the render shows (precedent: `progress-root`). | 15.3 |
+
+---
+
+### 16.4 Test rows per part
+
+The old rows named here are rewritten, not deleted, so the suites keep their coverage count.
+
+**`dialog.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| D1 | Re-entry (library mode, with `action`) | Deferred `action`: a second click, Enter and Space leave it at one call, each is `defaultPrevented`, `aria-disabled="true"` and `data-pending` are on and `data-disabled` is off; the button keeps focus; resolve → one `openChangeAction(false, "activate")`, one `close(value)`, attributes gone (the dialog is closed, so the button is gone with it in the usual harness; assert on the element reference). JS-free variant: one `dialog.close(value)`. |
+| D2 | Re-entry, same task | Two synchronous `fireEvent.click`s inside one `act`: one `action` call. |
+| D3 | No `action` | A Close without `action` clicked twice while the Root's close is pending: unchanged behaviour (`requestClose` no-op against `intended()`), no `aria-disabled` (no own run). |
+| D4 | Superseded rejection → N/A | `dialog.test.tsx:1240` ("with action: a superseded rejection still reaches the boundary") becomes a rejection row: the single run rejects → boundary above the Close, dialog stays open, a click after the boundary resets runs again. Top-of-file comment lists Overlap / Superseded rejection for the Close part as N/A (#79 reason). |
+| D5 | Stale close row (design table "Close part, stale close") | Unchanged except its last sentence: drop "a superseded click's rejection reaches the catcher". |
+| D6 | Owned `aria-disabled` | A `render` element's `aria-disabled` is removed when the Close is idle (owned `undefined`). |
+
+**`popover.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| P1 | Re-entry (library mode and JS-free mode, with `action`) | As D1 with `hidePopover` / `requestClose` (one `openChangeAction(false)` / one `hidePopover()`). |
+| P2 | Re-entry, same task | As D2. |
+| P3 | `popover.test.tsx:1360` ("a superseded rejection still reaches the boundary") | Becomes the single-run rejection row; N/A comment as D4. |
+| P4 | Owned `aria-disabled` | As D6. |
+
+**`menu.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| M1 | `menu.test.tsx:844` ("two activations run the action twice; the close happens once") | Rewritten: a deferred `action` on a `closeOnActivate` Item; a second Enter, Space and click leave it at one call and are `defaultPrevented`; the item has `aria-disabled="true"`, `data-pending`, no `data-disabled`; resolve → one `requestClose`, the menu closes. |
+| M2 | Re-entry on a `closeOnActivate={false}` Item | Deferred action: second activation ignored; resolve → attributes gone, menu still open, the next Enter runs again. |
+| M3 | Navigation ignores pending (split, wave 9 deviation 1) | Integration half (`menu.test.tsx`): while an Item is pending (`aria-disabled` on it), the arrows, Home, End and typeahead land on it as on any item (they never skipped disabled items). Unit half (`menu-dom.test.ts`): `edgeItem` returns a pending item (`aria-disabled` without `data-disabled`) as the first enabled item and skips a `data-disabled` one; the open-focus rows already cover `edgeItem`'s use. The "re-open while pending" case cannot be observed end to end: the re-open is entangled with the pending item's action and commits after it settles, so the pending state is gone by the time the open focus resolves. |
+| M4 | `menu.test.tsx:871` ("a superseded rejection reaches the boundary", Item) | Becomes the single-run rejection row (menu stays open, boundary above the item, the next activation runs after reset); N/A comment. `menu.test.tsx:1350` (RadioItem / CheckboxItem) is **unchanged**: state owners keep overlap and superseded rejection. |
+| M5 | Design table "Overlap" row (menu.md 966) | "Two Item clicks: action called twice, `requestClose` once effective" → "Two Item clicks: action called once (the second is ignored), one `requestClose`". The RadioItem half stays. |
+| M6 | `menu-dom.ts` unit | `isDisabledItem` is `true` for `data-disabled=""` and `false` for `aria-disabled="true"` without it. |
+
+**`toast.test.tsx`**
+
+| # | Row | Test |
+| --- | --- | --- |
+| T1 | `toast.test.tsx:852` ("two Undo dispatches resolved out of order close the toast once") | Rewritten: a deferred Undo `action`; a second click leaves it at one call and is `defaultPrevented`; the Action has `aria-disabled="true"` and `data-pending`, the Root `data-pending`, the timer paused (existing assertion); resolve → one close (`"activate"`). |
+| T2 | Superseded rejection rows in that `describe` | Become the single-run rejection row (toast stays, boundary above the Viewport, as walkthrough 4); N/A comment for Overlap / Superseded rejection on `Toast.Action`. |
+| T3 | `Toast.Close` while Undo pending (walkthrough 6) | Unchanged: Close is not a `useActionTrigger` user. |
+| T4 | Owned `aria-disabled` | A `render` element's `aria-disabled` on an idle Action is removed. |
+
+**`use-action-trigger` and the continuous controls**
+
+| # | Row | Test |
+| --- | --- | --- |
+| H1 | Default | `useActionTrigger()` with no options ignores a second `run` while the first is in flight (`run` returns `false`), and runs it after settle; `{ ignoreWhilePending: false }` runs both. The existing superseded-rejection hook tests move under the `false` option. (Since #145 those rows assert: every superseded rejection of a burst is passed to `reportError` and the latest reaches the boundary; superseded rejections are still reported after unmount and nothing is thrown.) |
+| H2 | Slider / NumberField | `slider.test.tsx` and `number-field.test.tsx` step rows (two steps in flight, out-of-order resolution, superseded step rejection) pass unchanged with the explicit `false`; one new assertion per file: a second step dispatched while the first step's action pends is **called** (guards the explicit opt-out). |
+
+### 16.5 Docs
+
+Dialog, Popover, Menu and Toast pages: the sentence "repeated clicks re-run the action" becomes
+"a second click while pending is ignored and the button is `aria-disabled` meanwhile", with the
+non-awaiting spelling for "close now, work later" (menu.md 2.3 already shows it). Owned-keys
+lists gain `aria-disabled`. The "Pending & optimistic state" concept page gets one paragraph:
+every pure trigger ignores re-entry; state owners (Toggle, Tabs, Checkbox items) take every
+click and the latest intent wins. Changelog entry (behaviour change, not breaking).
+
+---
+
+### 17.3 Test rows per part
+
+One jsdom row per part, in its own suite, plus the regression half:
+
+| Part | Row |
+| --- | --- |
+| `Dialog.Close`, `Popover.Close` | Library mode, `disabled` with `render={<a href="#x" />}` and with `render={<MyButton />}` (a component spreading onto a `<button>`): `aria-disabled="true"`, no `disabled` attribute, `data-disabled`, click `defaultPrevented` and no `openChangeAction` / `close` / `hidePopover`; `render={<button />}` and no `render`: native `disabled`, no `aria-disabled` (unchanged). JS-free mode without `action`, `render={<MyButton />}` disabled: native `disabled` (the command branch), `aria-disabled` absent. |
+| `Dialog.Trigger` | Library mode (modal and non-modal) and JS-free non-modal: link / component renders → `aria-disabled`, click cancelled, nothing opens; JS-free modal with a component render → native `disabled`. |
+| `Popover.Trigger` | Library mode: link / component renders → `aria-disabled`, click cancelled, no dispatch; JS-free mode with a component render → native `disabled`. |
+| `Menu.Trigger` | Link / component renders → `aria-disabled`; click, Enter, ArrowDown do not open; host button → native `disabled` (unchanged). |
+| `Toggle` | `disabled` with `render={<a href>}` / `render={<MyButton />}` → `aria-disabled`, no dispatch, `aria-pressed` still rendered, click `defaultPrevented`; host button unchanged. |
+| `ToggleGroup.Item` | Same, plus: a disabled link Item is reached by the arrows (documented), still never dispatches; a disabled host-button Item is skipped (unchanged). |
+| `Combobox.Trigger`, `Combobox.Clear` | Component render disabled → `aria-disabled`, `tabIndex` as before, click does nothing (no open / no clear). |
+| `NumberField.Increment` / `Decrement` | Component render: disabled by prop, by `readOnly`, and at the bound → `aria-disabled` and no step on click / pointerdown hold; host button → native `disabled` in all three (unchanged). |
+| `Form.Submit` | Regression: `disabled` with `render={<MyButton />}` renders native `disabled` and **no** `aria-disabled`; the props-table sentence "always native `disabled`: a submitter has no handler to honour `aria-disabled`" is in the docs. |
+| `Button` | Unchanged (#79 rows 1 and 2). |
+
+### 17.4 Docs
+
+Each affected page's `disabled` row gains the sentence "with a link or component `render`,
+`aria-disabled="true"` instead (the element stays focusable); native `disabled` on a `<button>`".
+Conventions 1.2's "the other `disabled` parts follow in a separate issue" is replaced by the list
+above. Changelog entry (behaviour change for link / component renders only).
+
+---
+
+## Implementation and review fold (wave 9, #81 and #83, 2026-10-22)
+
+Implementation 27e64f4 (#81) and f827869 (#83) on `memo/developer/wave9-triggers.md`; review
+`memo/reviewer/wave9.md` (a29e3ad, "acceptable with fixes"). All six developer deviations
+accepted; the review's items decided as follows and folded into 16 and 17 above.
+
+| # | Item | Decision | Where |
+| --- | --- | --- | --- |
+| W1 | Review M1: the focusable-disabled branch kept `commandfor` / `command`, so a disabled component render was a live invoker before hydration. | **Fix in code**: own both as `undefined` in that branch (Popover / Menu / Submenu Triggers, library-mode modal Dialog.Trigger, both Close parts); rows per part plus a `renderToString` row for `Menu.Trigger`. | 17.2 |
+| W2 | Review M2 / L1: docs, jsdoc, menu.md 2.3 and 16.3 said the arrows, Home / End and typeahead skip disabled items; only `edgeItem` (open focus, Trigger arrows while open) does. | Corrected in menu.md 2.3 and 16.3 here; the developer corrects `MenuPage.tsx`, `menu-item.tsx`'s `disabled` jsdoc and `menu-dom.ts`'s jsdoc to "a pending item is an ordinary item for navigation; only the open focus skips items with the `disabled` prop". | 16.3, menu.md 2.3 |
+| W3 | Deviation 1: M3 split into the integration half (arrows / Home / End / typeahead land on a pending item) and an `edgeItem` unit row; the re-open half is unobservable end to end (entanglement). | Accepted; row rewritten. | 16.4 M3 |
+| W4 | Deviation 2: D3 asserted as two `openChangeAction` calls (the open and one close), one `close()`, no `aria-disabled`. | Accepted. | 16.4 D3 |
+| W5 | Deviation 3: D4 / P3 / M4 also reset the boundary (key bump) and check the next activation runs on the fresh instance. | Accepted; stronger than the design row (the in-flight decrement on reject is not observable through a boundary, which unmounts the part). | 16.4 |
+| W6 | Deviation 4: T2 split into "two clicks in one task → one dispatch; rejection reaches the boundary, toast not ending" and the `closeOnSettle={false}` variant (where the guard is visible). | Accepted. | 16.4 T2 |
+| W7 | Deviation 5: `aria-disabled` owned only in the focusable branch (and always on the Close parts for pending); host buttons keep a consumer's own `aria-disabled` as pass-through. | Accepted as the rule; recorded in 17.2. | 17.2 |
+| W8 | Deviation 6: JS-free non-modal `Dialog.Trigger` rendered `aria-disabled` on a component render but no `data-disabled` (`data-disabled` was library-mode only); `Popover.Trigger` in JS-free mode had the same gap. | **Landed in wave 9 after all (5fc05d5)**: both Triggers emit `data-disabled` whenever disabled, in every mode. The rule is now current in conventions 4.1 (`disabled` row: emitted in every mode in which the part renders `disabled` or `aria-disabled`); dialog.md 1 and popover.md 1 updated. | conventions 4.1; dialog.md, popover.md anatomy tables |
+| W9 | Review L2: the NumberField disabled-link `preventDefault()` row clicks with `detail: 0`. | Developer adds a `detail: 1` assertion. | 17.3 |
+| W10 | Review L3: a pointer press on a disabled focusable step render takes focus from the input (`pointerdown` returns before `preventDefault()`). | **Accept the suggestion**: cancel the `pointerdown` when disabled too, so a disabled step button never steals focus (Combobox.Trigger / Clear already cancel unconditionally). | 17.1 NumberField row |
+| W11 | Review L4: the #81 changelog says "behaviour change"; a consumer counting clicks through `Menu.Item` / `Toast.Action` changes result silently. | Flag it in the alpha.7 release notes as breaking for that pattern, pointing at the non-awaiting spelling; 16.5 amended by this row. | 16.5 |
+
+---
+
+### 18.5 Tests
+
+`button.test.tsx` / `button.browser.test.tsx` (section 13 rows):
+
+| Row | Change |
+| --- | --- |
+| Top-of-file comment | Overlap and Superseded rejection are no longer N/A for Button: required in `"run"` mode, N/A in `"ignore"` mode. |
+| 3 Async action | Default: `data-pending`, **no** `aria-disabled`. With `whilePending="ignore"`: the current assertions. |
+| 5 Re-entry | Whole row under `whilePending="ignore"`. |
+| 5b Every activation runs (new) | Default and explicit `"run"`: while a deferred action pends, a click, an Enter and a Space make three more calls; none is `defaultPrevented`; two `fireEvent.click`s in one `act` call it twice; no `aria-disabled`; runs resolved out of order: `data-pending` stays until the last; `render={<a href>}`: the second click is not cancelled. |
+| 5c Overlap, Superseded rejection (new) | Conventions 10.1 rows for `"run"`: the older run rejects after, and separately while, the newer pends: stubbed `reportError` once, not the catcher; the latest rejects: catcher; a burst of three. |
+| 5d Prop change (new) | `"run"` to `"ignore"` while a run pends: `aria-disabled` appears with the re-render and the next click is ignored; back to `"run"`: it runs. |
+| 6 Settled-but-held | Under `"ignore"` (unchanged). Under the default the "+1 three times" probe needs no special case: three calls. |
+| 8 Suspending content | "clicks ignored meanwhile" is under `"ignore"`; default: a click runs. |
+| 10 Consumer state after await | Default: commits once per click. |
+| 11 `formAction` per-submitter | Default: click A again: `a` called twice, the click not `defaultPrevented`, no `aria-disabled`. With `"ignore"`: the current assertions. |
+| 15 Trigger-wrapped | "a second click leaves `a` at one call" needs `whilePending="ignore"`; default: two calls. |
+| 18 Types | `whilePending` accepts `"run"` / `"ignore"`, rejects `true` and other strings; `WhilePending` exported from the root. |
+| 22 Invoker Command + action (browser) | `"ignore"`: unchanged. Default: the second click runs the action and the command (the popover toggles closed). |
+| 24 Implicit submission (browser) | `"ignore"`: unchanged. Default: the second Enter submits again. |
+| 26 Accessibility tree (browser) | Under `"ignore"`; default: no disabled state on the pending Button. |
+
+Other suites (section 16.4 rows), with the decided defaults:
+
+| Suite | Change |
+| --- | --- |
+| `dialog.test.tsx`, `popover.test.tsx` | D1, D2, D3, P1, P2 unchanged: they now pin the **default**. New D7 / P5, `whilePending="run"` with `action`: a second click calls `action` again, no `aria-disabled`, `data-pending` until both settle, one `openChangeAction(false)` / one `close()` / one `hidePopover()`, the stale-close guard still holds; the older run rejects: `reportError`; the first resolves and closes, the second rejects after the part left: `reportError` (#152). |
+| `menu.test.tsx` | M1 unchanged (default, `closeOnActivate`). **M2 flips**: a `closeOnActivate={false}` Item runs every activation by default (two calls, no `aria-disabled`) and ignores with `whilePending="ignore"`. New: a closing Item with `whilePending="run"`: two calls, one close. M3 (navigation over a pending item) under `"ignore"`. Overlap / Superseded rejection rows for the `"run"` cases. If question 2 is answered (b), M2 stays as it is. |
+| `toast.test.tsx` | T1 unchanged. The `closeOnSettle={false}` variant (W6) **flips**: two clicks, two calls by default; `whilePending="ignore"` restores one. The timer stays paused and the Root `data-pending` until every run settled. If question 3 is answered (b), it stays. |
+| `use-action-trigger.test.tsx` | H1: the default is `false` (runs overlap); the guard rows run under `{ ignoreWhilePending: true }`. |
+| `slider.test.tsx`, `number-field.test.tsx` | Unchanged (H2 keeps guarding that steps run). |
+| Type tests | `whilePending` on the four parts; absent on `Menu.CheckboxItem`, `Menu.RadioItem`, `Form.Submit`, `Toast.Close`. |
+
+About sixty guard assertions exist today (most in `button.test.tsx` and
+`use-action-trigger.test.tsx`); the bulk move under the prop rather than disappear.
+
+### 18.6 Docs
+
+- **Pending & optimistic page** (`PendingOptimisticPage.tsx`, "A second click while pending",
+  and the pure-trigger definition that links to it): rewritten around the ownership rule, with
+  the counter and the Save examples side by side.
+- **Action props page** (`ActionPropsPage.tsx`): the sentence on pure triggers; remove "do not
+  await" as the way to count clicks.
+- **Button page**: props table row `whilePending` (default `"run"`), the `aria-disabled` text,
+  the `formAction` caveat of 18.3; `ButtonSave.tsx` and `ButtonFormActions.tsx` examples gain
+  `whilePending="ignore"`; a "+1" example shows the default; check `button.css` and the other
+  example stylesheets: a rule that styles pending through `[aria-disabled]` moves to
+  `[data-pending]`.
+- **Dialog, Popover, Menu, Toast pages**: props table row on Close / Item / Action with the
+  default (and its dependency on `closeOnActivate` / `closeOnSettle` if questions 2 and 3 are
+  answered (a)); the "second click is ignored" sentences name the prop.
+- Toolbar and ToggleGroup pages where they describe a pending `Button`; the Roadmap page; the
+  agent skill (`packages/ui/skills/funstack-ui-knowledge/SKILL.md`); JSDoc of the five parts
+  and of `useActionTrigger`; the playground (`button-demo.tsx`, `toolbar-demo.tsx`).
+- **Release notes: breaking for `Button`** (a pending Button no longer ignores clicks or
+  renders `aria-disabled` unless `whilePending="ignore"`), and for keep-open Items / Actions
+  (questions 2 and 3 were answered (a)).
+
+### 18.7 Implementation notes (2026-11-24)
+
+- As designed: `WhilePending` in `internal/types.ts`, exported from the root entry only (like
+  the other shared types); `useActionTrigger`'s `ignoreWhilePending` defaults to `false`;
+  Button, `useOverlayClose` (Dialog.Close, Popover.Close), `Menu.Item` and `Toast.Action`
+  compute `ignoring` per render and render `aria-disabled` from `pending && ignoring`. The
+  `Menu.CheckboxItem` props type now also omits `whilePending` (it extends `MenuItemProps`; the
+  type test caught the leak), so `Menu.RadioItem` does too.
+- `ToastActionOptions` gets no `whilePending` (conventions 2.5.1, the sub-question of 3).
+- **Closing parts in `"run"` mode (review F1, product-owner decision 2026-11-24):** the first
+  implementation ran each resolved run's close. A library-mode close was then held by
+  entanglement and committed together with a failed latest run (boundary fallback inside a
+  closed overlay); a JS-free Close and a `Toast.Action` closed at the first resolved run while a
+  later run could still fail. Now `useActionTrigger` runs the continuation once, when the last
+  run in flight settles, and only if the latest run resolved, for every closing part; a
+  rejection leaves the overlay, menu or toast open in both modes. Conventions 2.5.1 and 3.4.
+- Tests: 18.5 rows in `button.test.tsx` (5b, 5c, 5d added; 3, 5, 6, 9, 10, 11, 15, 18 split by
+  mode), `button.browser.test.tsx` (21, 22, 24, 26 split by mode); D7 / P5 as shared rows of
+  `src/__tests__/overlay-close-part-suite.tsx` (library and JS-free mode);
+  `menu.test.tsx` "whilePending (#146)"; `toast.test.tsx` "whilePending (#146)";
+  `use-action-trigger.test.tsx` H1 flipped; type rows in `internal/types.test.ts`.
