@@ -147,6 +147,10 @@ export function ToastViewport({
   const [rejected, setRejected] = useState(() =>
     toastManagerInternals(manager).isTaken(listener.current!),
   );
+  // The subscription itself was refused: the manager has another Viewport. Not `rejected`, a
+  // render-time guess that is also true for the replacement of a Viewport in one commit (a `key`
+  // change, a move between parents), rendered while the old instance is still subscribed.
+  const [duplicate, setDuplicate] = useState(false);
 
   const regionRef = useRef<HTMLElement | null>(null);
   const roots = useRef(new Map<string, HTMLElement>());
@@ -364,9 +368,11 @@ export function ToastViewport({
     const unsubscribe = toastManagerInternals(manager).subscribe(listener.current!);
     if (unsubscribe === null) {
       setRejected(true);
+      setDuplicate(true);
       return;
     }
     setRejected(false);
+    setDuplicate(false);
     return unsubscribe;
   }, [manager, handlers]);
 
@@ -445,9 +451,9 @@ export function ToastViewport({
 
   // --- Development checks ---------------------------------------------------------------------
 
-  // A second Viewport on a taken manager renders nothing (`rejected`, set above).
+  // A second Viewport on a taken manager renders nothing (`duplicate`, set above).
   useDevWarning(
-    rejected,
+    duplicate,
     isDev &&
       "Toast.Viewport: another Toast.Viewport already renders this manager; this one renders " +
         "nothing. Use one Viewport per manager, or `createToastManager()` for a second queue.",

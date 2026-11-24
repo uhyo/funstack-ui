@@ -10924,3 +10924,14 @@ top-level function or constant of that name; it also asserts that the two Select
 collected, so the collector cannot silently stop seeing this class. Without the guard it fails on
 three pieces (both files). Sections changed: conventions 7.2 states that the check reads the
 named module-level helpers and how to pass one.
+
+## 2026-11-24, #157 follow-up: the second-Viewport warning follows the refused subscription
+
+Corrects the "#157 follow-up: the helpers in the files skipped for the split" entry above
+(`memo/reviewer/review-157-helpers-followup.md` major 1). Its `useDevWarning(rejected, ...)` keyed
+off `rejected`, whose first value is read during render (`isTaken`). When a Viewport is replaced
+in one commit (a `key` change, a move between two parents) the new instance renders while the old
+one is still subscribed, so it warned "another Toast.Viewport already renders this manager" for a
+single Viewport. The warning now reads a `duplicate` state set only when the subscription is
+refused, as the former `console.error` in that branch did; it still fires once per instance.
+Development console only.

@@ -2587,6 +2587,57 @@ describe("Toast", () => {
       expect(warnings).toHaveLength(1);
     });
 
+    // Review of refactor/157-helpers-followup, major 1: a replacement in one commit renders the
+    // new instance while the old one is still subscribed; only a refused subscription warns.
+    const titles = ({ toasts }: { toasts: readonly { id: string; title?: unknown }[] }) =>
+      toasts.map((t) => <p key={t.id}>{String(t.title)}</p>);
+    const viewportWarnings = (error: ReturnType<typeof silenceErrors>) =>
+      error.mock.calls.filter((args) => String(args[0]).includes("another Toast.Viewport"));
+
+    it("a Viewport remounted with a new key does not warn", async () => {
+      const error = silenceErrors();
+      const { rerender } = render(
+        <Toast.Viewport key="a" manager={manager} data-testid="one">
+          {titles}
+        </Toast.Viewport>,
+      );
+      await flushMicrotasks(2);
+      rerender(
+        <Toast.Viewport key="b" manager={manager} data-testid="one">
+          {titles}
+        </Toast.Viewport>,
+      );
+      await flushMicrotasks(2);
+      await call(() => manager({ title: "After" }));
+      expect(screen.getByTestId("one").textContent).toBe("After");
+      expect(viewportWarnings(error)).toEqual([]);
+    });
+
+    it("a Viewport moved to another parent does not warn", async () => {
+      const error = silenceErrors();
+      function Layout({ left }: { left: boolean }) {
+        const viewport = (
+          <Toast.Viewport manager={manager} data-testid="one">
+            {titles}
+          </Toast.Viewport>
+        );
+        return (
+          <>
+            <div>{left ? viewport : null}</div>
+            <section>{left ? null : viewport}</section>
+          </>
+        );
+      }
+      const { rerender } = render(<Layout left />);
+      await flushMicrotasks(2);
+      rerender(<Layout left={false} />);
+      await flushMicrotasks(2);
+      await call(() => manager({ title: "Moved" }));
+      expect(screen.getByTestId("one").closest("section")).not.toBeNull();
+      expect(screen.getByTestId("one").textContent).toBe("Moved");
+      expect(viewportWarnings(error)).toEqual([]);
+    });
+
     // #63 L8
     it("two Viewports mounted in one commit: the second region is never shown", async () => {
       silenceErrors();
