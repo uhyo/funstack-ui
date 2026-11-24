@@ -19,14 +19,9 @@ import type {
   StateValue,
   WhilePending,
 } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import {
-  disabledButton,
-  pendingAriaDisabled,
-  rendersButton,
-  useRender,
-} from "../internal/use-render.js";
+import { usePureTrigger } from "../internal/use-pure-trigger.js";
+import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -176,8 +171,8 @@ export function Button({
   }).props;
   // Button is the fully user-owned trigger: every activation runs unless the consumer opts in
   // (conventions 2.5.1, design 18).
-  const ignoring = (whilePending ?? "run") === "ignore";
-  const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: ignoring });
+  const trigger = usePureTrigger({ whilePending, defaultWhilePending: "run" });
+  const { ignoring } = trigger;
 
   // Per-submitter pending (design 6.2): React reports the latest submitter's function as
   // `status.action`. `submittedWith` keeps the function this Button last submitted with, so an
@@ -201,7 +196,7 @@ export function Button({
   // Gated as a whole: a latch left from a function `formAction` that became a URL or `action`
   // must not keep the Button pending (a URL has no pending and no guard, 6.2).
   const formPending = typeof formAction === "function" && (named || (status.pending && submitted));
-  const pending = ownPending || formPending;
+  const pending = trigger.pending || formPending;
 
   useDevWarning(
     action !== undefined && formAction !== undefined,
@@ -232,10 +227,9 @@ export function Button({
       // `undefined` (not `false`) when enabled or in the focusable branch, so the owned key
       // removes a render element's `disabled` too.
       disabled: disabledProps.disabled === true ? true : undefined,
-      // While pending only when ignoring: a Button that still acts is not unavailable (3.6).
-      // Native `disabled` wins over it.
-      "aria-disabled": pendingAriaDisabled(disabledProps, pending && ignoring),
-      "data-pending": dataAttr(pending),
+      // `aria-disabled` while pending only when ignoring: a Button that still acts is not
+      // unavailable (3.6). Native `disabled` wins over it. Both channels' pending.
+      ...trigger.pendingProps(disabledProps, pending),
       "data-disabled": dataAttr(disabled),
       onClick: (event: MouseEvent<HTMLButtonElement>) => {
         // `event.defaultPrevented` is never read: an outer part (`Dialog.Trigger`) cancels the
@@ -256,7 +250,7 @@ export function Button({
         }
         const details: ButtonActionDetails = createActionDetails(event.nativeEvent, {});
         // Ignored while pending (`"ignore"` only): do not navigate, submit or run a command either.
-        if (!run(() => action(details))) event.preventDefault();
+        trigger.runActivation(event, () => action(details));
       },
     },
   });

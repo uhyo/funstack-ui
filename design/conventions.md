@@ -2588,6 +2588,7 @@ packages/ui/src/
     platform-attributes.ts  # the one `declare module "react"` (section 7.4)
     use-controllable-action.ts  # section 3.4; also intendedValue (3.8 rule 1)
     use-action-trigger.ts   # section 3.4: pure triggers
+    use-pure-trigger.ts     # usePureTrigger: the whilePending wiring of the four pure triggers with the prop (2.5.1, 3.6)
     report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; useConnected(); both hooks call them
     use-render.tsx          # resolves render / className / style / children against state
     render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, pendingAriaDisabled (1.2)

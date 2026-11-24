@@ -1,7 +1,6 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action-details.js";
-import { dataAttr } from "../internal/data-attr.js";
 import type {
   Action,
   ActionDetails,
@@ -9,7 +8,7 @@ import type {
   StateValue,
   WhilePending,
 } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
+import { usePureTrigger } from "../internal/use-pure-trigger.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import { useMenuContext } from "./menu-context.js";
 import { useMenuItem } from "./use-menu-item.js";
@@ -109,11 +108,12 @@ export function MenuItem({
   // The close belongs to the top-level menu, so its open generation guards it.
   // Mixed ownership (conventions 2.5.1): an item the library closes the menu after ignores by
   // default; a keep-open item is a user-owned trigger and runs every activation.
-  const ignoring = (whilePending ?? (closeOnActivate ? "ignore" : "run")) === "ignore";
-  const { pending, run } = useActionTrigger({
+  const trigger = usePureTrigger({
+    whilePending,
+    defaultWhilePending: closeOnActivate ? "ignore" : "run",
     openGeneration: menu.root.popover.openGeneration,
-    ignoreWhilePending: ignoring,
   });
+  const { pending } = trigger;
 
   const { libraryProps } = useMenuItem({
     part: "Menu.Item",
@@ -125,11 +125,11 @@ export function MenuItem({
       // When ignoring, a second activation while this item's own run is in flight starts
       // nothing and is cancelled (the hook's guard): a link does not navigate, a composed
       // command does not run. Enter / Space reach here through the element's click, their keydown is cancelled.
-      const started = run(
+      trigger.runActivation(
+        event,
         () => action?.(details),
         closeOnActivate ? () => menu.root.popover.requestClose(event, "activate") : undefined,
       );
-      if (!started) event.preventDefault();
     },
   });
 
@@ -146,11 +146,10 @@ export function MenuItem({
     libraryProps: {
       ...(rendersButton(render) && { type: "button" as const }),
       ...libraryProps,
-      // Also while pending when ignoring: an item that will not act is unavailable to AT.
-      // Navigation keys on `data-disabled` (the `disabled` prop), so a pending item is still an
-      // enabled item.
-      "aria-disabled": disabled || (pending && ignoring) ? true : undefined,
-      "data-pending": dataAttr(pending),
+      // Also while pending when ignoring: an item that will not act is unavailable to AT. The
+      // item is never natively disabled (`useMenuItem`'s focusable branch). Navigation keys on
+      // `data-disabled` (the `disabled` prop), so a pending item is still an enabled item.
+      ...trigger.pendingProps(libraryProps),
     },
   });
 }

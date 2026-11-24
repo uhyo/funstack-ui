@@ -8,7 +8,6 @@ import type { ElementLikeProps, RenderElementOptions } from "./render-element.js
 export {
   disabledButton,
   isHostButton,
-  pendingAriaDisabled,
   rendersButton,
   resolveStateValue,
 } from "./render-element.js";

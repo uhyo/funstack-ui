@@ -826,7 +826,14 @@ defaults are in 18.4 and conventions 2.5.1.
 
 `useActionTrigger({ openGeneration?, ignoreWhilePending? })`. `ignoreWhilePending` is `false`
 by default; a part passes `(whilePending ?? <its default>) === "ignore"`, read per render.
-`run` returns `false` when the run was ignored.
+`run` returns `false` when the run was ignored. The four pure triggers with a `whilePending`
+prop (Button, the Close parts through `useOverlayClose`, Menu.Item, Toast.Action) do this
+through `usePureTrigger({ whilePending, defaultWhilePending, openGeneration? })`
+(`internal/use-pure-trigger.ts`), which also returns `ignoring`, `runActivation(event, work,
+then?)` (`run` plus the `preventDefault()` of an ignored activation) and `pendingProps(
+disabledProps, pending?)`, the owned `aria-disabled` (through `pendingAriaDisabled`, 17.2) and
+`data-pending`. Button passes its pending merged with the form channel; Slider and NumberField
+call `useActionTrigger` directly (no `whilePending`).
 
 ### 16.3 Per-part behaviour
 
@@ -1016,8 +1023,8 @@ submission): Enter in a field submits again under `"run"`, is cancelled under `"
 ### 18.4 The other pure triggers
 
 Conventions 2.5.1 has the table. `Dialog.Close`, `Popover.Close` (`useOverlayClose`),
-`Menu.Item` and `Toast.Action` each have `whilePending?: WhilePending`, compute their default,
-pass `ignoreWhilePending` to the hook and render `aria-disabled` from `pending && ignoring`.
+`Menu.Item` and `Toast.Action` each have `whilePending?: WhilePending` and pass it with their
+default to `usePureTrigger` (16.2), which renders `aria-disabled` from `pending && ignoring`.
 Defaults: Close parts `"ignore"`; `Menu.Item` `closeOnActivate ? "ignore" : "run"`;
 `Toast.Action` `closeOnSettle ? "ignore" : "run"`. Slider and NumberField have no prop: every
 step runs.

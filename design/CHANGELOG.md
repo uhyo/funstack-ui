@@ -10681,3 +10681,14 @@ toast.md on the pending `aria-disabled`.
   a handler): a host link render there renders `aria-disabled` instead of a meaningless
   `disabled` attribute; nothing cancels its click (no handler installed), and it is no invoker,
   as before. `Button` now calls the helper instead of its own expression.
+
+---
+
+# 2026-11-24, #157 candidate 4: `usePureTrigger`
+
+Internal refactoring, no behaviour change (refactoring wave #157, `memo/architect/refactor-audit.md`
+rank 4). The `whilePending` wiring that Button, `useOverlayClose`, Menu.Item and Toast.Action each
+restated (resolve the default, `ignoreWhilePending`, `aria-disabled` iff `pending && ignoring`,
+`data-pending`, `preventDefault()` of an ignored activation) is one hook,
+`internal/use-pure-trigger.ts`. Sections changed: button.md 16.2 and 18.4 (which helper the parts
+call), the conventions 9.1 file listing.

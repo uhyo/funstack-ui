@@ -2,9 +2,9 @@
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "./data-attr.js";
 import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "./types.js";
-import { useActionTrigger } from "./use-action-trigger.js";
 import { useElementCheck } from "./use-element-check.js";
-import { disabledButton, pendingAriaDisabled, rendersButton, useRender } from "./use-render.js";
+import { usePureTrigger } from "./use-pure-trigger.js";
+import { disabledButton, rendersButton, useRender } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
@@ -58,11 +58,12 @@ export function useOverlayClose<Details extends ActionDetails>(
 ): ReactNode {
   const { part, noun, isLibrary, popupId, command, action, disabled, render } = options;
   // The library owns the close, so a Close ignores clicks while pending by default (2.5.1).
-  const ignoring = (options.whilePending ?? "ignore") === "ignore";
-  const { pending, run } = useActionTrigger({
+  const trigger = usePureTrigger({
+    whilePending: options.whilePending,
+    defaultWhilePending: "ignore",
     openGeneration: options.openGeneration,
-    ignoreWhilePending: ignoring,
   });
+  const { pending } = trigger;
   const installClick = isLibrary || action !== undefined;
   // JS-free mode without `action` is the browser's command, which only native `disabled` stops.
   const disabledProps = disabledButton(render, disabled, { handlesClick: installClick });
@@ -88,7 +89,8 @@ export function useOverlayClose<Details extends ActionDetails>(
       return;
     }
     const details = options.details(native);
-    run(
+    // An ignored run needs no extra cancel: the click is already cancelled above.
+    trigger.run(
       () => action(details),
       () => options.close(native),
     );
@@ -99,7 +101,6 @@ export function useOverlayClose<Details extends ActionDetails>(
     // Owned: a render element must not re-enable a disabled Close.
     disabled: disabledProps.props.disabled,
     // Only on a button (or a component, assumed to render one): another element is no invoker.
-    // `disabledProps.invoker` itself stays the availability below.
     commandfor: disabledProps.invoker && rendersButton(render) ? popupId : undefined,
     command: disabledProps.invoker && rendersButton(render) ? command : undefined,
     ...options.ownProps,
@@ -107,8 +108,7 @@ export function useOverlayClose<Details extends ActionDetails>(
     // Exactly while `data-pending` when ignoring: a Close that will not act is unavailable to
     // AT; one that runs again is not; native `disabled` wins. Owned, so an idle Close removes a
     // render element's own.
-    "aria-disabled": pendingAriaDisabled(disabledProps.props, pending && ignoring),
-    "data-pending": dataAttr(pending),
+    ...trigger.pendingProps(disabledProps.props),
     "data-disabled": dataAttr(disabled),
   };
 
