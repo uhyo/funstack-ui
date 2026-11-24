@@ -37,7 +37,7 @@ inline styles cannot express the rule; it must be documented and overridable. Ru
   on a Popup): the part then renders neither the inline reference nor the style, and hands the
   consumer the data (custom properties) their own rules need.
 - **The CSS text lives in a directive-free module** of the component that ships it, as a string
-  constant (`menu/menu-point.ts`, `internal/tooltip-warm.ts`; the precedence name
+  constant (`menu/menu-point.ts`, `tooltip/tooltip-warm.ts`; the precedence name
   `FSUI_PRECEDENCE` in `internal/shipped-styles.ts`), covered by a jsdom row (one `<style>` in
   `document.head` after use, none without) and a browser row (the computed property names the
   option).

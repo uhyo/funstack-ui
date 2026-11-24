@@ -5,7 +5,7 @@ import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
-import { useUntilFound } from "../internal/use-until-found.js";
+import { useUntilFound } from "./use-until-found.js";
 import { useTabsContext } from "./tabs-context.js";
 import type { TabsContextValue, TabsOrientation } from "./tabs-context.js";
 import { panelId, tabId } from "./tabs-ids.js";

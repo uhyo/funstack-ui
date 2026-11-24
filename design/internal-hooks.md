@@ -284,11 +284,9 @@ packages/ui/src/internal/
   use-register-count.ts   # how many parts of a kind are registered
   use-mount-fixed.ts      # useMountFixed(value, isDev && message): a prop read once at mount (the JS-free / library mode, `exclusive`), with its dev warning
   use-delayed-pair.ts     # an open timer and a close timer that exclude each other
-  use-until-found.ts      # hidden="until-found" (section 7.4)
   modal-registry.ts, use-modal-registration.ts  # the stack of open modal dialogs (section 3.5); the registry is directive-free
   decimal.ts              # decimal helpers of Slider and NumberField; directive-free
   range-value.ts          # clamp, percentage and formatting of Progress and Meter; directive-free
   csp-context.ts          # what <CSPProvider> gives the parts that render a hoisted <style> (section 12)
-  tooltip-warm.ts         # Tooltip's skip-delay on the native interestfor path (section 12); directive-free
   form-status-watcher.tsx # the useFormStatus edge watcher of Form.Root and Dialog.Form
 ```

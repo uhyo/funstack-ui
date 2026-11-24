@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import type { ReactNode } from "react";
 import { renderToReadableStream } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { TOOLTIP_WARM_HREF, TOOLTIP_WARM_RULES } from "../internal/tooltip-warm.js";
+import { TOOLTIP_WARM_HREF, TOOLTIP_WARM_RULES } from "../tooltip/tooltip-warm.js";
 import { Menu } from "../menu/index.js";
 import { MENU_POINT_HREF, MENU_POINT_RULES } from "../menu/menu-point.js";
 import { Tooltip } from "../tooltip/index.js";

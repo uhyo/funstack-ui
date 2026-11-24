@@ -26,7 +26,7 @@ const clientFiles = [
   "tabs/tabs-tab.mjs",
   "tabs/tabs-panel.mjs",
   "tabs/tabs-indicator.mjs",
-  "internal/use-until-found.mjs",
+  "tabs/use-until-found.mjs",
   "internal/action/use-controllable-action.mjs",
   "internal/action/use-connected.mjs",
   "internal/use-dev-warning.mjs",
@@ -268,7 +268,7 @@ const directiveFreeFiles = [
   // The CSP subpath's entry and data, and Tooltip's skip-delay constants (conventions 12).
   "csp/index.mjs",
   "csp/style-hashes.mjs",
-  "internal/tooltip-warm.mjs",
+  "tooltip/tooltip-warm.mjs",
 ];
 
 /** Files a release removed; a stale build must not keep shipping them (button.md row 20). */

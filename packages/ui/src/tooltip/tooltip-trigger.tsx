@@ -9,7 +9,7 @@ import {
   TOOLTIP_WARM_HREF,
   TOOLTIP_WARM_RULES,
   warmDelay,
-} from "../internal/tooltip-warm.js";
+} from "./tooltip-warm.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { rendersButton, resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";

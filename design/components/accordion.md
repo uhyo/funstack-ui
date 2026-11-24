@@ -513,7 +513,7 @@ unmount prop in v0.
 
 No `keepMounted` prop, deliberately. Tabs offers `keepMounted: boolean | "until-found"` because a
 `tabpanel` is a plain `div` that the library must hide, and `hidden="until-found"` needs the
-shared `use-until-found.ts` hook (ref-based attribute upgrade plus a `beforematch` listener) to
+`tabs/use-until-found.ts` hook (ref-based attribute upgrade plus a `beforematch` listener) to
 keep find-in-page working. `<details>` gives both halves natively: closed content is kept in the
 DOM under `content-visibility: hidden`, and the browser opens the item itself on a find-in-page
 match (then fires `toggle`, section 2.3). The until-found hook is therefore moot here, and the

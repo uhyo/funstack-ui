@@ -31,7 +31,7 @@ import { createSuspender, silenceErrors } from "../__tests__/helpers.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { isPopoverOpen } from "../__tests__/popover-shim.js";
 import { CSPProvider } from "../csp/index.js";
-import { TOOLTIP_WARM_RULES } from "../internal/tooltip-warm.js";
+import { TOOLTIP_WARM_RULES } from "./tooltip-warm.js";
 import { Menu } from "../menu/index.js";
 import { Tabs } from "../tabs/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
