@@ -10329,3 +10329,27 @@ the Field labels, listens to and focuses is not the element whose `ValidityState
 
 Combobox, Slider and the native controls register no `validityElement`, so nothing changes for
 them; the "Inside a Field" test row gains NumberField (conventions 10.1).
+
+---
+
+# conventions.md: 13.5 migration note
+
+### 13.5 Migration (0.1.0-alpha.9)
+
+- `data-side` / `data-align` / `state.side` / `state.align` change meaning while shown:
+  resolved, not requested. CSS that used them for an arrow or a gap now follows flips (the
+  intent); code that wanted the requested value reads its own prop.
+- `align="start"` / `"end"` on a `top` / `bottom` side are inline-relative: unchanged in LTR,
+  mirrored under `direction: rtl`.
+- `side` gains `"inline-start"` / `"inline-end"` (Tooltip, Popover, Menu). The state types
+  widen accordingly: an exhaustive switch over `TooltipSide` / `PopoverSide` / `MenuSide` gains
+  two cases, and `state.side` is physical only while shown.
+- Menu's submenu default side is `inline-end`: in RTL the submenu opens on the left and its
+  `data-side` is `left` while shown; the docs' gap rule covers both sides.
+- Combobox's listbox follows a `dir="rtl"` container (Chromium, WebKit; Firefox under 13.3).
+- A context menu in an RTL popup opens to the left of the point; the shipped stylesheet has
+  five options instead of three.
+- The Tooltip docs sentence "`data-side` is the side you asked for" and the Popover / Menu
+  props tables are updated by hand (CLAUDE.md, docs site).
+
+---
