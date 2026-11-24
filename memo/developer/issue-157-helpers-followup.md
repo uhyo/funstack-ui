@@ -10,9 +10,9 @@ Branch `refactor/157-helpers-followup` on master f0a7fac. Source: `memo/reviewer
    1 for unrelated nodes, new returns 0; roots are filtered `isConnected` in one region, so no change);
    Toast.Viewport's second-Viewport warning is `useDevWarning(rejected, ...)` (placed before the
    `if (rejected) return null`). New StrictMode test counts it: master warned twice (verified by
-   reverting the viewport file), now once. CHANGELOG: corrected the one sentence ("left for the branch
-   that splits it") in place, as the task asked, although the CHANGELOG header says "Never edit an
-   entry"; plus a new entry.
+   reverting the viewport file), now once. CHANGELOG: new entry only; it states that it supersedes
+   the earlier "left for the branch that splits it" remark (an in-place edit was made first, then
+   reverted at the coordinator's request: the header says "Never edit an entry").
 2. StrictMode count tests: two Selects with a portalled Value -> 2 warnings; two Dialog Roots with
    Trigger only -> 2. Removing `warned.current` in `useElementCheck` gives 4 (killed).
 3. Messages fixed, rule unchanged: Dialog.Form -> "Dialog.Form: rendered as a `Form.Root`, it needs

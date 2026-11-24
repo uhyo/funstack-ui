@@ -10873,8 +10873,7 @@ directive-free parts): the sites that warn from a registration callback or an ev
 no-Track warnings, Combobox's duplicate option value, RadioGroup's partial hydration,
 `Menu.ContextTrigger`'s missing Popup, `useInitialFocusTarget`), the ones that read the DOM or a
 ref in an effect (`Field.Root`'s "no form control", `useItemOrder`'s duplicate values, Tooltip's
-three checks), and the two in `toast/toast-viewport.tsx` (skipped by that branch; its split, #160,
-was already on master, see the follow-up entry below).
+three checks), and the two in `toast/toast-viewport.tsx` (left for the branch that splits it).
 
 ## 2026-11-24, #157 follow-up: the helpers in the files skipped for the split
 
@@ -10890,8 +10889,9 @@ The files that branch left alone because #160 was splitting them now use the sha
   fires one commit later and once per instance (it fired twice under StrictMode). "toast.update:
   no toast" warns from a call and stays as it is.
 
-The earlier entry's "left for the branch that splits it" is corrected in place to say the split
-was already on master.
+This corrects and supersedes the "hand-rolled dev warnings through the shared helpers" entry
+above, where the two `toast/toast-viewport.tsx` sites are "left for the branch that splits it":
+that split (#160) was already on master, and the sites are converted here.
 
 ## 2026-11-24, #157 follow-up: every development warning starts with its part's name
 
