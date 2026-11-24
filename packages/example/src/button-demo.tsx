@@ -83,7 +83,8 @@ function FormDemo() {
     <section>
       <h3>Secondary submitters: formAction</h3>
       <p>
-        Each <code>Button formAction</code> is pending for its own submission only;{" "}
+        Each <code>Button formAction</code> is pending from its own submission until the form's
+        submissions have all finished (never for another submitter's alone);{" "}
         <code>Form.Submit</code> shows the whole form channel.
       </p>
       <Form.Root

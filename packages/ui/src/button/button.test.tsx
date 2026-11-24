@@ -1030,17 +1030,21 @@ describe("Button", () => {
       expect(click(button("A")).defaultPrevented).toBe(true);
       expect(a).toHaveBeenCalledTimes(1);
 
-      // B while A pends: B's own submission runs.
+      // B while A pends: B's own submission runs; A stays pending although the form status now
+      // names `b` (#154).
       await user.click(button("B"));
       expect(b).toHaveBeenCalledTimes(1);
+      expect(seen.at(-1)).toBe(b);
       expectPending(button("B"));
+      expectPending(button("A"));
+      expect(button("A")).toHaveAttribute("aria-disabled", "true");
       expectPending(button("Publish"));
       await act(async () => {
         da.resolve();
       });
-      // Only A clears; B's own submission and the form channel are still pending.
-      expectNotPending(button("A"));
-      expect(button("A")).not.toHaveAttribute("aria-disabled");
+      // React holds the form status until every overlapping submission has finished, and the
+      // submitters with it.
+      expectPending(button("A"));
       expectPending(button("B"));
       expect(button("B")).toHaveAttribute("aria-disabled", "true");
       expectPending(button("Publish"));
@@ -1050,6 +1054,150 @@ describe("Button", () => {
       expectNotPending(button("A"));
       expectNotPending(button("B"));
       expectNotPending(button("Publish"));
+    });
+
+    for (const order of ["a first", "b first"] as const) {
+      it(`two submitters with different functions: each pending until both finished (${order}, #154)`, async () => {
+        const da = deferred();
+        const db = deferred();
+        const a = vi.fn<(formData: FormData) => Promise<void>>(() => da.promise);
+        const b = vi.fn<(formData: FormData) => Promise<void>>(() => db.promise);
+        render(
+          <form action={() => {}}>
+            <Button formAction={a}>A</Button>
+            <Button formAction={b}>B</Button>
+          </form>,
+        );
+        const user = setupUser();
+        await user.click(button("A"));
+        expectPending(button("A"));
+        expectNotPending(button("B"));
+        await user.click(button("B"));
+        expect(a).toHaveBeenCalledTimes(1);
+        expect(b).toHaveBeenCalledTimes(1);
+        expectPending(button("A"));
+        expectPending(button("B"));
+        const [first, second] = order === "a first" ? [da, db] : [db, da];
+        await act(async () => {
+          first.resolve();
+        });
+        expectPending(button("A"));
+        expectPending(button("B"));
+        await act(async () => {
+          second.resolve();
+        });
+        expectNotPending(button("A"));
+        expectNotPending(button("B"));
+        // The latch is released: a later submission by B alone leaves A idle.
+        const db2 = deferred();
+        b.mockImplementation(() => db2.promise);
+        await user.click(button("B"));
+        expectPending(button("B"));
+        expectNotPending(button("A"));
+        await act(async () => {
+          db2.resolve();
+        });
+        expectNotPending(button("B"));
+      });
+    }
+
+    it("the form's own action submitted while A runs: A stays pending (#154)", async () => {
+      const da = deferred();
+      const df = deferred();
+      const a = vi.fn<(formData: FormData) => Promise<void>>(() => da.promise);
+      const own = vi.fn<(formData: FormData) => Promise<void>>(() => df.promise);
+      render(
+        <form action={own}>
+          <Button formAction={a}>A</Button>
+          <Form.Submit>Publish</Form.Submit>
+        </form>,
+      );
+      const user = setupUser();
+      await user.click(button("A"));
+      expectPending(button("A"));
+      await user.click(button("Publish"));
+      expect(own).toHaveBeenCalledTimes(1);
+      expectPending(button("A"));
+      expectPending(button("Publish"));
+      await act(async () => {
+        da.resolve();
+      });
+      expectPending(button("A"));
+      await act(async () => {
+        df.resolve();
+      });
+      expectNotPending(button("A"));
+      expectNotPending(button("Publish"));
+    });
+
+    it('"ignore": A, B, then A again is cancelled while the first run of a is in flight (#154)', async () => {
+      const da = deferred();
+      const db = deferred();
+      const a = vi.fn<(formData: FormData) => Promise<void>>(() => da.promise);
+      const b = vi.fn<(formData: FormData) => Promise<void>>(() => db.promise);
+      render(
+        <form action={() => {}}>
+          <Button formAction={a} whilePending="ignore">
+            A
+          </Button>
+          <Button formAction={b}>B</Button>
+        </form>,
+      );
+      const user = setupUser();
+      await user.click(button("A"));
+      await user.click(button("B"));
+      expect(button("A")).toHaveAttribute("aria-disabled", "true");
+      expect(click(button("A")).defaultPrevented).toBe(true);
+      await act(async () => {});
+      expect(a).toHaveBeenCalledTimes(1);
+      // Still cancelled after b settled: a has not.
+      await act(async () => {
+        db.resolve();
+      });
+      expect(click(button("A")).defaultPrevented).toBe(true);
+      expect(a).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        da.resolve();
+      });
+      expectNotPending(button("A"));
+      expect(button("A")).not.toHaveAttribute("aria-disabled");
+    });
+
+    it("a click whose submission validation cancels never latches (#154)", async () => {
+      const db = deferred();
+      const a = vi.fn<(formData: FormData) => Promise<void>>(() => Promise.resolve());
+      const b = vi.fn<(formData: FormData) => Promise<void>>(() => db.promise);
+      const pendings: boolean[] = [];
+      render(
+        <form action={() => {}}>
+          <input name="title" required aria-label="Title" />
+          <Button
+            formAction={a}
+            className={({ pending }) => {
+              pendings.push(pending);
+              return undefined;
+            }}
+          >
+            A
+          </Button>
+          <Button formAction={b}>B</Button>
+        </form>,
+      );
+      const user = setupUser();
+      await user.click(button("A"));
+      expect(a).not.toHaveBeenCalled();
+      expectNotPending(button("A"));
+      await user.type(screen.getByRole("textbox", { name: "Title" }), "Draft");
+      await user.click(button("B"));
+      expect(b).toHaveBeenCalledTimes(1);
+      expectPending(button("B"));
+      expectNotPending(button("A"));
+      expect(pendings).not.toContain(true);
+      await act(async () => {
+        db.resolve();
+      });
+      expectNotPending(button("B"));
+      expectNotPending(button("A"));
     });
 
     it("inside Form.Root: the Button's function runs, not the form's; the form shows pending", async () => {

@@ -1026,9 +1026,12 @@ are independent and the library does not couple them:
   and `Form.Submit` (#54) do, and a control inside a Field keeps its own `data-pending` for its
   own action, so the two meanings never share an element. A part with its **own** function
   `formAction` (`Button`, #79) may expose the channel's pending **for its own submissions only**:
-  `useFormStatus().action` is the submitter's function, so `status.pending && status.action ===
-  formAction` is this submitter's pending and no other's (the third and last allowed reading of
-  the channel; a plain `type="submit"` button with no `formAction` reads nothing).
+  `useFormStatus().action` is the latest submitter's function, so once `status.pending &&
+  status.action === formAction` has been rendered the part latches it and stays pending until
+  the channel is idle: pending from its own submission until the form's submissions have all
+  finished, and never for another submitter's alone (#154; `status.action` is overwritten by an
+  overlapping submission, so the bare comparison lost it). This is the third and last allowed
+  reading of the channel; a plain `type="submit"` button with no `formAction` reads nothing.
 - A part may **observe** the form channel to perform a platform side effect after a successful
   action (`Dialog.Form` closes the dialog once the action's transition settles); it never wraps
   the action (so a Server Function keeps progressive enhancement) and never reports form pending

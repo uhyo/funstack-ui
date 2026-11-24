@@ -87,7 +87,8 @@ export function ButtonPage() {
               <>
                 React's <code>formAction</code>: run by React instead of the form's{" "}
                 <code>action</code> when this Button submits the form. With a function the Button is
-                pending for its own submissions only and defaults to <code>type="submit"</code>; a
+                pending from its own submission until the form's submissions have all finished
+                (never for another submitter's alone) and defaults to <code>type="submit"</code>; a
                 click meanwhile submits again unless <code>whilePending</code> is{" "}
                 <code>"ignore"</code> (see <a href="#forms">Forms</a>). Prefer a stable function (a
                 Server Function, a <code>useActionState</code> dispatch, <code>useCallback</code>)
@@ -165,7 +166,7 @@ export function ButtonPage() {
         rows={[
           [
             "`data-pending`",
-            "The Button's own `action` is in flight (until the commit that ends it, including a Suspense wait), or a submission it started with its own function `formAction` is pending.",
+            "The Button's own `action` is in flight (until the commit that ends it, including a Suspense wait), or it submitted the form with its own function `formAction` and the form's submissions have not all finished.",
           ],
           ["`data-disabled`", "The `disabled` prop. Not set by pending."],
           [
@@ -216,7 +217,7 @@ export function ButtonPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          'A [pure trigger](/concepts/pending-and-optimistic#pure-trigger): no optimistic state. `data-pending` while its own action (or a submission started by its own function `formAction`) is in flight. A second click, Enter or Space meanwhile runs again by default; with `whilePending="ignore"` it is ignored and the Button is `aria-disabled="true"`.'
+          'A [pure trigger](/concepts/pending-and-optimistic#pure-trigger): no optimistic state. `data-pending` while its own action is in flight, or from a submission started by its own function `formAction` until the form\'s submissions have all finished. A second click, Enter or Space meanwhile runs again by default; with `whilePending="ignore"` it is ignored and the Button is `aria-disabled="true"`.'
         }
       >
         <h4 id="pending-and-re-entry">A click while pending</h4>
@@ -320,8 +321,9 @@ import { archive } from "./actions"; // "use server"
         A Button is <code>type="button"</code> by default, so an <code>action</code> Button never
         submits the form it sits in. With <code>formAction</code> it is a submit button that runs
         its own function instead of the form's <code>action</code>: constraint validation,{" "}
-        <code>FormData</code> and React's automatic form reset all apply. It is pending for its own
-        submissions only (React reports the submitter's function through{" "}
+        <code>FormData</code> and React's automatic form reset all apply. It is pending from its own
+        submission until the form's submissions have all finished, and never for another submitter's
+        alone (React reports the latest submitter's function through{" "}
         <code>useFormStatus().action</code>).
       </p>
       <Callout title="Overlapping submissions">
@@ -333,6 +335,17 @@ import { archive } from "./actions"; // "use server"
           For a submission that must not overlap, use <code>whilePending="ignore"</code> (as in the
           example above), or pass a <code>useActionState</code> dispatch, which React runs in order.
         </p>
+        <p>
+          When another submitter (a second <code>Button formAction</code>, <code>Form.Submit</code>,
+          Enter in a field) submits while a Button's own submission runs, both stay pending until
+          both have settled, also the one that finished first: React holds the form's status, and
+          the results of the actions, until every overlapping submission has finished, as it does
+          for two overlapping <code>Button action</code>s. A <code>whilePending="ignore"</code>{" "}
+          Button therefore keeps ignoring clicks through the overlap. One case cannot be seen: two
+          submissions started by script in the same task (<code>requestSubmit(a)</code> then{" "}
+          <code>requestSubmit(b)</code>) never let React render the status of the first, so its
+          Button is not pending.
+        </p>
       </Callout>
       <Table
         head={["", "Form.Submit", "Button formAction", 'Button type="submit"']}
@@ -343,7 +356,12 @@ import { archive } from "./actions"; // "use server"
             "its own function instead",
             "the form's own `action`",
           ],
-          ["`pending`", "the form channel: any submitter", "its own submissions only", "none"],
+          [
+            "`pending`",
+            "the form channel: any submitter",
+            "from its own submission until the form's submissions have all finished",
+            "none",
+          ],
           [
             "A click while pending",
             "not blocked (a `useActionState` dispatch queues it, in order)",
