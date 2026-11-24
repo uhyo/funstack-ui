@@ -12,12 +12,11 @@ small text edits). None of M1 to M3 is a regression against master (the text was
 stale there), but each contradicts the branch's own claim that the #148 sweep and the
 `aria-expanded` cleanup are done. L1 is new with the branch.
 
-Note before merging: the branch contains the `feat/157-align` merge (bda96ce: Accordion
-document order, the Toast / Form.Submit `disabled` rule, Form.Root `reportError`), which is
-**not on master**. Merging this branch lands that code too. It was reviewed
-(`memo/reviewer/review-157-align.md`, acceptable) and c41e2c8 addresses that review. On the
-branch, `pnpm --filter @funstack/ui typecheck` and the jsdom tests of accordion, form, toast,
-dialog and popover pass (835 tests). I did not run the full `test:run` / browser suites.
+Note: the branch contains the `feat/157-align` merge (bda96ce). It was not on master when the
+review started and was merged to master during it, so merging this branch no longer brings in
+code. On the branch, `pnpm --filter @funstack/ui typecheck` and the jsdom tests of accordion,
+form, toast, dialog and popover pass (835 tests); I did not run the full `test:run` / browser
+suites.
 
 ## Medium
 
