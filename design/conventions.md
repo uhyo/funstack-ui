@@ -2589,6 +2589,7 @@ packages/ui/src/
     use-controllable-action.ts  # section 3.4; also intendedValue (3.8 rule 1)
     use-action-trigger.ts   # section 3.4: pure triggers
     use-pure-trigger.ts     # usePureTrigger: the whilePending wiring of the four pure triggers with the prop (2.5.1, 3.6)
+    use-step-commit.ts      # the step / commit core of the continuous controls, Slider and NumberField (2.3; slider.md 2.4)
     report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; useConnected(); both hooks call them
     use-render.tsx          # resolves render / className / style / children against state
     render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, pendingAriaDisabled (1.2)
@@ -2621,6 +2622,7 @@ packages/ui/src/
     use-overlay-root.ts     # useOverlayRoot, popoverDetails, OverlayRootValue (section 3.9): Popover, Menu, Combobox, Dialog
     use-popover-popup.ts, use-popover-trigger.ts  # the shared Popup and Trigger of Popover, Menu, Combobox
     overlay-popup.tsx       # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
+    overlay-show.ts         # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
     use-overlay-close.ts    # useOverlayClose: the one Close part of Popover and Dialog
     content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
     use-exit-animation.ts   # held content while an exit animates (popover.md 4.4)

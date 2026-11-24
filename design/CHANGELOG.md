@@ -10646,7 +10646,64 @@ where this document and the conventions disagree, the conventions win.
 
 ---
 
-# 2026-11-24, #158: `disabled` follows who runs the click
+# Entries
+
+## 2026-11-24: one step / commit core for Slider and NumberField (#157)
+
+Refactoring wave #157, candidate 3 of `memo/architect/refactor-audit.md` (user decision: the
+wave). Internal only, no behaviour change. The step and commit logic that `Slider.Root` and
+`NumberField.Root` carried twice (`live`, `stepHeld`, the gesture start, the commit sequence with
+the `"dismiss"` revert, the two channels through `useControllableAction` and `useActionTrigger`,
+the pending source, the reason consumed by the Field notification) moved to
+`internal/use-step-commit.ts`. What differs is passed in as options: the internal value shape
+(`toShown` / `fromShown`: Slider's arrays), the no-op test (`equalValues` / `Object.is`),
+NumberField's rounding before the no-op test (`normalize`), its draft clearing and hidden-input
+write per step (`onStep`) and its announcement per commit (`onCommit`).
+
+Sections changed: conventions 9.1 (the `internal/` listing names the new module); slider.md 2.4
+and number-field.md 2.4 say where the two entry points are implemented. Developer notes:
+`memo/developer/issue-157-step-commit.md`.
+
+## 2026-11-24: slider.md and number-field.md describe the step / commit code (#157)
+
+Coordinator request after the step / commit refactor; docs only, no code change. The design text
+had drifted from the code (found while extracting `internal/use-step-commit.ts`):
+
+- slider.md 2.4 and number-field.md 2.4 said a commit writes `gestureStart = next` after
+  dispatching. The code clears the gesture start to `null` at the start of every commit; a
+  trailing native `change` finds no open gesture, and a later native `input` opens a fresh one.
+- number-field.md 2.2 / 2.4 spoke of `live: useState<number | null>` with a `liveSet` flag; the
+  code boxes `live` (`{ value }`), as Slider now does. Slider's `live` row and 2.2 snippet follow.
+- number-field.md 2.4 and 4.3 item 3 said a key press and a hold open the gesture at the base
+  (the parsed draft); the code opens it at the shown value and steps from the base.
+- slider.md 2's state table had `gesture: useState<{ thumb } | null>`; the code has
+  `gestureThumb: number | null`.
+
+The 2.4 pseudocode of both documents, which restated the code, is replaced by present-tense
+bullets (as dialog.md 2.5 and popover.md 2.5). Sections changed: slider.md 2 (table), 2.2, 2.4;
+number-field.md 2 (table), 2.2, 2.4, 4.3.
+
+## 2026-11-24: slider.md 4.1 and 12 name `gestureThumb` (#157)
+
+Review of `refactor/157-step-commit` (nit 3): the `pointerdown` row of 4.1 wrote
+`gesture = { thumb: index }` and the walkthroughs of section 12 `G={thumb:0}`, after the state
+table had become `gestureThumb: number | null`. Now `gestureThumb = index`, and `G` is
+`gestureThumb` in the walkthrough notation (`G=0`, `G=null`). Docs only.
+
+## 2026-11-24, #157: shared popup flags and show wrapper
+
+Refactoring wave #157, phase 2 (overlay safe steps; user decision 2026-11-24: share the show
+wrapper and the refused-reopen flags first, reassess the full merge afterwards). Internal only,
+no behaviour change.
+
+- `design/conventions.md` 9.1: the `internal/` listing gains `overlay-show.ts`
+  (`createPopupFlags`, `showWithFocus`), which `internal/use-popover-popup.ts` and
+  `dialog/dialog-popup.tsx` now both use for `awaitingClose`, the library echo
+  (`libraryHide` / `libraryClose`) and `refusedFact`, and for the `inert` + `autofocus` +
+  `try/finally` around the show. The rules (3.9.2, 3.9.4, popover.md 2.5, dialog.md 2.3) are
+  unchanged; Dialog still applies the refused re-open to non-modal dialogs only.
+
+## 2026-11-24: `disabled` follows who runs the click (#158)
 
 Decided by the user (2026-11-24, GitHub issue #158), from the ruling in
 `memo/reviewer/review-157-align.md`. Sections changed: conventions 1.2 (the `disabled` rule, the
@@ -10679,12 +10736,11 @@ toast.md on the pending `aria-disabled`.
   is a host element other than `<button>` / `<input>`" (Form.Submit's expression, moved into the
   helper). Side effect on the JS-free command parts (Dialog / Popover Trigger and Close without
   a handler): a host link render there renders `aria-disabled` instead of a meaningless
-  `disabled` attribute; nothing cancels its click (no handler installed), and it is no invoker,
-  as before. `Button` now calls the helper instead of its own expression.
+  `disabled` attribute, and while disabled the part installs a click handler that cancels the
+  click (after hydration a disabled link does not navigate; review M1 of
+  `memo/reviewer/review-157-pure-trigger.md`). It is no invoker, as before. `Button` now calls the helper instead of its own expression.
 
----
-
-# 2026-11-24, #157 candidate 4: `usePureTrigger`
+## 2026-11-24: `usePureTrigger` (#157 candidate 4)
 
 Internal refactoring, no behaviour change (refactoring wave #157, `memo/architect/refactor-audit.md`
 rank 4). The `whilePending` wiring that Button, `useOverlayClose`, Menu.Item and Toast.Action each

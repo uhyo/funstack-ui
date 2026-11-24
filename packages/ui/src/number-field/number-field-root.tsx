@@ -1,16 +1,6 @@
 "use client";
-import {
-  addTransitionType,
-  use,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { use, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
-import { createActionDetails } from "../internal/action-details.js";
 import { announce as speak } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { FieldContext } from "../internal/field-context.js";
@@ -23,14 +13,13 @@ import type {
   RenderProp,
   StateValue,
 } from "../internal/types.js";
-import { useActionTrigger } from "../internal/use-action-trigger.js";
-import { useControllableAction } from "../internal/use-controllable-action.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
+import { useStepCommit } from "../internal/use-step-commit.js";
 import { keyStep, stepValue } from "./number-field-arithmetic.js";
 import type { StepBounds } from "./number-field-arithmetic.js";
 import { NumberFieldContext } from "./number-field-context.js";
@@ -192,6 +181,15 @@ function sanitize(value: number | null | undefined): number | null | undefined {
   return Number.isFinite(value) ? value : null;
 }
 
+/** The `details` fields of both actions. */
+function numberFieldDetails(reason: ChangeReason, source: NumberFieldSource) {
+  return { reason, source };
+}
+
+function identity(value: number | null): number | null {
+  return value;
+}
+
 /** The hidden input's value for `value`. */
 function hiddenText(value: number | null): string {
   return value === null ? "" : String(value);
@@ -309,20 +307,10 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   const [draft, setDraft] = useState<string | null>(null);
   const draftRef = useRef<string | null>(null);
-  /** The value the open gesture has reached (`null` inside: an empty value). */
-  const [live, setLive] = useState<{ readonly value: number | null } | null>(null);
   const [hold, setHold] = useState<StepDirection | null>(null);
-  const [stepHeld, setStepHeld] = useState(false);
-  const [pendingSource, setPendingSource] = useState<NumberFieldSource>(null);
-
-  const liveRef = useRef<number | null>(null);
-  /** The shown value when the open gesture began; `null` when no gesture is open. */
-  const gestureStart = useRef<{ readonly value: number | null } | null>(null);
   /** The value the next tick of a hold steps from. */
   const holdBase = useRef<number | null>(null);
   const holdRef = useRef<StepDirection | null>(null);
-  const commitSeq = useRef(0);
-  const lastReason = useRef<ChangeReason | null>(null);
   const visibleRef = useRef<HTMLInputElement | null>(null);
   const hiddenRef = useRef<HTMLInputElement | null>(null);
 
@@ -348,51 +336,55 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     if (visible.validationMessage !== message) visible.setCustomValidity(message);
   }, []);
 
-  // A step is not a re-entry: a continuous control dispatches one step per key press or pointer
-  // move and every step must run (design/components/button.md 16.1), so no in-flight guard.
-  const { pending: stepPending, run: runStep } = useActionTrigger({
-    ignoreWhilePending: false,
-  });
-
-  const runCommit = async (
-    next: number | null,
-    details: NumberFieldValueChangeDetails,
-  ): Promise<void> => {
-    const seq = ++commitSeq.current;
-    try {
-      await valueCommitAction?.(next, details);
-    } catch (error) {
-      // Design 2.4: in uncontrolled mode, tell the preview channel about the rollback, for the
-      // latest commit only. Yield once to leave the commit's transition (conventions 2.6).
-      if (valueProp === undefined && seq === commitSeq.current) {
-        await undefined;
-        // `step` and `committedRef` are declared below; this runs long after the render.
-        step(committedRef.current, null, "dismiss", undefined);
-      }
-      throw error;
-    }
-  };
-
-  const commitState = useControllableAction<number | null, NumberFieldValueChangeDetails>({
+  // The step and commit core (design 2.4), shared with Slider.
+  const {
+    shown,
+    shownRef,
+    optimistic,
+    pending,
+    pendingSource,
+    step,
+    commit,
+    openGesture,
+    captureGesture,
+    takeEdit,
+  } = useStepCommit<
+    number | null,
+    number | null,
+    NumberFieldSource,
+    ReturnType<typeof numberFieldDetails>
+  >({
     controlled: value,
     defaultValue,
     initialValue: null,
-    action: runCommit,
-    transitionTypes: () => COMMIT_TYPES,
+    stepAction: valueChangeAction,
+    commitAction: valueCommitAction,
+    stepTypes: STEP_TYPES,
+    commitTypes: COMMIT_TYPES,
     warn: { component: "NumberField.Root", prop: "value" },
+    toShown: identity,
+    fromShown: identity,
+    equals: Object.is,
+    details: numberFieldDetails,
+    captured: hold !== null,
+    // What the text can show is what the form posts (5.4): a step finer than the format's
+    // digits is rounded like a typed value.
+    normalize: (next) => (next === null ? next : formatter.round(next)),
+    // A step clears the draft and writes the hidden input synchronously (section 6).
+    onStep: (next) => {
+      clearDraft();
+      syncHidden(next);
+    },
+    // `announceValue` is declared below; this runs in an event, long after the render.
+    onCommit: (next, source, reason) => {
+      if (reason === "activate" && source !== "input" && source !== null) announceValue(next);
+    },
   });
-  const { optimistic, committed, dispatch } = commitState;
-  const committedRef = useLatest(committed);
 
-  const held = hold !== null || stepHeld || stepPending || commitState.pending;
-  const shown = held && live !== null ? live.value : optimistic;
-  const pending = stepPending || commitState.pending;
   const text = draft ?? formatter.format(shown);
   // The value a button press steps from (4.3 step 3): the parsed draft while one is open.
   const parsedDraft = draft === null ? undefined : formatter.parse(draft);
   const stepBase = parsedDraft === undefined ? shown : parsedDraft;
-  /** What the input shows, for handlers; also written by `step` ahead of the render. */
-  const shownRef = useLatest(shown);
 
   const state = useMemo<NumberFieldState>(
     () => ({ value: shown, text, pending, disabled, readOnly, required }),
@@ -401,15 +393,9 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // A step, a key and a typed commit fire no `input` / `change` on the element the Field hears
   // for the value (the hidden input is written by script): tell it at the commit (design 7.2).
-  useFieldValueChange(optimistic, () => {
-    const edit = lastReason.current === "activate";
-    lastReason.current = null;
-    return edit;
-  });
+  useFieldValueChange(optimistic, takeEdit);
 
   const latest = useLatest({
-    valueChangeAction,
-    runStep,
     formatter,
     bounds,
     largeStep,
@@ -419,41 +405,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     state,
   });
 
-  // --- Step and commit (design 2.4) -----------------------------------------------------------
-
-  const step = useCallback(
-    (
-      next: number | null,
-      source: NumberFieldSource,
-      reason: ChangeReason,
-      event: Event | undefined,
-    ): boolean => {
-      // What the text can show is what the form posts (5.4): a step finer than the format's
-      // digits is rounded like a typed value.
-      const { formatter: f } = latest.current;
-      if (next !== null) next = f.round(next);
-      // No-op against what the user sees (conventions 2.3 item 8).
-      if (Object.is(next, shownRef.current)) return false;
-      liveRef.current = next;
-      shownRef.current = next;
-      lastReason.current = reason;
-      setLive({ value: next });
-      clearDraft();
-      setPendingSource(source);
-      syncHidden(next);
-      // A revert has no commit after it: the optimistic value already shows the committed one.
-      if (reason !== "dismiss") setStepHeld(true);
-      const { valueChangeAction: action, runStep: run } = latest.current;
-      // Without a step action nothing runs and no transition starts (as Slider).
-      if (action === undefined) return true;
-      run(() => {
-        for (const type of STEP_TYPES) addTransitionType(type);
-        return action(next, createActionDetails(event, { reason, source }));
-      });
-      return true;
-    },
-    [clearDraft, latest, shownRef, syncHidden],
-  );
+  // --- Announcements (design 8.3) ---------------------------------------------------------------
 
   const announceValue = useCallback(
     (next: number | null) => {
@@ -466,30 +418,6 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     },
     [latest],
   );
-
-  const commit = useCallback(
-    (source: NumberFieldSource, reason: ChangeReason, event: Event | undefined): boolean => {
-      const start = gestureStart.current;
-      gestureStart.current = null;
-      // The commit's own pending state holds `live` from here (set in this same batch).
-      setStepHeld(false);
-      const next = liveRef.current;
-      // Nothing changed since the gesture began (a hold that returned to its start).
-      if (start === null || Object.is(next, start.value)) return false;
-      lastReason.current = reason;
-      setPendingSource(source);
-      dispatch(next, createActionDetails(event, { reason, source }));
-      if (reason === "activate" && source !== "input" && source !== null) announceValue(next);
-      return true;
-    },
-    [announceValue, dispatch],
-  );
-
-  /** Opens a gesture at the shown value. */
-  const openGesture = useCallback(() => {
-    gestureStart.current = { value: shownRef.current };
-    liveRef.current = shownRef.current;
-  }, [shownRef]);
 
   /** The value a key or a button steps from: the parsed draft if one is open, else the shown value. */
   const resolveBase = useCallback((): number | null => {
@@ -613,15 +541,14 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       const { disabled: off, readOnly: ro } = latest.current;
       if (off || ro || holdRef.current !== null) return false;
       const base = resolveBase();
-      openGesture();
       // A capture alone holds `live` on screen: start it from what is shown.
-      setLive({ value: shownRef.current });
+      captureGesture();
       holdBase.current = base;
       holdRef.current = direction;
       setHold(direction);
       return tickHold(direction, event);
     },
-    [latest, openGesture, resolveBase, shownRef, tickHold],
+    [captureGesture, latest, resolveBase, tickHold],
   );
 
   const activate = useCallback(

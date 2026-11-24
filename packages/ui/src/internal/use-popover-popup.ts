@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
+import { useCallback, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
 import { withCssTransitionCut } from "./css-transition-cut.js";
@@ -14,6 +14,7 @@ import {
   useCloseHold,
   useInitialFocusTarget,
 } from "./overlay-popup.js";
+import { createPopupFlags, showWithFocus } from "./overlay-show.js";
 import { isPopoverOpen } from "./popover-open.js";
 import { useElementCheck } from "./use-element-check.js";
 import { useInterestDismiss } from "./use-interest-dismiss.js";
@@ -114,22 +115,12 @@ export function usePopoverPopup(
   const opening = useRef(false);
   // Set across `reshow()`: the show is not a new open.
   const reshowing = useRef(false);
-  // Set by the synchronous `beforetoggle` of a close, cleared by `toggle` a task later: the
-  // popup is hidden but its `toggle` has not arrived, so the apply effect must not re-open it
-  // from a commit that lands in between (design 2.5).
-  const awaitingClose = useRef(false);
-  // Set right before the library's own `hidePopover()` (the apply effect), consumed by the next
-  // `toggle`: that hide is the library's, every other is a fact (conventions 3.9.2). The
-  // echo is recognised by its source, as Dialog's `libraryClose`, not by what is intended: a
-  // dismissal during a pending part close is a fact and must be reported.
-  const libraryHide = useRef(false);
+  // `awaitingClose` (design 2.5), the library echo `libraryHide` (conventions 3.9.2) and
+  // `refusedFact` (3.9.4; #155: otherwise Tab and Escape could never leave a menu whose parent
+  // keeps `open={true}`), as Dialog's.
+  const [flags] = useState(createPopupFlags);
   // Whether focus was inside the popup when its last close began (design 6.2 rule 1).
   const focusWasInside = useRef(false);
-  // Set when a fact hid the popup, cleared once a commit has `committed` false (the fact was
-  // adopted): a show while it is set is the re-open of a dismissal a controlled parent refused,
-  // which leaves focus where the dismissal put it (no initial focus; #155: otherwise Tab and
-  // Escape could never leave a menu whose parent keeps `open={true}`).
-  const refusedFact = useRef(false);
   const initialFocusTarget = useInitialFocusTarget(part, "popup");
   // `interestfor` (library mode, popover.md lost-interest amendment).
   const interest = useInterestDismiss(ctx);
@@ -181,34 +172,27 @@ export function usePopoverPopup(
 
   const showPopup = (element: HTMLElement): void => {
     // A refused re-open never moves focus (#155, #156): no initial focus target, and the popup is
-    // `inert` for the duration of the call, so the popover focusing steps find nothing focusable
-    // and do nothing: neither the dialog focusing steps of a `<dialog>` (Popover's default) nor a
-    // consumer's own `autofocus` in any popup. The element the dismissal focused sees no blur.
-    // A consumer's own `inert` is left alone.
-    const refused = refusedFact.current;
-    refusedFact.current = false;
-    const inerted = refused && !element.hasAttribute("inert");
-    if (inerted) element.setAttribute("inert", "");
+    // `inert` for the call (showWithFocus), whether the focusing steps are the dialog focusing
+    // steps of a `<dialog>` (Popover's default) or a consumer's own `autofocus` in any popup.
+    const refused = flags.takeRefused();
     const focus = refused ? null : resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps
-    // for a <dialog>, in every engine); React drops `autoFocus` on client-rendered content.
-    // Never `.focus()` (6.1) except for the quiet target above.
-    const autofocused =
-      focus !== null && !focus.quiet && !focus.target.hasAttribute("autofocus")
-        ? focus.target
-        : null;
-    autofocused?.setAttribute("autofocus", "");
-    opening.current = true;
-    try {
-      const source = options.source !== undefined ? options.source() : triggerRef.current;
-      withCssTransitionCut(element, hasTransition, () =>
-        element.showPopover(source != null && source.isConnected ? { source } : undefined),
-      );
-    } finally {
-      opening.current = false;
-      autofocused?.removeAttribute("autofocus");
-      if (inerted) element.removeAttribute("inert");
-    }
+    // for a <dialog>, in every engine). Never `.focus()` (6.1) except for the quiet target above.
+    showWithFocus(element, {
+      refused,
+      autofocus: focus !== null && !focus.quiet ? focus.target : null,
+      show: () => {
+        opening.current = true;
+        try {
+          const source = options.source !== undefined ? options.source() : triggerRef.current;
+          withCssTransitionCut(element, hasTransition, () =>
+            element.showPopover(source != null && source.isConnected ? { source } : undefined),
+          );
+        } finally {
+          opening.current = false;
+        }
+      },
+    });
     if (focus?.quiet === true && isPopoverOpen(element) && element.contains(focus.target)) {
       focus.target.focus({ focusVisible: false } as FocusOptions);
     }
@@ -233,7 +217,7 @@ export function usePopoverPopup(
     }
     // Whether or not the engine fires the coalesced `toggle`, the close bookkeeping of the hide
     // half is void: the popup is open again.
-    awaitingClose.current = false;
+    flags.endClose();
     focusWasInside.current = false;
     return isPopoverOpen(element);
   };
@@ -268,16 +252,16 @@ export function usePopoverPopup(
     if (element === null || !element.isConnected) return;
     // The fact was adopted (or anything else closed the popup in state): a later show is a new
     // open, with initial focus.
-    if (!ctx.committed) refusedFact.current = false;
+    if (!ctx.committed) flags.factAdopted();
     if (!ctx.pending && ctx.latestInFlight() === null) {
       const shown = isPopoverOpen(element);
       if (ctx.committed && !shown) {
-        if (!awaitingClose.current) showPopup(element);
+        if (!flags.awaitingClose()) showPopup(element);
       } else if (!ctx.committed && shown) {
-        // The library's own hide: the `toggle` listener recognises it by `libraryHide` and
-        // reports nothing.
+        // The library's own hide: the `toggle` listener recognises it by the echo marker
+        // (`libraryHide`) and reports nothing.
         ctx.recordCloseIntent(undefined);
-        libraryHide.current = true;
+        flags.markLibraryClose();
         withCssTransitionCut(element, hasTransition, () => element.hidePopover());
         // The close commit may have unmounted the focused content before the hide: the
         // platform restores focus only from inside the popover, so do it now.
@@ -286,7 +270,7 @@ export function usePopoverPopup(
     }
     // Content that unmounted while the popup stays open (not a close): forget it.
     if (ctx.committed && isPopoverOpen(element)) contentProbe.forget();
-    exit.releaseIfIdle(ctx.committed, awaitingClose.current, isPopoverOpen(element));
+    exit.releaseIfIdle(ctx.committed, flags.awaitingClose(), isPopoverOpen(element));
   });
 
   // --- Native listeners (conventions 7.4; filtered on target: React 19.3.1 emulates bubbling
@@ -317,7 +301,7 @@ export function usePopoverPopup(
       if (isLibrary && closedByPopoverTarget(toggle, element)) {
         ctx.recordCloseIntent({ reason: "activate", event }, { unlessRecorded: true });
       }
-      awaitingClose.current = true;
+      flags.beginClose();
       exit.recordBaseline(element);
       const active = element.ownerDocument.activeElement;
       focusWasInside.current =
@@ -329,11 +313,10 @@ export function usePopoverPopup(
   const onToggle = (event: Event): void => {
     const element = popupRef.current;
     if (element === null || event.target !== element) return;
-    awaitingClose.current = false;
+    flags.endClose();
     // Consumed by every `toggle`, whatever it reports: a hide the engine coalesced with a show
     // must not mark a later dismissal as the library's.
-    const echo = libraryHide.current;
-    libraryHide.current = false;
+    const echo = flags.takeLibraryClose();
     const lostInterest = interest.takeLostInterest();
     // JS-free mode writes the Trigger's `data-open`; library mode mirrors into the Root, which
     // non-button Triggers and the Combobox Input render as `aria-expanded`.
@@ -356,7 +339,7 @@ export function usePopoverPopup(
         // Anything but the library's own hide is a fact: committed `false` now (urgent, this
         // event's commit) and `onOpenChange(false)` (conventions 3.9.3).
         if (!echo) {
-          refusedFact.current = true;
+          flags.markFact();
           ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
         }
       }

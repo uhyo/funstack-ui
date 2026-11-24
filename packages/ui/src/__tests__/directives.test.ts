@@ -200,6 +200,8 @@ const directiveFreeFiles = [
   "menu/menu-outside.mjs",
   "menu/menu-gestures.mjs",
   "menu/menu-point.mjs",
+  "dialog/dialog-dismiss.mjs",
+  "internal/overlay-show.mjs",
   "toast/toast-queue.mjs",
   "toast/toast-hotkey.mjs",
   "toast/toast-timers.mjs",
