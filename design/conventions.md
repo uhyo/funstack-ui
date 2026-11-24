@@ -2574,6 +2574,7 @@ packages/ui/src/
     platform-attributes.ts  # the one `declare module "react"` (section 7.4)
     use-controllable-action.ts  # section 3.4; also intendedValue (3.8 rule 1)
     use-action-trigger.ts   # section 3.4: pure triggers
+    use-step-commit.ts      # the step / commit core of the continuous controls, Slider and NumberField (2.3; slider.md 2.4)
     report-dropped.ts       # section 2.4: reportDropped(error) -> global reportError, console.error fallback; useConnected(); both hooks call them
     use-render.tsx          # resolves render / className / style / children against state
     render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton (1.2)

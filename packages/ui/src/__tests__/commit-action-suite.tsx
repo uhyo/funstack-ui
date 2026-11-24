@@ -341,6 +341,43 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
       });
     });
 
+    describe("rejection, synchronous throw", () => {
+      // #157 review M6: a synchronous throw lands in the catch while the commit's transition
+      // scope is still open; the rollback must leave it first (conventions 2.6).
+      it('a valueCommitAction that throws synchronously reports the "dismiss" step after the event, outside the commit\'s transition', async () => {
+        silenceErrors();
+        const order: string[] = [];
+        const caught = vi.fn();
+        const onChange = vi.fn<ChangeFn>((_next, details) => {
+          order.push(details.reason);
+        });
+        const onCommit = vi.fn<CommitFn>(() => {
+          order.push("commit");
+          throw new Error("sync failure");
+        });
+        render(
+          <Fixture
+            mode="uncontrolled"
+            initial={values[1]}
+            onChange={onChange}
+            onCommit={onCommit}
+            boundary={caught}
+          />,
+        );
+        // Not awaited before the mark: an `await` here would itself yield to the microtasks.
+        const done = driver.gesture(1);
+        order.push("event done");
+        await done;
+        await flushMicrotasks();
+        expect(order).toEqual(["activate", "commit", "event done", "dismiss"]);
+        const [next, details] = onChange.mock.calls[1]!;
+        expect(next).toEqual(values[1]);
+        expect(source(details)).toBeNull();
+        expect(caught).toHaveBeenCalledTimes(1);
+        expect((caught.mock.calls[0]![0] as Error).message).toBe("sync failure");
+      });
+    });
+
     describe("rollback with the control mounted", () => {
       it("an update-on-success parent whose save fails (handled in the action): the control returns to the parent's value", async () => {
         const d = deferred();

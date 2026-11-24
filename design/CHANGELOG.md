@@ -10643,3 +10643,49 @@ where this document and the conventions disagree, the conventions win.
 
 Status: **proposed** (2026-10-15, GitHub issue #9). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win.
+
+---
+
+# Entries
+
+## 2026-11-24: one step / commit core for Slider and NumberField (#157)
+
+Refactoring wave #157, candidate 3 of `memo/architect/refactor-audit.md` (user decision: the
+wave). Internal only, no behaviour change. The step and commit logic that `Slider.Root` and
+`NumberField.Root` carried twice (`live`, `stepHeld`, the gesture start, the commit sequence with
+the `"dismiss"` revert, the two channels through `useControllableAction` and `useActionTrigger`,
+the pending source, the reason consumed by the Field notification) moved to
+`internal/use-step-commit.ts`. What differs is passed in as options: the internal value shape
+(`toShown` / `fromShown`: Slider's arrays), the no-op test (`equalValues` / `Object.is`),
+NumberField's rounding before the no-op test (`normalize`), its draft clearing and hidden-input
+write per step (`onStep`) and its announcement per commit (`onCommit`).
+
+Sections changed: conventions 9.1 (the `internal/` listing names the new module); slider.md 2.4
+and number-field.md 2.4 say where the two entry points are implemented. Developer notes:
+`memo/developer/issue-157-step-commit.md`.
+
+## 2026-11-24: slider.md and number-field.md describe the step / commit code (#157)
+
+Coordinator request after the step / commit refactor; docs only, no code change. The design text
+had drifted from the code (found while extracting `internal/use-step-commit.ts`):
+
+- slider.md 2.4 and number-field.md 2.4 said a commit writes `gestureStart = next` after
+  dispatching. The code clears the gesture start to `null` at the start of every commit; a
+  trailing native `change` finds no open gesture, and a later native `input` opens a fresh one.
+- number-field.md 2.2 / 2.4 spoke of `live: useState<number | null>` with a `liveSet` flag; the
+  code boxes `live` (`{ value }`), as Slider now does. Slider's `live` row and 2.2 snippet follow.
+- number-field.md 2.4 and 4.3 item 3 said a key press and a hold open the gesture at the base
+  (the parsed draft); the code opens it at the shown value and steps from the base.
+- slider.md 2's state table had `gesture: useState<{ thumb } | null>`; the code has
+  `gestureThumb: number | null`.
+
+The 2.4 pseudocode of both documents, which restated the code, is replaced by present-tense
+bullets (as dialog.md 2.5 and popover.md 2.5). Sections changed: slider.md 2 (table), 2.2, 2.4;
+number-field.md 2 (table), 2.2, 2.4, 4.3.
+
+## 2026-11-24: slider.md 4.1 and 12 name `gestureThumb` (#157)
+
+Review of `refactor/157-step-commit` (nit 3): the `pointerdown` row of 4.1 wrote
+`gesture = { thumb: index }` and the walkthroughs of section 12 `G={thumb:0}`, after the state
+table had become `gestureThumb: number | null`. Now `gestureThumb = index`, and `G` is
+`gestureThumb` in the walkthrough notation (`G=0`, `G=null`). Docs only.
