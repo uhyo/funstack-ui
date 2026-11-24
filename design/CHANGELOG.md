@@ -10888,3 +10888,22 @@ option of `useOverlayRoot` (it defaulted to `:popover-open`, which only `usePopo
 The popover value still changes only with the open state, pending and `shown`. Sections
 changed: conventions 3.2's `shown` row and the 9.1 file listing, menu.md (intro, 1, 2.1),
 combobox.md (intro, decisions table, 1, 2, 5.1), popover.md 15 (hook names only).
+
+## 2026-11-24, #157: `usePopoverTrigger`'s `onActivate` and `submenuItem`
+
+Refactoring wave #157 (`memo/architect/refactor-audit.md` rank 11). Internal only; no rendered
+attribute, handler order or warning text changed. `usePopoverTrigger` took three options that
+only Menu passed: `activate` (Menu.SubmenuTrigger's click, which also picked the wording of the
+non-button warning), `beforeOpen` (Menu.Trigger's open cause) and `disabledAs: "aria"`
+(Menu.SubmenuTrigger). Now:
+
+- `onActivate(event)`: what a library-mode click does after the cancel and the `disabled` check;
+  default `toggleFromTrigger(ctx, event.nativeEvent)`. Menu.Trigger passes the same toggle with
+  its open cause as `toggleFromTrigger`'s `beforeOpen` (the call it made before);
+  Menu.SubmenuTrigger passes its open.
+- `submenuItem: true` (Menu.SubmenuTrigger): `disabled` renders `aria-disabled` (the
+  `alwaysFocusable` branch of `disabledButton`) and the non-button warning says a press while
+  open dismisses the popup instead of moving focus into it. The two followed different options
+  but always come together: the Trigger that is an item of a parent menu and never closes.
+
+Sections changed: conventions 1.2 (the `alwaysFocusable` sentence names `submenuItem`).

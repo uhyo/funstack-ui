@@ -202,7 +202,7 @@ Rules for the element passed to `render` (same as Base UI):
   the branch it chose, and `invoker`, whether `commandfor` / `command` may render;
   `handlesClick: false` is the browser-run case above (native unless the element certainly
   cannot be disabled) and `alwaysFocusable` the opt-in focusable case (`SubmenuTrigger` through
-  `usePopoverTrigger`'s `disabledAs: "aria"`, `Button`'s Toolbar and `focusableWhenDisabled`).
+  `usePopoverTrigger`'s `submenuItem`, `Button`'s Toolbar and `focusableWhenDisabled`).
   `pendingAriaDisabled` in the same module merges the branch with a pure trigger's pending
   `aria-disabled`.
 - Library-controlled attributes (`role`, `aria-*` *state* the part computes such as
