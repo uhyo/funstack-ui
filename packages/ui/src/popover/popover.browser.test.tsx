@@ -576,6 +576,52 @@ describe("Popover (browser)", () => {
   });
 
   describe("focus", () => {
+    // #155: a parent that keeps `open={true}` after a dismissal gets the popup re-shown in the
+    // fact's commit. A `<div>` popup is re-shown without `initialFocus`: focus stays where the
+    // dismissal put it (the Trigger, after Escape). The default `<dialog>` runs the platform's
+    // dialog focusing steps on every show, so focus moves inside as on any open (not a trap:
+    // Tab leaves an open Popover, which does not close on focus leaving).
+    it.each([
+      ["a <div> popup", true],
+      ["the default <dialog> popup", false],
+    ] as const)(
+      "a refused Escape re-opens %s; initial focus only where the platform applies it (#155)",
+      async (_, div) => {
+        const fact = vi.fn<ActionFn>();
+        render(
+          <div style={{ padding: "40px 160px" }}>
+            <Popover.Root open openChangeAction={() => {}} onOpenChange={fact}>
+              <Popover.Trigger data-testid="trigger" style={{ width: 100, height: 30 }}>
+                Filters
+              </Popover.Trigger>
+              <Popover.Popup
+                data-testid="popup"
+                aria-label="Filters"
+                style={box(200, 120)}
+                initialFocus="[data-testid=target]"
+                render={div ? <div /> : undefined}
+              >
+                <button type="button">First</button>
+                <input data-testid="target" />
+              </Popover.Popup>
+            </Popover.Root>
+          </div>,
+        );
+        await expect.poll(() => isOpen()).toBe(true);
+        screen.getByTestId("target").focus();
+        await user.keyboard("{Escape}");
+        await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+        await expect.poll(() => isOpen()).toBe(true);
+        await quietPeriod(50, "the re-show's focus settles");
+        if (div) {
+          expect(trigger()).toHaveFocus();
+        } else {
+          // The library still names its target, so the dialog focusing steps pick it.
+          expect(screen.getByTestId("target")).toHaveFocus();
+        }
+      },
+    );
+
     it("platform probe: what showPopover() on a <dialog> does with focus", async () => {
       // Raw platform, no library: records the engine's popover focusing steps for a <dialog>.
       render(

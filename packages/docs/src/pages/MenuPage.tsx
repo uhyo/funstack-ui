@@ -202,7 +202,7 @@ export function MenuPage() {
             name: "open",
             type: "boolean",
             description:
-              "Controlled open state. undefined means uncontrolled. Pass `onOpenChange` too: the browser closes the menu without asking (development warns).",
+              "Controlled open state. undefined means uncontrolled. Pass `onOpenChange` too: the browser closes the menu without asking (development warns). A parent that keeps `true` after a dismissal gets the menu shown again at once, with focus left where the dismissal put it (no initial focus).",
           },
           {
             name: "defaultOpen",

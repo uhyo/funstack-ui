@@ -1101,6 +1101,27 @@ describe("Combobox (browser)", () => {
       });
     }
 
+    // #155: the re-open of a refused fact applies no initial focus. Combobox never moves focus on
+    // a show, so this pins that it stays so: after a refused focus-leave the listbox is shown
+    // again and focus stays where the user moved it.
+    it("a refused focus-leave re-shows the listbox; focus stays on the next field (#155)", async () => {
+      const fact = vi.fn<OpenAction>();
+      render(
+        <>
+          <Box root={{ open: true, openChangeAction: () => {}, onOpenChange: fact }} />
+          <input data-testid="after" aria-label="After" />
+        </>,
+      );
+      await expect.poll(() => isOpen()).toBe(true);
+      input().focus();
+      screen.getByTestId("after").focus();
+      await settle(() => expect(fact).toHaveBeenCalledTimes(1));
+      expect(fact.mock.calls[0]![1].reason).toBe("dismiss");
+      await expect.poll(() => isOpen()).toBe(true);
+      await quietPeriod(50, "nothing may move focus back");
+      expect(screen.getByTestId("after")).toHaveFocus();
+    });
+
     it("a link render pressed while open: light-dismissed at the press, one (false, activate), no re-open", async () => {
       vi.spyOn(console, "error").mockImplementation(() => {});
       const openAction = vi.fn<OpenAction>();

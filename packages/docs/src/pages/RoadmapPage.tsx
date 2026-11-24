@@ -59,7 +59,9 @@ export function RoadmapPage() {
               <code>
                 open={"{open}"} openChangeAction={"{setOpen}"} onOpenChange={"{setOpen}"}
               </code>
-              . Without it the popup re-opens after every dismissal (development warns).
+              . Without it the popup re-opens after every dismissal (development warns); a Menu
+              re-opened this way leaves focus where the dismissal put it (
+              <a href={issue(155)}>#155</a>).
             </li>
             <li>
               <code>onOpenChange</code> must set state directly, not in <code>startTransition</code>{" "}
