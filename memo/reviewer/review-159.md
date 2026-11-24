@@ -104,3 +104,107 @@ Optional.
 - No public API change, so no docs-site props-table update is needed.
 - I probed a Suspense re-hide (same element, detach and attach in separate commits) during a
   close in a scratch jsdom test. Not stuck: the close was adopted. No finding.
+
+---
+
+# Follow-up review: 21bf43e (on 46c01fd), findings 1-4
+
+Verdict: **mergeable after one small fix (Minor A).** Findings 1-4 are addressed. The refactor
+keeps the old listener behaviour. The new replay has one stuck path, which 46c01fd did not have.
+
+## Merge with master (5225cce)
+
+Scratch merge: one conflict, in design/CHANGELOG.md. It is append-append: the branch's two #159
+entries and master's "#157: conventions.md, second slimming pass" entry go at the same end of the
+file. Keep both. dialog.md and popover.md merge cleanly. Conventions 3.9.x (3.9.4 and 3.9.5 are
+cited) stays in conventions.md, and `check-design-refs` passes on the merged tree ("all 1083
+section citations resolve"). The branch's CHANGELOG diff against 46c01fd is 28 added, 0 removed.
+
+## Runs (merged tree)
+
+- jsdom, dialog/popover/menu/combobox/internal/overlay-show: 11 files, 1214 passed.
+- Browser, `FUNSTACK_BROWSERS=chromium,firefox`, dialog/popover/menu/combobox: 10 files, 562
+  passed, 16 skipped. WebKit not run.
+- tsc for packages/ui, lint (only the warnings that were already there), and format:check are green.
+
+## Mutations (scratch worktree, reverted, removed)
+
+| Mutation | Killed by |
+| --- | --- |
+| Drop `if (replaying) return` (allow a second replay) | only the overlay-show unit row |
+| Dialog replay guard `popupRef.current !== null` -> `true` | Dialog "unmounts before the replay" row |
+| Clear `awaitingClose` when the replay is queued | 6 rows (Dialog 3, Popover 2, unit 1) |
+| Drop `flags.endClose()` in `replayLostHide` | 2 Popover #159 rows |
+
+## Probes (scratch jsdom, Popover)
+
+- Two remounts before the replay (A -> B -> C): one report, the popup stays closed, and the
+  Trigger opens it again. Correct. No component row pins this; the unit row does.
+- A Trigger click between the remount and the replay: `openChangeAction(false)` runs (committed is
+  still `true`, so the Trigger toggles closed), then the fact is reported. The popup stays
+  closed. This matches the no-remount baseline exactly (a click between `hidePopover()` and its
+  `toggle`): same report, same action call. The click is swallowed, but this is the same
+  window that already existed. The window is wider, though: a timer task instead of the
+  DOM-manipulation task (4 ms clamp, background-tab throttling). Acceptable.
+- Suspense hides the Popup in the window: see Minor A.
+
+## Findings, by severity
+
+### Minor A: a Suspense hide before the replay leaves the popup stuck and the fact unreported (regression from 46c01fd)
+
+dialog-popup.tsx (the `flags.attach` callback in `libraryRef`, `if (popupRef.current !== null)`)
+and use-popover-popup.ts (the same check in `setElement`). `popupRef.current === null` is used to
+mean "the Popup unmounted". But a Suspense boundary above the Popup that shows its fallback
+detaches the element's ref too, and the Popup stays mounted. Probe: hide, remount
+(`transition`), then a sync update suspends an ancestor boundary, all before the timer runs. The
+replay is skipped, so `awaitingClose` stays `true`. On reveal the same element re-attaches
+(`attach` is a no-op), and the apply sees committed `true`, hidden, and awaiting, so it never
+shows the popup. Trigger clicks do not help. `onOpenChange` is never called. Only another
+remount gets it out (it queues a replay with the wrong `lost` element). At 46c01fd the same probe
+re-showed the popup (the documented silent undo). The window is very narrow, but a stuck popup is
+the #159 bug. Fix: tell "unmounted" from "ref detached". Options: a flag set by a passive effect's
+cleanup (Suspense hiding does not run passive cleanups), or replay whatever the ref state and
+let the unmount case be a no-op another way. At minimum, call `flags.endClose()` when the replay
+is skipped. Add a row for each component.
+
+### Low B: the docs say the replay runs "where the lost event would have run"
+
+overlay-show.ts JSDoc, dialog.md 2.5 ("a task later, where its `close` event would have run"),
+popover.md 2.5, and the CHANGELOG entry. The replay is a `setTimeout(0)`, a different task source
+from the DOM-manipulation task the event used. It can run later, and an input task can run before
+it (see the Trigger-click probe). Say "a task later (a timer)" and drop "where it would have
+run", or state the ordering caveat. The CHANGELOG can only take an added line, so fix this in a
+later entry or in the design text.
+
+### Nit C: what the replay cannot know
+
+- Popover: `replayLostHide` passes `lostInterest = false`. This matches what `takeLostInterest`
+  would return after the detach's `interest.reset()`. A lost-interest hide that remounts would
+  still get the focus-return fallback if `focusWasInside` were set. That cannot happen in
+  practice (interest is lost only once focus has left), so this is fine. A one-line comment would
+  help.
+- Dialog: the focus-return fallback checks `element.contains(activeElement)` on the detached old
+  dialog. That is always false after the removal, so an "opener gone, focus left inside" case
+  ends on `<body>`. The platform's own restoration already ran synchronously inside `close()`,
+  so only that already-degraded case is affected. No action.
+
+### Checked, no finding
+
+- No double report. Popover's listeners on the old element are removed at detach. Dialog's
+  `onClose` / `onBeforeToggle` drop events whose target is not `popupRef.current`. The tests count
+  exactly one `onOpenChange`. A second remount queues no second replay (unit row, plus probe).
+- Controlled refusal: the replay calls `markFact` and `notifyClosed`, so the parent's
+  `open={true}` gets the refused fact's re-open (Dialog and Popover rows). Uncontrolled: stays
+  closed, with no `show` / `showPopover` call (spied).
+- Unmount before the replay: nothing is reported (rows on both, killed by mutation 2).
+- Refactor fidelity. Dialog `handleClose` is the old `onClose` body, verbatim, after the target
+  guard. Popover `handleHidden` is the old `!isPopoverOpen` block, verbatim, still at the same
+  point in `onToggle` (after `setShown` / `syncOpen`, before the `whileShown` start/stop).
+  `replayLostHide` adds `endClose`, and the detach already did `setShown(false)`,
+  `stopListeningWhileShown` and the interest reset. The echo is false, because only facts
+  replay. `latestHandleClose` / `handlers.current` give the replay the latest render's closures.
+- `details.event` is the intent's event, otherwise `undefined` (asserted). Dialog's `returnValue`
+  is the old element's ("esc" asserted).
+- Wording: "layout phase, children first ... must stay in an ancestor" is now in overlay-show.ts,
+  both 2.5 sections, the CHANGELOG correction entry and the developer memo. Finding 3 is
+  corrected in the memo. Menu and Combobox rows have been added.
