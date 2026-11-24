@@ -434,13 +434,24 @@ toast({ title: "Link copied" });`}</CodeBlock>
             description:
               'What a click does while this part\'s action is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the Action and the Root stay `data-pending` and the timer paused until every run has settled; with `closeOnSettle` the toast then closes once, if the latest run resolved (a rejection keeps it, in both modes). Set it on the part: `toast({ action })` has no such option. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
+          {
+            name: "disabled",
+            type: "boolean",
+            default: "false",
+            description:
+              'Never runs the action. Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render`, `aria-disabled="true"` instead and the click is cancelled (a link does not navigate).',
+          },
           ...functionProps("ToastActionState", "Default: `toast.action.label`."),
           renderProp("button", "ToastActionState"),
         ]}
       />
       <PartFacts
-        state={"`ToastActionState` is `{ pending, toast }`."}
-        owned={"`type` (on a `<button>` only), `onClick`, `aria-disabled`, `data-pending`."}
+        state={
+          "`ToastActionState` is `{ pending, disabled, toast }`; `disabled` is the prop, never set by pending."
+        }
+        owned={
+          "`type` (on a `<button>` only), `disabled`, `onClick`, `aria-disabled`, `data-pending`, `data-disabled`."
+        }
         note={
           'By default (`whilePending="ignore"` unless `closeOnSettle={false}`) a second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is then `aria-disabled="true"` while it shows `data-pending`; it is never natively disabled, so it keeps focus.'
         }
@@ -450,11 +461,23 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <code>Toast.Close</code>
       </h4>
       <PropsTable
-        rows={[...functionProps("ToastCloseState"), renderProp("button", "ToastCloseState")]}
+        rows={[
+          {
+            name: "disabled",
+            type: "boolean",
+            default: "false",
+            description:
+              'Never closes. Native `disabled`; owned, so a `render` element cannot re-enable it. With a link or component `render`, `aria-disabled="true"` instead and the click is cancelled (a link does not navigate).',
+          },
+          ...functionProps("ToastCloseState"),
+          renderProp("button", "ToastCloseState"),
+        ]}
       />
       <PartFacts
-        state={"`ToastCloseState` is `{ toast }`."}
-        owned={"`type` (on a `<button>` only), `onClick`."}
+        state={"`ToastCloseState` is `{ disabled, toast }`."}
+        owned={
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-disabled`."
+        }
         note={
           'Closes the toast with `reason: "dismiss"`, like Escape. Give it a name (text or `aria-label`); development warns otherwise.'
         }
@@ -471,9 +494,10 @@ toast({ title: "Link copied" });`}</CodeBlock>
           ],
           [
             "`aria-disabled`",
-            "Action",
-            '`"true"` while `data-pending` with `whilePending="ignore"` (the default unless `closeOnSettle={false}`): a second click is ignored',
+            "Action, Close",
+            '`"true"` on the Action while `data-pending` with `whilePending="ignore"` (the default unless `closeOnSettle={false}`): a second click is ignored. Also on either part when `disabled` with a link or component `render`',
           ],
+          ["`data-disabled`", "Action, Close", "The part's `disabled` prop (never set by pending)"],
           [
             "`data-ending`",
             "Root",

@@ -11,7 +11,7 @@
 // return value (results reach the Fields as the `errors` prop). Rejection, overlap and suspending
 // content apply to the submission and are covered below.
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { StrictMode, Suspense, useActionState, useState } from "react";
+import { Activity, StrictMode, Suspense, useActionState, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -24,6 +24,7 @@ import {
   setupUser,
   PlainButton,
   flushMicrotasks,
+  sequencedDeferreds,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
@@ -542,6 +543,93 @@ describe("Form: rejection", () => {
     expect(screen.getByTestId("error-catcher")).toHaveTextContent("network");
     expect(reset).not.toHaveBeenCalled();
   });
+
+  // #157, conventions 2.4: the rejections React would drop go to `reportError`.
+  function setupRuns(count: number) {
+    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const onError = vi.fn();
+    const deferreds = sequencedDeferreds(count);
+    const action = vi.fn(() => deferreds.next());
+    const view = render(
+      <ErrorCatcher onError={onError}>
+        <Form.Root action={action} data-testid="form">
+          <EmailField />
+          <Form.Submit>Save</Form.Submit>
+        </Form.Root>
+      </ErrorCatcher>,
+    );
+    for (let i = 0; i < count; i++) fireEvent.click(submit());
+    expect(action).toHaveBeenCalledTimes(count);
+    return { reportError, onError, deferreds, view };
+  }
+
+  it.each([
+    ["while the newer submission is pending", false],
+    ["after the newer submission resolved", true],
+  ] as const)(
+    "a superseded submission's rejection %s is reported once, not caught",
+    async (_l, newerFirst) => {
+      const { reportError, onError, deferreds } = setupRuns(2);
+      if (newerFirst) await act(async () => deferreds[1]!.resolve());
+      const older = new Error("older");
+      await act(async () => deferreds[0]!.reject(older));
+      if (!newerFirst) await act(async () => deferreds[1]!.resolve());
+      await flushMicrotasks();
+      expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+      expect(onError).not.toHaveBeenCalled();
+      expectNotPending(screen.getByTestId("form"));
+    },
+  );
+
+  it("the latest submission's rejection reaches the boundary, not reportError", async () => {
+    const { reportError, onError, deferreds } = setupRuns(2);
+    const latest = new Error("latest");
+    await act(async () => deferreds[1]!.reject(latest));
+    await act(async () => deferreds[0]!.resolve());
+    await flushMicrotasks();
+    expect(onError).toHaveBeenCalledExactlyOnceWith(latest);
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("a rejection that settles after the form unmounted is reported", async () => {
+    const { reportError, onError, deferreds, view } = setupRuns(1);
+    view.unmount();
+    const late = new Error("late");
+    await act(async () => deferreds[0]!.reject(late));
+    await flushMicrotasks();
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(late);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("a rejection that settles while an <Activity> hides the form is reported once", async () => {
+    silenceErrors();
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const onError = vi.fn();
+    const d = deferred();
+    const ui = (mode: "visible" | "hidden") => (
+      <ErrorCatcher onError={onError}>
+        <Activity mode={mode}>
+          <Form.Root action={() => d.promise}>
+            <EmailField />
+            <Form.Submit>Save</Form.Submit>
+          </Form.Root>
+        </Activity>
+      </ErrorCatcher>
+    );
+    const { rerender } = render(ui("visible"));
+    fireEvent.click(submit());
+    rerender(ui("hidden"));
+    const hidden = new Error("hidden");
+    await act(async () => d.reject(hidden));
+    await flushMicrotasks();
+    rerender(ui("visible"));
+    await flushMicrotasks();
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(hidden);
+    expect(onError).not.toHaveBeenCalled();
+  });
 });
 
 describe("Form: overlap", () => {
@@ -715,6 +803,59 @@ describe("Form: function props and render", () => {
     await setupUser().click(submit());
     await flushMicrotasks();
     expect(action).not.toHaveBeenCalled();
+  });
+
+  // #157: the library disabled rule for an element that cannot be natively disabled.
+  it("Form.Submit disabled with a link render gets aria-disabled and a cancelled click", async () => {
+    const clicks: boolean[] = [];
+    render(
+      <Form.Root action={() => {}}>
+        <Form.Submit
+          disabled
+          render={<a href="#elsewhere" onClick={(e) => clicks.push(e.isDefaultPrevented())} />}
+        >
+          Save
+        </Form.Submit>
+      </Form.Root>,
+    );
+    const link = screen.getByRole("link", { name: "Save" });
+    expect(link).not.toHaveAttribute("disabled");
+    expect(link).not.toHaveAttribute("type");
+    expect(link).toHaveAttribute("aria-disabled", "true");
+    expect(link).toHaveAttribute("data-disabled", "");
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    act(() => {
+      link.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(true);
+    expect(clicks).toHaveLength(1);
+  });
+
+  it("Form.Submit enabled with a link render has no aria-disabled and no click handler", () => {
+    render(
+      <Form.Root action={() => {}}>
+        <Form.Submit render={<a href="#elsewhere" aria-disabled="true" />}>Save</Form.Submit>
+      </Form.Root>,
+    );
+    const link = screen.getByRole("link", { name: "Save" });
+    expect(link).not.toHaveAttribute("aria-disabled");
+    expect(link).not.toHaveAttribute("data-disabled");
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    act(() => {
+      link.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("Form.Submit disabled with an input render stays natively disabled", () => {
+    render(
+      <Form.Root action={() => {}}>
+        <Form.Submit disabled render={<input type="submit" value="Go" />} />
+      </Form.Root>,
+    );
+    const input = screen.getByRole("button", { name: "Go" });
+    expect(input).toBeDisabled();
+    expect(input).not.toHaveAttribute("aria-disabled");
   });
 
   it("Form.Submit works in a plain React form (useFormStatus of the nearest form)", async () => {

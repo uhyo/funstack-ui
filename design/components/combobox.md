@@ -1,20 +1,8 @@
 # Combobox
 
-Status: **accepted** (2026-10-17, wave 4, GitHub issue #50; the product owner accepted questions
-1 to 5 and 7 to 11 as recommended and the user overrode question 6: a default English
-announcement ships, see "Decisions recorded" at the end). **Revised after review** (2026-10-17,
-`memo/reviewer/combobox.md` and `memo/developer/combobox.md`; the product owner's decisions are
-in "Review revisions" at the end: the loading state and `aria-busy`, the active option cleared by
-typing, the rollback outside the transition, and the accepted implementation deviations).
-**Amended 2026-10-23 (#96, user decision)**: the urgent lane is a handler, `onInputValueChange:
-UrgentChangeHandler`, no longer `inputValueChangeAction: UrgentChangeAction`; edited in place
-(decision 3, 2.2, 3, 3.1, 3.6, 4, 6.2, 9, 10, 11.2, 12.1, 14), migration and implementation
-checklist in the amendment at the end; the historical sections keep the old names.
-**Amended 2026-11-24 (#148, user decision; implemented 2026-11-24)**: `onInputValueChange` follows
-the library-wide handler rule (a returned promise is allowed, no warning, rejection or throw to
-`reportError`; edited in place in 4, 9 and 12.1), and `open` gains `onOpenChange` for
-dismissals (amendment at the end, which overrides what 3.1, 5.4 and 5.5 say about dismissals).
-Follows `design/conventions.md`
+Status: **accepted**, implemented. History (decisions, review revisions, amendments,
+implementation notes, the test plan): `design/CHANGELOG.md`, parts "combobox.md". Follows
+`design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
 `design/components/popover.md` and `design/components/menu.md` first**: Combobox is built on
 the same internal hooks (`useOverlayRoot`, `usePopoverPopup`, `useActionTrigger`), the same
@@ -156,7 +144,7 @@ Why this shape:
   (the popup is always opened by the library with `source: input`) and, because the button names
   the shown popover, a press on it is **not a light dismiss** (HTML's "topmost clicked popover";
   conventions 3.5). Without the attributes the browser hid the listbox at `pointerup`, before
-  the click's `openChangeAction(false)` could run (section 3.3, the #112 amendment).
+  the click's `openChangeAction(false)` could run (section 3.3).
 - **`Clear` exists** because "clear the selection" has no keyboard-free spelling otherwise
   (Escape closes; it does not clear, section 8), and prior art agrees (Base UI, Ark).
 - **No `Separator`** in v1: `role="separator"` is not in a listbox's content model; a visual
@@ -182,7 +170,7 @@ renders (owned keys, conventions 1.2).
 | `inputValue` | Root (`useState`, plus an optional controlled prop) | the text in the input | **urgent** (section 4) | Library-owned through a controlled `<input value>`; residual browser paths: typing before hydration (mount reconciliation), form reset, Firefox form-state restoration, all `"platform"`. |
 | `query` | Root, derived: `useDeferredValue(inputValue)` | what the results are for | deferred | Derived; never set. `stale = inputValue !== query`. |
 | `activeValue` | Root (`useState`) | the option `aria-activedescendant` points at, `null` for none | **urgent** | Library-owned virtual focus. Not controllable in v1. Cleared (`null`) when the active option unmounts and by typing, Home, End, Left and Right (6.5); with `autoHighlight`, set to the first option when results settle. |
-| `open` | Root (`useOverlayRoot`, library mode) | the listbox is shown | transition | Library-owned for opens and for the close after an accepted option; browser-owned for Escape and light dismiss (notified); library-performed immediate close on focus loss (Menu's Tab rule). |
+| `open` | Root (`useOverlayRoot`, library mode) | the listbox is shown | transition | Library-owned for opens and for the close after an accepted option; browser-owned for Escape and light dismiss (facts, `onOpenChange`); library-performed immediate close on focus loss (Menu's Tab rule; a fact too). 5.6. |
 | `pending` | Root | `value` transition or `open` transition in flight | | On the Input (owner surface), the Trigger (open only), the target Option (value only). |
 | `loading` | Root, derived from the Status registry | a `Status` is mounted inside the List (the Suspense fallback) | n/a | Internal, not in `state` in v1: drives `aria-busy` on the List, hides `Empty`, gates the announcement (6.3, 6.4). Read through a ref in effects, never through render state (6.4). |
 | mounted options, labels, Status parts | Root (refs) | registration from `Option` and `Status` layout effects | n/a | Internal: the active-option revalidation, `Empty`, `loading`, `ariaNotify`, and the value→label cache (2.2). |
@@ -348,8 +336,10 @@ export interface ComboboxRootProps {
 
   open?: boolean;
   defaultOpen?: boolean;
-  /** As Popover: awaited for opens and for the close after an accepted option; a notification for dismissals. */
+  /** As Popover, requests only: awaited for opens and for the close after an accepted option. Never called for a dismissal. */
   openChangeAction?: ChangeAction<boolean, ComboboxOpenChangeDetails>;
+  /** As Popover, facts only: a dismissal (Escape, focus leaving, light dismiss, a foreign invoker). Always `false`; synchronous, not awaited (5.6). */
+  onOpenChange?: UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>;
 
   /**
    * Free text is a value: Enter with no active option, or focus leaving with text that is not
@@ -486,7 +476,7 @@ accessible name, as Popover's Popup).
 
 Clear: click writes `""` (urgent) and dispatches `valueChangeAction(null, { reason: "activate",
 custom: false })` unless the optimistic value is already `null`. While the listbox is open the
-press is a light dismiss: the listbox closes with a `"dismiss"` notification and is **not
+press is a light dismiss: the listbox closes as a `"dismiss"` fact and is **not
 re-opened** (re-opening would flash and run an open transition; the Trigger is one click away).
 
 ### 3.4 `Combobox.Popup`
@@ -604,13 +594,10 @@ input in a Combobox". This is that design, kept as small as possible:
 1. **The name says it is a handler, not an action.** `inputValue` / `defaultInputValue` /
    `onInputValueChange`: the `x` / `defaultX` pair as for every other state, and the ordinary
    React handler form for the callback, typed `UrgentChangeHandler<T, Details>` (returns
-   `void`, documented as synchronous and not awaited). This is the library's **one `on*`
-   prop**, and it is one by the user's decision (#96, conventions 2.1 and resolved question 39):
-   `fooAction` must always mean "the component runs this in a transition", so a callback that
-   the component must *not* run in a transition cannot carry the suffix. v1 had chosen
-   `inputValueChangeAction: UrgentChangeAction` so that the no-`on*` rule had no exception;
-   that bought the rule's purity at the price of the suffix's meaning, and the suffix matters
-   more at the call site. Rejected then and still: `inputValueAction` (reads as a pure
+   `void`, documented as synchronous and not awaited). It is a **fact** (conventions 2.1): the
+   browser has written the keystroke before the library hears of it. `fooAction` always means
+   "the component runs this in a transition", so a callback that the component must *not* run
+   in a transition cannot carry the suffix. Not chosen: `inputValueAction` (reads as a pure
    trigger); and `onInputChange` without `Value` (the state name must be exactly the controlled
    prop's name, conventions 2.1).
 2. **The library calls it synchronously, outside any transition**, from the `input` event
@@ -620,8 +607,7 @@ input in a Combobox". This is that design, kept as small as possible:
 3. **Not awaited, no pending, no optimistic.** The text is already in the DOM when the action
    runs; there is nothing to wait for and nothing to roll back. A returned promise is allowed
    and not awaited: its rejection, and a synchronous throw, go to `reportError` (the handler
-   rule, conventions 2.1; #148). Before #148 development warned once when a thenable came back;
-   that warning is removed.
+   rule, conventions 2.1). Development does not warn for a returned promise.
 4. **Controlled `inputValue` follows the DOM, it does not gate it.** If the parent does not
    adopt a keystroke, React restores the old prop at the end of the event (the usual controlled
    input behaviour); the library's own `useState` is bypassed in controlled mode, so there is
@@ -653,7 +639,7 @@ popover ancestor, and creates the implicit anchor the inline `position-area` and
 `anchor-size(width)` use. It does **not** exempt a press on the input from light dismiss: `source`
 plays no part in HTML's "topmost clicked popover", and the research's claim that it did came from
 a synthesised click (#123). The Input keeps the listbox open across its own presses with pointer
-capture (5.4, amendment #123).
+capture (5.4).
 
 | Open cause | What happens | `reason` |
 | --- | --- | --- |
@@ -742,10 +728,10 @@ value); focus leaving reverts the text (2.2).
 | Close | Owner | What happens | `reason` |
 | --- | --- | --- | --- |
 | Accepted option (after its action settles), Trigger click while open, controlled `open={false}` | library | `requestClose`; `hidePopover()` in the apply effect of the close commit; `<ViewTransition>` if set. The Trigger's press does not light-dismiss first (it is an invoker of the popup after hydration, 3.3, #112): the listbox stays shown, input focused, Trigger `data-pending`, until `openChangeAction(false)` settles; a refusing controlled parent keeps it shown (5.5) | `"activate"` (controlled: no dispatch) |
-| Escape while open | browser (the auto popover's close watcher) | hidden at once; focus stays in the input (research); `toggle` → notification. The library does **not** intercept Escape: a second Escape therefore reaches an enclosing Dialog or Popover, which is the nesting behaviour a user expects | `"dismiss"` |
-| Light dismiss, another `auto` popover or modal dialog opening outside | browser | notification; focus wherever the platform left it; text reverted on the `focusout` that preceded it, if any | `"dismiss"` |
-| Focus leaving the input to anything outside the popup (Tab, Shift+Tab, a click elsewhere, script) | library-performed, browser-shaped | the Input's `focusout` with `relatedTarget` outside the input and the popup → `popup.hidePopover()` at once (Menu 2.2: a listbox must not linger over a page whose focus moved on), then the text revert or the custom-value commit of 5.3; `toggle` → notification. `relatedTarget === null` closes nothing synchronously. If a pointer is down (the blur came from a `mousedown`), the check runs one task after that press is released (`pointerup` or `pointercancel`); a `<label for>` (Combobox.Label, Field.Label) refocuses the input in the release's click, so a label press of any length keeps the text (#111). Without a press (script blur) it runs a task later. In both cases, if `document.hasFocus()` and the active element is outside the input and the popup, the revert or custom commit runs; the light dismiss has already closed the listbox (a label press closes it too, the label being outside the popup); a window blur stays a no-op. Nothing runs while `disabled` | `"dismiss"` |
-| Clear click while open | browser (light dismiss: the button is outside the popup) | notification; the listbox is not re-opened; the text is emptied and `null` dispatched as 3.3 | `"dismiss"` |
+| Escape while open | browser (the auto popover's close watcher) | hidden at once; focus stays in the input (research); `toggle` → the fact (`onOpenChange`). The library does **not** intercept Escape: a second Escape therefore reaches an enclosing Dialog or Popover, which is the nesting behaviour a user expects | `"dismiss"` |
+| Light dismiss, another `auto` popover or modal dialog opening outside | browser | a fact; focus wherever the platform left it; text reverted on the `focusout` that preceded it, if any | `"dismiss"` |
+| Focus leaving the input to anything outside the popup (Tab, Shift+Tab, a click elsewhere, script) | library-performed, browser-shaped | the Input's `focusout` with `relatedTarget` outside the input and the popup → `popup.hidePopover()` at once (Menu 2.2: a listbox must not linger over a page whose focus moved on), then the text revert or the custom-value commit of 5.3; `toggle` → the fact. `relatedTarget === null` closes nothing synchronously. If a pointer is down (the blur came from a `mousedown`), the check runs one task after that press is released (`pointerup` or `pointercancel`); a `<label for>` (Combobox.Label, Field.Label) refocuses the input in the release's click, so a label press of any length keeps the text (#111). Without a press (script blur) it runs a task later. In both cases, if `document.hasFocus()` and the active element is outside the input and the popup, the revert or custom commit runs; the light dismiss has already closed the listbox (a label press closes it too, the label being outside the popup); a window blur stays a no-op. Nothing runs while `disabled` | `"dismiss"` |
+| Clear click while open | browser (light dismiss: the button is outside the popup) | a fact; the listbox is not re-opened; the text is emptied and `null` dispatched as 3.3 | `"dismiss"` |
 | Foreign invoker click while open (a consumer `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names the popup) | browser | the Popup prevents the button's primary `mousedown` while shown, so the input keeps focus and the focus-leaving row above cannot pre-empt the click (#126); the press is light-dismiss exempt (conventions 3.5); the click's native toggle (or `hide-popover`) hides the listbox; the text is untouched; notified from `toggle` with the `ToggleEvent` (the `CommandEvent` for `commandfor`) whose `source` is the button (#125) | `"activate"` |
 | Alt+ArrowUp while open | library | the active option, if any, is accepted (APG optional behaviour); else `requestClose` | `"activate"` |
 
@@ -780,7 +766,8 @@ decided by CI); Shift+click, Shift+arrows and the double click still select.
 
 As Popover 2.5 / 4.3 with the combobox's words: a controlled parent that refuses an open gets a
 snap-back of `aria-expanded`; one that refuses the close after an accepted option keeps the
-listbox open (a real veto); one that refuses a dismissal re-opens it (not a veto). Overlapping
+listbox open (a real veto); one that refuses a dismissal gets it re-opened at once, with the
+input still focused (not a veto; conventions 3.9.4). Overlapping
 value dispatches follow latest intent; `data-pending` and `data-selected` move to the latest
 option; the close waits for the latest. A rejected `openChangeAction(true)` leaves the listbox
 closed with the typed text intact.
@@ -790,7 +777,40 @@ parent whose save failed and was caught) gets the rollback of 2.2, text and `dat
 revert with no error, and the listbox **closes**. Non-adoption is only visible in the commit
 that ends the action, which is the commit that closes; deferring the close until the library
 knows would split it from that commit and from its view transition. Only a rejection keeps the
-listbox open (deviation 4, accepted at review).
+listbox open.
+
+### 5.6 Requests and facts: which cause goes where
+
+The Root has three states in three shapes, each for a stated reason: `value` (requests only,
+`valueChangeAction`: nothing but the library changes it), `inputValue` (facts only,
+`onInputValueChange`: the browser writes every keystroke), `open` (both: parts ask, the browser
+dismisses; conventions 3.9).
+
+| Cause | Channel | `next` | `reason` |
+| --- | --- | --- | --- |
+| Typing; ArrowDown / ArrowUp / Alt+ArrowDown while closed; Trigger click while closed; a pointer click in the input with `openOnClick`; a foreign open | `openChangeAction` | `true` | `"activate"` |
+| Found open at mount (only script can cause it here) | `openChangeAction` | `true` | `"platform"` |
+| The close after an accepted option (after `valueChangeAction` settled); re-accepting the selected option; Trigger click while open; Alt+ArrowUp | `openChangeAction` | `false` | `"activate"` |
+| Escape while open | **`onOpenChange`** | `false` | `"dismiss"` |
+| Focus leaving the input to outside the popup (the library's immediate `hidePopover()`) | **`onOpenChange`** | `false` | `"dismiss"` |
+| Light dismiss; another `auto` popover or modal dialog opening outside; a `Clear` click while open (the button is outside the popup) | **`onOpenChange`** | `false` | `"dismiss"` |
+| A foreign invoker button closing the listbox | **`onOpenChange`** | `false` | `"activate"` |
+| Script `hidePopover()` | **`onOpenChange`** | `false` | `"dismiss"` |
+
+- What a close *also does* stays on its own channel: the text revert or the custom-value commit
+  after focus leaves (`valueChangeAction`, 5.3), the `Clear` dispatch of `null`.
+- **An accepted option's `valueChangeAction` is pending and the user presses Escape.** The fact
+  closes the listbox at once. The value action is a different state: it is not superseded,
+  keeps `data-pending` and commits or rolls back; its continuation requests no close (nothing
+  is open; open-generation guard).
+- `aria-expanded` on the Input is the `shown` mirror; `data-open` on Input and Trigger is
+  optimistic (conventions 3.9.7).
+- Controlled `open` with a refusing parent: the listbox re-opens at once after Escape, with the
+  input still focused. Controlled `open` on a Combobox is rare; it needs
+  `onOpenChange={setOpen}` (development warns without it).
+- `onInputValueChange` follows the handler rule (conventions 2.1): it may return a promise,
+  which is not awaited and not warned about; a rejection and a synchronous throw go to
+  `reportError`, and the text write and everything after it still happen.
 
 ---
 
@@ -1002,7 +1022,7 @@ with `ctrlKey` / `metaKey` are ignored; `altKey` is read for the two Alt combina
 
 Whether the listbox is open is judged against the popup's **`:popover-open`**, what the user
 sees, not against `intended()`: right after Escape the popup is already hidden but its `toggle`
-notification is still queued, and Enter in that window must reach the form instead of being
+(the fact) is still queued, and Enter in that window must reach the form instead of being
 prevented (an Escape-then-Enter race found in the docs smoke). The corollary runs the other way
 and is accepted: Enter during an open that has not committed yet submits a form while
 `aria-expanded="true"` is already shown.
@@ -1021,7 +1041,7 @@ and is accepted: Enter during an open that has not committed yet submits a form 
 | Enter | open, active option | accept (5.2) | yes |
 | Enter | open, no active option | `allowCustomValue`: commit the text (5.3) and close; else nothing | yes |
 | Enter | closed | `allowCustomValue`: commit the text if it changed (in `flushSync`, 5.3); the form may submit | no |
-| Escape | open | **platform**: the auto popover's close watcher closes it; focus stays in the input; notified `"dismiss"`. The active option is forgotten; the text is kept | no (the platform cancels the close request itself) |
+| Escape | open | **platform**: the auto popover's close watcher closes it; focus stays in the input; a `"dismiss"` fact. The active option is forgotten; the text is kept | no (the platform cancels the close request itself) |
 | Escape | closed | nothing; reaches an enclosing Dialog / Popover | no |
 | Tab / Shift+Tab | open | focus moves on; `focusout` closes the listbox (5.4); the text reverts or, with `allowCustomValue`, commits. **Tab does not accept the active option** (question 5) | no |
 | Space | any | a character (the input's own) | no |
@@ -1110,7 +1130,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
    a transition held until `save` settles: the input shows `data-open` /
    `data-pending` (`aria-expanded="false"`, #118) and no popup until then (React entanglement; Menu walkthrough 11; documented).
 7. **Escape, then Tab.** Escape → the close watcher hides the popup; focus stays in the input;
-   `toggle` → `openChangeAction(false, { reason: "dismiss" })`; `A=null`; `T` unchanged
+   `toggle` → `onOpenChange(false, { reason: "dismiss" })`; `A=null`; `T` unchanged
    ("Jamaicax"). Tab → `focusout` with `relatedTarget` the next field → the popup is already
    hidden; without `allowCustomValue` the text reverts to the committed value's label
    ("Jamaica"); with it, `valueChangeAction("Jamaicax", { custom: true })` is dispatched with
@@ -1151,12 +1171,12 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
     `A=null`, `Empty` shows.
 14. **Clear while open.** The listbox is open; the user clicks Clear. `pointerdown` prevented
     (focus stays); the press is outside the popup, so the browser light-dismisses the listbox
-    (`toggle` → `openChangeAction(false, { reason: "dismiss" })`); `click` → `T=""`,
+    (`toggle` → `onOpenChange(false, { reason: "dismiss" })`); `click` → `T=""`,
     `valueChangeAction(null)`; the listbox is not re-opened (3.3). The Trigger, by contrast, is
     never light-dismissed by its own press (it is an invoker of the popup, 3.3): its click closes
     through `requestClose` and the listbox stays shown until the action settles (walkthrough 17).
 15. **Escape, then Enter at once (single-field search form, `allowCustomValue`).** Escape → the
-    close watcher hides the popup; the `toggle` notification is queued. Enter before it runs:
+    close watcher hides the popup; the `toggle` (the fact) is queued. Enter before it runs:
     the key handler sees `:popover-open` false (section 8), commits the text in `flushSync` and
     lets the form submit with it. Judged against `intended()` it would have been prevented.
 16. **A synchronously throwing `valueChangeAction`.** A plain function validates and throws.
@@ -1270,71 +1290,14 @@ press used to hide the popup before the close commit, so there was no exit to ca
   popup Chromium would keep the closing box rendered through its fade, so the close's view
   transition would capture it as a live `::view-transition-new(…)` next to the `old` image (a
   double image; probed for this component in #132). `usePopoverPopup` cuts the popup's CSS
-  transition around that call and around the open; no consumer rule is needed (until #147 it was
-  `html:active-view-transition .listbox { transition: none; }`). The hide on focus leaving the
+  transition around that call and around the open; no consumer rule is needed. The hide on focus leaving the
   input and the popup (5.4) is a dismissal and keeps its CSS fade.
 
 ---
 
 ## 12. Test plan
 
-`packages/ui/src/combobox/combobox.test.tsx` (jsdom) and `combobox.browser.test.tsx` (Chromium,
-Firefox, WebKit). "both" = `describe.each` over uncontrolled and "update on success" controlled
-wrappers for `value`; `inputValue` rows run controlled and uncontrolled as well. jsdom: the
-popover shim (with `source` recording), `user.type` for the urgent path, `createSuspender` for
-async results, fake timers where needed. jsdom has no anchor positioning, no `ariaNotify`
-(stubbed onto `Element.prototype` for the announcement rows), no close watcher (Escape rows are
-browser-mode; the dismiss path is driven with `hidePopover()`).
-
-### 12.1 jsdom
-
-| Area | Tests |
-| --- | --- |
-| Roles and ARIA | The section 1 HTML: Input `role=combobox`, `aria-autocomplete=list`, `aria-expanded`, `aria-controls` = List id, `autocomplete=off`, `id` = Label `for`; List `role=listbox`, `aria-labelledby` = Label id, consumer tokens merged; Option `role=option`, derived `id`, `aria-selected` only on the selected one, `aria-disabled`; Trigger / Clear `tabindex=-1`, `type=button`; Popup `popover=auto`, inline placement string; Status `role=status` in the Popup and `role=none` inside the List; List `aria-labelledby` absent (and a dev warning without `aria-label`) when no Label is rendered; hidden input present only with `name`, value `""` for `null`; `required` lands on the Input; duplicate option values warn. |
-| Urgent text (both for `inputValue`) | `user.type("ja")`: the DOM value is updated per keystroke, `onInputValueChange` called synchronously per keystroke with the `input` event and `"activate"`, **not** inside a transition (a `useTransition` spy / `isPending` probe in the parent stays false); a controlled parent that sets state in the body keeps the input in sync; a parent that does not adopt sees the DOM restored; the handler rule (#148): a returned promise does not warn, its rejection and a synchronous throw each reach `reportError` once and no Error Boundary, and the text is still written. |
-| Deferred query | A List children function receives `query`; a suspending result for the new query keeps the old options mounted with `data-stale` / `aria-busy` on the List; on resolve the new options and no stale; a slow earlier query resolved after a later one never shows (cache keyed by query). |
-| Open | Typing opens (`openChangeAction(true, "activate")` with the `input` event; `showPopover` called once with `{ source: input }` after the open commit); ArrowDown / ArrowUp / Alt+ArrowDown open; focus alone does not; `openOnClick` makes a click open; Trigger click toggles and focuses the input; `disabled` opens nothing. |
-| Keyboard | The section 8 table: ArrowDown / ArrowUp move `aria-activedescendant` and `data-active`, skip disabled, stop or wrap with `loop`; Alt+ArrowUp accepts or closes; Enter accepts the active option (keydown prevented), does nothing with none (prevented while open, not prevented while closed), commits custom text with `allowCustomValue`; typing, Home, End, ArrowLeft and ArrowRight clear `aria-activedescendant` and are not prevented; Enter right after typing (results stale) accepts nothing stale, with or without `autoHighlight`; open-ness judged against `:popover-open` (a hidden popup with a queued `toggle`: Enter is not prevented); Escape is browser-mode. |
-| Accept (both) | Enter / click: the text becomes `label` (or `textContent`) at once; `valueChangeAction(value, { reason: "activate", custom: false })` with the `keydown` / `click`; `data-selected` / `aria-selected` move optimistically; hidden input value follows; with a deferred action `data-pending` on the Option and Input while the listbox stays open, `hidePopover` not yet called; on resolve `hidePopover` once and committed / parent updated; typing while the action is pending keeps the listbox open (`hidePopover` not called on resolve, value committed). Re-accepting the selected option closes without dispatching. Disabled options never accept. |
-| Rejection (both) | The catcher above Root receives it; `O` reverts; the input text reverts to the previous label with `onInputValueChange(prev, { reason: "dismiss", event: undefined })`; the listbox still open; hidden input back; a **synchronously throwing** action: the rollback write runs outside any transition (a `useTransition` probe or React's transition slot, review M2). Caught-inside variants commit. Controlled refusal: same revert without the error, and the listbox closes. |
-| Overlap, superseded rejection (both) | Two accepts out of order: text and `data-pending` follow the latest, `hidePopover` once after the latest; the older's rejection is passed to `reportError` (stubbed) once and does not reach the catcher, after and while the newer is pending. |
-| Custom value | `allowCustomValue`: Enter with no active option dispatches `{ custom: true }`; `focusout` with changed text dispatches with the `focusout` event; empty text with a value dispatches `null`; without the flag `focusout` reverts the text (`"dismiss"`) and dispatches nothing. |
-| Focus loss | `focusout` with `relatedTarget` outside → `hidePopover` at once, notification `"dismiss"`; `relatedTarget: null` → nothing synchronously (with a pointer down, nothing until one task after its `pointerup`/`pointercancel`; a label press keeps the text), then (fake timers) with `document.hasFocus()` and focus outside → the revert / custom commit, with focus still in the input (window blur) → nothing, while `disabled` → nothing; `pointerdown` and `mousedown` on an Option / the Popup are `defaultPrevented` and the input keeps focus. A `mousedown` on a foreign `<button popovertarget={popupId}>` while open is `defaultPrevented` and the input keeps focus (no revert); on a plain button or while closed it is not (#126). |
-| Active-option revalidation | The active option unmounts (results change) → `aria-activedescendant` removed; with `autoHighlight` → the first enabled option once not stale and not loading, and not before (the stale list's first option is never active); never a dangling id. |
-| Empty and Status | `Empty` renders only with zero mounted options, not stale and not loading: hidden during the Suspense fallback (a `Status` inside the List) and while stale old results show; `data-empty` on the List likewise; the List is `aria-busy="true"` while loading and while stale; a Status in the Popup is `role=status` and does not count as loading. |
-| Announcements | With `ariaNotify` stubbed: called on the List once per settled result set with the default message (`"No results"` / `"1 result"` / `"3 results"`) or the consumer's `announce(count)`; not while stale; **with a `Status` fallback inside the List: zero calls until the results resolve, then one** (review H1); not for an unchanged count; never when `announce` returns `null`. |
-| Clear | Writes `""`, dispatches `null` (`"activate"`, the `click`), no dispatch when already `null`, input keeps focus; while open, the light dismiss (shim) closes the listbox and it is not re-opened. |
-| Trigger | Toggles against `intended()`; every click is `defaultPrevented`; after mount a `<button>` Trigger carries `popovertarget` equal to the Popup's `id` and no `aria-expanded` (#121), `renderToString` output carries no `popovertarget`, a non-button `render` gets none, renders `aria-expanded` from `shown` and gets a dev warning; a `disabled` component `render` (`aria-disabled="true"`, #132) carries no `popovertarget` and renders `aria-expanded="false"`, the attribute appears when `disabled` flips to `false` in a re-render and goes when it flips back, and a native-`disabled` host button keeps it (it is an invoker; the browser's own disabled check makes it non-exempt); a controlled `open={true}` parent whose action leaves `open` alone keeps the listbox shown with one `(false, "activate")` dispatch (#112). |
-| Platform path (both) | Mount reconciliation: `renderToString`, set `input.value = "jap"` before `hydrateRoot` → one `onInputValueChange("jap", { reason: "platform", event: undefined })`, no open, StrictMode still one; no `valueChangeAction`. Form reset: `form.reset()`, `<button type=reset>`, automatic reset after `<form action>` → one `valueChangeAction(resetTarget, "platform")` with the `reset` event and one text write; the reset target is the JS-computed one (uncontrolled: latest `defaultValue`; controlled: mount-time); the visible input's `defaultValue` attribute is the mirror at the time of the `reset` event (uncontrolled: latest `defaultInputValue`; controlled: mount-time); the hidden input carries no `defaultValue`. |
-| Suspending content (both) | Dependent content keyed on `value` suspends on accept: old content stays, Input `data-pending`, no fallback above; then new content. Results boundary outside the List: the open waits with `data-pending` on Input and Trigger, `showPopover` not called until resolve. |
-| Function props / `render` | Every part's documented state; `render={<input type="search" />}` keeps the role and handlers; a `render={<button />}` Input warns; Popup `render={<div className />}` merges. |
-| Post-await rule | Controlled `value` parent updating after `await` inside `startTransition`; controlled `inputValue` parent with a plain `setState`. |
-| `transition` smoke | Popup renders with and without; a close after accept unmounts children in the close commit with `transition`, holds without. |
-| Directive | Every file under `src/combobox/` except `index.ts` begins with `"use client"`. |
-| Types | `UrgentChangeHandler` is exported (and `UrgentChangeAction` is not: no alias, #96); `onInputValueChange` accepts any `(next, details) => void`, a promise-returning function included (#148); `inputValueChangeAction` is not a prop; `multiple` is not a prop (type test). The library-wide "Action naming" guard (conventions 10.1, `src/__tests__/action-naming.test.ts`) lists the allowed `on*` keys: `onInputValueChange`, and since #148 `onOpenChange`. |
-
-### 12.2 Browser mode (`combobox.browser.test.tsx`)
-
-Feature checks added to `src/__tests__/engine.ts`: `supportsAriaNotify = "ariaNotify" in
-Element.prototype` (all three stable engines; asserted true, branch kept for Playwright builds).
-
-| Row | Assertion | Engine branches |
-| --- | --- | --- |
-| Placement and width | After typing: the popup's top edge equals the input's bottom edge, its left (inline-start) edge the input's, and `getBoundingClientRect().width >= input width` (`anchor-size`). Under `dir="rtl"` on the **document** (`document.documentElement.dir`) the inline-start edges still coincide (the right edges). **Container RTL (wave 11):** with `dir="rtl"` on a wrapper around the Combobox in an LTR document, the right edges coincide. Near the viewport bottom the popup flips above (`flip-block`). | Container row: `anchorPositionHonoursParentDirection` (`engine.ts`, conventions 13.3) true: right edges coincide; false (Firefox, Mozilla 2019601): the listbox's inline edges coincide with neither input edge, asserted with the bug named, never skipped. Page row: none. |
-| Focus stays | Click an option with the real pointer: `document.activeElement` is the input before, during and after; the selection dispatched; the popup closed after the action. Click the Trigger: input focused, popup open. Click Clear: input focused. | none |
-| Escape | Escape closes the popup, `openChangeAction(false, "dismiss")`, focus in the input, text kept; a second Escape inside a `Dialog.Popup` closes the Dialog; inside a `Popover.Popup` closes the Popover. | none |
-| Tab closes | Tab from the input: focus on the next field, popup hidden, text reverted (or custom value committed); Shift+Tab likewise. | none |
-| Typing while a save is pending | Deferred results re-render during a pending `valueChangeAction` (walkthrough 6): new options appear before the save resolves. **Verifies the lane claim of section 4**; if it fails, the design's statement is corrected to "results wait for a pending save". | none |
-| Enter submits with the new value | `allowCustomValue` inside a `<form>` with a submit spy: Enter while closed posts the typed text in `FormData` (hidden input updated before the implicit submission). | all three; document any engine where the sync flush lands after submission |
-| Nested in Popover / Dialog | Opening the listbox keeps the outer open; light dismiss closes the stack; **WebKit 302008 row**: `browserName === "webkit"`, open the listbox inside an open `Popover.Popup` twice with the default `flip-block` under a 15 s timeout so a hang fails instead of stalling. | WebKit row runs regardless |
-| Announcements | `ariaNotify` spied on the List: one call per settled result set with the default or the `announce` string; none while stale. | `supportsAriaNotify`; otherwise assert no throw |
-| Trigger close (#112) | Real mouse (`mouse.down` / `mouse.up`) on the Trigger of an open listbox with `openChangeAction` resolving after 300 ms: at `pointerup` + 20 ms the popup still matches `:popover-open`, `document.activeElement` is the input, the Trigger has `data-pending`, no `data-open` and no `aria-expanded` (#121; the Chromium branch asserts the Trigger's AX `expanded=true` through `getAXNodes()` at the same sample); after the action: hidden, exactly one dispatch `(false, { reason: "activate" })` whose `event` is the `click`. Controlled `open={true}` parent that refuses (async and sync action): `:popover-open` sampled every frame from the press to + 400 ms is never false. With `transition`: `startViewTransition` called once for the Trigger close with a `::view-transition-old` of the popup. A click while closed opens with the popup's inline-start edge on the input's and width `>= input width` (the command never ran; the anchor is still the input). | none: all three engines run the same DOM assertions; the AX assertion is Chromium only. WebKit is checked by its CI job (`FUNSTACK_BROWSERS=webkit`); its `handlePopoverLightDismiss` checks `popoverTargetElement()` (`Document.cpp`, main, #121 evaluation) |
-| Input press (#123) | The #117 row, now passing: a real press (`mouse.down` / 20 ms / `mouse.up`) on the input of an open listbox: at the press and 80 ms after the release the popup matches `:popover-open`, `document.activeElement` is the input, the text is unchanged, nothing dispatched; the `click` landed on the Popup (`openOnClick` neither re-opens nor dispatches). Caret: a press after the third character leaves `selectionStart === selectionEnd === 3`. Nested inside an open `Popover.Popup`: both stay open. Touch (a `hasTouch` context, `touchscreen.tap`, or CDP `Input.dispatchTouchEvent`): stays open at top level; under vitest's runner the page is a frame, where Chromium closes it (#124): the row asserts the close in Chromium with the issue named, so it fails the day Chromium changes. It runs in Chromium only: the harness creates no `hasTouch` context, and CDP touch input is Chromium's (as the Menu and NumberField touch rows); Firefox's touch outcome comes from the plain-DOM probe (open, top level and frame). Drag-to-select from the second to the eighth character while open: `[2, 8]` where the engine's selection drag ignores pointer capture; Firefox: `[2, 2]`, asserted as the documented cost, never skipped. | Touch row: `browserName === "chromium"` (CDP), branching on `window === window.top` (the frame is #124's trigger; vitest's runner is always a frame) with #124 named. Drag row: `browserName === "firefox"` with the finding named (conventions 13.3: no feature check fits a drag). WebKit's expectation is `[2, 8]`; if its CI job alone disagrees, record it in the amendment and branch |
-| Pre-hydration typing | `renderToString` into an `iframe srcdoc`, type with the real keyboard before `hydrateRoot`: the text survives hydration, one `"platform"` text dispatch, no `valueChangeAction`, nothing opened; the server HTML's Trigger has no `popovertarget`, a real click on it before `hydrateRoot` opens nothing, after hydration it carries `popovertarget` (#112, #121). | The "keyboard did not reach the iframe" fallback is allowed for WebKit only (the engine not probed locally, review L4); Chromium and Firefox must reach it |
-| ViewTransition | With `transition={{ …, default: "none" }}`: open calls `startViewTransition` once, accept-close once with a `::view-transition-old` of the popup present, a deferred results change zero times; with `transition="pop"` a results change calls it once (documents the cost); without `transition` zero calls. **CSS exit (#132, #147, as the shared overlay suite's "plus a CSS exit" rows):** the type map plus a `display` / `overlay` exit on the popup, no consumer rule, an accepted option: at `ready` the popup is `display: none` with the `old` image only and no inline `transition` left (the library's cut); one view transition, the content not re-mounted. The open: the popup is opaque at `ready` (no CSS enter under the view transition's). | WebKit: pseudo names unreliable, assert `display` only (as Dialog 13.3). |
-| IME | Composition (`compositionstart` … `compositionend` through Playwright's `insertText` / keyboard IME where available): the text updates per composition update, the listbox opens, Enter during composition does not accept. | Chromium (Playwright IME support); others assert the non-composition path |
-
----
+Moved to `design/CHANGELOG.md` (part "combobox.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 13. Not in v1
 
@@ -1369,1013 +1332,4 @@ Element.prototype` (all three stable engines; asserted true, branch kept for Pla
 
 ## 14. Implementation notes
 
-```
-packages/ui/src/combobox/
-  index.ts                  # no directive; namespace + types; imports platform-attributes
-  combobox-context.ts       # "use client": ComboboxContext (root value + text + active + registry), ComboboxListContext
-  combobox-root.tsx         # "use client": useOverlayRoot({ component: "combobox", mode: "library", details: popoverDetails }), useControllableAction<string | null>, useState text + useDeferredValue, active option, useOptionRegistry, label cache, accept(), useComboboxForm (form reset, mount reconciliation, hidden input), keyboard model
-  use-option-registry.ts    # "use client": useOptionRegistry(labels): the Option registry (a Map in a ref plus a count state) and its DOM-ordered read
-  use-combobox-form.ts      # "use client": useComboboxForm(options): form reset of text and value, the DOM re-sync for a controlled parent, the mount reconciliation of pre-hydration text (11.1)
-  combobox-label.tsx        # "use client"
-  combobox-input.tsx        # "use client": the controlled <input>, onInput / onKeyDown / onBlur / onClick
-  combobox-trigger.tsx      # "use client"
-  combobox-clear.tsx        # "use client"
-  combobox-popup.tsx        # "use client": usePopoverPopup, inline placement, onPointerDown
-  combobox-list.tsx         # "use client": role=listbox, aria-busy, data-stale/empty, children({ query })
-  combobox-option.tsx       # "use client": registration, pointer handlers, accept on click
-  combobox-group.tsx        # "use client": Group, GroupLabel, Empty, Status
-  combobox.test.tsx, combobox.browser.test.tsx
-packages/ui/src/internal/
-  types.ts                  # + UrgentChangeHandler
-  use-form-reset.ts         # widen FormAssociatedElement with HTMLInputElement (already) — the hidden input is the subscription element
-```
-
-- **Root.** `useOverlayRoot` as Menu (always library mode; the shared `popoverDetails` builder). `useControllableAction<string | null, ComboboxValueChangeDetails>({
-  initialValue: null, transitionTypes: () => ["fsui-combobox", "fsui-combobox-select"] })`. The
-  wrapped action: `async (next, details) => { try { await valueChangeAction?.(next, details); }
-  catch (e) { await undefined; writeText(previousLabel, "dismiss"); throw e; } if (latest &&
-  openGeneration() === recorded && text === writtenText) requestClose(details.event,
-  "activate"); }`, with `recorded` and `writtenText` captured at dispatch (per-dispatch metadata
-  in a `WeakMap` keyed by the `details` object); the `await undefined` keeps a synchronous
-  throw's rollback outside the transition (2.2). Text: `const [internalText, setInternalText] =
-  useState(defaultInputValue ?? "")`, `text = inputValue ?? internalText`, `query =
-  useDeferredValue(text)`; `writeText(next, reason, event)` sets internal state (uncontrolled)
-  and calls `onInputValueChange` synchronously; never inside `startTransition`. Active:
-  `useState<string | null>(null)`. Registry: `useOptionRegistry(labels)` (`use-option-registry.ts`): `Map<value, { element,
-  label }>` in a ref plus a `useState` count for `Empty` / `data-empty` (updated in Option
-  layout effects, batched by React), with the DOM-ordered read the keyboard model uses. Status registry: `Combobox.Status` registers from a layout effect when rendered under
-  the List context; `loading = statusCount > 0`, kept both in state (for `aria-busy`, `Empty`)
-  and in a ref (for effects). Label cache: a ref map, write-only on registration and on accept.
-- **Revalidation effect** (6.5): a layout effect after every commit reading the registry;
-  `typed()` and the caret keys call `setActive(null)` directly.
-- **Announcement effect**: a passive effect keyed on `[stale, count, query]` that reads the
-  option count and the loading count **from the refs** (6.4, review H1); speaks through
-  `internal/announce.ts`'s `announce(list, message)` and composes the consumer's `announce` prop
-  only where `canAnnounce(list)` (#129; the Root's own `ariaNotify` call before).
-- **Form reset** (`useComboboxForm`, `use-combobox-form.ts`): `useFormReset(hiddenInputRef or
-  inputRef, onReset, onResetEvent)`;
-  `onResetEvent` (synchronous, before the reset algorithm) writes the text mirror into the
-  visible input's `defaultValue`; the microtask `onReset` dispatches the JS-computed value reset
-  target and writes the text from the DOM (11.1).
-- **Mount reconciliation** (also `useComboboxForm`): layout effect at mount reading `input.value`; compare with
-  `defaultInputValue ?? inputValue ?? ""`.
-- **Input handlers.** `onInput` → `setActive(null)`, `writeText(target.value, "activate",
-  nativeEvent)`, then `requestOpen(nativeEvent, "activate")`. `onKeyDown` per section 8, open-ness
-  from `popup.matches(":popover-open")`, reading options from the registry in DOM order
-  (`compareDocumentPosition`), skipping `aria-disabled`; Home / End / ArrowLeft / ArrowRight →
-  `setActive(null)` without `preventDefault`; Enter while closed with `allowCustomValue` →
-  `flushSync` around the commit. `onFocus` → start the #111 press watch (an owned key since
-  #132, as the `onBlur` it serves). `onBlur` (React's `focusout`): nothing while `disabled`; if
-  `relatedTarget` is outside the input and the popup → `popup.hidePopover()` with a recorded
-  `"dismiss"` intent, then the revert / custom commit (`leave()`); if `relatedTarget === null` →
-  `setTimeout(0)` (while a pointer is pressed, one task after the last release instead; see 5.4,
-  #111), then `leave()` only if `document.hasFocus()` and `document.activeElement` is outside the
-  input and the popup. `onClick` → `openOnClick`. `onPointerDown` → while
-  `popup.matches(":popover-open")` and `button === 0`, `capturePointer(popup, pointerId)` (#123;
-  the helper moves from `menu/menu-dom.ts` to `internal/pointer-capture.ts`). **Foreign invokers**
-  (#126): `Combobox.Popup` passes a `whileShown` installer to `usePopoverPopup` (#129; an
-  `onToggle` before) that starts
-  `listenInvokerPresses(popup)` (`internal/invokers.ts`, `invoker-press.ts` before #129, shared with Menu: a document capture
-  `mousedown` listener preventing the primary button's default on a `<button>` outside the popup
-  whose `popoverTargetElement` / `commandForElement` with a `*-popover` command is the popup) when
-  shown and stops it when closed. Composition: ignore
-  Enter / arrows while `event.nativeEvent.isComposing`.
-- **Popup.** `usePopoverPopup(ctx, { part, initialFocus: undefined, keepMounted, transition })`;
-  `libraryProps`: `id`, `popover: "auto"`, `onPointerDown` and `onMouseDown` →
-  `preventDefault()`, `data-stale`, inline `style` (consumer wins per property); content through
-  `renderContent` as Popover 14.4.
-- **Trigger.** `onPointerDown` and `onMouseDown` → `preventDefault()` (focus stays in the
-  input); ref callback → when `element.tagName === "BUTTON"` and `invoker` (from
-  `disabledButton(render, disabled)`, a dependency of the `useCallback`, so React re-runs the
-  cleanup and the ref when it flips, #132), `setAttribute("popovertarget",
-  ids.popup)` (#121; `commandfor` + `command` at #112), removed in the cleanup
-  (otherwise a dev warning); `onClick` → `preventDefault()` first (the command never runs), then
-  `disabled` check, toggle against `intended()`, focus the input. No `onPointerCancel`, no
-  `pointerdown` snapshot (#112).
-- **Option.** Mount layout effect registers `{ element, label: labelProp ?? textContent }` and
-  unregisters on cleanup; `onPointerMove` → set active if not disabled; `onClick` →
-  `ctx.accept(value, event)`; `onPointerDown` and `onMouseDown` → `preventDefault()`.
-- **Status.** Reads the List context: inside a List, `role="none"` and a layout-effect
-  registration that increments the Root's status count; outside, `role="status"` and no
-  registration.
-- **Label.** Registers its id with the Root from a layout effect so the List's `aria-labelledby`
-  is emitted only while a Label is mounted.
-- **Dev warnings** per section 9.
-- **Docs site and example app.** Playground: a country picker with a fake 400 ms search
-  (`createSuspender`-style cache), a slow Server-Function-like save, `allowCustomValue` tag
-  input, a combobox inside a Dialog, and the "typed before hydration" note. Docs page: props
-  tables from the declarations, the urgent-lane explanation (section 4) as the page's first
-  concept, the `default: "none"` transition recipe, the keyboard table, the `announce`
-  one-liner.
-
----
-
-## Conventions feedback (applied to `design/conventions.md` at acceptance, 2026-10-17)
-
-1. **2.6 Urgent updates.** Replace "not provided in v0" with the urgent lane as designed in
-   section 4: an urgent state keeps the `x` / `defaultX` / `xChangeAction` triple; its action
-   is typed `UrgentChangeAction<T, Details>` (sync, called outside any transition, not awaited,
-   no pending, no optimistic); the library uses it only where React requires urgency
-   (controlled text input). Still no `on*` props. Resolved question 2 updated accordingly.
-2. **2.2 shared types / 9.4.** Add `UrgentChangeAction` to `internal/types.ts` and the root
-   entry's public types.
-3. **3.2 three values.** Add a fourth row for the urgent lane: `text` / `activeValue`-style
-   states, source `useState`, lane sync, shown by the input and the virtual focus. And a rule:
-   **virtual focus (`aria-activedescendant`) is urgent library state**, as DOM focus is
-   browser-owned and immediate; it is never a transition and never dispatches.
-4. **3.5 residual paths.** Add "text typed into a controlled text input before hydration is
-   reconciled at mount with `reason: "platform"` through the urgent action"; and "form
-   participation through a hidden input mirroring the optimistic value, with `defaultValue`
-   mirrored as the reset target" as a named pattern (Combobox; a future multi-select).
-   *Corrected after review (deviation 2):* a hidden input has no reset behaviour, so the pattern
-   is "a hidden input mirroring the optimistic value, with the reset target computed in JS";
-   conventions 3.5 and 3.8 rule 6 carry the corrected wording.
-5. **1.1 part vocabulary.** `Label` gains "`label[for]` naming an `Input` part"; add `Input`
-   (the text field of a combobox), `List` (an ARIA `listbox` inside a `Popup`; the Popup is the
-   container because a listbox may contain only options and groups), `Option` (Combobox:
-   `div[role=option]`, never focused), `Clear`, `Empty` (rendered by the library only when the
-   list has no options and is not stale), `Status` (`div[role=status]`), and the rule that a
-   Root may render exactly one hidden form element when it owns a form value but no visible
-   element.
-6. **4.1 vocabulary.** Add `active` (virtual focus on an Option, urgent), `stale` (the shown
-   results are for an older text; `aria-busy` equivalent on the listbox), `empty` (the list
-   has no options), `selected` row gains `Combobox.Option` and `Combobox.Input`
-   (`data-selected` = a non-null optimistic value), `open` row gains `Combobox.Input` /
-   `Trigger` (optimistic `data-open`; no `aria-expanded` on a `<button>` since #121, the browser exposes the state; Popup none).
-7. **5.1 ViewTransition.** Note that updates from `useDeferredValue` activate a boundary like
-   transitions do, so a part whose content re-renders from a deferred value (Combobox.Popup)
-   documents the `default: "none"` type-map form as the recommended spelling.
-8. **5.3 types.** `Combobox`: `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close`,
-   `fsui-combobox-select`.
-9. **7.3.** Combobox joins Menu as an always-library-mode component; its progressive
-   enhancement is "the text input works before hydration and is adopted at mount".
-10. **8 experimental table.** No new flag. Record `ariaNotify` as adopted without a flag (all
-    three stable engines) and the Open UI customizable combobox as a future `experimental_`
-    rendering candidate.
-11. **10.1 test rows.** Add "Urgent action (both)" as a required row for any component with an
-    urgent state: called synchronously per DOM event, outside a transition, DOM in sync for a
-    controlled parent.
-12. **New section 11, built-in strings** (from the user's decision on question 6): a built-in
-    UI string is an English default, exists only where accessibility needs text the consumer
-    might forget, and is always overridable through a prop that takes a function (so the
-    message can depend on state); the library never ships a locale mechanism.
-
----
-
-## Questions for the product owner
-
-1. **One Combobox with `allowCustomValue`** (decision 1) rather than `Combobox` + `Autocomplete`
-   as Base UI does. Recommendation: one component. The two share everything but the meaning of
-   unmatched text on commit; a second namespace would duplicate twelve parts and the whole test
-   plan for one boolean's worth of behaviour, and React Aria / Ark show the single shape reads
-   fine (`allowsCustomValue` / `allowCustomValue`). Cost: a consumer building a pure search box
-   still sees `value` / `valueChangeAction` and must learn that with `allowCustomValue` the
-   value is the committed text. Alternative: ship `Autocomplete` later as a thin preset over the
-   same parts if the docs show confusion.
-2. **The urgent lane is `inputValueChangeAction: UrgentChangeAction`** (section 4), keeping the
-   triple and the no-`on*` rule, with urgency expressed by the type and the docs. Alternatives:
-   a one-off `onInputChange` handler (an `on*` exception), or `inputValueAction`. Recommendation:
-   as designed; this becomes the library-wide urgent convention (feedback 1).
-3. **`value` and `inputValue` are two explicit states; the library never derives the text from
-   the value** (2.2), so a preselected value needs `defaultInputValue` / `inputValue` at the
-   call site (dev warning otherwise). Alternative: an `itemToString` / `displayValue` function
-   on Root (Headless UI, Base UI), which a Server Component cannot pass and which duplicates the
-   Options' labels. Recommendation: as designed.
-4. **Accepting an option keeps the listbox open with `data-pending` on the option until
-   `valueChangeAction` settles** (5.2, Menu decision 3), the input text changing at once.
-   Alternative: close at once and run the action detached (prior art everywhere; no pending
-   surface, no rollback the user can see). Recommendation: as designed; sync actions are
-   indistinguishable.
-5. **Tab does not accept the active option** (section 8; manual selection). Many
-   implementations (React Aria with `autoHighlight`-like modes, Chrome's own address bar) accept
-   on Tab. Recommendation: no, because Tab is "leave" everywhere else in the library (Menu
-   closes on Tab), and `autoHighlight` + Enter covers the "accept the first match" flow. Could
-   become a prop (`selectOnTab`) if asked for.
-6. **`announce` has no default string** (6.4). Alternative: a default English `"${n} results"`
-   with override. Recommendation: no default, matching "the library ships no text"; the docs
-   show the one-liner next to every example. Flagging because it is an accessibility default
-   that is off until the consumer acts.
-7. **`multiple` deferred** (section 13) with the anatomy leaving room for `Chips`. Confirm.
-8. **No JS-free mode; the Trigger server-renders no invoker attribute** (section 1, 2.4): a pre-hydration
-   Trigger click does nothing, a pre-hydration keystroke is adopted at mount. Alternative:
-   a server-rendered invoker attribute on the Trigger for a pre-hydration open of an empty, button-anchored popup
-   (Menu's shape), at the cost of wrong anchoring and width after hydration unless the library
-   re-opens with `source: input`. Recommendation: as designed.
-9. **Escape is left to the platform** (5.4): the library never intercepts it, so Escape when the
-   listbox is closed reaches an enclosing Dialog / Popover, and there is no "second Escape clears
-   the text" (APG optional behaviour). Confirm.
-10. **The WebKit 302008 row and the `style={{ positionTryFallbacks: "none" }}` escape hatch**
-    (7.3), keeping `flip-block` by default (Menu / Select precedent). Confirm.
-11. **Conventions feedback 1 to 11** to apply on acceptance by whoever holds `conventions.md`.
-
----
-
-## Decisions recorded (product owner, 2026-10-17)
-
-Questions 1 to 5 and 7 to 11 accepted as recommended: one component with `allowCustomValue`;
-`inputValueChangeAction: UrgentChangeAction` as the library-wide urgent convention; two explicit
-states and no `itemToString`; stay open with `data-pending` on the option and close on settle
-(consistent with Menu); Tab does not accept; `multiple` deferred; no server-rendered invoker attribute on the Trigger
-and no JS-free mode; Escape not intercepted; the WebKit 302008 row with the
-`positionTryFallbacks` escape hatch; the conventions changes applied (feedback 1 to 12).
-
-**Question 6, overridden by the user:** `announce` ships a default English message
-(`"No results"`, `"1 result"`, `"N results"`), overridable for i18n, so the result count is
-announced out of the box. Recorded as a convention (conventions 11): built-in strings are
-English defaults and always overridable. Sections 6.4, 3.1 and the decisions table are updated;
-the test rows assert the default.
-
----
-
-## Review revisions (product owner, 2026-10-17)
-
-From `memo/reviewer/combobox.md` (review of 08e1d23 … 3f61f1f, verdict "acceptable with fixes")
-and the developer's deviations in `memo/developer/combobox.md`. The architecture held (urgent
-lane, deferred results, accept-then-close, open-generation guard, form reset, hydration path);
-the items below are corrections to this document and the code fixes it now requires.
-
-| Item | Decision | Where |
-| --- | --- | --- |
-| H1 (announces "No results" on every open of an async combobox) | Nothing is announced while loading; the announcement effect reads the Status count through a ref, as it already did for the option count. | 6.4, 14; test row "Announcements" |
-| M1 (the active option survives typing) | Follow the APG: typing, Home, End, Left and Right clear the active option; `autoHighlight` re-highlights the first option only once the results settle (never a stale list). Resolves L5: a fast Enter while stale never accepts a stale option; it commits the typed text with `allowCustomValue`, or does nothing. | 2, 5.3, 6.5, 8, walkthrough 13 |
-| M2 (a synchronous throw runs the rollback inside the transition) | The urgent rollback write runs after `await undefined`, outside the transition; then the rethrow. | 2.2, 14, walkthrough 16; conventions 2.6 |
-| M3 (`role="status"` inside the listbox, no `aria-busy` while loading) | The List is `aria-busy="true"` while loading (a Status inside the List) as well as while stale. A Status inside the List has no status role or live region (`role="none"`); a Status outside the List is `role="status"`. A Status inside the List means "loading" (deviation 5 of the developer memo, the reviewer's 3: accepted). | 1, 3.5, 6.3, 9 |
-| L1 | The List's `aria-labelledby` is emitted only while a Label is mounted; otherwise the consumer's `aria-label`; dev warning with neither. | 9 |
-| L2, L3 | Trigger snapshot dropped on `pointercancel`, `detail === 0` falls back to `intended()`; `leave()` is a no-op while `disabled`. | 3.3, 5.4 |
-| L4 | Test-only: the iframe keyboard fallback is WebKit-only. | 12.2 |
-| L6 | The design corrections listed by the reviewer are applied: 3.3 (Clear closes; the Trigger decides at `pointerdown`), 5.2 (typing drops the pending close), 5.4 (deferred `relatedTarget === null` check), 5.5 and walkthrough 4 (controlled refusal closes), 6.3 and the anatomy (Status inside the List means loading), 7.2 and 12.2 (container RTL does not flip), 8 (keys judged against `:popover-open`), 11.1 and conventions feedback 4 (no hidden-input `defaultValue` mirror; JS reset target; the visible input's mirror written in the `reset` event). | as listed |
-| Deviation 1 (RTL page-level only) | Accepted for v1; a follow-up repo issue reads the input's direction at open. | 7.2, 13 |
-| Deviation 2 (no hidden-input `defaultValue` mirror) | Accepted; the reset target is computed in JS. | 11.1; conventions 3.5, 3.8 |
-| Deviation 4 (a controlled refusal closes) | Accepted. | 5.5, walkthrough 4 |
-| Deviation 5 (Clear while open closes through light dismiss) | Accepted. | 3.3, 5.4, walkthrough 14 |
-| Added behaviours | Accepted: keys judged against `:popover-open`; the Trigger snapshots its state at `pointerdown`; `focusout` with `relatedTarget === null` is deferred and checked with `document.hasFocus()`; typing cancels the pending close while the value still commits; `mousedown` prevented alongside `pointerdown`; the closed-Enter custom commit in `flushSync`. | 3.3, 3.4, 5.2, 5.3, 5.4, 8 |
-| Section 4 lane claim | **Verified**: a `useDeferredValue` re-render is not entangled with a pending action. | 4 |
-
-Repo issue to record (human): "Combobox: container-level `dir=rtl` does not flip the listbox
-(logical `position-area` keywords resolve against the top-layer containing block; Firefox lacks
-`span-self-inline-end`)", the follow-up for deviation 1. Filed as #53; resolved by the wave 11
-amendment below (the Firefox claim was wrong, see 7.2).
-
----
-
-## Amendment: container direction (wave 11, 2026-10-23, issue #53)
-
-Status: **accepted** (product owner, 2026-10-23: `self-*` keywords; no `data-side` now,
-recorded as a possible follow-up; Firefox 2019601 is #89); the cross-component rules are
-conventions 13. Edited in place: decision 10, the section 1 HTML, 7.2, 12.2, 13.
-
-| | v1 (as accepted) | Wave 11 |
-| --- | --- | --- |
-| Inline `position-area` | `block-end span-inline-end` (plain logical: the root's direction) | `self-block-end span-self-inline-end` (the popup's own direction) |
-| `dir="rtl"` container | left edges aligned (Chromium), documented | right edges aligned (Chromium, WebKit); Firefox misplaced (Mozilla 2019601), asserted in the browser row |
-| Follow-up "read the input's direction at open" | planned | rejected (JS, pre-hydration, staleness; no gain in Firefox) |
-| `data-side` | none | none (a possible follow-up, 7.2) |
-
-Migration: an RTL island's listbox moves to the correct side in Chromium and WebKit; a consumer
-who compensated with `style={{ positionArea: "block-end span-left" }}` can drop it. Nothing
-else changes.
-
-Questions for the product owner: none beyond Tooltip's amendment question 5 (Firefox
-unworked-around). The absence of `data-side` on `Combobox.Popup` is a choice (7.2), not an
-omission; say so if a `data-side` for the flipped listbox is wanted now.
-
----
-
-## Amendment: the urgent lane is a handler (#96, 2026-10-23)
-
-Status: **user decision** (2026-10-23, from the docs feedback in #95: "`action` should always
-mean a handler automatically wrapped with a transition"). Cross-component rules: `docs/vision.md`
-principle 3 and conventions 2.1, 2.6, 10.1, resolved question 39. Edited in place above:
-decision 3, 2.2, 3, 3.1, 3.6, 4, 6.2, 9, 10, 11.2, 12.1, 14. The historical sections ("Conventions
-feedback", "Questions for the product owner", "Decisions recorded", "Review revisions") keep the
-v1 names: they record what was decided on 2026-10-17, and question 2 there is the decision this
-amendment reverses.
-
-| | v1 (as accepted, #50) | #96 |
-| --- | --- | --- |
-| Urgent prop on `Combobox.Root` | `inputValueChangeAction` | **`onInputValueChange`** |
-| Its type (root entry export) | `UrgentChangeAction<T, Details>` | **`UrgentChangeHandler<T, Details>`**, same signature `(next: T, details: Details) => void` |
-| Details type | `ComboboxInputValueChangeDetails` | unchanged (it describes the change, not the lane; conventions 9.4) |
-| `inputValue` / `defaultInputValue` | unchanged | unchanged |
-| Behaviour | sync, in the event, outside any transition, not awaited, thenable warns once | unchanged, warning text names the new prop |
-| Deprecated alias | | **none** (alpha); passing `inputValueChangeAction` is a type error and, at runtime, an unknown prop on `Root` (no DOM element receives it, so no React warning either: the type is the guard) |
-| What `fooAction` means | a transition, except this one prop | **a transition, always** |
-| `on*` props the library defines | none | **exactly one**, this one; any other needs a React-imposed urgency and a conventions amendment (2.1) |
-
-Call site, after:
-
-```tsx
-const [text, setText] = useState("");
-<Combobox.Root
-  value={country}
-  valueChangeAction={async (next) => { await save(next); setCountry(next); }}
-  inputValue={text}
-  onInputValueChange={(next) => setText(next)}
->
-```
-
-Read aloud, the two props now say what they do: `valueChangeAction` is awaited inside the
-Root's transition and the chosen option is `data-pending` until it settles; `onInputValueChange`
-is a React handler, called per keystroke, and the text is in the DOM before it runs.
-
-Why not keep the suffix and rely on the type (v1's argument): a consumer reads
-`inputValueChangeAction={async (q) => setResults(await search(q))}` and, trusting the suffix,
-expects a pending state and an awaited promise; both are wrong, and the type comment is the
-only thing that says so. With `onInputValueChange` the line looks like what it is, a plain
-handler that happens to receive `(next, details)`, and the `async` reads as the mistake it is.
-
-### Migration (0.1.0-alpha.11)
-
-Rename the prop and, where imported, the type. Nothing else changes.
-
-```diff
--<Combobox.Root inputValue={text} inputValueChangeAction={(next) => setText(next)}>
-+<Combobox.Root inputValue={text} onInputValueChange={(next) => setText(next)}>
-
--import type { UrgentChangeAction } from "@funstack/ui";
-+import type { UrgentChangeHandler } from "@funstack/ui";
-```
-
-### Implementation checklist (for the developer)
-
-Grep for both `inputValueChangeAction` and `UrgentChangeAction` after the change; the only
-hits left must be in `design/` and `memo/` history. Occurrence counts are as of this amendment.
-
-**`packages/ui`**
-
-- `src/internal/types.ts` (2): rename the type to `UrgentChangeHandler`; doc comment: "A change
-  **handler** the library calls synchronously, outside any Transition, and does not await: the
-  urgent lane (conventions 2.6; first used by Combobox's `onInputValueChange`). Not an action:
-  nothing is pending or optimistic for it."
-- `src/internal/types.test.ts` (5): rename the import and the `it` title ("UrgentChangeHandler is
-  synchronous: (next, details) => void"); add `// @ts-expect-error` on a `UrgentChangeAction`
-  import from `../index.js` so the alias cannot come back (plus
-  `expectTypeOf<UrgentChangeAction>().toBeAny()` so the import is used).
-- `src/index.ts` (1, line ~336): export `UrgentChangeHandler` instead of `UrgentChangeAction`.
-- `src/combobox/combobox-root.tsx` (8): the prop (line ~116) and its JSDoc (section 3.1 above),
-  the `ComboboxInputValueChangeDetails` comment (~48), the module doc (~215), `writeText`
-  (~293 to 305: `latest.onInputValueChange`; warning text
-  "Combobox.Root: `onInputValueChange` returned a promise. It is the urgent lane: it is not
-  awaited. Fetch in a transition instead (`valueChangeAction`, or `useDeferredValue` of
-  `inputValue`)."), the comment at ~344.
-- `src/combobox/index.ts` (1, line ~23): the doc comment.
-- `src/combobox/combobox.test.tsx` (21): the type import (line 26), the two `it` titles (~493,
-  ~558), the type test at ~2383 ("types: UrgentChangeHandler is exported, UrgentChangeAction and
-  inputValueChangeAction are not, multiple is not a prop"), every `inputValueChangeAction:` /
-  `inputValueChangeAction=` in wrappers and assertions. (The file has no top-of-file row list;
-  the urgent rows are the `renderBoth("urgent text")` describe, which keeps its name.)
-- `src/combobox/combobox.browser.test.tsx` (2, lines ~356 and ~546).
-- `src/toast/toast.test.tsx` (line 10), `src/field/field.test.tsx` (line 13),
-  `src/form/form.test.tsx` (line 9): the N/A row is now called "Urgent handler"
-  (`UrgentChangeHandler` in the Toast comment).
-- **New** `src/__tests__/action-naming.test.ts` (conventions 10.1 "Action naming"), jsdom
-  project, type-level with `expectTypeOf` plus one runtime completeness check. The load-bearing
-  types, as implemented (two corrections to the first draft of this checklist are marked):
-
-  ```ts
-  import type {
-    ButtonHTMLAttributes,
-    DialogHTMLAttributes,
-    DOMAttributes,
-    InputHTMLAttributes,
-  } from "react";
-  import type * as UI from "../index.js";
-
-  /**
-   * Keys a part passes through from `ComponentPropsWithRef<...>` to its DOM element. React's
-   * names, not the library's; they cannot be told apart from library props by type, so they
-   * are excluded by name from both checks. (Correction 1: `DOMAttributes` alone misses
-   * `<dialog>`'s `onCancel` / `onClose`, passed through by Dialog.Popup and Popover.Popup, and
-   * `<button>` / `<input>`'s `formAction`, whose function member returns `void`.)
-   */
-  type DomPassThroughKeys =
-    | keyof DOMAttributes<Element>
-    | keyof DialogHTMLAttributes<HTMLDialogElement>
-    | keyof ButtonHTMLAttributes<HTMLButtonElement>
-    | keyof InputHTMLAttributes<HTMLInputElement>;
-
-  /** The function members of a prop's type. (Correction 2: `Form.Root`'s `action` is `string | fn`.) */
-  type FunctionPart<T> = Extract<NonNullable<T>, (...args: never[]) => unknown>;
-
-  type ActionKeys<P> = Exclude<Extract<keyof P, "action" | `${string}Action`>, DomPassThroughKeys>;
-
-  /** Action-named keys whose function part is missing or does not return `unknown`. */
-  type NonTransitionActionKeys<P> = {
-    [K in ActionKeys<P>]-?: [FunctionPart<P[K]>] extends [never]
-      ? K
-      : FunctionPart<P[K]> extends (...args: never[]) => infer R
-        ? unknown extends R ? never : K
-        : K;
-  }[ActionKeys<P>];
-
-  /** `on*` keys that are not DOM pass-throughs, i.e. the library's own. */
-  type OwnHandlerKeys<P> = Exclude<Extract<keyof P, `on${string}`>, DomPassThroughKeys>;
-
-  type PublicProps = {
-    ToggleProps: UI.ToggleProps;
-    ComboboxRootProps: UI.ComboboxRootProps;
-    // … every `*Props` exported from src/index.ts, one line each
-  };
-
-  type Offenders = { [K in keyof PublicProps]: NonTransitionActionKeys<PublicProps[K]> }[keyof PublicProps];
-  type OwnHandlers = { [K in keyof PublicProps]: OwnHandlerKeys<PublicProps[K]> }[keyof PublicProps];
-
-  // Self-test of the helpers: a planted urgent handler with the suffix, and a string, are caught;
-  // the form channel and the DOM pass-throughs are not.
-  expectTypeOf<NonTransitionActionKeys<{
-    inputValueChangeAction?: UI.UrgentChangeHandler<string>;
-    valueChangeAction?: UI.ChangeAction<string>;
-    action?: string | ((formData: FormData) => unknown);
-    formAction?: string | ((formData: FormData) => void);
-    labelAction?: string;
-  }>>().toEqualTypeOf<"inputValueChangeAction" | "labelAction">();
-  expectTypeOf<OwnHandlerKeys<{ onValueChange?: () => void; onClick?: () => void; onClose?: () => void }>>()
-    .toEqualTypeOf<"onValueChange">();
-
-  expectTypeOf<Offenders>().toEqualTypeOf<never>();
-  expectTypeOf<OwnHandlers>().toEqualTypeOf<"onInputValueChange">(); // the allow-list
-  expectTypeOf<UI.ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
-    UI.UrgentChangeHandler<string, UI.ComboboxInputValueChangeDetails> | undefined
-  >();
-  ```
-
-  Completeness: keep `const listed = [...] as const` of the `PublicProps` keys, assert
-  `Exclude<keyof PublicProps, (typeof listed)[number]>` is `never`, and at runtime read
-  `src/index.ts` (`readFileSync`, as `directives.test.ts` reads `dist`) and `expect` the set of
-  `/\b\w+Props\b/g` matches to equal `listed` (as sets), so a newly exported Props type fails the
-  test until it is listed. `Form.Root`'s `action` is React's form channel, a URL string or
-  `(formData) => unknown`: the check is on the function member only, which returns `unknown` and
-  passes, as it should (the first draft checked the whole type with `NonNullable<P[K]> extends
-  fn`, which the `string` member fails; the claim that it "passes" was wrong until the check was
-  narrowed). Why exclude by name rather than by type: `formAction`'s function member is
-  `(formData: FormData) => void | Promise<void>`, indistinguishable from an urgent handler
-  mis-named as an action, so only the fact that React owns the name tells them apart.
-
-**`packages/example`**
-
-- `src/combobox-demo.tsx` (2, lines ~176 and ~182): the prose ("`setState` in
-  `onInputValueChange`, the urgent lane") and the prop.
-
-**`packages/docs`** (props tables are written by hand; update them with the types)
-
-- `src/pages/ActionPropsPage.tsx` (3): the intro (line ~17, "has no `onClick`, `onChange` or
-  `onValueChange`": add "with one exception, below"), the triple table's Combobox row (~53 to 54:
-  "`valueChangeAction`; `onInputValueChange` (a handler, not an action: the urgent lane);
-  `openChangeAction`"), and "The urgent lane" (~290 to 307): rename, retitle the type, and replace
-  the closing sentence "It is still not an `on*` handler: there are none" with the rule: "It is
-  the library's one `on*` prop, and it is one on purpose: `fooAction` always means a handler the
-  component runs in a transition, so a callback that must not run in one is named like the
-  plain React handler it is. Nothing else in the library is an `on*` prop."
-- `src/pages/ComboboxPage.tsx` (8): "Typing is urgent" (~38 to 49, the sample
-  `<Combobox.Root inputValue={text} onInputValueChange={(next) => setText(next)}>`), the Callout
-  (~67 to 71, "Do not fetch in onInputValueChange"), the props table row (~207 to 210, type
-  `UrgentChangeHandler<string, ComboboxInputValueChangeDetails>`, description starting "A
-  handler, not an action: the urgent lane, called synchronously…"), ~532, ~636.
-- `src/pages/RoadmapPage.tsx` (2, lines ~83 to 84) and a new release entry, following the
-  `Toolbar.Button` precedent at ~137: "**Breaking:** `Combobox.Root`'s `inputValueChangeAction`
-  is renamed `onInputValueChange` and the type `UrgentChangeAction` is renamed
-  `UrgentChangeHandler`; an action prop always means a transition (#96)".
-- `src/pages/ServerComponentsPage.tsx` (1, line ~148): "reported once through
-  `onInputValueChange`".
-- `src/examples/ComboboxDrink.tsx` (2, lines ~9 and ~25).
-- `src/pages/HomePage.tsx` ~68 needs no change (it describes other libraries).
-
-**Release**: alpha, breaking, no alias; the Roadmap entry is the changelog. Version bump is the
-release skill's job, not this change's.
-
-## Amendment: a Trigger click while open closes through the action (#112, 2026-10-24)
-
-Status: architect decision; no API change, no new prop, no new `reason`. Edited in place:
-decision 6, the anatomy table, section 1 (the `commandfor` bullet), 3.3 (props type and prose),
-5.1, 5.4 row 1, walkthroughs 14 and 17, 11.2, 11.4, 12.1, 12.2, 14. The cross-component rule is
-in conventions 3.5 (the light-dismiss trap under "a part's library-owned close is the single
-source of that close") and the attribute mechanism in conventions 7.4.
-
-Finding (wave 17 audit C1 / D1): the Trigger named no popover, so a press on it while the
-listbox was open was a **light dismiss** (being the `source` would not have helped either, #123): the
-platform hid the listbox at `pointerup`, in the task before the `click`, on every engine. The
-click's `requestClose(click, "activate")` then ran against a popup already gone: the reason was
-right, but nothing was awaited (5.4 row 1 and the docs said it was), a controlled parent that
-refused the close saw the listbox hide and re-open (300 ms apart with an async action, one frame
-with a sync one), and the `<ViewTransition>` exit never ran for this close. The `pointerdown`
-snapshot existed only to make the click toggle in the right direction after that dismissal.
-
-| | Before (every engine) | After (every engine) |
-| --- | --- | --- |
-| Press on the Trigger of an open listbox | light dismiss hides the popup at `pointerup` | not a light dismiss: the Trigger names the popup (`popovertarget` since #121, `commandfor` + `command="toggle-popover"` at #112; written after hydration) |
-| Dispatch | `(false, "activate")` from the click, the hide's `toggle` an echo; the toggle direction from the `pointerdown` snapshot | `(false, "activate")` from the click, judged against `intended()` |
-| While `openChangeAction(false)` runs | listbox gone; Trigger `data-pending` | listbox shown, options visible, input focused; Trigger `data-pending`, no `data-open` (exposed as expanded while shown, #121) |
-| Controlled parent keeps `open={true}` | hidden, then re-shown when the action settles (a blink; exit and entry animations replay) | snap-back, nothing hidden (Popover 2.3's veto) |
-| Rejection | listbox already gone, re-opened by the apply effect | listbox stays shown |
-| `transition` exit | none (the popup was hidden before the close commit) | view transition |
-| Before hydration | the Trigger is inert | unchanged: no invoker attribute in the server HTML; it arrives with the hydration commit |
-
-Why the invoker attributes and not the other way round (accept the browser shape and correct 5.4
-and the docs): conventions 3.5 says a part's library-owned close is the single source of that
-close, and Menu's Trigger was just moved onto that rule (#110) for the focus-move trap; this is
-the same class with a different trigger (light dismiss) and the fix is as contained. The
-"pending state exposed" argument that chose the awaited close for Menu items and Triggers holds
-here too: the Trigger is the one part that can show `data-pending` for the close, and the user
-should see the listbox it is closing until the close has happened. The alternative would also
-have left this the only overlay Trigger whose controlled close is not a veto.
-
-Why written through the ref rather than rendered: product-owner decision 8 (no `commandfor` in
-the server HTML; a pre-hydration click must not open an empty, button-anchored popup) stands.
-The invoker relationship is only needed for light dismiss, which only exists once the library
-has opened the popup, which only happens after hydration. The precedent is conventions 7.4's
-`hidden="until-found"` upgrade and the JS-free Popover Trigger's `toggle`-driven DOM write. The
-click is cancelled before anything else in the handler, so the command never runs, no matter
-what the handler does afterwards; a consumer cannot pass `commandfor` / `command` (owned keys).
-
-**Superseded by #121 (2026-10-24): the Trigger now writes `popovertarget`, the attribute every
-other overlay Trigger renders; the exemption is the same, as this paragraph established.** Why
-`commandfor` + `command="toggle-popover"` rather than `popovertarget`, at #112: it was the attribute
-pair every other overlay Trigger rendered (`usePopoverTrigger`) and the one conventions 7.4
-types. Both are exempt from light dismiss: HTML's "topmost clicked popover" takes the invoker's
-popover from the button's popover target (`popovertarget`, or `commandfor` with a popover
-command), and WebKit's `handlePopoverLightDismiss` checks `commandForElement()` and
-`popoverTargetElement()` in that order (`Source/WebCore/dom/Document.cpp`, main, 2026-10-24).
-The reviewer's probe verified Chromium and Firefox (`none` → closed, `commandfor` → stays open,
-`popovertarget` → stays open). WebKit is verified by the CI job (12.2): the "Trigger close"
-rows passed on WebKit with `commandfor` (branch CI run 40089882553), so the `popovertarget`
-fallback was not needed.
-
-By the spec only a popover command is exempt (HTML "get the target popover" returns null
-unless the command is `toggle-popover`, `show-popover` or `hide-popover`). Chromium and Firefox
-(Playwright builds, 2026-10) exempt any `commandfor` that names the popover, whatever the
-command (a custom `--x`, none, or `close`). So the behaviour rows cannot tell the command apart,
-and the jsdom and hydration attribute assertions are what pin `command="toggle-popover"`. We
-write the spec's form so the exemption holds on a conformant engine; the click must always be
-cancelled so that the command never runs. A disabled button is never exempt (step 2 of the same
-algorithm; probed on Chromium and Firefox).
-
-Disabled flavours differed while open (review F7, recorded behaviour then, no code change): a
-native-`disabled` Trigger is not exempt, so a press on it light-dismisses the open listbox
-(`"dismiss"`, as before #112); an `aria-disabled` `<button>` (component `render`) was exempt and
-its cancelled click returned early, so a press on it did nothing and the listbox stayed open.
-**Superseded by #132:** the ref writes `popovertarget` only while the Trigger is an invoker under
-the shared rule (not disabled-and-focusable), so both flavours light-dismiss.
-
-Chromium and WebKit expose an invoker relationship to accessibility: an implicit `aria-expanded`
-derived from the popover, which the explicit attribute does **not** override (#118,
-`docs/research/invoker-aria-expanded.md`; the next amendment renders the committed state so
-every engine agrees), and `aria-details` when the popover is not DOM-adjacent. `aria-controls`
-is unaffected; `Popover.Trigger` and `Menu.Trigger` have lived with the same relationship since
-v0.
-
-Considered and left alone:
-
-- **Clear** stays a light dismiss (3.3, accepted deviation 5). Its close is browser-owned by
-  design (nothing awaits it; the listbox is not re-opened), so the 3.5 rule, which protects
-  library-owned closes, does not apply, and it behaves the same on every engine. Making Clear an
-  invoker would change the designed outcome (the listbox would stay open after clearing), a
-  separate product question, not a bug.
-- **Other overlays with a Trigger.** Popover and Menu Triggers render `popovertarget` (#121; `commandfor` before): exempt
-  through it (they are also the popover's `source`, which is no exemption, #123; popover.md's
-  "Click on the Trigger" row; #110 was the focus trap, not this one). Dialog's Trigger is the dialog's invoker (`commandfor`,
-  cancelled click), and the audit confirmed a non-modal light dismiss excludes it. Select's
-  Trigger is the native picker's button inside the `<select>`: the picker is browser-owned
-  throughout. Tooltip and Toast have no closing Trigger. A second Trigger in one Root (audit
-  API3) is not supported and is out of scope here. Combobox was the only one.
-- **Writing the attributes only while open.** Simpler to write them once at mount: a cancelled
-  click on an invoker of a hidden popover does nothing either, and the AT relationship is then
-  stable.
-- **Keeping the `pointerdown` snapshot for non-button renders.** A Trigger that is not a
-  `<button>` is already outside the part's contract ("should render a `<button>`"); a dev
-  warning is enough, and the snapshot code would otherwise be dead on the supported path.
-
-Implementation (developer), `packages/ui/src/combobox/combobox-trigger.tsx`:
-
-1. Remove `openAtPress`, `onPointerCancel` and the `detail === 0` branch; `onClick` becomes
-   `event.preventDefault()` first, then the `disabled` return, then
-   `popover.intended() ? requestClose(native, "activate") : requestOpen(native, "activate")`,
-   then focus the input. Remove `"onPointerCancel"` from the `Omit` list, add `"commandfor" |
-   "command"`.
-2. A ref callback composed with `useNameWarning`'s ref (or a layout effect reading it): when
-   `element.tagName === "BUTTON"`, `element.setAttribute("commandfor", popover.ids.popup)` and
-   `element.setAttribute("command", "toggle-popover")`; remove both in the cleanup. Otherwise,
-   in development, warn once: "Combobox.Trigger: rendered a <x>. Only a <button> can name the
-   listbox as its invoker; a press on this element while the listbox is open light-dismisses it
-   before the click." Follow `useElementCheck` from `internal/use-element-check.ts`.
-3. Update the part's doc comment (owned keys gain `commandfor`, `command`; lose
-   `onPointerCancel`; drop the "No `commandfor`" sentence) and
-   `packages/docs/src/pages/ComboboxPage.tsx`: the overview sentence at line 77 ("The Trigger
-   has no `commandfor`"), the owned keys at 361, the `openChangeAction` row at 218 is now true
-   as written, and the Trigger/Clear behaviour text at 364 may add "a Trigger click while open
-   keeps the listbox shown until `openChangeAction(false)` settles".
-4. Tests: the 12.1 Trigger row (jsdom: attributes present after mount and absent in
-   `renderToString`, click `defaultPrevented`, refusing controlled parent, non-button warning)
-   and the 12.2 "Trigger close" row plus the pre-hydration extension (browser, all three
-   engines, unbranched). The jsdom popover shim does not light-dismiss, so the browser row is
-   the one that proves the fix (conventions 3.5: "a browser row that asserts the reason and
-   `document.activeElement` across the click is required").
-
-## Amendment: `aria-expanded` renders the shown state (#118, 2026-10-24)
-
-Status: architect decision; no API change. Edited in place: the anatomy table (Input and
-Trigger), the 9 ARIA table, walkthroughs 1, 6 and 17, 12.2's Trigger-close row, conventions
-feedback 6, and the #112 amendment's table and its "Chromium exposes an invoker relationship"
-paragraph. The grounds and the engine table are in popover.md's amendment of the same name; the
-rule is conventions 3.2 and decision 40.
-
-For Combobox: `Combobox.Trigger` (an invoker after hydration, #112) and `Combobox.Input` (no
-invoker, but the same listbox) both render `aria-expanded` from the Root's `shown` mirror of the Popup's `toggle` (revised
-after review M1, below; `committed` for a day), the listbox being in the top layer; `data-open`, `state.open` on both parts and `children(state).open` stay
-optimistic. The Input is included deliberately: it is the primary control, its explicit
-attribute wins in every engine, and after the Trigger change it would otherwise say "collapsed"
-during a pending close while the Trigger, the listbox and the other two engines said "expanded".
-The APG's combobox pattern ties the attribute to the popup being visible, which is committed
-state here. The #112 Trigger close therefore reads `aria-expanded="true"` with `data-pending`
-and no `data-open` on the Trigger while the close is awaited with the listbox shown; a pending
-open from typing (walkthrough 1) reads `"false"` on the input with `data-open` and `data-pending`
-until the open commits, which for a sync `openChangeAction` is the same task.
-
-Implementation: `combobox-trigger.tsx` and `combobox-input.tsx`, `"aria-expanded":
-popover.shown` (was `popover.optimistic`, then `popover.committed` on the #118 branch); the doc comments' attribute lists say
-"committed". Tests: `combobox.test.tsx`, the controlled refused Trigger close (`"true"` while
-pending and after), the pending open on the input (`"false"` while pending, `"true"` after the
-commit); `combobox.browser.test.tsx`, the #112 Trigger-close row (`"true"` at `pointerup` +
-20 ms). `ComboboxPage.tsx`: the pending sentence and the `data-open` row's `aria-expanded`
-aside. The Trigger's `commandfor` write (#112) is unchanged (it became a `popovertarget` write with #121).
-
-Revision (review M1, 2026-10-24): `committed` was wrong for the Input. It is no invoker, so every
-engine reads its attribute, and after Escape or a light dismiss it said "expanded" over the
-hidden listbox, on the focused element, until the `"dismiss"` notification and anything entangled
-with it (a pending save) settled: a regression from the optimistic `"false"` in Chromium and
-WebKit too. Both parts now render the Root's **`shown`** mirror of the Popup's `toggle` (an
-urgent `useState` in `useOverlayRoot`, written by `usePopoverPopup`, which `Combobox.Popup`
-uses); see popover.md's revision of the same name for the mechanism and the phase table. For the
-Combobox: Escape → listbox hidden, `aria-expanded="false"` on the Input and the Trigger one task
-later while `data-pending` lasts; typing "j" → `"false"` until the `toggle` of `showPopover()`,
-`"true"` then, which with a sync `openChangeAction` is the next task; the #112 Trigger close →
-`"true"` until the close commits and hides (unchanged). Implementation: `popover.shown` on both
-parts; tests as listed in popover.md's revision (the Escape row with a deferred close action, and
-the entangled-save variant, belong here).
-
-## Amendment: a press on the Input while open stays open (#123, 2026-10-24)
-
-Status: architect decision; no API change, no new prop, no new `reason`; `onPointerDown` becomes
-an owned key of `Combobox.Input`. Edited in place: decision 6, 3.2, 5.1, 5.4, 12.2, 14, the #112
-amendment's two sentences that implied `source` mattered, conventions 3.5 (the `source` clause
-and the pointer-capture lever) and the research probe table (`docs/research/select-combobox.md`
-§6, with a correction note).
-
-### Finding
-
-Found by the #117 real-mouse rows. With the listbox open, a real press on `Combobox.Input`
-light-dismissed it (Chromium at the `click`, Firefox at `pointerup`; WebKit runs the same
-algorithm): `openChangeAction(false, { reason: "dismiss", event: <toggle> })`, focus and text
-kept, the listbox gone under the user's caret click, and with `openOnClick` re-opened by the
-click a task later (a blink and two dispatches).
-
-Three documents said otherwise: 5.1 ("makes clicks on the input not light-dismiss"), the
-research probe table ("Clicking the `source` does not light-dismiss") and conventions 3.5 (the
-`source` listed among the light-dismiss exemptions). All three rested on one probe, and the
-probe used a synthesised click, which has no `pointerdown` / `pointerup` and never runs light
-dismiss. Re-probed with a real pointer in plain DOM (no library): an `<input>`, a plain
-`<button>` and a `<span>` as `source` are all dismissed; only a `<button commandfor>` /
-`popovertarget` survives.
-
-### What the spec and the engines do
-
-HTML "light dismiss open popovers" records, at `pointerdown`, the "topmost clicked popover" of
-the event target and, at `pointerup`, hides every popover above the topmost clicked popover of
-*that* target if it is the same one. "Topmost clicked popover" is the higher in the stack of two
-things: the nearest inclusive **open popover** ancestor of the target in the flat tree, and the
-nearest inclusive **target popover**, which comes from a button's `commandfor` (with a popover
-command) or `popovertarget`. `showPopover({ source })` sets the popover's trigger (used to place
-a nested popover under its invoker's popover in the stack) and the implicit anchor; the
-light-dismiss path never reads it.
-
-| Engine | Where it decides | Target used | Reads the `source`? |
-| --- | --- | --- | --- |
-| Chromium (`LightDismissFromClick`, stable) | at the `click`, comparing `FindTopmostRelatedPopover` of the `pointerdown` and `pointerup` targets it recorded (`PointerEventManager`, `MouseEventManager`) | the pointer events' dispatch targets, so pointer capture counts | no (`NearestOpenPopover`, `NearestTargetPopoverForInvoker`: `commandfor`, `popovertarget`, `interestfor`, select picker, base-appearance combobox) |
-| Gecko | `EventStateManager::LightDismissOpenPopovers` at `pointerdown` / `pointerup` | the pointer event's target content | no (`nsINode::GetTopmostClickedPopover`: `GetEffectiveCommandForElement`, `GetEffectivePopoverTargetElement`, select picker) |
-| WebKit | `PointerCaptureController::pointerEventWillBeDispatched` → `Document::handlePopoverLightDismiss` at `pointerdown` / `pointerup` | the element the pointer event is dispatched to | no (`commandForElement`, `popoverTargetElement` on buttons and button-type inputs, select picker) |
-
-None of them checks `defaultPrevented`: a prevented `pointerdown`, `pointerup` or `click` changes
-nothing (probed in Chromium and Firefox, every combination). An `<input type="text">` cannot be an
-invoker by any route: `popovertarget` applies to button-type inputs only and `commandfor` to
-`<button>` (and Chromium's `<menuitem>`).
-
-### Options
-
-| Option | Outcome | Verdict |
-| --- | --- | --- |
-| Accept the browser shape (document "a click in the field closes the listbox") | Engine-consistent and honest, but the user who clicks into the field to move the caret loses the list they were reading; with `openOnClick` the list blinks and dispatches twice. No library does this; APG says nothing because native listboxes never did it | rejected |
-| Re-show after the dismissal | Hide, `toggle`, show: a blink, a `"dismiss"` dispatch that was not one, the `<ViewTransition>` exit and entry both run | rejected |
-| `popover="manual"` with library light dismiss | Loses the platform's close watcher (Escape, decision 9 reversed), the auto stack (another auto popover opening elsewhere no longer closes the listbox; the listbox no longer closes with an enclosing Popover's stack) and `:popover-open`-driven nesting for free; the library would re-implement outside-press, Escape and stacking. A redesign of the Combobox popup model for one press | rejected |
-| An invoker relationship | An `<input>` cannot be one | impossible |
-| **Pointer capture to the Popup at the Input's `pointerdown`** | The release (`pointerup`, and the `pointerup` target Chromium records for the `click`) is dispatched to the Popup, whose topmost clicked popover is the listbox itself: nothing above it, nothing hides. One handler, `popover="auto"` and everything it gives stay | **chosen** |
-
-### Verified (plain DOM, Playwright, Chromium 156 and Firefox 157; both engines unless noted)
-
-| Case | Without capture | With `popup.setPointerCapture(pointerId)` at the input's `pointerdown` |
-| --- | --- | --- |
-| Mouse press and release on the input | hidden (`"dismiss"`) | shown; `pointerup`, `mouseup`, `click` dispatched to the popup; `mousedown` to the input |
-| Caret: click after the third character | `selectionStart === 3` | `selectionStart === 3` (the compat `mousedown` is not retargeted) |
-| Double click on a word | word selected | word selected |
-| Drag from the second to the eighth character | `[2, 8]` | Chromium `[2, 8]`; **Firefox `[2, 2]`** |
-| Drag from the input, released outside | Chromium shown (down and up targets differ), Firefox hidden | shown |
-| Touch tap (`hasTouch`, `touchscreen.tap`) | hidden | shown (the touch compat `mousedown` / `click` arrive at the input after the release; Chromium's click-time comparison still sees the captured `pointerup`). **Chromium in a same-origin iframe: hidden** (#124, found by the developer; the event order is identical, the comparison misses the captured `pointerup`); Firefox in a frame: shown |
-| Capture at `mousedown` instead | | mouse as above; **touch hidden** (its compat `mousedown` comes after `pointerup`): capture must be at `pointerdown` |
-| Nested in an open outer auto popover | listbox hidden, outer kept | both kept |
-| Right click (button 2, not captured) | Chromium shown, Firefox hidden | unchanged |
-| `preventDefault()` on `pointerdown` / `pointerup` / `click` | hidden | n/a |
-
-WebKit could not be run locally; it uses the pointer event's dispatch target, which its
-`PointerCaptureController` overrides under capture, so the expectation is Chromium's. Its CI job
-decides; if the press row alone fails there, the amendment is wrong about WebKit and the fallback
-is to record a browser-shaped close for that engine, not to re-show.
-
-### Decision
-
-`Combobox.Input` owns `onPointerDown`: when `event.button === 0` and the Popup matches
-`:popover-open`, `capturePointer(popup, event.pointerId)` (the Menu helper, moved to
-`internal/pointer-capture.ts`: swallows the `NotFoundError` of a pointer the engine no longer
-tracks, returns whether the capture was taken). Nothing else changes: no `preventDefault` (the
-caret, selection and focus behaviour of the field are the platform's), no `pointerup` handler
-(the engine releases the capture after `pointerup` / `pointercancel`), no change to the #111
-press tracking (its document-level capture-phase `pointerup` listener still sees the release:
-the Popup is in the document), no change to the Trigger (#112), Clear (deviation 5) or the Labels
-(#111).
-
-Why `:popover-open` and not `intended()`: a press during a pending close (the listbox still
-shown, the close in flight) must not dismiss either; the pending close hides it in its commit, as
-every key is judged against what the user sees (section 8). A press while the listbox is closed
-captures nothing, so the `click` reaches the input and `openOnClick` works as before.
-
-Why only the primary button: a right click on the field wants the field's own context menu
-(cut, copy, paste, spelling), which the engines build from the hit test, and a middle click on
-Linux pastes; retargeting their `pointerup` buys nothing and, in Chromium, `contextmenu` follows
-pointer capture. In Firefox and WebKit a secondary-button press therefore still light-dismisses,
-as it does today and as every auto popover does; it is not a case the #117 rows cover.
-
-Consequences, stated:
-
-- For a mouse or pen press on the open field the `click` is dispatched to the Popup, not the input
-  (a touch tap's compat `click` comes after the release and is hit-tested: it reaches the input,
-  where `openOnClick`'s `requestOpen` while open is a no-op): the Input's
-  `onClick` (`openOnClick`) does not run for it (correct: there is nothing to open), and a
-  consumer `onClick` on the Popup sees a click whose `pointerdown` was on the input. Options are
-  not affected (their `onClick` needs the target inside them).
-- **Firefox: drag-to-select in the field does not extend while the listbox is open.** Gecko
-  routes the mouse drag to the pointer-capturing element; Chromium's selection drag ignores
-  capture. Shift+click, Shift+arrows, the double click and the keyboard still select, and typing,
-  the caret click and Escape are unaffected. Accepted as the cost of the lever: the alternative
-  (no capture) closes the listbox on every click into the field, in every engine. Recorded in
-  5.4, conventions 3.5 and the research note; not a Gecko bug by any spec text (Pointer Events
-  does not define selection), so nothing to report upstream, but worth re-checking when Gecko's
-  pointer capture changes.
-- **Chromium, touch, inside a same-origin iframe: the tap still closes the listbox** (#124,
-  upstream, a human reports it). Top-level touch, mouse in a frame and Firefox are unaffected.
-  Not worked around: the only levers left are the rejected ones (re-show, `manual`). The docs page
-  carries a one-line caveat so a Storybook or sandbox preview on a touch device is not reported as
-  a library bug; the browser row asserts the close with #124 named so it fails when Chromium
-  changes.
-- Pass-through handlers on the Input see a different event set during a primary mouse or pen press
-  while the listbox is open: the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` do not
-  fire (those events go to the Popup; `onMouseDown` still fires), and the Input gets
-  `pointerleave` / `mouseleave` (and `pointerenter` / `mouseenter` again after the release) as the
-  pointer's boundary events cross to the Popup and back. `:hover` is unaffected. Stated in the
-  docs page's Input note (#123 review).
-- `gotpointercapture` / `lostpointercapture` fire on the Popup for each such press; harmless.
-- A consumer who needs `onPointerDown` on the field listens on a wrapper, as for the Popup's
-  owned `onPointerDown` (3.4).
-
-### Implementation (developer)
-
-1. `internal/pointer-capture.ts`: move `capturePointer` out of `menu/menu-dom.ts` (re-export or
-   update the Menu's imports; the jsdom `pointer-capture-shim.ts` keeps working).
-2. `combobox-root.tsx`: `inputPointerDown(event: PointerEvent)`: `if (disabled || event.button
-   !== 0) return; const popup = popover.popupRef.current; if (popup !== null &&
-   isPopoverOpen(popup)) capturePointer(popup, event.pointerId);`. Expose it on the context.
-3. `combobox-input.tsx`: add `"onPointerDown"` to the `Omit`, `onPointerDown: (event) =>
-   ctx.inputPointerDown(event.nativeEvent)` to `libraryProps`, list it in the owned keys of the
-   doc comment, and correct the ref-callback comment ("makes clicks on it not light-dismiss" is
-   wrong: the registration is for the anchor and the nested stacking).
-4. Docs (`packages/docs/src/pages/ComboboxPage.tsx`): the overview sentence "clicks on the input
-   never light-dismiss it" (line 74 today) becomes "a press on the input keeps the listbox open
-   (the Input captures the pointer to the Popup; in Firefox a drag-to-select in the field does
-   not extend while the listbox is open)"; the Input's owned keys gain `onPointerDown`.
-5. Tests. jsdom (`combobox.test.tsx`): `setPointerCapture` spied through the shim, called once
-   with the Popup element and the pointer id for a `pointerdown` with `button: 0` while the
-   popup is open (the shim's `:popover-open`), not called while closed, not for `button: 2`, not
-   while `disabled`; `openOnClick` still opens from a click while closed. Browser
-   (`combobox.browser.test.tsx`): flip the #117 row "the input (the popup's source)" from
-   `it.fails` to `it` and rename it ("the input: nothing closes or dispatches; the input keeps
-   focus and its text"), then add the 12.2 "Input press" row's extras: caret at 3, nested in
-   `Popover.Popup`, touch tap, and the drag-selection row with the Firefox branch. Firefox runs
-   browser files serially (#62), so the drag's pointer input is safe there.
-
-## Amendment: `popovertarget` Trigger, no `aria-expanded` (#121, 2026-10-24)
-
-Status: architect decision, user-approved through the product owner. **Breaking (DOM attributes
-only; no prop or type change beyond two more omitted keys).** After hydration a `<button>`
-`Combobox.Trigger` writes `popovertarget` (the Popup's id) through its ref instead of
-`commandfor` + `command="toggle-popover"` (#112's mechanism, same timing, same cleanup), and it
-renders **no `aria-expanded`**: once the attribute is there, Chromium, Firefox and WebKit expose
-the listbox's shown state from the popover itself (HTML-AAM `popovertarget` mapping; measured in
-`memo/architect/probes/121-popovertarget/`), ARIA in HTML #514 forbids the explicit attribute on
-such a button, and Firefox ORs an explicit value in. Before hydration the button exposes no
-state (it has neither attribute); the **Input keeps its explicit `aria-expanded` from
-`popover.shown`** (`role="combobox"` requires it; it is no invoker) and is the widget's primary
-control, so the pre-hydration gap on a `tabindex="-1"` button is accepted. A non-button `render`
-is no invoker (#112's warning) and renders `aria-expanded` from `popover.shown` (#118) so a
-link-shaped Trigger still exposes the state. `ComboboxTriggerProps` omits `popoverTarget` /
-`popoverTargetAction` as owned keys next to the reserved `commandfor` / `command`. Grounds and
-trade-offs: `memo/architect/eval-121-popovertarget.md`; the cross-component rule is conventions
-decision 41; Popover's amendment of the same date carries the full implementation and test plan.
-Edited in place: the anatomy table, section 1's Trigger bullet, 3.3 (props type and prose), the
-11 walkthroughs' Trigger lines, 12.1's Trigger row, 12.2's Trigger-close and pre-hydration rows,
-the deviations list, and the #112 amendment (its table and the "why `commandfor`" paragraph,
-marked superseded).
-
-Verified unchanged for `popovertarget` (the #112 guarantee): a press on the Trigger of the open
-listbox is not a light dismiss in Chromium and Firefox (real pointer, popup shown with
-`source: input`, click cancelled: `:popover-open` at `pointerup` + 20 ms and after) and in WebKit
-by source (`handlePopoverLightDismiss` checks `commandForElement()` then
-`popoverTargetElement()`); a native-disabled Trigger is still not exempt; a cancelled click never
-runs the activation, with a mouse, Enter or Space; the listbox stays anchored to the input.
-
-Combobox-specific implementation: `combobox-trigger.tsx`'s ref callback writes
-`element.setAttribute("popovertarget", popupId)` on a `<button>` and removes it in the cleanup
-(the `command` write and removal go); `libraryProps` drops `"aria-expanded"` for a button render
-and keeps `popover.shown` for a non-button one (`rendersButton(render)`, as `usePopoverTrigger`);
-the `Omit` list gains `"popoverTarget" | "popoverTargetAction"`. `combobox-input.tsx` is unchanged.
-Tests: `combobox.test.tsx` asserts `popovertarget` after mount, none in `renderToString`, none on a
-non-button render (which asserts `aria-expanded` from `shown` instead), and **no `aria-expanded`**
-on the button Trigger in the controlled refused-close, pending-open and Escape rows, whose Input
-assertions are unchanged (22 attribute sites, about half of them the Input's and kept);
-`combobox.browser.test.tsx`'s Trigger-close and pre-hydration rows swap the attribute name and
-add the Chromium AX sample. `ComboboxPage.tsx`: the overview sentence, the owned keys and the
-`data-open` row's `aria-expanded` aside.
-
-## Amendment: a press on a foreign invoker is not focus leaving (#126, 2026-10-25)
-
-Status: architect decision; no API change, no new prop, no new `reason`. Edited in place:
-decision 6, 5.4 (a new "Foreign invoker click while open" row and the paragraph after the table),
-12.2's Focus loss row, the 14 Input-handlers bullet. The cross-component rule is in conventions
-3.5; Menu's amendment of the same date carries the engine table and the grounds
-(`memo/architect/issue-126-foreign-invoker-press.md`, probe in
-`memo/architect/probes/126-foreign-invoker-press/`, which includes the Combobox shape: an input
-outside the popup as the focus holder, shown with `source: input`).
-
-The case: a consumer's own `<button popoverTarget={popupId}>` (or `commandfor` + `toggle-popover`
-/ `hide-popover`) pressed with a real mouse while the listbox is shown. Chromium and Firefox focus
-it on `mousedown`; the Input's `focusout` (`relatedTarget` = the button) ran `leave()`: the
-listbox hidden as `"dismiss"`, the text reverted (or the custom value committed), and the click's
-native toggle then re-showed the hidden listbox with the input blurred. WebKit, which does not
-focus a button on click, took the intended path: input focused, the click's toggle hides the
-listbox, `"activate"` from `ToggleEvent.source` (#125), text untouched.
-
-Rule: `Combobox.Popup` keeps a document capture `mousedown` listener alive while shown that calls
-`preventDefault()` for `button === 0` when the target's closest `<button>` is outside the popup
-and names it (`popoverTargetElement === popup`, or `commandForElement === popup` with a
-`*-popover` `command`). Every engine then ends as WebKit did: the input keeps focus, no `focusout`,
-no revert, the click's native toggle closes the listbox as `"activate"`; a dragged-off press
-leaves the listbox shown with the input focused. It is the rule the Combobox's own Trigger and
-Clear already follow ("the input must keep focus", 3.3, conventions 3.5), applied to a button the
-library does not render but which names its popup. A plain foreign button is unchanged: focus
-leaves, the listbox closes as `"dismiss"`, the text reverts or commits (5.4). A Tab onto a foreign
-invoker is unchanged too: focus leaving, `"dismiss"`; the guard is a `mousedown` rule.
-
-Rejected (as for Menu): the `focusout` path ignoring an invoker `relatedTarget`. For Combobox it
-is worse than for Menu: the input would be blurred with the listbox shown, and `leave()`'s second
-duty (the text revert / custom commit) would have to run or not run on a guess.
-
-Implementation (developer): `combobox-popup.tsx` passes an `onToggle` to `usePopoverPopup` that
-starts `listenInvokerPresses(popup)` (`internal/invoker-press.ts`, shared with Menu) when
-`newState === "open"` and the popup is `:popover-open`, and stops it on `"closed"` and unmount
-(since #129: a `whileShown` installer, the hook owning the same lifecycle, and the module is
-`internal/invokers.ts`);
-`combobox-root.tsx` and `combobox-input.tsx` are unchanged. The docs page's `openChangeAction`
-row gains one sentence as Menu's.
-
-Tests. jsdom (`combobox.test.tsx`): with the listbox open, `fireEvent.mouseDown` on a foreign
-`<button popovertarget={popupId}>` is `defaultPrevented` and the input stays focused; not on a
-plain button, not while closed; the #125 foreign row keeps `foreign.click()`. Browser
-(`combobox.browser.test.tsx`, Chromium, Firefox and WebKit, real pointer): type unmatched text
-("Jamaicax", `allowCustomValue` off), then `user.click(foreign)`: the listbox is not
-`:popover-open`, `openChangeAction` since the open is exactly `[(false, "activate")]` with the
-`beforetoggle` `ToggleEvent` whose `source` is the button, **the input text is still "Jamaicax"**
-(no `leave()`), `document.activeElement === input`, and no `(true, …)` follows within 100 ms; a
-dragged-off press leaves the listbox shown, input focused, nothing dispatched. Mutation check: with
-the listener removed, the Chromium and Firefox rows fail (`"dismiss"`, text reverted, re-open on
-Firefox), the WebKit row passes.
-
-## Amendment: `Combobox.Input` owns `onFocus`; the CSS exit recipe applies here (#132, 2026-10-25)
-
-Status: architect decision on two wave 18 audit findings (`memo/reviewer/wave18-audit-source.md`
-S10, `memo/technical-writer/wave18-docs-audit.md` D3). Edited in place: 3.2 (props type and owned
-keys), 11.3, 11.4, 12.2, 14. Notes: `memo/architect/issue-132.md`.
-
-**S10: `onFocus` is omitted from `ComboboxInputProps` and listed as owned.** #111 made the Input
-install a prop-form `onFocus` (it starts the press watch that decides whether a `focusout` with
-no `relatedTarget` is a leave) without updating 3.2, which still said `onFocus` passes through.
-Today a consumer's `onFocus` is chained before the library's (conventions 1.2 merge order), so
-nothing breaks at runtime; the type is the inconsistency: `onBlur` refused, `onFocus` accepted.
-Conventions 1.5 is a blanket rule, "the library's own prop-form event handlers are omitted from
-the type", and every other part follows it (`Tabs.Tab` installs and omits `onFocus`; `Menu.Popup`,
-`Tabs.List`, `Toast.Viewport`, `ToggleGroup.Root`, `Toolbar.Root` omit it). The alternative, keep
-accepting it and document it as "owned, chained", would create a third category of handler
-("installed by the library but passed through") that 1.5 would have to define and every part
-would then have to classify its handlers against; a passive handler today can grow a
-`preventDefault()` tomorrow. Not worth it for one key. A types-only breaking change, allowed in
-alpha; the runtime is unchanged. What a consumer who reacts to focus does instead: `onFocusCapture`
-(a DOM event prop the part does not use, 1.5) or the function form of `render`.
-
-Implementation (developer): `combobox-input.tsx`: `"onFocus"` in the `Omit`; the doc comment's
-owned-key list gains `onFocus`. `combobox.test.tsx`: a `// @ts-expect-error -- owned key` line
-for `onFocus` next to the existing one. Docs (`ComboboxPage.tsx`, the Input's `PartFacts`): add
-`onFocus` to the owned list; the note gains "`onFocusCapture` passes through".
-
-**D3: the "cut the CSS exit while a view transition runs" rule applies to Combobox** (and Menu;
-see the Menu amendment of the same date). Confirmed two ways: by construction, since
-`Combobox.Popup` wraps the popover element in the boundary and `usePopoverPopup` runs
-`hidePopover()` in the layout effect of the close commit exactly as `Popover.Popup` does; and by
-a Chromium and Firefox probe of the docs' CSS shape (11.4). The docs and the playground must add
-the rule: `html:active-view-transition .demo-combobox-popup { transition: none; }`
-(`packages/docs/src/examples/combobox.css`) and `html:active-view-transition .cb-popup {
-transition: none; }` (`packages/example/src/combobox-demo.css`), with ComboboxPage's Styling
-section carrying the one-line CSS and the Chromium double-image reason, or a link to the general
-statement if the technical writer moves it to the Transitions page (recommended: the rule is
-general, conventions 5.1, and four pages now repeat it). A permanent browser row (12.2) is
-recommended so the Combobox gets what the shared overlay suite already gives Popover, Dialog and
-Menu.
-
-## Amendment: a disabled, focusable Trigger is no invoker (#132, from the #128 review F1, 2026-10-25)
-
-Status: architect decision; a DOM-attribute change in one narrow case, no prop or type change.
-Edited in place: 3.3, the #112 amendment's F7 paragraph (superseded), 12.1's Trigger row, 14's
-Trigger bullet; conventions decision 41. Notes: `memo/architect/issue-132.md`.
-
-The gap (`memo/reviewer/issue-128-review.md` F1): `Popover.Trigger` and `Menu.Trigger` render
-`popoverTarget` only while `disabledButton(...).invoker` is true, so a Trigger that is disabled
-and still focusable (`aria-disabled="true"` on a link or component `render`, button.md 17) is no
-invoker (#83 M1, #115), and the docs state that as the rule for every overlay Trigger.
-`combobox-trigger.tsx`'s ref wrote `popovertarget` on any `<button>`, so a disabled component
-render of `Combobox.Trigger` stayed an invoker after hydration; the #112 amendment had recorded
-the consequence (F7: a press on it while the listbox is shown did nothing instead of
-light-dismissing) as behaviour, not as a decision.
-
-Decision: follow the shared rule. The ref writes `popovertarget` only when the element is a
-`<button>` **and** `disabledButton(render, disabled).invoker` is true; `aria-expanded` follows the
-same test (`invoker ? undefined : popover.shown`), as `use-popover-trigger.ts` does. Grounds:
-(1) one rule for every overlay Trigger (conventions decision 41 is written as one; the docs page
-on browser-owned state teaches it as one); (2) a disabled control is inert, and a press on an
-inert element while the listbox is shown is a press on the page, so light dismiss (`"dismiss"`)
-is the right outcome, which is what the native-`disabled` flavour already does (F7), so the two
-disabled flavours now agree inside Combobox as well; (3) the only thing the invoker relationship
-bought a disabled Trigger was the implicit expanded state, which the explicit `aria-expanded` from
-`popover.shown` provides equally (#118). The case is narrow (a component `render` with
-`disabled`), so the visible change is small; nothing changes for the default `<button>` (native
-`disabled`, invoker, non-exempt by the browser's own check) or for an enabled Trigger.
-
-Implementation (developer): `combobox-trigger.tsx`: compute `const { props: disabledProps,
-invoker: enabledInvoker } = disabledButton(render, disabled)` once; the ref's guard becomes
-`element.tagName !== "BUTTON" || !invoker` with `invoker` in the `useCallback` dependencies (React
-runs the cleanup and the new ref on a change, so a flip of `disabled` adds or removes the
-attribute); `"aria-expanded": invoker && rendersButton(render) ? undefined : popover.shown`;
-the doc comment names the rule. Tests (`combobox.test.tsx`, jsdom): the 12.1 Trigger row's new
-clauses: `disabled` with `render={<MyButton />}` has `aria-disabled="true"`, no `popovertarget`,
-`aria-expanded="false"` (and `"true"` once the listbox is shown through typing), a cancelled click
-that opens nothing; re-render with `disabled={false}`: `popovertarget` present and `aria-expanded`
-gone; the native-`disabled` host button keeps `popovertarget`. Optional browser row
-(`combobox.browser.test.tsx`): a real press on the disabled component-render Trigger of a shown
-listbox light-dismisses it (`(false, "dismiss")`, input keeps focus), on all three engines. Docs:
-`BrowserOwnedStatePage.tsx`'s "a disabled Trigger that stays focusable is no invoker either"
-becomes true as written; ComboboxPage's Trigger owned-keys note gains "(while enabled, or
-natively disabled; not while `aria-disabled`)" next to `popoverTarget`.
-
-## Amendment: requests and facts (#148, 2026-11-24, user decision; implemented 2026-11-24)
-
-Design: `design/components/overlay-open-change.md` (section 5 is Combobox's; conventions
-resolved question 45). What it changes here:
-
-| | Before | After |
-| --- | --- | --- |
-| `onInputValueChange` returning a promise | dev warning once; a rejection is unhandled; a throw propagates out of the `input` listener | **allowed, no warning**; the promise is not awaited; a rejection and a synchronous throw go to `reportError`; the text write and everything after it still happen (the handler rule, conventions 2.1) |
-| `openChangeAction` | every open-state change, dismissals as a "notification" | **requests only**: typing and arrow opens, Trigger, `openOnClick`, foreign opens, a popup found open at mount (`"platform"`), the close after an accepted option, Alt+ArrowUp |
-| `onOpenChange` | (none) | **new**, `UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>`, always `false`: Escape, focus leaving the input, light dismiss, another top-layer element, a `Clear` click while open, script `hidePopover()` (`"dismiss"`); a foreign invoker button (`"activate"`) |
-| After a dismissal | optimistic `false`, the action awaited in the Root's transition, `data-pending` on Input and Trigger, committed `false` when it settled | committed `false` in the event's urgent commit; no `data-pending`; no view transition |
-| Controlled `open`, parent keeps `true` after a dismissal (5.5) | re-opens after the action settles | re-opens at once; needs `onOpenChange={setOpen}` not to (development warns for `open` without `onOpenChange`) |
-
-The Root's three states now have three shapes, each for a reason: `value` (requests only:
-`valueChangeAction`), `inputValue` (facts only: `onInputValueChange`), `open` (both).
-Unchanged: the text revert and the custom-value commit after focus leaves (`valueChangeAction`),
-`Clear`'s `null` dispatch, `aria-expanded` from the `shown` mirror, the accept flow (a pending
-`valueChangeAction` is not superseded by an Escape; its continuation requests no close).
-
-Sections 3.1 (Root props), 5.4 (the Closing table's "notification" rows), 5.5 and the
-walkthroughs of 10 are rewritten with the implementation. Developer: the "returned a promise"
-warning text and its test row (amendment #96, implementation checklist) are deleted;
-`onInputValueChange` is called through `callUrgentHandler` (overlay-open-change.md 11).
-
-## Amendment: the library cuts the CSS transition (#147, 2026-11-24)
-
-The #132 amendment's rule (`html:active-view-transition .demo-combobox-popup { transition: none; }`
-in `packages/docs/src/examples/combobox.css`, `.cb-popup` in the playground, `.listbox` in 11.3)
-is removed: `usePopoverPopup` cuts the popup's CSS transition around the library's own show / hide
-during a view transition (Popover's #147 amendment, conventions 5.1). 11.3, 11.4 and 12 edited in
-place.
+Moved to `design/CHANGELOG.md` (part "combobox.md"). Not part of the contract: the code and the tests are the reference.

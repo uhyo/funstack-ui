@@ -1221,7 +1221,7 @@ describe("Dialog", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("the mode changed after mount"));
     });
 
-    // #148, overlay-open-change.md 2.11 and 6.2
+    // #148, conventions 3.9.11 and dialog.md 2.7
     it("onOpenChange alone selects library mode; a script close(v) is a fact with its returnValue", async () => {
       const user = setupUser();
       const onOpenChange = vi.fn<ActionFn>();

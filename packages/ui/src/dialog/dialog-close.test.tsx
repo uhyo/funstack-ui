@@ -484,7 +484,7 @@ describe("Dialog", () => {
       await act(async () => popup().requestClose());
       await flushTasks(2);
       expect(popup().open).toBe(false);
-      // Reported the moment it happened (overlay-open-change.md 6.3: nothing is stored).
+      // Reported the moment it happened (dialog.md 2.7: nothing is stored).
       expect(fact.mock.calls.map(([next, d]) => [next, d.reason, d.returnValue])).toEqual([
         [false, "dismiss", ""],
       ]);

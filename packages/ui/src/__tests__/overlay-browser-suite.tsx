@@ -3,7 +3,7 @@
 // platform's focus return, CSS exit animations and the deferred unmount (design 4.4), and
 // `<ViewTransition>` around the top-layer element (the library-owned closes run inside the update
 // callback; a dismissal is a fact, an urgent commit that starts none: #148,
-// design/components/overlay-open-change.md 2.8). The jsdom half is overlay-open-state-suite.tsx.
+// conventions 3.9.8). The jsdom half is overlay-open-state-suite.tsx.
 //
 // Each component's `.browser.test.tsx` calls `describeOverlayInBrowser` with a driver; the rows
 // that differ per component (Dialog's 10.3 capture, the focus return of a keyboard-activated Close,

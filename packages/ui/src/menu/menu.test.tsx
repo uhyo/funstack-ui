@@ -937,7 +937,7 @@ describe("Menu.Item actions", () => {
       expect(isOpen()).toBe(true);
     });
 
-    // #148, overlay-open-change.md 4.3
+    // #148, menu.md 2.4
     it("Escape while the item's action runs: the fact closes the menu at once; the item requests no close", async () => {
       const user = setupUser();
       const work = deferred();

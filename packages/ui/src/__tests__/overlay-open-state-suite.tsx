@@ -3,7 +3,7 @@
 // components: `openChangeAction` plumbing and `details`, optimistic open and pending, part-initiated
 // closes (requests, library-owned: awaited, then the library closes) against dismissals (facts:
 // the platform closed; `onOpenChange(false)` synchronously, committed `false` urgently, nothing
-// pending; #148, design/components/overlay-open-change.md), rejection and revert, controlled
+// pending; #148, conventions 3.9), rejection and revert, controlled
 // refusal (an immediate re-open) and veto, overlapping and superseded dispatches (a fact supersedes
 // every request), suspending content, the platform path (an open found on hydration, a controlled
 // flip), the controlled-without-`onOpenChange` warning and the stale close-intent clear
@@ -98,7 +98,7 @@ export interface OverlayHarnessProps<D> {
 /**
  * Controlled/uncontrolled parity harness. The controlled variant follows "update on success"
  * (`startTransition` after the await, design 2.2) for requests and adopts facts in `onOpenChange`
- * directly (urgent, overlay-open-change.md 2.4); both modes mirror what the consumer was told in
+ * directly (urgent, conventions 3.9.4); both modes mirror what the consumer was told in
  * `data-testid="committed"`. `renderRoot` renders the component's Root with `rootProps` and the
  * component's own harness props; the parts must carry the test ids `trigger`, `popup` and (in the
  * default content) `content`.
@@ -949,7 +949,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
           close = spyClose();
         });
         await flushTasks(2);
-        // The documented mistake (overlay-open-change.md 2.4): `open={true}` in the event's own
+        // The documented mistake (conventions 3.9.4): `open={true}` in the event's own
         // commit re-opens the popup; the late `false` then closes it as a controlled close.
         expect(open).toHaveBeenCalledTimes(1);
         expect(close).toHaveBeenCalledTimes(1);

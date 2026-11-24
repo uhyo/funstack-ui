@@ -224,12 +224,12 @@ export function DialogPopup({
   const awaitingClose = useRef(false);
   // Set right before the library's own `close()` (the apply effect), consumed by the `close`
   // event it causes: the echo is recognised by its source, not by what is intended. Every other
-  // close is a fact (overlay-open-change.md 6.3), reported the moment it happens, also while a
+  // close is a fact (dialog.md 2.7), reported the moment it happens, also while a
   // part's close is in flight: nothing is stored for later.
   const libraryClose = useRef(false);
   // Set when a fact closed the dialog, cleared once a commit has `committed` false (the fact was
   // adopted): a show while it is set is the re-open of a dismissal a controlled parent refused
-  // (overlay-open-change.md 2.4).
+  // (conventions 3.9.4).
   const refusedFact = useRef(false);
   const initialFocusTarget = useInitialFocusTarget("Dialog.Popup", "dialog");
 
@@ -309,7 +309,7 @@ export function DialogPopup({
 
   // The apply effect (design 2.5), as usePopoverPopup's: once nothing is in flight, the DOM
   // follows committed state. Opens on the user's dispatch, `defaultOpen`, a controlled parent,
-  // the re-open of a dismissal a controlled parent refused (overlay-open-change.md 2.4: in the
+  // the re-open of a dismissal a controlled parent refused (conventions 3.9.4: in the
   // fact's own commit, which `epoch` makes re-render the Popup, or once the requests it
   // superseded settled); closes after a part-initiated close settled, a controlled close, or a
   // refused pre-hydration open. Also returns focus after a close whose commit unmounted the
@@ -439,7 +439,7 @@ export function DialogPopup({
     // Closed by the browser: a returnValue a pending part close recorded will never be used.
     ctx.takeCloseReturnValue();
     // A fact, also while a part's close is in flight: it supersedes that request (committed
-    // `false` now) and `onOpenChange(false)` is called (overlay-open-change.md 2.5, 6.3).
+    // `false` now) and `onOpenChange(false)` is called (conventions 3.9.5, dialog.md 2.7).
     ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss", element.returnValue);
   });
 

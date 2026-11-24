@@ -1,56 +1,38 @@
 # Button
 
-Status: **Accepted by the product owner** (2026-10-22, GitHub issue #79, wave 8 tracker #80;
-drafted 2026-10-18). Every recommendation accepted as recommended; user decisions: **`Toolbar.Button`
-is removed now** (a breaking change, section 7.3 and the migration note in 14) and
-`focusableWhenDisabled` ships in v1. The follow-up for the other pure triggers is **#81**.
-Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
-the conventions win. The conventions amendments this design asks for are applied to
-`design/conventions.md` in the same commit (resolved question 34).
+Status: **accepted**, implemented. Follows `design/conventions.md`; where this document and the
+conventions disagree, the conventions win. History (the product owner's starting decisions,
+reviews, the wave 9 and #146 amendments as written, implementation notes, test rows):
+`design/CHANGELOG.md`, parts "button.md".
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.2, 2.3, 2.5, 2.7, 3.4, 3.6, 4.1, 7.1),
 `docs/research/button.md` (af1993f; probes in `memo/platform-researcher/probes/16-button/`),
 the product owner's decisions on the research (recorded in section 0),
-`packages/ui/src/internal/use-action-trigger.ts`, `toolbar/toolbar-button.tsx`,
+`packages/ui/src/internal/use-action-trigger.ts`,
 `form/form-submit.tsx`, `form/form-root.tsx`, `menu/menu-item.tsx`, `menu/menu-dom.ts`,
 `dialog/dialog-close.tsx`, `dialog/dialog-trigger.tsx`, `popover/popover-close.tsx`,
-`design/components/toggle-group.md` 3.4 and 11.5 (`Toolbar.Button`), `design/components/field-form.md`
+`design/components/toggle-group.md` 3.4 and 11.5, `design/components/field-form.md`
 (`Form.Submit`, repeat submits), `design/components/menu.md` 2.3. Prior art: React Aria Components
 1.22 `Button` (`isPending`), Base UI 1.9 `Button` (`focusableWhenDisabled`), MUI 9 `loading`,
 Radix Themes `loading`, GOV.UK `preventDoubleClick`.
 
 ## 0. Product-owner decisions this design starts from
 
-1. A Button **ignores activation while its own action is pending**, by default. It renders
-   `aria-disabled="true"` meanwhile and never native `disabled`, so focus stays and a Tooltip
-   still works. Conventions 2.5 and 3.6 are amended.
-2. **No `aria-busy` by default, no built-in announcement** in v1.
-3. **Forms**: default `type="button"`, `"submit"` when `formAction` is given; `formAction` shows
-   pending for this button's own submissions only (from its own submission until the form's
-   submissions have all finished, a latch since #154, 6.2); `Form.Submit` stays; a plain `type="submit"`
-   Button does not read `useFormStatus`.
-4. **Composition**: an already-cancelled click does not block the action
-   (`Dialog.Trigger render={<Button />}` works); focus and hover listeners keep working while
-   pending; the Toolbar question is decided here (section 7.3).
-5. The module is `"use client"`; the cost to Server Component callers is documented (section 11).
+Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the code and the tests are the reference.
 
 ## Decisions at a glance
-
-> **Amended 2026-11-23 (#146, section 18).** Rows 3 to 5 describe the guard as unconditional.
-> It is now the prop `whilePending`: a Button runs every activation by default and ignores
-> re-entry (with `aria-disabled="true"`) only with `whilePending="ignore"`.
 
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Anatomy | One plain component, `Button` (`@funstack/ui/button`), a `<button type="button">` by default; `render` allowed (`<a href>` included). No parts, no `.Root`. |
 | 2 | Action | Bare `action(details)` in the Button's own transition through `useActionTrigger` (conventions 3.4). `data-pending` / `state.pending` while it runs. Without `action` the Button is a plain native button (a `formAction` submitter, an Invoker Command, a link). |
-| 3 | Re-entry | **Ignored while pending**: a click, Enter or Space while the Button's own `action` (or its own `formAction` submission) is in flight starts nothing and is `preventDefault()`ed, so a link does not navigate, a form does not submit and a command does not run twice. Guarded by the Button's **own synchronous in-flight counter only** (section 5.2; the rendered `pending` is not a guard source, review item 3). No opt-out prop (section 5.4). |
-| 4 | AT state while pending | `aria-disabled="true"` (owned), `data-disabled` **not** set, `state.disabled` unchanged. Never native `disabled`, never `inert`, no `aria-busy`, no announcement. |
-| 5 | Library-wide rule | "A pure trigger ignores re-entry" becomes the conventions' rule (2.5, 3.6) and a `useActionTrigger` option; **wave 8 lands it for Button only**; `Dialog.Close`, `Popover.Close`, `Menu.Item` follow in **#81** because their tests and docs are built on re-run and `Menu.Item`'s navigation keys on `aria-disabled` (section 5.5). `Form.Submit` is **not** guarded (section 6.4). |
-| 6 | `type` | Default `"button"`; `"submit"` when `formAction` is given. The Button's own `type` prop wins (`"submit"` / `"reset"` allowed); the computed value is owned on a `<button>` and on a **component** `render` element (assumed to render a `<button>`; review item 2, library-wide in `rendersButton`), and omitted only for a host element of another tag (`<a href>`). `action` with a submitting `type` warns in development. |
+| 3 | Re-entry | The prop **`whilePending`** (`"run"` \| `"ignore"`, section 18). Default **`"run"`**: every activation runs, nothing is cancelled. With `"ignore"`, a click, Enter or Space while the Button's own `action` (or its own `formAction` submission) is in flight starts nothing and is `preventDefault()`ed, so a link does not navigate, a form does not submit and a command does not run twice. The guard is the Button's **own synchronous in-flight counter only** (section 5.2; the rendered `pending` is not a guard source). |
+| 4 | AT state while pending | Under `whilePending="ignore"`: `aria-disabled="true"` (owned), `data-disabled` **not** set, `state.disabled` unchanged. Under `"run"`: nothing. Never native `disabled`, never `inert`, no `aria-busy`, no announcement. |
+| 5 | Library-wide rule | Every pure trigger has `whilePending`; the default follows who owns the action (conventions 2.5.1): `"run"` for `Button`, `"ignore"` for `Dialog.Close` / `Popover.Close`, `closeOnActivate ? "ignore" : "run"` for `Menu.Item`, `closeOnSettle ? "ignore" : "run"` for `Toast.Action` (sections 16 and 18.4). `Form.Submit` has no guard (section 6.4). |
+| 6 | `type` | Default `"button"`; `"submit"` when `formAction` is given. The Button's own `type` prop wins (`"submit"` / `"reset"` allowed); the computed value is owned on a `<button>` and on a **component** `render` element (assumed to render a `<button>`; library-wide in `rendersButton`), and omitted only for a host element of another tag (`<a href>`). `action` with a submitting `type` warns in development. |
 | 7 | `formAction` | First-class pass-through with **per-submitter pending**: latched once `useFormStatus().pending && status.action === <the function this Button submitted with>` has rendered, held until the form status is idle (6.2, #154). `action` and `formAction` together is a development error. Progressive enhancement is React's (a Server Function submits before hydration). |
-| 8 | `disabled` | Native `disabled` (owned) plus `data-disabled`, like `Dialog.Close` / `Form.Submit`. `focusableWhenDisabled` renders `aria-disabled="true"` instead (Base UI's name); it is implied `true` inside a `Toolbar.Root` (APG Toolbar) and for **any `render` element that is not a host `<button>`** (an `<a href>`, a component: native `disabled` means nothing on a link and would expose an enabled link to AT; review must-fix 1). Never dispatches either way; a disabled link does not navigate. |
-| 9 | Toolbar | `Button` reads `ToolbarContext`; **`Toolbar.Button` is removed** (user decision, a breaking change): a Toolbar's command button is `<Button>`, with the same `aria-disabled` behaviour `Toolbar.Button` had. One implementation, one name. |
+| 8 | `disabled` | Native `disabled` (owned) plus `data-disabled`, like `Dialog.Close` / `Form.Submit`. `focusableWhenDisabled` renders `aria-disabled="true"` instead (Base UI's name); it is implied `true` inside a `Toolbar.Root` (APG Toolbar) and for **any `render` element that is not a host `<button>`** (an `<a href>`, a component: native `disabled` means nothing on a link and would expose an enabled link to AT). Never dispatches either way; a disabled link does not navigate. |
+| 9 | Toolbar | `Button` reads `ToolbarContext`: a Toolbar's command button is `<Button>`, focusable when disabled there (`aria-disabled`, APG Toolbar). The Toolbar has no button part of its own. One implementation, one name. |
 | 10 | Composition | Button does **not** treat a `defaultPrevented` click as a veto (a Trigger-wrapped Button runs its action); its guard cannot stop an outer part's handler that ran first; `command` / `commandfor` pass through untouched (both the action and the command run on one click). |
 | 11 | Announcement | None in v1; the outcome is the consumer's (toast, Field error, `ariaNotify` in the action). `aria-busy` is pass-through. |
 | 12 | ViewTransition | `transition` on the Button (content keyed on `pending`, the Toggle rule); no `fsui-*` types (as Toolbar). |
@@ -68,7 +50,7 @@ Button    button type="button" [aria-disabled] [data-pending] [data-disabled]
 One element, no parts. The default element is `<button>`; `render` substitutes any element
 (`<a href>` for a link that runs an action, a styled `<MyButton>` that spreads its props). The
 Button adds no `role`: a `render={<a href>}` stays a link to assistive technology, with a link's
-keyboard (Enter), as `Menu.Item` and `Toolbar.Button` already allow.
+keyboard (Enter), as `Menu.Item` allows.
 
 What a Button is for: **a click that is a transition**. The library's other buttons each carry a
 second meaning and stay: `Form.Submit` (the form's own submission, form-channel pending),
@@ -190,7 +172,7 @@ The tooltip keeps opening on hover and focus while the Button is pending: the Bu
 
 Inside a `Toolbar.Root` a disabled Button renders `aria-disabled="true"` instead of native
 `disabled`, stays in the arrow-key sequence and is still found by assistive technology (the APG
-Toolbar example). This is what `Toolbar.Button` did; `Button` replaces it (section 7.3).
+Toolbar example; section 7.3).
 
 ### 2.5 From a Server Component
 
@@ -377,9 +359,9 @@ CSS hooks next to the attributes: `:focus-visible`, `:hover`, `:active` (platfor
 
 ## 5. Pending and re-entry
 
-> **Amended 2026-11-23 (#146, section 18).** This section describes a Button with
-> `whilePending="ignore"`. The default is `"run"`: every activation runs, nothing is cancelled,
-> no `aria-disabled` while pending. 5.4 ("No opt-out prop") is replaced by the prop.
+Which activations run while the Button is pending is the prop `whilePending` (section 18). The
+default is `"run"`: every activation runs, nothing is cancelled, no `aria-disabled` while
+pending. 5.2 and 5.3 describe `whilePending="ignore"`.
 
 ### 5.1 The click handler
 
@@ -391,11 +373,12 @@ onClick: (event) => {
   }
   if (action === undefined) {
     // A native button: formAction, command, link, plain submit. Only the re-entry guard applies.
-    if (formPending) event.preventDefault();   // my formAction submission is in flight
+    if (ignoring && formPending) { event.preventDefault(); return; }  // my formAction submission is in flight
+    submittedWith.current = formAction;        // per-submitter pending, 6.2
     return;
   }
   const details = createActionDetails(event.nativeEvent, {});
-  const started = run(() => action(details));  // useActionTrigger, ignoreWhilePending: true
+  const started = run(() => action(details));  // useActionTrigger({ ignoreWhilePending: ignoring })
   if (!started) event.preventDefault();        // ignored: do not navigate, submit or run a command
 }
 ```
@@ -406,11 +389,11 @@ action (decision 4; this is the complementary case to conventions 2.3 item 3, wh
 checkable inputs where a cancelled click reverts the DOM). The warning of 2.3 item 3 (a
 `preventDefault()` in the sync prefix) does not apply to a pure trigger: there is no DOM state to
 revert, and `details.event.preventDefault()` in the action is a legitimate way to stop a link's
-navigation or a command.
+navigation or a command. `ignoring` is `(whilePending ?? "run") === "ignore"`.
 
 ### 5.2 What "ignored while pending" means
 
-While the Button's own run is in flight, an activation (pointer click, Enter, Space, a
+Under `whilePending="ignore"`, while the Button's own run is in flight, an activation (pointer click, Enter, Space, a
 programmatic `.click()`, the click an implicit form submission sends to the default button):
 
 - starts **no** second run of `action` (and sends no second submission when the pending is a
@@ -428,15 +411,15 @@ settles (resolves or rejects). It is synchronous, so two activations in one task
 `fireEvent.click`, a key repeat) see it where React's `isPending` is still the stale render
 value `false`.
 
-The rendered `pending` is **not** a guard source (review item 3; the draft used both). There is a
+The rendered `pending` is **not** a guard source. There is a
 window after the promise settled but before the commit that ends the transition, which React
 holds for as long as any other async action in the app is pending (entanglement, conventions
 2.3 item 5) or while the resulting render suspends. In that window the button still shows
 `data-pending` and `aria-disabled`, and a click starts a **new run**: the previous one has
 fully settled, so this is not a duplicate side effect, and the new run's commit joins the held
 one. The alternative, ignoring clicks whenever the button looks pending, silently dropped user
-intent: the reviewer's probe clicked a non-awaiting "+1" Button three times while an unrelated
-action was pending and got **one** call. Losing intent is the worse failure; the cost accepted is
+intent: a non-awaiting "+1" Button clicked three times while an unrelated action was pending
+got **one** call. Losing intent is the worse failure; the cost accepted is
 that `aria-disabled="true"` can outlast the guard by the length of the held commit.
 
 For the `formAction` path the guard is `formPending` (section 6.2), a render value: React's form
@@ -449,8 +432,8 @@ the docs say so.
 ### 5.3 `aria-disabled="true"` while pending
 
 A control that will not act is, to assistive technology, unavailable; that is what React Aria
-renders for `isPending` and what the research recommends (2.4). The Button sets it while
-`pending` (either source) and removes it in the same commit that clears `data-pending`. It does
+renders for `isPending` and what the research recommends (2.4). Under `whilePending="ignore"`
+the Button sets it while `pending` (either source) and removes it in the same commit that clears `data-pending`. It does
 **not** set `data-disabled` (that attribute is the consumer's `disabled`, and `[data-pending]`
 styles pending) and `state.disabled` stays `false`, so `children(state)` reads as before.
 
@@ -463,49 +446,18 @@ Whether the `aria-disabled` *change* on the focused element is spoken is not kno
 2.4 did not verify it); the value is that a user who presses again, or returns to the button,
 hears "unavailable" rather than nothing.
 
-### 5.4 No opt-out prop
+### 5.4 Counting every click
 
-A concurrent-run button (a "+1" counter, a "fire" button in a game) is spelled with an action
-that does not await its work:
+With the default `whilePending="run"` every click runs the action, also while an earlier run is
+pending (section 18.2). An action that does not await its work
+(`action={() => { void increment(); }}`) is still the spelling for "the UI must not wait"
+(conventions 2.3 item 5): pending ends at once. An ordered, result-threaded sequence is
+`useActionState` (React's queue), passed as `formAction` or called from the action.
 
-```tsx
-<Button action={() => { void increment(); }}>+1</Button>   // pending ends at once; every click counts
-```
+### 5.5 The other pure triggers
 
-That is conventions 2.3 item 5 ("await only what the UI must wait for") applied to the one case
-where the UI must not wait. The in-flight counter is back to zero a microtask after the click, so
-every click runs the action even while an unrelated async action elsewhere holds this Button's
-commit; what lingers in that case is only the `data-pending` / `aria-disabled` attributes, until
-the held commit lands (5.2). An ordered, result-threaded sequence is `useActionState` (React's
-queue), passed as `formAction` or called from the action. Neither needs a Button prop, and a
-`repeatable` prop would invite the duplicate-submit bug the default exists to prevent. If a real
-case appears, the hook option already exists and the prop would be a boolean on Button; it is not
-named now.
-
-### 5.5 The other pure triggers: rule now, change later
-
-The conventions now say **every pure trigger ignores re-entry** (2.5, 3.6 as amended), and
-`useActionTrigger` gains the guard as an option (section 15.2). Wave 8 turns it on for Button
-only. The four existing users keep running every activation until a follow-up issue switches
-them, for these reasons:
-
-| Part | What changes | Why not in wave 8 |
-| --- | --- | --- |
-| `Dialog.Close`, `Popover.Close` | With `action`: a second click while pending is ignored instead of re-running the action (the close already happened at most once). Gains `aria-disabled` while pending. | Their designs (Dialog "Pending, in order", Popover 3.4) and about twenty test assertions document "repeated clicks re-run the action; the first close wins"; the superseded-rejection rows become unreachable through user input. Mechanical, but each design doc and walkthrough has to be rewritten. |
-| `Menu.Item` | A second activation while pending is ignored. | `menu-dom.ts` treats `aria-disabled="true"` items as disabled for arrow navigation and typeahead, so a pending item would be skipped by the arrows while it is the focused one. The follow-up must key the DOM query on something else (`data-disabled`) before the item may render `aria-disabled` while pending; a design decision, not a flag flip. |
-| `Toolbar.Button` | Removed; `Button` replaces it (section 7.3), so a toolbar's command button is guarded in wave 8. | |
-| `Form.Submit` | **Unchanged, by design** (section 6.4). | |
-
-**#81 is designed in section 16 (wave 9, 2026-10-22)**, which supersedes the rest of this
-subsection: the four pure triggers (`Toast.Action` included) are guarded and the guard is the
-hook's default. The follow-up as proposed here was: switch `Dialog.Close`, `Popover.Close`, `Menu.Item` to
-`useActionTrigger({ ignoreWhilePending: true })`, render `aria-disabled` while pending, make
-`menu-dom.ts` key disabled on `data-disabled`, rewrite the re-run walkthroughs and test rows in
-dialog.md, popover.md, menu.md and toggle-group.md 11.5, then make `ignoreWhilePending` the
-hook's default and drop the option.
-
-Until then the conventions text records the split ("landed for Button in #79; the other parts
-follow in #81"), the same way other staged rules were recorded.
+`Dialog.Close`, `Popover.Close`, `Menu.Item` and `Toast.Action` have the same prop with their
+own defaults: conventions 2.5.1, sections 16 and 18.4. `Form.Submit` has none (section 6.4).
 
 ---
 
@@ -606,16 +558,15 @@ too. Test row 12 guards the first two facts.
 | --- | --- | --- | --- |
 | Submits | the form's own `action` | its own function instead | the form's own `action` |
 | `pending` | the form channel: any submitter | from its own submission until the form's submissions have all finished | none |
-| Re-entry while pending | **not blocked** (a `useActionState` dispatch queues it, in order; a plain action runs concurrently; `Form.Submit` has no action of its own to key a guard on, and the queue is React's documented semantics for forms, conventions 2.5) | ignored | none |
+| Re-entry while pending | **not blocked** (a `useActionState` dispatch queues it, in order; a plain action runs concurrently; `Form.Submit` has no action of its own to key a guard on, and the queue is React's documented semantics for forms, conventions 2.5) | `whilePending`: submits again (`"run"`, default) or cancelled (`"ignore"`) | none |
 | Use | the one primary submit button | secondary submitters | rarely; `Form.Submit` is the documented spelling |
 
-The product owner asked whether `Form.Submit` should block repeat submissions. Recommendation:
-**no.** Its pending is the form's, not its own: blocking on it would make "Save draft" pending
-(a `Button formAction`) also disable "Publish" (`Form.Submit`), which is exactly the coupling
-conventions 2.7 forbids in the other direction; and a `useActionState` form has the ordered
-queue React designed for repeat submits. The field-form design's decision 11 stands; a consumer
+`Form.Submit` does not block repeat submissions. Its pending is the form's, not its own:
+blocking on it would make "Save draft" pending (a `Button formAction`) also disable "Publish"
+(`Form.Submit`), which is exactly the coupling conventions 2.7 forbids in the other direction;
+and a `useActionState` form has the ordered queue React designed for repeat submits. A consumer
 who wants a hard block styles `Form.Submit[data-pending] { pointer-events: none }` or renders
-the primary button as `<Button formAction={dispatch}>` to get the guard.
+the primary button as `<Button formAction={dispatch} whilePending="ignore">` to get the guard.
 
 ### 6.5 Implicit submission
 
@@ -661,33 +612,19 @@ never opens a tooltip (no events); `focusableWhenDisabled` is the answer for a d
 that needs one (section 3). The Tooltip's composite-role check (toggle-group.md 18) is unaffected:
 a Button inside a Toolbar has the engine's `tabindex`, which the check already allows.
 
-### 7.3 Toolbar: `Button` reads `ToolbarContext`; `Toolbar.Button` is removed
+### 7.3 Toolbar: `Button` reads `ToolbarContext`
 
-Options weighed (research 4):
+`Button` reads `ToolbarContext` (`useToolbarContext()`, also read by `ToggleGroup.Root`,
+`Toolbar.Separator` and `Menu.Trigger`), and the Toolbar has no button part of its own: one
+implementation, one name. Inside a `Toolbar.Root` the rule is `focusableWhenDisabled` forced
+on, which is why the prop exists: the context only flips its default. A `Button disabled` in a
+toolbar therefore renders `aria-disabled` (APG), stays in the arrow-key sequence and in AT
+discovery, and never dispatches; `action`, `formAction`, `whilePending`, `type` and `data-*`
+are as anywhere else.
 
-| | (a) `Button` reads `ToolbarContext` and replaces `Toolbar.Button` | (b) keep `Toolbar.Button` as a separate part; Button is a plain item |
-| --- | --- | --- |
-| Surface | one implementation, one name | two button components with different pending behaviour until #81, and two `disabled` semantics by name |
-| Toolbar `disabled` | `aria-disabled` (APG), automatic | `aria-disabled` only if the author remembers `Toolbar.Button`; a `Button disabled` in a toolbar drops out of the sequence and out of AT discovery |
-| Cost | one context read (`useToolbarContext()`, already read across folders by `ToggleGroup.Root`, `Toolbar.Separator`, `Menu.Trigger`); a breaking rename for alpha users (`Toolbar.Button` → `Button`) | none now |
-| Behaviour change | a toolbar's command button gains the re-entry guard, `formAction`, `type` / `tabIndex` pass-through, `focusableWhenDisabled` (a no-op in a toolbar) | none |
-
-**(a)**, the smaller surface that stays consistent (the product owner's criterion), with the
-alias dropped (**user decision**: the project is alpha, and two names for one component is
-surface). The toolbar rule is literally `focusableWhenDisabled` forced on, which is why the prop
-exists: the context only flips its default. Edge to document: the context is React's, not the
-DOM's, so a Button rendered under a `Toolbar.Root` in the React tree but outside its DOM items
-(inside a `Menu.Popup` opened from the toolbar) is also focusable-disabled; harmless.
-
-What goes: `toolbar/toolbar-button.tsx`, `Toolbar.Button` from the namespace,
-`ToolbarButtonProps` / `ToolbarButtonState` / `ToolbarButtonActionDetails` from `toolbar/index.ts`
-and the root entry, the `Toolbar.Button` rows of `toolbar.test.tsx` (their guarded form lives in
-`button.test.tsx`), the `Toolbar.Button` props table on the Toolbar docs page. The Toolbar's
-keyboard rows and `ToolbarEditor.tsx` / `ToolbarVertical.tsx` switch to `<Button>`;
-toggle-group.md 3.4 and 11.5 are superseded by this document (an amendment note there is part of
-#79's docs work). **Migration** (changelog / Toolbar page): replace `Toolbar.Button` with `Button`
-from `@funstack/ui/button`; props, `disabled` semantics inside the toolbar and `data-*` are the
-same; new: a second click while pending is ignored and the button is `aria-disabled` meanwhile.
+Edge to document: the context is React's, not the DOM's, so a Button rendered under a
+`Toolbar.Root` in the React tree but outside its DOM items (inside a `Menu.Popup` opened from
+the toolbar) is also focusable-disabled; harmless.
 
 ### 7.4 Invoker Commands
 
@@ -824,7 +761,7 @@ serialisable); style pending with `[data-pending]` CSS. What it cannot: pass fun
 plain client function as `action`.
 
 Before hydration: an `action` Button does nothing on click (no residual browser path, no mount
-reconciliation; as `Toolbar.Button`); a Server Function `formAction` Button submits natively; a
+reconciliation); a Server Function `formAction` Button submits natively; a
 command Button runs its command; a `render={<a href>}` navigates. The server markup carries no
 `aria-disabled` and no `data-pending`.
 
@@ -845,344 +782,48 @@ command Button runs its command; a `render={<a href>}` navigates. The server mar
 
 ## 13. Test plan
 
-`packages/ui/src/button/button.test.tsx` (jsdom) and `button.browser.test.tsx` (Chromium,
-Firefox, WebKit). Top-of-file comment (conventions 10.1): "Button: no controlled state, so the
-controlled-parity, optimistic, platform-path, urgent-action, continuous-control and inside-a-Field
-rows are N/A; the **overlap and superseded-rejection rows are N/A because the re-entry guard means
-a Button never has two of its own runs in flight** (rows 5 and 6 replace them)."
-
-| # | Area | Project | Test |
-| --- | --- | --- | --- |
-| 1 | Roles and ARIA | jsdom | Default `<button type="button">`, no `role`; `type="submit"` with a function `formAction`; a consumer `type="submit"` / `"reset"` wins; `render={<a href>}` gets no `type`; `render={<MyButton />}` (a component spreading onto a `<button>`) **gets** `type="button"` and, inside a `<form>`, does not submit on click (review item 2); `render={<button type="submit">}` is overridden by the Button's computed `type` (owned); `disabled` renders native `disabled` + `data-disabled`, no `aria-disabled`; `focusableWhenDisabled` renders `aria-disabled="true"`, no `disabled`, `data-disabled`; `disabled` with `render={<a href>}` and with `render={<MyButton />}` renders `aria-disabled="true"` and **no** `disabled` attribute (review must-fix 1); a consumer `aria-disabled` prop is not accepted (type) and a render element's is removed (owned). |
-| 2 | Sync action | jsdom | Click, Enter and Space each call `action` once with `details.event` the native event; disabled (every spelling, the link and component renders included) never dispatches and a disabled `render={<a href>}` click is `defaultPrevented`; a Button without `action` starts no transition (no `data-pending` flicker: assert no `data-pending` after a click, synchronously). |
-| 3 | Async action | jsdom | Deferred action: `data-pending`, `aria-disabled="true"`, **no** `data-disabled`, `state.disabled === false` in `children(state)`; `document.activeElement` stays the button from click through resolve; after resolve all three facts invert, focus still on the button. |
-| 4 | Rejection | jsdom | Reaches `<ErrorCatcher>` above the Button; pending ended. Caught inside: resolves; the next click runs again (no stuck guard). |
-| 5 | Re-entry ★ | jsdom | While a deferred action pends: a second click, an Enter and a Space each leave `action` at one call and are `defaultPrevented`; two `fireEvent.click`s inside one `act` (same task, before any re-render) call it once (the ref); after resolve a click calls it again; `render={<a href>}`: the second click while pending is `defaultPrevented`, the first was not; with `commandfor` / `command` attributes present the second click is `defaultPrevented` (jsdom runs no command; the browser row 22 covers the command itself). |
-| 6 | Settled-but-held commit ★ | jsdom | A second, unrelated `useTransition` action (deferred) is pending; the Button's action resolves; the button still shows `data-pending` and `aria-disabled` (entangled commit) and a click in that window **runs the action again** (two calls; the guard is the in-flight counter only); the reviewer's probe as a row: a non-awaiting `action` clicked three times while the unrelated action pends is called three times; when the unrelated action resolves, one commit clears the attributes. |
-| 7 | Two Buttons | jsdom | A pending; B clicked: B's action called at once, B `data-pending`; both clear after both resolve. |
-| 8 | Suspending content | jsdom | The action sets a value that makes sibling content suspend (`createSuspender`): old content stays, `data-pending` on until it resolves, clicks ignored meanwhile. |
-| 9 | Function props, `render` | jsdom | `className` / `style` / `children` receive `{ pending, disabled }` and agree with the attributes; element form merges `className` / `style`, keeps dispatch and the guard, forwards `ref`; function form gets `(props, state)`; `render={<MyButton />}` (a component that spreads props) works; a pass-through `onFocus` / `onPointerEnter` / `onKeyDown` fires while pending. |
-| 10 | Consumer state after await | jsdom | `action={async () => { await d.promise; startTransition(() => setCount(c => c + 1)); }}` commits once per accepted click (guards the documented post-await pattern). |
-| 11 | `formAction`, per-submitter pending ★ | jsdom | A `<form>` with `Form.Submit` and two `Button formAction` (deferred functions `a`, `b`): click A → A `data-pending` + `aria-disabled`, B neither, `Form.Submit` `data-pending`; `useFormStatus().action === a` observed through a probe; click A again → `a` called once, click `defaultPrevented`; click B while A pends → `b` called, both pending (A stays `aria-disabled`); resolve A → all still pending (React holds the form status); resolve B → all clear. #154 rows: two Buttons with different functions, both settle orders, each pending until both settled, then B alone leaves A idle; the form's own `action` submitted while A runs keeps A pending; `"ignore"` A, B, A again: `a` called once, the third click `defaultPrevented`, also after `b` settled; a click on A cancelled by constraint validation, then B: A never pending. `type` on both is `"submit"`. |
-| 12 | `formAction` inside `Form.Root` ★ | jsdom | `Form.Root action={formAction}` with a `Button formAction={mine}`: clicking the Button calls `mine`, not `formAction`; `Form.Root` shows `data-pending` meanwhile (form channel); the button element has a `formaction` attribute (react-dom's URL for a function), which is what `Form.Root`'s submitter check keys on; `Form.Submit` in the same form still runs `formAction`. |
-| 13 | `formAction` identity | jsdom | An inline `formAction={(fd) => …}` whose parent re-renders (state change) during the submission keeps the Button `data-pending` until it settles (the `submittedWith` ref); a stable function works without the ref (sanity). |
-| 14 | Dev warnings | jsdom | `action` + `formAction` logs an error once; `action` + `type="submit"` and `+ "reset"` warn once; no warning for `formAction` alone, `type="submit"` alone, `commandfor` + `action`. |
-| 15 | Trigger-wrapped ★ | jsdom | `Dialog.Trigger render={<Button action={a} />}` in library mode: one click calls `a` (the click arrives `defaultPrevented`) and dispatches the open; with a **deferred** `a` the Trigger shows `data-open` and `data-pending`, `showModal` is not yet called, a second click leaves `a` at one call, and resolving `a` calls `showModal` once (entanglement, review deviation 1); with a **non-awaiting** `a` the dialog opens in the same commit; `Button render={<Dialog.Trigger />}` likewise. |
-| 16 | Toolbar ★ | jsdom | Inside `Toolbar.Root`: `Button disabled` renders `aria-disabled="true"` and no `disabled`, is reached by the arrows and never dispatches; `Toolbar` has no `Button` member (type and runtime); `ToolbarEditor`-style mixed children with `<Button>` in place of `Toolbar.Button` still pass the toolbar's row 12; a `Button` with `tabIndex={-1}` is skipped by the arrows (pass-through, as any item). |
-| 17 | `details.event` is virtual | jsdom | As Toggle row 21 for `ButtonActionDetails`: `details.event` is the click, `"event" in details`, `Object.keys(details)` is `[]`, a Server-Function-shaped `action` receives it. |
-| 18 | Types | jsdom (`expectTypeOf`) | `onClick`, `aria-disabled` not accepted; `type` is the three-way union; `formAction` accepts a `(formData: FormData) => Promise<void>` and a string; `ButtonProps` / `ButtonState` / `ButtonActionDetails` exported from `@funstack/ui/button` and the root. |
-| 19 | SSR markup | jsdom | `renderToString`: `type="button"`, no `aria-disabled`, no `data-pending`; with a function `formAction`: `type="submit"` and a `formaction` attribute; `hydrateRoot` over it logs no mismatch. |
-| 20 | Directive | script | `dist/button/button.mjs` starts with `"use client"`; `dist/button/index.mjs` does not; `dist/toolbar/toolbar-button.mjs` no longer exists. |
-| 21 | Focus retention | browser | All three engines: focus the Button, click (Enter), action pending: `document.activeElement` is the Button after two animation frames (the probe's window in which native `disabled` would have blurred it in Chromium / Firefox), and still after resolve. |
-| 22 | Invoker Command + action | browser | `<Button commandfor="p" command="toggle-popover" action={slow}>`: first click runs the action and the popover is `:popover-open`; second click while pending: action still one call and the popover still open (the command did not run); after settle a click closes it. Same engines (Invoker Commands are Baseline on all three). |
-| 23 | Tooltip while pending | browser | `Tooltip.Trigger render={<Button action={slow} />}`: hover during pending opens the popup (`:popover-open`), leave closes it; focus during pending opens it. Chromium with `experimental_interestFor` on takes the native path (branch on `src/__tests__/engine.ts`). |
-| 24 | Implicit submission | browser | A form with a text field and a `Button formAction={slow}` as its only submit button: Enter in the field submits once; Enter again while pending submits nothing (the guard cancelled the synthetic click); with `Form.Submit` as the default button and a pending `Button formAction` elsewhere in the form, Enter submits the form's action. |
-| 25 | ViewTransition | browser | `{show && <Button />}` mounted in a `startTransition`: `document.startViewTransition` called zero times without `transition`, once with `transition="none"` (conventions 10.1 mount row); a settle that swaps `children(state)` calls it **zero** times under `transition="none"` (React starts a document view transition for a `"none"` boundary only on mount / reveal) and **once** under `transition="auto"` (review deviation 2). |
-| 26 | Accessibility tree | browser (Chromium, CDP) | The pending Button's name is unchanged and the node has the `disabled`-equivalent state from `aria-disabled` (whatever CDP reports for it; the row records the value, `memo/developer/cross-engine.md`); after settle the state is gone. |
-
-★ rows are the ones this design adds beyond conventions 10.1.
-
----
+Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 14. Docs page
 
-`packages/docs/src/pages/ButtonPage.tsx` at `/components/button`, first in `componentNavItems`
-(it is the most basic component), routed in `App.tsx`. Sections:
-
-1. Intro: a button whose click is a transition; what it adds over `<button onClick>` (pending
-   state, re-entry guard, errors to a boundary, Server Functions as actions).
-2. Examples (`src/examples/`, source shown):
-
-   | Example | Directive | Shows |
-   | --- | --- | --- |
-   | `ButtonSave.tsx` | `"use client"` | 2.1: fake async save (`fake-api.ts`), `children(state)` spinner, the re-entry guard made visible (a call counter), a rejecting variant inside `DemoErrorBoundary`, a caught-inside variant with a toast. |
-   | `ButtonFormActions.tsx` | `"use client"` | 2.2: `Form.Root` with `Form.Submit` "Publish" and two `Button formAction` ("Save draft", "Discard"), each with its own pending; the form-channel pending on `Form.Submit` contrasted. |
-   | `ButtonCompose.tsx` | `"use client"` | 2.3: `Dialog.Trigger render={<Button />}` and `Tooltip.Trigger render={<Button />}` (hover a pending button). |
-   | `ButtonInvoker.tsx` | **none (Server Component)** | 2.5's second button: `commandfor` / `command` opening a Dialog with no JS, plus a `Button` styled by `[data-pending]` CSS only; the page says the file has no directive and which props a Server Component cannot pass. (The docs site has no Server Functions, so `action` from a Server Component is shown as code, not run.) |
-   | `button.css` | | 2.6 recipes, reduced motion. |
-
-3. Anatomy (one element), props table (`ButtonProps`, with `type`'s default rule and the
-   `formAction` identity note), `ButtonState`, data attributes (and the "pending is not disabled"
-   sentence), owned keys.
-4. "Pending and re-entry": what is ignored, `aria-disabled`, why not `disabled`, the
-   non-awaiting spelling for concurrent clicks, `useActionState` for a queue.
-5. "Forms": `type` defaults, `formAction` vs `Form.Submit` (the 6.4 table), implicit submission.
-6. "Which button?": the 1. list (`Form.Submit`, `Dialog.Close`, `Menu.Item`, `Toggle`, `Toolbar`),
-   as a callout.
-7. Keyboard (8.2), "What assistive technology hears" with the outcome pattern (8.3) and the
-   `aria-busy` note.
-8. Server Components (11), before hydration.
-9. The reduced-motion block.
-
-Also: `ToolbarPage.tsx` drops the `Toolbar.Button` props table, uses `<Button>` in its examples
-and links here, with a **migration callout** ("`Toolbar.Button` was removed in this release; use
-`Button` from `@funstack/ui/button`, which behaves the same inside a toolbar and also ignores a
-second click while pending"); `RoadmapPage.tsx`'s changelog entry marks the removal as a
-breaking change; `MenuPage.tsx` gains a one-line "a Button inside a Menu
-is not an item"; `ActionPropsPage.tsx` / `GettingStartedPage.tsx` may use `<Button action>` as
-the first example of an action prop; `ServerComponentsPage.tsx` lists Button under "client
-modules you can render from a Server Component" with the Server Function `action` / `formAction`
-note; `RoadmapPage.tsx` changelog entry; `packages/example` gets a demo page; `index.ts`,
-`tsdown.config.ts` and `package.json` exports gain `button`.
-
----
+Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the code and the tests are the reference.
 
 ## 15. Implementation notes
 
-### 15.1 Files
+Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the code and the tests are the reference.
 
-```
-packages/ui/src/button/
-  index.ts              # no directive
-  button.tsx            # "use client"
-  button.test.tsx
-  button.browser.test.tsx
-packages/ui/src/internal/use-action-trigger.ts   # gains the guard option, `run` returns boolean
-packages/ui/src/toolbar/index.ts                 # Toolbar = { Root, Separator } (7.3)
-packages/ui/src/toolbar/toolbar-button.tsx       # removed (7.3), with its types and root-entry exports
-```
+## 16. The other pure triggers
 
-### 15.2 `useActionTrigger` change
-
-```ts
-export interface ActionTriggerOptions {
-  /** Open generation of the overlay a `then` belongs to (unchanged). */
-  readonly openGeneration?: () => number;
-  /**
-   * Ignore `run` while a run is in flight (conventions 2.5 as amended): `run` returns `false`
-   * and starts nothing. In flight means the hook's synchronous in-flight counter is non-zero;
-   * the last render's `pending` is **not** consulted (design 5.2). Default `false` until #81
-   * flips it.
-   */
-  readonly ignoreWhilePending?: boolean;
-}
-
-export interface ActionTrigger {
-  readonly pending: boolean;
-  /** Returns `false` when the run was ignored (so the part can `preventDefault()`). */
-  readonly run: (work: () => unknown, then?: () => void) => boolean;
-}
-
-export function useActionTrigger(options?: ActionTriggerOptions | (() => number)): ActionTrigger;
-```
-
-The positional `openGeneration` form may stay accepted for the three existing call sites, or they
-may be edited to the object form (three one-line changes); the developer's choice. Inside:
-`inFlight` is a `useRef(0)`; `run` does `if (ignoreWhilePending && inFlight.current > 0) return false; inFlight.current++;` before `startOwnTransition`, and decrements in a
-`finally` around `await work()`. The superseded-rejection handling stays (it is reachable for the
-unguarded parts and stays correct for guarded ones). **Since #145 (2026-11-23)** that handling is
-one call: a run that is no longer the latest passes its rejection to `reportError`
-(`internal/report-dropped.ts`, conventions 2.4) instead of throwing it from the part's
-render; the latest run's rejection is rethrown inside the transition as before, unless the part
-unmounted or is hidden by `<Activity>` by then, when it is reported too (#152). The hook's
-options are `{ openGeneration?, ignoreWhilePending? }`; the `captureSuperseded` option that #100
-added is gone.
-
-### 15.3 `Button` sketch
-
-```tsx
-export function Button({ action, formAction, type, disabled = false, focusableWhenDisabled = false,
-  transition, className, style, children, render, ...rest }: ButtonProps) {
-  const toolbar = useToolbarContext();
-  // Not a host <button> (a link, a component): native `disabled` would mean nothing to the
-  // browser and hide the state from AT, so the focusable-disabled branch (review must-fix 1).
-  const focusable = focusableWhenDisabled || toolbar !== null || !isHostButton(render);
-  const { pending: ownPending, run } = useActionTrigger({ ignoreWhilePending: true });
-  const status = useFormStatus();
-  const submittedWith = useRef<unknown>(undefined);
-  // Since #154 `formPending` also holds through a `submitted` latch (6.2).
-  const formPending = status.pending && typeof formAction === "function"
-    && (status.action === formAction || status.action === submittedWith.current);
-  const pending = ownPending || formPending;
-  useDevWarning(...); // action + formAction (error), action + submitting type (warn)
-  const state: ButtonState = { pending, disabled };
-  const element = useRender<ComponentPropsWithRef<"button">, ButtonState>({
-    defaultElement: "button", render, state, className, style, children,
-    props: { ...rest, formAction },
-    libraryProps: {
-      ...(rendersButton(render) && { type: type ?? (formAction !== undefined ? "submit" : "button") }),
-      disabled: disabled && !focusable ? true : undefined,
-      "aria-disabled": pending || (disabled && focusable) ? true : undefined,
-      "data-pending": dataAttr(pending),
-      "data-disabled": dataAttr(disabled),
-      onClick: (event: MouseEvent<HTMLElement>) => {
-        if (disabled) { event.preventDefault(); return; }
-        if (action === undefined) {
-          if (formPending) { event.preventDefault(); return; }
-          submittedWith.current = formAction;
-          return;
-        }
-        const details: ButtonActionDetails = createActionDetails(event.nativeEvent, {});
-        if (!run(() => action(details))) event.preventDefault();
-      },
-    },
-  });
-  return useTransitionBoundary("Button", transition, element);
-}
-```
-
-`useFormStatus` is imported from `react-dom` as in `form-submit.tsx`. `disabled` is passed as
-`undefined` (not `false`) in the focusable case so the owned key removes a render element's
-`disabled` (conventions 1.2, owned keys).
-
-`render-element.ts` after review items 1 and 2: `rendersButton(render)` (the `type` predicate,
-library-wide) returns `true` for no `render`, the function form, a host `"button"` **and any
-component element**, `false` only for a host element of another tag; a new `isHostButton(render)`
-keeps today's strict meaning (no `render`, function form, host `"button"`) for the `disabled`
-branch. Every part that emits `type="button"` through `rendersButton` (Toggle, Tabs.Tab, the
-Menu items, the Close and Trigger parts, …) gains the component case at once, which is the same
-footgun fixed everywhere (`<Toggle render={<MyButton />}>` inside a form is the Getting Started
-page's own example); the existing "no `type`" assertions all use host `<a>` renders and keep
-passing. The other parts' `disabled` on a link render is a separate follow-up (fold, item F3).
-
-### 15.4 Toolbar
-
-`toolbar/index.ts`: `export const Toolbar = { Root: ToolbarRoot, Separator: ToolbarSeparator } as const;`
-with the `ToolbarButton*` type exports removed there and in `src/index.ts`. The `toolbar.test.tsx`
-rows that test `Toolbar.Button`'s own action (sync / async / rejection / "pending stays until both
-overlapping runs settle") move to `button.test.tsx` in their guarded form; the keyboard rows
-render `<Button>` from `../button/button.js` instead of `Toolbar.Button` and are otherwise
-unchanged. `packages/example` and the docs examples follow the same rename.
-
----
-
-## Conventions amendments (applied to `design/conventions.md` in this commit; accepted 2026-10-22)
-
-1. **Decisions table, row 2**: a pure trigger ignores activation while its own action is pending
-   and says so with `aria-disabled="true"` (#79).
-2. **1.1 `Button` row**: `Button` is now the general single-element button (`@funstack/ui/button`)
-   and replaces `Toolbar.Button`; the "not a general button component" sentence goes. 3.6, 4.1
-   and 5.3 drop their `Toolbar.Button` mentions accordingly.
-3. **2.3 item 3**: a pure trigger does not treat an already-cancelled click as a veto (the
-   Trigger-wrapped Button); item 9 reworded to "never *natively* disabled while pending; pure
-   triggers ignore re-entry (2.5)".
-4. **2.5**: new bullet "**Pure triggers ignore re-entry.**" with the rule, the two guard sources,
-   `preventDefault()`, the non-awaiting spelling, and the staged rollout (Button in #79; the
-   other parts in the follow-up).
-5. **2.7**: a part with its **own** `formAction` may expose per-submitter form-channel pending
-   (`useFormStatus().action` identity), the third allowed reading of the channel.
-6. **3.4**: `useActionTrigger`'s `ignoreWhilePending` option and `run`'s boolean return.
-7. **3.6**: "A part is never **natively** disabled while pending" (unchanged reason), plus: a pure
-   trigger renders `aria-disabled="true"` while its own action is pending because it ignores
-   activation then; `data-disabled` and `state.disabled` are the consumer's `disabled` only; the
-   "latest-intent rule makes repeated activation safe" sentence is removed (it never protected a
-   trigger); `focusableWhenDisabled` joins Tabs / Toolbar as a source of `aria-disabled`.
-8. **4.1 `pending` row**: `Button` (its own action, or its own `formAction` submission).
-9. **5.3**: `Button` emits no types.
-10. **9.1**: `button/` folder.
-11. **10.1**: a "Re-entry" row required for every guarded pure trigger; the superseded-rejection
-    row notes that a guarded trigger declares it N/A with the reason.
-12. **Resolved questions**: entry 34.
-13. **1.2** (review fold, 2026-10-22): `type="button"` is emitted for a host `<button>` **and for a
-    component `render` element**, omitted only for a host element of another tag; a `disabled`
-    part whose rendered element is not a host `<button>` uses `aria-disabled`.
-14. **2.5, 3.4, 10.1** (review fold): the guard source is the in-flight counter only; the held
-    commit window accepts a new run.
-
----
-
-## Implementation and review fold (#79, 2026-10-22)
-
-Implementation d8136b4 (library, `Toolbar.Button` removed), 465d106 (playground), 0201cec
-(docs); review `memo/reviewer/button.md` (c8e09d1, "acceptable with minor fixes"). Decisions on
-the review's open items and the developer's deviations, folded into the sections above:
-
-| # | Item | Decision | Where |
-| --- | --- | --- | --- |
-| F1 | Must-fix 1: `disabled` on `render={<a href>}` outside a Toolbar rendered a meaningless `disabled=""` and no `aria-disabled`. | **Fix in code.** `focusable` includes `!isHostButton(render)`; a link or component render takes the `aria-disabled` branch. | 3 (`disabled` doc), 4, 8.1, 15.3, rows 1 and 2 |
-| F2 | Item 2: `render={<MyButton />}` got no `type`, so inside a form it submitted. | **Fix in code, library-wide**: `rendersButton` returns `true` for a component element; `isHostButton` is the new strict predicate for the `disabled` branch. No `nativeButton` prop: host elements are detectable statically, and the "harmless if wrong" rule covers components. Affects every part that emits `type` through `rendersButton` (the same footgun); conventions 1.2 amended. | 4, 15.3, conventions 1.2 |
-| F3 | Review's note that other parts (`Dialog.Close`, `Popover.Close`, `Dialog.Trigger`, `Form.Submit`) render native `disabled` on a link `render` too. | **Follow-up issue** (not #79): apply `isHostButton` to their `disabled` branch; `Form.Submit` must stay a submitter anyway. | proposal for the PO |
-| F4 | Item 3: the rendered-`pending` guard source dropped clicks under entanglement (probe: three clicks, one call). | **Guard on the in-flight counter only.** The held window accepts a new run; `aria-disabled` may outlast the guard. `formAction` keeps its render-value guard (React's own status). | 5.2, 5.4, walkthroughs 5 and 7, row 6, 15.2, conventions 2.5 / 3.4 / 10.1 |
-| F5 | Item 4: row 11 intermediate assertion ("resolve A → only A clears"). | Developer adds it. | row 11 (unchanged) |
-| F6 | Item 5: playground `.tb-item[aria-disabled="true"]` styles a pending Button as disabled. | Developer switches to `[data-disabled]` as the docs CSS did. | 2.6 |
-| F7 | Minor 6: two Buttons sharing one `formAction` function both show pending. | Documented; inherent to `useFormStatus`. | 6.2 |
-| F8 | Minors 7 and 8 (`ButtonInvoker` CSS-only Button, `ButtonSave` counter updates on settle). | Developer's call; optional. | 14 |
-| D1 | Trigger-wrapped **awaited** action holds `showModal()` until it settles (entanglement). | **Accepted; the design was wrong.** 2.3 uses a non-awaiting prefetch and names the awaited behaviour; 7.1 and row 15 describe it. | 2.3, 7.1, row 15 |
-| D2 | Row 25: a `transition="none"` content swap starts no view transition; `"auto"` starts one. | **Accepted**; row 25 rewritten. | row 25 |
-| D3 | Hyphenated `aria-disabled` cannot be type-checked away; `expectTypeOf().not.toHaveProperty` plus the owned-key removal test cover it. | Accepted. | row 18 |
-| D4 | Playwright `force: true` for clicks on an `aria-disabled` Button (row 22): Playwright's actionability treats it as disabled; the real pointer click still dispatches. | Accepted. | row 22 |
-| D5 | `useDevWarning` (`console.error`, once per instance, in an effect) where the design says "warns". | Accepted; the library's one warning channel. | 6.1 |
-| D6 | oxlint disable for reading `submittedWith` in render. | Accepted; written only by the click handler before the submission whose status the render shows (precedent: `progress-root`). | 15.3 |
-
----
-
-## Recommendations and decisions (all accepted 2026-10-22)
-
-1. **Re-entry guard: Button in wave 8, the rest in a follow-up** (5.5). The rule is library-wide
-   in the conventions now; `Dialog.Close`, `Popover.Close`, `Menu.Item` switch in **#81** because
-   of their re-run tests and docs and `menu-dom.ts`'s `aria-disabled` query.
-   Alternative: switch all five now (one wave, about twenty assertions and four design docs,
-   plus the Menu navigation change). Recommended: staged. **Accepted: staged, #81 filed.**
-2. **No opt-out prop** (5.4): the non-awaiting action is the spelling. Alternative: `repeatable`.
-3. **`aria-disabled="true"` while pending; `data-disabled` and `state.disabled` untouched** (5.3).
-4. **`type` is owned on a `<button>`**, computed from the Button's own `type` prop (6.1), so a
-   `render` element's `type` is overridden. Alternative: not owned (the element's wins), which
-   would make `render={<button type="submit">}` a silent submit button.
-5. **`formAction` per-submitter pending with the `submittedWith` ref** (6.2). Alternative: prop
-   identity only, with a documented "pass a stable function" rule.
-6. **`Form.Submit` stays unguarded** (6.4).
-7. **Implicit submission goes through the guard**, no `type` flip (6.5).
-8. **`Button` reads `ToolbarContext`** (7.3). Accepted.
-9. **`Toolbar.Button`: keep as an alias or remove.** The draft recommended keeping the alias
-   through `0.1.0`. **User decision: remove it now** (one name for one component; the project is
-   alpha; a breaking change recorded in 7.3 and the migration note in 14).
-10. **`focusableWhenDisabled`** (3, 7.2): the one prop this design adds beyond the product owner's
-    list. It is the toolbar rule as a prop and the only way to put a Tooltip on a disabled Button
-    (a natively disabled button fires no events, and `aria-disabled` is owned). **User decision:
-    in v1.**
-11. **Trigger-wrapped Button runs its action on a cancelled click** (7.1), as decided.
-12. **Browser rows 21 to 26** are the ones jsdom cannot observe; 21 (focus retention) is the
-    load-bearing accessibility claim and runs on all three engines.
-
-## Resolved questions (2026-10-22)
-
-1. Remove `Toolbar.Button` now, or keep the alias? **Removed now** (user).
-2. `focusableWhenDisabled` in v1, or defer? **In v1** (user).
-3. The follow-up for the other pure triggers: **one issue, #81** (product owner).
-
-## Open questions
-
-None at present.
-
----
-
-## 16. Wave 9, #81: re-entry for the other pure triggers
-
-Status: **design amendment, accepted by the user with wave 9 (tracker #85), 2026-10-22.** Applies
-the rule of 5.2 and conventions 2.5 to every pure trigger and settles the hook's default.
+The users of `useActionTrigger`, and what `whilePending="ignore"` means on each part. The
+defaults are in 18.4 and conventions 2.5.1.
 
 ### 16.1 Which `useActionTrigger` users are pure triggers
 
-| User | What `run` wraps | Pure trigger? | #81 |
+| User | What `run` wraps | Pure trigger? | `whilePending` |
 | --- | --- | --- | --- |
-| `Button` | its `action` | yes | guarded since #79 |
-| `Dialog.Close` | `action`, then the close | yes | **guard** |
-| `Popover.Close` | `action`, then the hide | yes | **guard** |
-| `Menu.Item` | `action`, then the menu close | yes | **guard** |
-| `Toast.Action` | `action`, then the toast close | yes: an Undo / Retry / View run twice is a duplicate side effect (toast.md 4.2 called it "harmless for an idempotent Undo"; it is not harmless for Retry) | **guard** |
-| `Slider.Root` (`runStep`) | each step's `valueChangeAction` | **no**: a continuous control dispatches one step per pointer move or key press and every step must run (conventions 2.1, 10.1 "Continuous control"); the hook is used for per-step `pending` and superseded-rejection reporting (`reportError` since #145, conventions 2.4) only | unguarded, explicit |
-| `NumberField.Root` (`runStep`) | each step's `valueChangeAction` (press-and-hold) | **no**, as Slider | unguarded, explicit |
+| `Button` | its `action` | yes | prop, default `"run"` |
+| `Dialog.Close` | `action`, then the close | yes | prop, default `"ignore"` |
+| `Popover.Close` | `action`, then the hide | yes | prop, default `"ignore"` |
+| `Menu.Item` | `action`, then the menu close | yes | prop, default `closeOnActivate ? "ignore" : "run"` |
+| `Toast.Action` | `action`, then the toast close | yes: an Undo / Retry / View run twice is a duplicate side effect | prop, default `closeOnSettle ? "ignore" : "run"` |
+| `Slider.Root` (`runStep`) | each step's `valueChangeAction` | **no**: a continuous control dispatches one step per pointer move or key press and every step must run (conventions 2.1, 10.1 "Continuous control"); the hook is used for per-step `pending` and superseded-rejection reporting (`reportError`, conventions 2.4) only | none: every step runs |
+| `NumberField.Root` (`runStep`) | each step's `valueChangeAction` (press-and-hold) | **no**, as Slider | none: every step runs |
 
-### 16.2 The hook's default flips
+### 16.2 The hook's option
 
-`ignoreWhilePending` becomes **`true` by default** and the option stays for the two continuous
-controls, which pass `ignoreWhilePending: false` with a comment ("a step is not a re-entry").
-Reasoning: five of seven users are pure triggers, the hook's own doc calls itself "the transition
-of a pure-trigger part", and the failure mode of a forgotten option should be the safe one (a
-guarded trigger) rather than the bug #79 exists to prevent (a duplicate side effect). The
-positional `useActionTrigger(openGeneration)` form is removed at the same time: every call site
-becomes the options object. `run` keeps returning `boolean`.
+`useActionTrigger({ openGeneration?, ignoreWhilePending? })`. `ignoreWhilePending` is `false`
+by default; a part passes `(whilePending ?? <its default>) === "ignore"`, read per render.
+`run` returns `false` when the run was ignored.
 
 ### 16.3 Per-part behaviour
 
-Common to the four parts: while the part's own run is in flight (in-flight counter, never the
-rendered `pending`, 5.2), a click / Enter / Space starts nothing and is `preventDefault()`ed; the
-part renders `aria-disabled="true"` for exactly the renders where `data-pending` is set;
-`data-disabled` and `state.disabled` stay the consumer's `disabled`; every other listener keeps
-working. `aria-disabled` joins each part's owned keys. Walkthroughs that said "repeated clicks
-re-run the action; the first close wins" now read "a repeated click while pending is ignored";
-the superseded-rejection and overlap rows of each part become N/A with the #79 reason and are
-replaced by a Re-entry row (conventions 10.1).
+Under `"ignore"`, common to the four parts: while the part's own run is in flight (in-flight
+counter, never the rendered `pending`, 5.2), a click / Enter / Space starts nothing and is
+`preventDefault()`ed; the part renders `aria-disabled="true"` for exactly the renders where
+`data-pending` is set; `data-disabled` and `state.disabled` stay the consumer's `disabled`;
+every other listener keeps working. `aria-disabled` is among each part's owned keys. Under
+`"run"` every activation runs and the part's close is requested once, when the last run in
+flight settles and only if the latest run resolved (conventions 2.5.1).
 
 - **`Dialog.Close`** (dialog.md "Pending, in order"). The click is already always cancelled in
   library mode; with `action`, `run` returning `false` makes the handler return before
@@ -1197,8 +838,7 @@ replaced by a Re-entry row (conventions 10.1).
   reading `aria-disabled`**: `isDisabledItem(item)` keys on **`data-disabled`** (present exactly
   when the item's `disabled` prop is set). Its only reader is `edgeItem` (the open focus, and
   the Trigger's ArrowDown / ArrowUp while the menu is open); the in-menu arrows, Home / End and
-  typeahead walk every item, disabled included (menu.md 5, APG), and never read it (wave 9
-  review L1 corrects the draft of this bullet, which said they did). `useMenuItem` already
+  typeahead walk every item, disabled included (menu.md 5, APG), and never read it. `useMenuItem`
   emits `data-disabled`; `Menu.SubmenuTrigger` too. Consequence: a pending item is an ordinary
   item for navigation and still the "first enabled item" for the open focus, which is right (it
   is pending, not disabled).
@@ -1207,83 +847,23 @@ replaced by a Re-entry row (conventions 10.1).
   `CheckboxItem` / `RadioItem` are state owners (`useControllableAction`), not pure triggers:
   unchanged, latest intent wins.
 - **`Toast.Action`** (toast.md 4.2, walkthrough 5). `run` returning `false` returns from the
-  handler. `aria-disabled` while pending is a new owned key (the part owned no `disabled`
-  before; `rest.disabled` stays pass-through and the no-dispatch check on it stays). The Root's
-  `actionPending` (timer pause) is unchanged. Walkthrough 5 ("Undo clicked twice") becomes "the
-  second click is ignored; one dispatch, one close".
+  handler. `aria-disabled` while pending is an owned key (`disabled` on the Toast parts: toast.md). The
+  Root's `actionPending` pauses the timer. "Undo clicked twice": the second click is ignored;
+  one dispatch, one close.
 
 ### 16.4 Test rows per part
 
-The old rows named here are rewritten, not deleted, so the suites keep their coverage count.
+Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the code and the tests are the reference.
 
-**`dialog.test.tsx`**
+## 17. `disabled` on link and component renders, library-wide
 
-| # | Row | Test |
-| --- | --- | --- |
-| D1 | Re-entry (library mode, with `action`) | Deferred `action`: a second click, Enter and Space leave it at one call, each is `defaultPrevented`, `aria-disabled="true"` and `data-pending` are on and `data-disabled` is off; the button keeps focus; resolve → one `openChangeAction(false, "activate")`, one `close(value)`, attributes gone (the dialog is closed, so the button is gone with it in the usual harness; assert on the element reference). JS-free variant: one `dialog.close(value)`. |
-| D2 | Re-entry, same task | Two synchronous `fireEvent.click`s inside one `act`: one `action` call. |
-| D3 | No `action` | A Close without `action` clicked twice while the Root's close is pending: unchanged behaviour (`requestClose` no-op against `intended()`), no `aria-disabled` (no own run). |
-| D4 | Superseded rejection → N/A | `dialog.test.tsx:1240` ("with action: a superseded rejection still reaches the boundary") becomes a rejection row: the single run rejects → boundary above the Close, dialog stays open, a click after the boundary resets runs again. Top-of-file comment lists Overlap / Superseded rejection for the Close part as N/A (#79 reason). |
-| D5 | Stale close row (design table "Close part, stale close") | Unchanged except its last sentence: drop "a superseded click's rejection reaches the catcher". |
-| D6 | Owned `aria-disabled` | A `render` element's `aria-disabled` is removed when the Close is idle (owned `undefined`). |
-
-**`popover.test.tsx`**
-
-| # | Row | Test |
-| --- | --- | --- |
-| P1 | Re-entry (library mode and JS-free mode, with `action`) | As D1 with `hidePopover` / `requestClose` (one `openChangeAction(false)` / one `hidePopover()`). |
-| P2 | Re-entry, same task | As D2. |
-| P3 | `popover.test.tsx:1360` ("a superseded rejection still reaches the boundary") | Becomes the single-run rejection row; N/A comment as D4. |
-| P4 | Owned `aria-disabled` | As D6. |
-
-**`menu.test.tsx`**
-
-| # | Row | Test |
-| --- | --- | --- |
-| M1 | `menu.test.tsx:844` ("two activations run the action twice; the close happens once") | Rewritten: a deferred `action` on a `closeOnActivate` Item; a second Enter, Space and click leave it at one call and are `defaultPrevented`; the item has `aria-disabled="true"`, `data-pending`, no `data-disabled`; resolve → one `requestClose`, the menu closes. |
-| M2 | Re-entry on a `closeOnActivate={false}` Item | Deferred action: second activation ignored; resolve → attributes gone, menu still open, the next Enter runs again. |
-| M3 | Navigation ignores pending (split, wave 9 deviation 1) | Integration half (`menu.test.tsx`): while an Item is pending (`aria-disabled` on it), the arrows, Home, End and typeahead land on it as on any item (they never skipped disabled items). Unit half (`menu-dom.test.ts`): `edgeItem` returns a pending item (`aria-disabled` without `data-disabled`) as the first enabled item and skips a `data-disabled` one; the open-focus rows already cover `edgeItem`'s use. The "re-open while pending" case cannot be observed end to end: the re-open is entangled with the pending item's action and commits after it settles, so the pending state is gone by the time the open focus resolves. |
-| M4 | `menu.test.tsx:871` ("a superseded rejection reaches the boundary", Item) | Becomes the single-run rejection row (menu stays open, boundary above the item, the next activation runs after reset); N/A comment. `menu.test.tsx:1350` (RadioItem / CheckboxItem) is **unchanged**: state owners keep overlap and superseded rejection. |
-| M5 | Design table "Overlap" row (menu.md 966) | "Two Item clicks: action called twice, `requestClose` once effective" → "Two Item clicks: action called once (the second is ignored), one `requestClose`". The RadioItem half stays. |
-| M6 | `menu-dom.ts` unit | `isDisabledItem` is `true` for `data-disabled=""` and `false` for `aria-disabled="true"` without it. |
-
-**`toast.test.tsx`**
-
-| # | Row | Test |
-| --- | --- | --- |
-| T1 | `toast.test.tsx:852` ("two Undo dispatches resolved out of order close the toast once") | Rewritten: a deferred Undo `action`; a second click leaves it at one call and is `defaultPrevented`; the Action has `aria-disabled="true"` and `data-pending`, the Root `data-pending`, the timer paused (existing assertion); resolve → one close (`"activate"`). |
-| T2 | Superseded rejection rows in that `describe` | Become the single-run rejection row (toast stays, boundary above the Viewport, as walkthrough 4); N/A comment for Overlap / Superseded rejection on `Toast.Action`. |
-| T3 | `Toast.Close` while Undo pending (walkthrough 6) | Unchanged: Close is not a `useActionTrigger` user. |
-| T4 | Owned `aria-disabled` | A `render` element's `aria-disabled` on an idle Action is removed. |
-
-**`use-action-trigger` and the continuous controls**
-
-| # | Row | Test |
-| --- | --- | --- |
-| H1 | Default | `useActionTrigger()` with no options ignores a second `run` while the first is in flight (`run` returns `false`), and runs it after settle; `{ ignoreWhilePending: false }` runs both. The existing superseded-rejection hook tests move under the `false` option. (Since #145 those rows assert: every superseded rejection of a burst is passed to `reportError` and the latest reaches the boundary; superseded rejections are still reported after unmount and nothing is thrown.) |
-| H2 | Slider / NumberField | `slider.test.tsx` and `number-field.test.tsx` step rows (two steps in flight, out-of-order resolution, superseded step rejection) pass unchanged with the explicit `false`; one new assertion per file: a second step dispatched while the first step's action pends is **called** (guards the explicit opt-out). |
-
-### 16.5 Docs
-
-Dialog, Popover, Menu and Toast pages: the sentence "repeated clicks re-run the action" becomes
-"a second click while pending is ignored and the button is `aria-disabled` meanwhile", with the
-non-awaiting spelling for "close now, work later" (menu.md 2.3 already shows it). Owned-keys
-lists gain `aria-disabled`. The "Pending & optimistic state" concept page gets one paragraph:
-every pure trigger ignores re-entry; state owners (Toggle, Tabs, Checkbox items) take every
-click and the latest intent wins. Changelog entry (behaviour change, not breaking).
-
----
-
-## 17. Wave 9, #83: `disabled` on link and component renders, library-wide
-
-Status: **design amendment, accepted by the user with wave 9 (tracker #85), 2026-10-22.** Applies
-the conventions 1.2 rule of the #79 fold (a `disabled` part whose rendered element is not a host
-`<button>` renders `aria-disabled="true"`, not native `disabled`) to every part that owns
+Conventions 1.2: a `disabled` part whose rendered element is not a host `<button>` renders
+`aria-disabled="true"`, not native `disabled`. This section applies it to every part that owns
 `disabled` and accepts an arbitrary `render`.
 
-### 17.1 The sweep
+### 17.1 The parts
 
-| Part | Today | Click handler always installed? | #83 |
+| Part | `disabled` on a host `<button>` | Click handler always installed? | Focusable-disabled branch for other renders |
 | --- | --- | --- | --- |
 | `Dialog.Close` | native `disabled`, owned | library mode or with `action`; JS-free mode without `action` is the browser's `request-close` command | **yes, when a click handler is installed**: `focusable = !isHostButton(render) && installClick`. In JS-free command mode a component render must render a `<button>` anyway (dev warning), and native `disabled` is what stops the command. |
 | `Popover.Close` | same | same | same |
@@ -1294,10 +874,10 @@ the conventions 1.2 rule of the #79 fold (a `disabled` part whose rendered eleme
 | `ToggleGroup.Item` | native `disabled`, owned; roving skips `:disabled` | always | **yes**; a link / component Item that is disabled is then **reachable by the arrows** (the engine skips `:disabled` only), which is the APG Toolbar behaviour and acceptable for the rare non-button Item; row below records it |
 | `Combobox.Trigger`, `Combobox.Clear` | native `disabled`, owned (`tabIndex` owned too) | always | **yes** |
 | `NumberField.Increment` / `Decrement` | native `disabled` (also at bound / `readOnly`), owned | always (`useStepButton`) | **yes**; the at-bound case follows the same branch |
-| `Form.Submit` | native `disabled`, owned; **no click handler** | never: it is a native submitter | **no**. With `aria-disabled` a component render would still submit on click (nothing cancels it), and a link render is already a dev error ("only a submit button submits the form"). Native `disabled` is the only correct disabled state for a submitter; documented in its props table. |
+| `Form.Submit` | native `disabled`, owned | only while `disabled` (it cancels the click; an enabled submitter's click is the browser's) | **no** for anything that may be a submitter: no `render`, a host `<button>` or `<input>`, or a component render. With `aria-disabled` alone it would still submit before hydration and on implicit submission, so native `disabled` is the only correct disabled state for a submitter. A host element of another tag (`<a>`, `<div>`) takes the `aria-disabled` branch with the cancelled click (`field-form.md` 4). |
 | `Select.Trigger` | native | must stay a `<button>` (conventions 1.2) | no (host button by contract) |
 | `Tabs.Tab`, `Accordion.Trigger`, `Menu.Item`, `Menu.CheckboxItem` / `RadioItem` / `SubmenuTrigger`, `Button` | `aria-disabled` already | | no change |
-| `Toast.Action`, `Toast.Close` | `disabled` is **pass-through** (not owned; the handler checks `rest.disabled`) | always | out of #83: they do not own `disabled`. Noted for a later "own `disabled` on the Toast parts" item; not a correctness bug today beyond the same link case, which the Toast parts never advertise. |
+| `Toast.Action`, `Toast.Close` | see `toast.md` (the library `disabled` rule, #157) | always | see `toast.md` |
 | `Tooltip.Trigger` | renders no `disabled` attribute (`data-disabled` only; the Root's `disabled` switches the tooltip off) | | no change |
 
 Where the condition is "when a click handler is installed", the part computes `focusable` from
@@ -1317,14 +897,14 @@ so a link does not navigate), exactly as `Button` does.
 - In the focusable branch the part passes `disabled: undefined` (owned removal) and
   `"aria-disabled": disabled ? true : undefined`; `data-disabled` and `state.disabled` are
   unchanged. Parts that already own `aria-disabled` for another reason (the Close parts, for
-  pending since #81) merge the conditions.
-- **`aria-disabled` is owned only where the part computes it** (wave 9 review deviation 5):
-  in the focusable branch, and always on the parts that render it for pending (#81). A
+  pending) merge the conditions.
+- **`aria-disabled` is owned only where the part computes it**:
+  in the focusable branch, and always on the parts that render it for pending. A
   host-button Toggle / Trigger outside the branch does not own the key, so a consumer's own
   `aria-disabled` passes through as before (conventions 1.2: "a part that does not own a key in
   some mode omits the key instead").
-- **An invoker in the focusable-disabled branch owns `commandfor` and `command` as `undefined`**
-  (wave 9 review M1): `aria-disabled` has no behaviour, so a disabled component render that
+- **An invoker in the focusable-disabled branch owns its invoker attributes (`popoverTarget`,
+  `commandfor`, `command`) as `undefined`**: `aria-disabled` has no behaviour, so a disabled component render that
   spreads onto a real `<button commandfor command>` would be a live invoker in the server HTML
   and open / close its target on a click before hydration, where native `disabled` used to make
   the button "not a valid invoker". With the attributes removed there is nothing to invoke while
@@ -1332,72 +912,21 @@ so a link does not navigate), exactly as `Button` does.
   disabled control, and both return when `disabled` is unset. Applies to `Popover.Trigger`,
   `Menu.Trigger`, `Menu.SubmenuTrigger` (`use-popover-trigger.ts`), library-mode modal
   `Dialog.Trigger`, `Dialog.Close` and `Popover.Close`; harmless on a link render (an `<a>` is
-  never an invoker). Row per part: a disabled component render has no `command` /
-  `commandfor` attribute (jsdom), plus a `renderToString` row for `Menu.Trigger`.
-- The `onClick` guard `if (disabled) { event.preventDefault(); return; }` is already the shape in
-  `Toggle`, the Close parts and the Triggers (some return without `preventDefault()`; add it, so
-  a disabled link render does not navigate, as `Toolbar.Button` did in #66 and `Button` does).
+  never an invoker).
+- The `onClick` guard is `if (disabled) { event.preventDefault(); return; }` in `Toggle`, the
+  Close parts and the Triggers, so a disabled link render does not navigate, as `Button`.
 - No new prop: `focusableWhenDisabled` stays Button-only (the Toolbar context read is also
-  Button-only; a Toggle inside a Toolbar keeps native `disabled`, #66 decision 13).
+  Button-only; a Toggle inside a Toolbar keeps native `disabled`, toggle-group.md decision 13).
 
 ### 17.3 Test rows per part
 
-One jsdom row per part, in its own suite, plus the regression half:
+Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the code and the tests are the reference.
 
-| Part | Row |
-| --- | --- |
-| `Dialog.Close`, `Popover.Close` | Library mode, `disabled` with `render={<a href="#x" />}` and with `render={<MyButton />}` (a component spreading onto a `<button>`): `aria-disabled="true"`, no `disabled` attribute, `data-disabled`, click `defaultPrevented` and no `openChangeAction` / `close` / `hidePopover`; `render={<button />}` and no `render`: native `disabled`, no `aria-disabled` (unchanged). JS-free mode without `action`, `render={<MyButton />}` disabled: native `disabled` (the command branch), `aria-disabled` absent. |
-| `Dialog.Trigger` | Library mode (modal and non-modal) and JS-free non-modal: link / component renders → `aria-disabled`, click cancelled, nothing opens; JS-free modal with a component render → native `disabled`. |
-| `Popover.Trigger` | Library mode: link / component renders → `aria-disabled`, click cancelled, no dispatch; JS-free mode with a component render → native `disabled`. |
-| `Menu.Trigger` | Link / component renders → `aria-disabled`; click, Enter, ArrowDown do not open; host button → native `disabled` (unchanged). |
-| `Toggle` | `disabled` with `render={<a href>}` / `render={<MyButton />}` → `aria-disabled`, no dispatch, `aria-pressed` still rendered, click `defaultPrevented`; host button unchanged. |
-| `ToggleGroup.Item` | Same, plus: a disabled link Item is reached by the arrows (documented), still never dispatches; a disabled host-button Item is skipped (unchanged). |
-| `Combobox.Trigger`, `Combobox.Clear` | Component render disabled → `aria-disabled`, `tabIndex` as before, click does nothing (no open / no clear). |
-| `NumberField.Increment` / `Decrement` | Component render: disabled by prop, by `readOnly`, and at the bound → `aria-disabled` and no step on click / pointerdown hold; host button → native `disabled` in all three (unchanged). |
-| `Form.Submit` | Regression: `disabled` with `render={<MyButton />}` renders native `disabled` and **no** `aria-disabled`; the props-table sentence "always native `disabled`: a submitter has no handler to honour `aria-disabled`" is in the docs. |
-| `Button` | Unchanged (#79 rows 1 and 2). |
+## 18. `whilePending`
 
-### 17.4 Docs
-
-Each affected page's `disabled` row gains the sentence "with a link or component `render`,
-`aria-disabled="true"` instead (the element stays focusable); native `disabled` on a `<button>`".
-Conventions 1.2's "the other `disabled` parts follow in a separate issue" is replaced by the list
-above. Changelog entry (behaviour change for link / component renders only).
-
----
-
-## Implementation and review fold (wave 9, #81 and #83, 2026-10-22)
-
-Implementation 27e64f4 (#81) and f827869 (#83) on `memo/developer/wave9-triggers.md`; review
-`memo/reviewer/wave9.md` (a29e3ad, "acceptable with fixes"). All six developer deviations
-accepted; the review's items decided as follows and folded into 16 and 17 above.
-
-| # | Item | Decision | Where |
-| --- | --- | --- | --- |
-| W1 | Review M1: the focusable-disabled branch kept `commandfor` / `command`, so a disabled component render was a live invoker before hydration. | **Fix in code**: own both as `undefined` in that branch (Popover / Menu / Submenu Triggers, library-mode modal Dialog.Trigger, both Close parts); rows per part plus a `renderToString` row for `Menu.Trigger`. | 17.2 |
-| W2 | Review M2 / L1: docs, jsdoc, menu.md 2.3 and 16.3 said the arrows, Home / End and typeahead skip disabled items; only `edgeItem` (open focus, Trigger arrows while open) does. | Corrected in menu.md 2.3 and 16.3 here; the developer corrects `MenuPage.tsx`, `menu-item.tsx`'s `disabled` jsdoc and `menu-dom.ts`'s jsdoc to "a pending item is an ordinary item for navigation; only the open focus skips items with the `disabled` prop". | 16.3, menu.md 2.3 |
-| W3 | Deviation 1: M3 split into the integration half (arrows / Home / End / typeahead land on a pending item) and an `edgeItem` unit row; the re-open half is unobservable end to end (entanglement). | Accepted; row rewritten. | 16.4 M3 |
-| W4 | Deviation 2: D3 asserted as two `openChangeAction` calls (the open and one close), one `close()`, no `aria-disabled`. | Accepted. | 16.4 D3 |
-| W5 | Deviation 3: D4 / P3 / M4 also reset the boundary (key bump) and check the next activation runs on the fresh instance. | Accepted; stronger than the design row (the in-flight decrement on reject is not observable through a boundary, which unmounts the part). | 16.4 |
-| W6 | Deviation 4: T2 split into "two clicks in one task → one dispatch; rejection reaches the boundary, toast not ending" and the `closeOnSettle={false}` variant (where the guard is visible). | Accepted. | 16.4 T2 |
-| W7 | Deviation 5: `aria-disabled` owned only in the focusable branch (and always on the Close parts for pending); host buttons keep a consumer's own `aria-disabled` as pass-through. | Accepted as the rule; recorded in 17.2. | 17.2 |
-| W8 | Deviation 6: JS-free non-modal `Dialog.Trigger` rendered `aria-disabled` on a component render but no `data-disabled` (`data-disabled` was library-mode only); `Popover.Trigger` in JS-free mode had the same gap. | **Landed in wave 9 after all (5fc05d5)**: both Triggers emit `data-disabled` whenever disabled, in every mode. The rule is now current in conventions 4.1 (`disabled` row: emitted in every mode in which the part renders `disabled` or `aria-disabled`); dialog.md 1 and popover.md 1 updated. | conventions 4.1; dialog.md, popover.md anatomy tables |
-| W9 | Review L2: the NumberField disabled-link `preventDefault()` row clicks with `detail: 0`. | Developer adds a `detail: 1` assertion. | 17.3 |
-| W10 | Review L3: a pointer press on a disabled focusable step render takes focus from the input (`pointerdown` returns before `preventDefault()`). | **Accept the suggestion**: cancel the `pointerdown` when disabled too, so a disabled step button never steals focus (Combobox.Trigger / Clear already cancel unconditionally). | 17.1 NumberField row |
-| W11 | Review L4: the #81 changelog says "behaviour change"; a consumer counting clicks through `Menu.Item` / `Toast.Action` changes result silently. | Flag it in the alpha.7 release notes as breaking for that pattern, pointing at the non-awaiting spelling; 16.5 amended by this row. | 16.5 |
-
----
-
-## 18. #146: `whilePending` (the guard becomes a prop)
-
-Status: **design amendment, 2026-11-23; user decision, accepted in full; implemented
-2026-11-24** (branch `feat/146-while-pending`). The prop, its `"ignore"` value and Button's
-default (every activation runs) were decided first; the opt-out value `"run"` and the
-`formAction` default (`"run"`, the dropped older rejection documented) followed
-(`design/conventions.md` resolved question 44). The library-wide rule and the classification of
-every pure trigger are conventions 2.5.1; this section is Button's share and the developer's
-work list. It supersedes decisions 3 to 5, sections 5.2 to 5.5 where they
-say "always", and the defaults of section 16.
+What a pure trigger does with an activation that arrives while its own action is pending is a
+prop. The library-wide rule and the classification of every pure trigger are conventions 2.5.1;
+this section is Button's share.
 
 ### 18.1 The prop
 
@@ -1425,8 +954,7 @@ export interface ButtonProps /* … */ {
 Why Button's default is `"run"`: Button is the fully user-owned trigger; the library does
 nothing on a click but run the consumer's function, so it has no ground for a policy on how
 often (conventions 2.5.1). It is also what React's `useTransition` and `<button formAction>` do.
-The cost is stated plainly: **a double click on an unguarded Save runs the save twice**, the bug
-#79 built the guard for. The docs lead the Save example with `whilePending="ignore"`.
+The cost is stated plainly: **a double click on an unguarded Save runs the save twice**. The docs lead the Save example with `whilePending="ignore"`.
 
 ### 18.2 Behaviour by value
 
@@ -1438,28 +966,14 @@ The cost is stated plainly: **a double click on an unguarded Save runs the save 
 | `aria-disabled="true"` from pending | **never** | exactly while `data-pending` |
 | `data-disabled`, `state.disabled` | the `disabled` prop only | the `disabled` prop only |
 | Two runs in flight | yes | never |
-| An older run rejects | `reportError`, once (conventions 2.4, #145) | unreachable |
+| An older run rejects | `reportError`, once (conventions 2.4) | unreachable |
 | The latest run rejects | Error Boundary above the Button, after older runs settled | Error Boundary above the Button |
 | Guard source | none | the in-flight counter (5.2), or `formPending` for a function `formAction` |
 
-The click handler of 5.1 changes in two places; `ignoring` is `(whilePending ?? "run") === "ignore"`:
-
-```ts
-if (action === undefined) {
-  if (ignoring && formPending) { event.preventDefault(); return; }   // was: if (formPending)
-  submittedWith.current = formAction;
-  return;
-}
-const started = run(() => action(details));   // useActionTrigger({ ignoreWhilePending: ignoring })
-if (!started) event.preventDefault();
-// …
-"aria-disabled": (pending && ignoring) || (disabled && focusable) ? true : undefined,
-```
-
-Everything else in section 5 holds under `"ignore"` as written: the counter-only guard and the
-settled-but-held window (5.2), `aria-disabled` and never native `disabled` (5.3). 5.4 ("No
-opt-out prop") is replaced by the prop; the `void increment()` spelling stays valid for "the UI
-must not wait" but is no longer needed to count clicks.
+The click handler is 5.1; `aria-disabled` is
+`(pending && ignoring) || (disabled && focusable) ? true : undefined`. Under `"ignore"` the
+counter-only guard and the settled-but-held window (5.2) and `aria-disabled`, never native
+`disabled` (5.3), apply.
 
 `disabled` wins over both values. A Button with neither `action` nor a function `formAction` is
 never pending, so the prop does nothing there (no warning). Composition (7.1) is unchanged: in
@@ -1470,102 +984,22 @@ Trigger dispatches on every click.
 
 Under `"run"` a `Button formAction={fn}` is React's submitter with per-submitter pending (6.2)
 and nothing more: a second click submits again, `pending` stays until React's form status
-clears (also when another submitter's submission overlaps its own, #154). Overlapping submissions are React's form channel, where **React drops the rejection of
-an older overlapping submission** and the library cannot see it (conventions 2.5.1, question
-4, accepted). Under `"ignore"` the guard is `formPending` as in 5.2, with its documented
-difference (a render value: a click in a held-commit window is ignored). With the latch (6.2,
-#154) the guard holds through another submitter's overlapping submission: click A, click B,
+clears (also when another submitter's submission overlaps its own). Overlapping submissions are React's form channel, where **React drops the rejection of
+an older overlapping submission** and the library cannot see it (conventions 2.5.1). Under `"ignore"` the guard is `formPending` as in 5.2, with its documented
+difference (a render value: a click in a held-commit window is ignored). With the latch (6.2)
+the guard holds through another submitter's overlapping submission: click A, click B,
 click A again is cancelled while `a` runs. 6.5 (implicit
 submission): Enter in a field submits again under `"run"`, is cancelled under `"ignore"`.
 
-### 18.4 The other pure triggers (replaces the defaults of section 16)
+### 18.4 The other pure triggers
 
-Conventions 2.5.1 has the table. For the developer: `Dialog.Close`, `Popover.Close`
-(`useOverlayClose`), `Menu.Item` and `Toast.Action` each gain `whilePending?: WhilePending`,
-compute their default, pass `ignoreWhilePending` to the hook and render `aria-disabled` from
-`pending && ignoring`. Defaults (user decision, questions 1 to 3): Close parts `"ignore"`;
-`Menu.Item` `closeOnActivate ? "ignore" : "run"`; `Toast.Action`
-`closeOnSettle ? "ignore" : "run"`. `useActionTrigger`'s own default becomes `false`
-(conventions 3.4); Slider and NumberField are unaffected. The branch `fix/151-152` merges first;
-nothing here depends on its internals, only on its public behaviour (a latest rejection after
-the part left is reported).
+Conventions 2.5.1 has the table. `Dialog.Close`, `Popover.Close` (`useOverlayClose`),
+`Menu.Item` and `Toast.Action` each have `whilePending?: WhilePending`, compute their default,
+pass `ignoreWhilePending` to the hook and render `aria-disabled` from `pending && ignoring`.
+Defaults: Close parts `"ignore"`; `Menu.Item` `closeOnActivate ? "ignore" : "run"`;
+`Toast.Action` `closeOnSettle ? "ignore" : "run"`. Slider and NumberField have no prop: every
+step runs.
 
 ### 18.5 Tests
 
-`button.test.tsx` / `button.browser.test.tsx` (section 13 rows):
-
-| Row | Change |
-| --- | --- |
-| Top-of-file comment | Overlap and Superseded rejection are no longer N/A for Button: required in `"run"` mode, N/A in `"ignore"` mode. |
-| 3 Async action | Default: `data-pending`, **no** `aria-disabled`. With `whilePending="ignore"`: the current assertions. |
-| 5 Re-entry | Whole row under `whilePending="ignore"`. |
-| 5b Every activation runs (new) | Default and explicit `"run"`: while a deferred action pends, a click, an Enter and a Space make three more calls; none is `defaultPrevented`; two `fireEvent.click`s in one `act` call it twice; no `aria-disabled`; runs resolved out of order: `data-pending` stays until the last; `render={<a href>}`: the second click is not cancelled. |
-| 5c Overlap, Superseded rejection (new) | Conventions 10.1 rows for `"run"`: the older run rejects after, and separately while, the newer pends: stubbed `reportError` once, not the catcher; the latest rejects: catcher; a burst of three. |
-| 5d Prop change (new) | `"run"` to `"ignore"` while a run pends: `aria-disabled` appears with the re-render and the next click is ignored; back to `"run"`: it runs. |
-| 6 Settled-but-held | Under `"ignore"` (unchanged). Under the default the "+1 three times" probe needs no special case: three calls. |
-| 8 Suspending content | "clicks ignored meanwhile" is under `"ignore"`; default: a click runs. |
-| 10 Consumer state after await | Default: commits once per click. |
-| 11 `formAction` per-submitter | Default: click A again: `a` called twice, the click not `defaultPrevented`, no `aria-disabled`. With `"ignore"`: the current assertions. |
-| 15 Trigger-wrapped | "a second click leaves `a` at one call" needs `whilePending="ignore"`; default: two calls. |
-| 18 Types | `whilePending` accepts `"run"` / `"ignore"`, rejects `true` and other strings; `WhilePending` exported from the root. |
-| 22 Invoker Command + action (browser) | `"ignore"`: unchanged. Default: the second click runs the action and the command (the popover toggles closed). |
-| 24 Implicit submission (browser) | `"ignore"`: unchanged. Default: the second Enter submits again. |
-| 26 Accessibility tree (browser) | Under `"ignore"`; default: no disabled state on the pending Button. |
-
-Other suites (section 16.4 rows), with the decided defaults:
-
-| Suite | Change |
-| --- | --- |
-| `dialog.test.tsx`, `popover.test.tsx` | D1, D2, D3, P1, P2 unchanged: they now pin the **default**. New D7 / P5, `whilePending="run"` with `action`: a second click calls `action` again, no `aria-disabled`, `data-pending` until both settle, one `openChangeAction(false)` / one `close()` / one `hidePopover()`, the stale-close guard still holds; the older run rejects: `reportError`; the first resolves and closes, the second rejects after the part left: `reportError` (#152). |
-| `menu.test.tsx` | M1 unchanged (default, `closeOnActivate`). **M2 flips**: a `closeOnActivate={false}` Item runs every activation by default (two calls, no `aria-disabled`) and ignores with `whilePending="ignore"`. New: a closing Item with `whilePending="run"`: two calls, one close. M3 (navigation over a pending item) under `"ignore"`. Overlap / Superseded rejection rows for the `"run"` cases. If question 2 is answered (b), M2 stays as it is. |
-| `toast.test.tsx` | T1 unchanged. The `closeOnSettle={false}` variant (W6) **flips**: two clicks, two calls by default; `whilePending="ignore"` restores one. The timer stays paused and the Root `data-pending` until every run settled. If question 3 is answered (b), it stays. |
-| `use-action-trigger.test.tsx` | H1: the default is `false` (runs overlap); the guard rows run under `{ ignoreWhilePending: true }`. |
-| `slider.test.tsx`, `number-field.test.tsx` | Unchanged (H2 keeps guarding that steps run). |
-| Type tests | `whilePending` on the four parts; absent on `Menu.CheckboxItem`, `Menu.RadioItem`, `Form.Submit`, `Toast.Close`. |
-
-About sixty guard assertions exist today (most in `button.test.tsx` and
-`use-action-trigger.test.tsx`); the bulk move under the prop rather than disappear.
-
-### 18.6 Docs
-
-- **Pending & optimistic page** (`PendingOptimisticPage.tsx`, "A second click while pending",
-  and the pure-trigger definition that links to it): rewritten around the ownership rule, with
-  the counter and the Save examples side by side.
-- **Action props page** (`ActionPropsPage.tsx`): the sentence on pure triggers; remove "do not
-  await" as the way to count clicks.
-- **Button page**: props table row `whilePending` (default `"run"`), the `aria-disabled` text,
-  the `formAction` caveat of 18.3; `ButtonSave.tsx` and `ButtonFormActions.tsx` examples gain
-  `whilePending="ignore"`; a "+1" example shows the default; check `button.css` and the other
-  example stylesheets: a rule that styles pending through `[aria-disabled]` moves to
-  `[data-pending]`.
-- **Dialog, Popover, Menu, Toast pages**: props table row on Close / Item / Action with the
-  default (and its dependency on `closeOnActivate` / `closeOnSettle` if questions 2 and 3 are
-  answered (a)); the "second click is ignored" sentences name the prop.
-- Toolbar and ToggleGroup pages where they describe a pending `Button`; the Roadmap page; the
-  agent skill (`packages/ui/skills/funstack-ui-knowledge/SKILL.md`); JSDoc of the five parts
-  and of `useActionTrigger`; the playground (`button-demo.tsx`, `toolbar-demo.tsx`).
-- **Release notes: breaking for `Button`** (a pending Button no longer ignores clicks or
-  renders `aria-disabled` unless `whilePending="ignore"`), and for keep-open Items / Actions
-  (questions 2 and 3 were answered (a)).
-
-### 18.7 Implementation notes (2026-11-24)
-
-- As designed: `WhilePending` in `internal/types.ts`, exported from the root entry only (like
-  the other shared types); `useActionTrigger`'s `ignoreWhilePending` defaults to `false`;
-  Button, `useOverlayClose` (Dialog.Close, Popover.Close), `Menu.Item` and `Toast.Action`
-  compute `ignoring` per render and render `aria-disabled` from `pending && ignoring`. The
-  `Menu.CheckboxItem` props type now also omits `whilePending` (it extends `MenuItemProps`; the
-  type test caught the leak), so `Menu.RadioItem` does too.
-- `ToastActionOptions` gets no `whilePending` (conventions 2.5.1, the sub-question of 3).
-- **Closing parts in `"run"` mode (review F1, product-owner decision 2026-11-24):** the first
-  implementation ran each resolved run's close. A library-mode close was then held by
-  entanglement and committed together with a failed latest run (boundary fallback inside a
-  closed overlay); a JS-free Close and a `Toast.Action` closed at the first resolved run while a
-  later run could still fail. Now `useActionTrigger` runs the continuation once, when the last
-  run in flight settles, and only if the latest run resolved, for every closing part; a
-  rejection leaves the overlay, menu or toast open in both modes. Conventions 2.5.1 and 3.4.
-- Tests: 18.5 rows in `button.test.tsx` (5b, 5c, 5d added; 3, 5, 6, 9, 10, 11, 15, 18 split by
-  mode), `button.browser.test.tsx` (21, 22, 24, 26 split by mode); D7 / P5 as shared rows of
-  `src/__tests__/overlay-close-part-suite.tsx` (library and JS-free mode);
-  `menu.test.tsx` "whilePending (#146)"; `toast.test.tsx` "whilePending (#146)";
-  `use-action-trigger.test.tsx` H1 flipped; type rows in `internal/types.test.ts`.
+Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the code and the tests are the reference.

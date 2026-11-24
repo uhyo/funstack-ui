@@ -120,7 +120,7 @@ export function usePopoverTrigger<State>(
   const state: PopoverTriggerHookState = {
     open: ctx.optimistic,
     // Opens and part-initiated closes belong to the Trigger (4.2); a dismissal is a fact and
-    // pends nothing (overlay-open-change.md 2.7).
+    // pends nothing (conventions 3.9.7).
     pending: ctx.pending,
     disabled,
   };
@@ -174,7 +174,7 @@ export function usePopoverTrigger<State>(
       if (ctx.hiddenBeforeToggle()) {
         // A non-button Trigger (#115): light dismiss hid the popup at `pointerup`, before this
         // click. The hide is a fact, reported by its pending `toggle`; this click only names its
-        // cause (overlay-open-change.md 3.2).
+        // cause (popover.md 2.8).
         ctx.recordCloseIntent({ reason: "activate", event: native });
         return;
       }
