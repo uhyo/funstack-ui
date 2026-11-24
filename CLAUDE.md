@@ -28,7 +28,7 @@ This is a pnpm monorepo managed with Turbo:
 - `pnpm test:jsdom` - Run only the jsdom tests
 - `pnpm test:browser` - Run only the browser tests (headless Chromium, Firefox and WebKit via Playwright; see Browser tests)
 - `pnpm typecheck` - Type check all packages
-- `pnpm lint` - Lint code with oxlint, then `scripts/check-design-refs.mjs` (fails when a `design/` doc names a source file that does not exist, or a source comment cites a design section that does not resolve)
+- `pnpm lint` - Lint code with oxlint, then `scripts/check-design-refs.mjs` (fails when a `design/` doc names a source file that does not exist, or a source comment cites a design section that does not resolve), then `scripts/check-internal-layers.mjs` (enforces the `internal/` layering of conventions 9.1)
 - `pnpm format` - Format code with oxfmt
 - `pnpm format:check` - Check formatting
 
