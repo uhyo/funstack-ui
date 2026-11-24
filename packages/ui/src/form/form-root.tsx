@@ -7,6 +7,7 @@ import { FormContext } from "../internal/field-context.js";
 import type { FormContextValue, FormFieldRegistration } from "../internal/field-context.js";
 import { announce } from "../internal/announce.js";
 import { FormStatusWatcher } from "../internal/form-status-watcher.js";
+import { reportDropped, useConnected } from "../internal/report-dropped.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
@@ -106,6 +107,9 @@ export function FormRoot({
   const [isPending, startTransition] = useTransition();
   const [statusPending, setStatusPending] = useState(false);
   const pending = isPending || statusPending;
+  // The newest submission the Form ran, and whether the Form is connected (report-dropped.ts).
+  const latestRun = useRef(0);
+  const connected = useConnected();
 
   const formRef = useRef<HTMLFormElement | null>(null);
   const submission = useRef<Submission | null>(null);
@@ -155,8 +159,17 @@ export function FormRoot({
     event.preventDefault();
     const formData = new FormData(event.currentTarget, submitter);
     submission.current = { intercepted: true, formData };
+    const id = ++latestRun.current;
     startTransition(async () => {
-      await action(formData);
+      try {
+        await action(formData);
+      } catch (error) {
+        // The latest submission's rejection takes React's route to the boundary while the Form
+        // is there to render it; a superseded one's, or one after the Form unmounted or was
+        // hidden, React would drop: reported instead (conventions 2.4, `useActionTrigger`).
+        if (id === latestRun.current && connected.current) throw error;
+        reportDropped(error);
+      }
     });
   };
 

@@ -245,11 +245,13 @@ Rules for the element passed to `render` (same as Base UI):
   which means nothing on a link and would expose an enabled link to assistive technology
   (`Button`, #79; with #83, wave 9, every part that owns `disabled`, accepts an arbitrary
   `render` **and installs its own click handler**: Toggle, ToggleGroup.Item, Menu.Trigger,
-  Combobox.Trigger / Clear, NumberField.Increment / Decrement, and the Close and Trigger parts of
-  Dialog and Popover in the modes where they handle the click; `design/components/button.md`
-  17.1). The handler is what makes `aria-disabled` safe (it returns before dispatch and
-  `preventDefault()`s), so a part that relies on the browser (`Form.Submit`, a JS-free command
-  Trigger / Close) keeps native `disabled`. In that `aria-disabled` branch an **invoker also
+  Combobox.Trigger / Clear, NumberField.Increment / Decrement, Toast.Action / Close (#157), and
+  the Close and Trigger parts of Dialog and Popover in the modes where they handle the click;
+  `design/components/button.md` 17.1). The handler is what makes `aria-disabled` safe (it
+  returns before dispatch and `preventDefault()`s), so a part that relies on the browser (a
+  JS-free command Trigger / Close; `Form.Submit` on any element that may be a submitter,
+  component included) keeps native `disabled`. `Form.Submit` on a host element of another tag
+  (`<a>`) takes the `aria-disabled` branch with a cancelled click (#157). In that `aria-disabled` branch an **invoker also
   owns `commandfor` and `command` as `undefined`** (wave 9 review M1): `aria-disabled` has no
   behaviour, and a disabled component render spreading onto a real `<button commandfor
   command>` would otherwise be a live invoker in the server HTML before hydration. The part owns
@@ -691,7 +693,8 @@ Contract:
   `internal/call-urgent-handler.ts`); nothing reaches an Error Boundary, and the library's own
   bookkeeping around the call (the committed `false` of a fact, a toast's queue write, a
   Combobox text write) stands.
-- Both hooks (`useControllableAction`, `useActionTrigger`) do this themselves, per instance. A
+- Both hooks (`useControllableAction`, `useActionTrigger`) do this themselves, per instance, and
+  so does `Form.Root` for the submissions it runs in its own transition (#157). A
   component with **two transition channels** (Slider and NumberField: steps through
   `useActionTrigger`, commits through `useControllableAction`) needs nothing extra: each channel
   judges "latest" among its own runs and reports its own superseded rejections, also while the
