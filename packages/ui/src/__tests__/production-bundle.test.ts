@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
  * The bundle is `src/index.ts` (every public part) built the way a consumer's bundler would:
  * `NODE_ENV` defined as `"production"`, minified, React external. The dev texts are collected
  * from the source: every string in the arguments of `console.error` / `console.warn` and of the
- * dev-warning hooks.
+ * dev-warning hooks, and of the dev-only arguments of other calls (`DEV_ARGUMENTS`).
  */
 const src = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -28,6 +28,13 @@ const DEV_CALLEES = new Set([
   "useNameWarning",
   "useShownNameWarning",
 ]);
+
+/**
+ * Calls whose listed arguments (by index) are development-only, the others being runtime
+ * values: `useSelectPartRef(component, tag, position)` takes its position check's message, while
+ * the part name (`"Select.GroupLabel"`) is also a production string.
+ */
+const DEV_ARGUMENTS = new Map<string, readonly number[]>([["useSelectPartRef", [2]]]);
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -75,9 +82,16 @@ function devTexts(path: string): Map<string, string> {
   const visit = (node: AstNode): void => {
     if (node.type === "CallExpression" && isNode(node.callee)) {
       const name = calleeName(node.callee);
-      if (name !== null && DEV_CALLEES.has(name)) {
+      const args = node.arguments as AstNode[];
+      const devArgs =
+        name === null
+          ? []
+          : DEV_CALLEES.has(name)
+            ? args
+            : (DEV_ARGUMENTS.get(name) ?? []).flatMap((i) => args[i] ?? []);
+      if (devArgs.length > 0) {
         const pieces = new Set<string>();
-        for (const argument of node.arguments as AstNode[]) texts(argument, pieces);
+        for (const argument of devArgs) texts(argument, pieces);
         for (const piece of pieces) {
           if (piece.trim().length >= 16) found.set(piece, `${relative(src, path)} (${name})`);
         }

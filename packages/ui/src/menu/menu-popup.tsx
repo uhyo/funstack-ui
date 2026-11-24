@@ -148,7 +148,11 @@ export interface MenuPopupProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, MenuPopupState>;
 }
 
-/** What a press may focus inside a popup: items, the popup itself, the consumer's controls. */
+/**
+ * What a press may focus inside a popup: items, the popup itself, the consumer's controls.
+ * Differs from the roving and Tooltip selectors on purpose: it asks "does a press focus
+ * something", so any `input` counts (a hidden one is never pressed).
+ */
 const FOCUSABLE_SELECTOR =
   'a[href], button, input, select, textarea, summary, [tabindex], [contenteditable]:not([contenteditable="false"])';
 

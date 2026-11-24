@@ -10,6 +10,8 @@ import { cancelClick, disabledButton, rendersButton } from "./use-render.js";
 import type { DataAttributes } from "./use-render.js";
 import type { PopoverRootValue } from "./use-overlay-root.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /**
  * The click rule of a Trigger that toggles a popover-kind Root (popover.md 2.8): Popover.Trigger,
  * Menu.Trigger, Menu.SubmenuTrigger (through `usePopoverTrigger`) and Combobox.Trigger. It toggles
@@ -41,8 +43,6 @@ export function toggleFromTrigger(
     ctx.requestOpen(event, "activate");
   }
 }
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * Owned and never written on an overlay Trigger (Popover, Menu, Combobox): the default

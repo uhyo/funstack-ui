@@ -54,6 +54,7 @@ export interface TooltipRootProps {
 
 const isDev = process.env.NODE_ENV !== "production";
 
+// Only drives the interactive-content dev warning, so it is broader than roving's and Menu's.
 const FOCUSABLE =
   "a[href],area[href],button,input,select,textarea,iframe,[tabindex],[contenteditable]";
 
