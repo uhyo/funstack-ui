@@ -1918,16 +1918,35 @@ and closes the library performs in a layout effect of a transition commit; brows
 ones (Escape, light dismiss) happen outside React and animate with CSS, as above. Since #148 such
 a dismissal is a fact whose commit is **urgent**, so it starts no view transition at all, with or
 without `transition`, and carries no `fsui-<component>-close` type
-(`design/components/overlay-open-change.md` 2.8). A CSS exit
-kept next to `transition` must be **cut while a view transition runs**
-(`html:active-view-transition .dialog { transition: none; }`), otherwise Chromium keeps the
-fading element rendered and the close's view transition captures it as a live
-`::view-transition-new` next to the old image (a double image); the rule is untyped on purpose,
-because a controlled close carries no types (#46; Dialog 10.3, Popover 10.2). It applies to
-**every** top-layer part that hides in a layout effect with `transition` set, Menu and Combobox
-included (confirmed in Chromium for both, #132; Menu 9, Combobox 11.4), and to a nested popup the
-browser closes together with its parent, so the selector goes on the class every such popup
-carries rather than on a variant for the ones that set `transition`.
+(`design/components/overlay-open-change.md` 2.8). **A CSS transition on the popup next to
+`transition` needs no consumer rule (#147, user decision 2026-11-24, option B):** when a Popup
+(Dialog, Popover, Menu, Combobox) has `transition` and `html:active-view-transition` matches at
+the moment of the library's **own** `showPopover()` / `hidePopover()` / `showModal()` / `show()`
+/ `close()`, the library wraps that call in one synchronous step (`internal/css-transition-cut.ts`):
+an inline `transition: none !important` on the popup, the call, a forced style recalculation
+(`getComputedStyle(popup).opacity`; without it Chromium sees the restored value and the fade
+runs), and the inline `transition` restored through CSSOM (the shorthand with its priority,
+or the longhands a consumer set on their own; the `style` attribute removed again if it was
+absent and is empty). Never through the attribute: a CSP without `'unsafe-inline'` for styles
+blocks `setAttribute("style")` (Chromium then kept the cut for good, Firefox dropped every inline
+declaration; review H1 of #147). The restore runs only while the cut's own `none !important` is
+still there, so a `transition` a listener wrote during the call is kept. Only CSS transitions are
+cut: a `@keyframes` exit still runs during a library close and double-images in Chromium. The view transition animates the show or hide; without the cut Chromium keeps a closing
+box rendered through its `display` / `overlay` fade and the new snapshot holds it next to the old
+image (a double image, #46, #132), and in every engine the open's `@starting-style` enter runs
+under the view transition's enter. **Dismissals (facts since #148) never go through it**: their
+CSS exit is the only thing that animates them, and an unrelated page view transition no longer
+cuts that fade (the old consumer recipe `html:active-view-transition .popup { transition: none }`
+did). Gated on the active view transition, not on the prop alone: a library close React batched
+into a non-transition commit keeps its CSS exit as the fallback. Recorded trade-offs: the library
+writes an inline style on the consumer's element for the length of one synchronous call (a
+`MutationObserver` on `style` sees it; this is a functional write, not shipped CSS, section 12);
+one forced style recalculation per such call; no opt-out (a CSS transition and a view
+transition cannot run together on one popup's library show / hide); the `::backdrop` is not cut
+(its enter fade runs on open, as with the old recipe); a nested popup that is **not** a DOM
+descendant of its parent keeps fading in Chromium when the parent's library close takes it down
+(no library composition produces that layout; the old rule still works for whoever builds one).
+Verified in Chromium 156, Firefox 157 and WebKit (CI), `memo/architect/147-reevaluation.md`.
 
 ```tsx
 // inside Tabs.Panel (mount strategy per `keepMounted`, section 3.7: not rendered, <Activity>,

@@ -173,17 +173,22 @@ export function TransitionsPage() {
         <a href="/concepts/browser-owned-state#dismissal">dismissal</a> happens in the browser
         before React hears about it, so only a CSS exit (<code>@starting-style</code>,{" "}
         <code>transition-behavior: allow-discrete</code>) can animate it; it is a fact, reported to{" "}
-        <code>onOpenChange</code> in an urgent commit, which starts no view transition at all. Keep
-        both, and turn the CSS exit off while a view transition runs:
+        <code>onOpenChange</code> in an urgent commit, which starts no view transition at all. Write
+        both: the <code>transition</code> prop animates what the library does, CSS animates what the
+        browser does, and the library&apos;s own show or hide never runs a CSS transition.
       </p>
-      <CodeBlock language="css">{`html:active-view-transition .my-popup { transition: none; }`}</CodeBlock>
       <p>
-        Without that rule, a popup the library hides keeps rendering through its CSS fade, and
-        Chromium captures it in the close's new snapshot as well as the old one: a double image. The
-        selector has no transition type on purpose, because a controlled close carries none. The
-        cost is that an unrelated view transition of the page also cuts a CSS fade in progress. Put
-        the rule on the whole popup class, so that nested popups that close with their parent are
-        covered too.
+        While a view transition runs, the library turns off the popup&apos;s CSS transitions for the
+        moment of its own show or hide. Otherwise Chromium would keep a popup the library hides
+        rendering through its CSS fade and capture it in the close&apos;s new snapshot as well as
+        the old one (a double image), and the CSS enter would run under the view transition&apos;s
+        enter. To do this, the library writes an inline <code>transition: none !important</code> on
+        the popup for the length of that one call and then puts your inline <code>transition</code>{" "}
+        back. A dismissal is never cut, so its CSS fade runs even when another view transition of
+        the page starts during it (a dismissal while the library&apos;s own view transition runs
+        fades inside that transition&apos;s new image). Only CSS transitions are cut: an exit
+        written as a <code>@keyframes</code> animation on the closed state still runs during a
+        library close, and Chromium captures it twice. Write the exit as a <code>transition</code>.
       </p>
       <ConceptExample component="Dialog" href="/components/dialog">
         <p>
@@ -195,9 +200,7 @@ export function TransitionsPage() {
 .dialog:open { opacity: 1; }
 @starting-style { .dialog:open { opacity: 0; } }
 ::view-transition-new(.pop) { animation: 180ms ease-out both pop-in; }
-::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }
-/* Keep the CSS exit for dismissals, but not while a view transition runs. */
-html:active-view-transition .dialog { transition: none; }`}</CodeBlock>
+::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }`}</CodeBlock>
       </ConceptExample>
 
       <h3>Rules the library follows for you</h3>

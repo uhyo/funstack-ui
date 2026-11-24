@@ -62,7 +62,10 @@ export interface ComboboxPopupProps extends Omit<
    * library-driven opens and closes (typing, the Trigger, an accepted option) in every engine;
    * dismissals are the browser's (CSS only). **A deferred results render also activates the
    * boundary** (React: updates from `useDeferredValue` animate), so use a type map with
-   * `default: "none"` unless every result change should cross-fade. Static.
+   * `default: "none"` unless every result change should cross-fade. Static. While a view
+   * transition runs, the popup's CSS transitions are turned off for the moment of the library's
+   * own show or hide (an inline `transition: none !important`, restored right after), so that
+   * show or hide runs no CSS transition (a `@keyframes` animation is not cut).
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */

@@ -897,7 +897,8 @@ on a top-level Root; a Popup rendered as a `<dialog>`; `transition` and `keepMou
 .menu-trigger[data-open] { background: var(--accent-weak); }
 ```
 
-Enter / exit CSS and `transition` exactly as Popover 10.1 / 10.2, **the recipe included**. With
+Enter / exit CSS and `transition` exactly as Popover 10.1 / 10.2 (no consumer rule since #147:
+the library cuts the CSS transition around its own show / hide during a view transition). With
 `transition` set, the view transition runs for: the open commit, a close after item activation
 (the dominant close: the research's reason for the whole top-layer rule), Trigger toggle,
 ArrowLeft, hover close and controlled closes; dismissals (Escape, click outside, Tab) use CSS
@@ -911,23 +912,18 @@ menu user is about to click something.
 ```css
 ::view-transition-new(.menu-in) { animation: 120ms ease-out both menu-in; }
 ::view-transition-old(.menu-out) { animation: 120ms ease-in both menu-out; }
-/* Keep the CSS exit for dismissals, but not while a view transition runs. */
-html:active-view-transition .menu { transition: none; }
 ```
 
-The recipe is not optional here (#132; Popover 10.2, Dialog 10.3, conventions 5.1): a
+Why the cut matters here (#132, #147; Popover 10.2, Dialog 10.3, conventions 5.1): a
 library-driven close hides the menu with `hidePopover()` in the layout effect of the close
-commit, and with the `display` / `overlay` transition on the popup Chromium keeps the closing
-box rendered through its fade, so the close's view transition captures it as a live
-`::view-transition-new(…)` next to the `old` image, a double image. The shared overlay browser
-suite pins this for Menu on every CI run (its "a CSS exit (recipe=false)" row asserts the menu is
-still displayed with a `new` image at `ready` in Chromium, and `display: none` with the `old`
-image only once the recipe is added). Put the rule on the menu class, not on a `-vt` variant for
-the popups that set `transition`: a submenu is closed by the browser together with its parent
-(nested popovers hide with their ancestor), so when the parent's item activation runs a view
-transition the submenu's CSS exit is in flight too and would be captured live the same way. The
-selector is untyped on purpose (a controlled close carries no types); the cost is that an
-unrelated page view transition also cuts a dismissal's fade.
+commit, and with the `display` / `overlay` transition on the popup Chromium would keep the
+closing box rendered through its fade, so the close's view transition would capture it as a live
+`::view-transition-new(…)` next to the `old` image, a double image. `usePopoverPopup` cuts the
+popup's CSS transition around that call (and around the open and Menu's `reshow`) while a view
+transition runs. The shared overlay browser suite pins it for Menu on every CI run (its "plus a
+CSS exit" rows assert `display: none` with the `old` image only at `ready`). A submenu is a DOM
+descendant of its parent, so when the parent's hide takes it down it has no box left to capture:
+the cut on the parent is enough (architect probe, `memo/architect/147-reevaluation.md`).
 
 Item state changes (`fsui-menu-check` and friends) land in the item's own transition; an item
 has no `transition` prop in v0 (its optimistic flip is a sync render, conventions 5.1; the
@@ -1162,7 +1158,7 @@ write is asserted through the `showPopover` spy inspecting the DOM, as Popover).
 | Submenu | ArrowRight opens the submenu anchored at the item's right edge (`getBoundingClientRect`) with focus on its first item; Escape closes only the submenu and **the library** focuses the SubmenuTrigger (every engine: the platform restores nothing); ArrowLeft likewise; hover intent with real timers (open after ~100 ms, close after leaving ~150 ms, cancelled by entering the submenu); item activation in the submenu closes both with focus on the root Trigger; outside click closes both. | None for placement since 842af81 (issue #56): every submenu row, the inline-flip assertion (a submenu near the right edge flips left) included, uses the shipped default placement (`position-try-fallbacks: flip-inline`) on all three engines. WebKit 302008 is covered by one named WebKit-only guard row that opens a submenu twice with the default placement under a 15 s timeout, so a regression hangs that row by name instead of stalling the job (review M3); it passed on the first WebKit run, settling question 6. |
 | Checkbox / radio | Space toggles `aria-checked` and keeps the menu open; `closeOnActivate` closes after the action; radio switch updates both items at once. | none |
 | Exit animation | After item activation without `transition`: `held` keeps items until `getAnimations()` settle; after Escape likewise. | Firefox: `getAnimations().length === 0` → unmount with the commit. |
-| ViewTransition | With `transition`: open calls `startViewTransition` once; item activation once with a `::view-transition-old` of the popup present during the transition; Escape only for the notification commit; without `transition` zero calls. The shared overlay suite (`describeOverlayInBrowser`) adds the CSS exit rows: with a `display` / `overlay` exit and no recipe an item activation leaves the popup displayed at `ready` with a live `::view-transition-new` in Chromium (the double image, #132); with `html:active-view-transition .fade { transition: none; }` it is `display: none` with the `old` image only; a dismissal runs one view transition, not two. | Assert on all three; the recipe rows branch on `browserName === "chromium"` for the displayed branch (Firefox: `old` only; WebKit: `display` asserted only). |
+| ViewTransition | With `transition`: open calls `startViewTransition` once; item activation once with a `::view-transition-old` of the popup present during the transition; Escape only for the notification commit; without `transition` zero calls. The shared overlay suite (`describeOverlayInBrowser`) adds the CSS exit rows (#132, #147): with a `display` / `overlay` exit and no consumer rule an item activation has the popup `display: none` at `ready` with the `old` image only (the library's cut; without it Chromium showed a live `::view-transition-new`, the double image); the open has the popup opaque at `ready`; a dismissal runs no view transition and its fade survives an unrelated one. | Assert on all three (WebKit: `display` asserted only, pseudo names unreliable). |
 | Light dismiss and layering | Click outside closes with `"dismiss"`; a Tooltip (`manual` / `hint`) on an item does not close the menu; a modal Dialog opened from an item keeps the menu open while it is a DOM descendant (and closes it when opened outside). | `supportsPopoverHint` for the hint variant. |
 | Pointer focus | Moving the real pointer over items focuses them; `:focus-visible` is false after a pointer open (the quiet focus path, 6.1); a click on a Separator leaves focus on the current item and ArrowDown still moves (M1). | none: all three engines implement `focus({ focusVisible })` (WebKit verified on CI run 39021387650, H1). |
 | Resolved side (wave 11) | A Trigger at the bottom of the viewport: the open menu reports `data-side="top"` and `state.side === "top"`; the existing inline-flip submenu row (near the right edge) additionally asserts the submenu's `data-side="left"` while shown and `"inline-end"` once closed. | none |
@@ -1623,7 +1619,7 @@ right after the Trigger still closes with `"dismiss"`. Mutation check: with the 
 the Chromium and Firefox press rows fail (`"dismiss"`, re-open), the WebKit row passes (no focus
 move there), which is why the row runs on all three.
 
-## Amendment: the CSS exit recipe is part of Menu's styling (#132, 2026-10-25)
+## Amendment: the CSS exit recipe is part of Menu's styling (#132, 2026-10-25; superseded by #147)
 
 Status: architect confirmation of wave 18 docs audit D3 (`memo/technical-writer/wave18-docs-audit.md`);
 no API change. Edited in place: 9, 13.2. Notes: `memo/architect/issue-132.md`.
@@ -1662,3 +1658,12 @@ a "notification" (2.2, 3.1, 10, 12):
   "owner left" rule (`reportError`).
 - A controlled submenu Root needs `onOpenChange` like any controlled Root (the W1 warning says
   so); a parent that keeps `open={true}` gets the menu re-shown at once.
+
+## Amendment: no CSS exit recipe; the library cuts the transition (#147, 2026-11-24)
+
+Supersedes the #132 amendment: `html:active-view-transition .demo-menu { transition: none; }`
+and `html:active-view-transition .menu { transition: none; }` are removed from `menu.css` and
+`menu-demo.css`, and MenuPage's Styling note now says the library keeps the CSS exit and the view
+transition apart. Mechanism: Popover's #147 amendment (`usePopoverPopup`, conventions 5.1). 13.2's
+"a CSS exit (recipe=%s)" rows became "plus a CSS exit" rows without a recipe, plus the open and
+unrelated-view-transition rows.

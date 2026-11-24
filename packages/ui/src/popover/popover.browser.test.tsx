@@ -43,8 +43,10 @@ import { deferred, silenceErrors } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { Tooltip } from "../tooltip/index.js";
 import {
+  addExitStyle,
   describeOverlayInBrowser,
   setUpViewTransitionRows,
+  watchExit,
 } from "../__tests__/overlay-browser-suite.js";
 import type {
   OverlayBrowserHarnessProps,
@@ -53,6 +55,8 @@ import type {
 import { Popover } from "./index.js";
 import type { PopoverOpenChangeDetails, PopoverPopupProps } from "./index.js";
 import {
+  addStyle,
+  animationsFinished,
   flushFor,
   leaveActEnvironment,
   quietPeriod,
@@ -829,6 +833,96 @@ describe("Popover (browser)", () => {
 
   describe("ViewTransition", () => {
     const vt = setUpViewTransitionRows((element) => element.matches(":popover-open"));
+
+    // #147, review M1: the cut is gated on a running view transition, not on the prop alone. A
+    // library close in an urgent commit (a controlled `open={false}` set outside a transition)
+    // starts no view transition, so the CSS exit is its only animation and must run.
+    it('transition="pop", a library close with no view transition: the CSS exit runs (the cut is gated)', async () => {
+      addExitStyle("gate-fade", "300ms", { openPseudo: ":popover-open", instantEnter: true });
+      function Urgent() {
+        const [open, setOpen] = useState(true);
+        return (
+          <Popover.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>
+            <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+            <Popover.Popup
+              data-testid="popup"
+              aria-label="Filters"
+              transition="pop"
+              className="gate-fade"
+              style={box(200, 100)}
+            >
+              {/* A plain handler: an urgent update, not a transition. */}
+              <button type="button" data-testid="urgent" onClick={() => setOpen(false)}>
+                Close now
+              </button>
+            </Popover.Popup>
+          </Popover.Root>
+        );
+      }
+      render(<Urgent />);
+      await expect.poll(() => isOpen()).toBe(true);
+      await animationsFinished(popup());
+      const opens = vt.calls.length;
+      const exit = watchExit(popup(), "toggle");
+      screen.getByTestId("urgent").click();
+      const animations = await exit;
+      expect(isOpen()).toBe(false);
+      // Chromium animates the exit; Firefox animates none (bug 1834877), WebKit as Chromium.
+      if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
+      if (animations.length > 0) {
+        expect(getComputedStyle(popup()).display).not.toBe("none");
+        expect(popup().style.getPropertyValue("transition")).toBe("");
+      }
+      await quietPeriod(50, "an urgent close starts no view transition");
+      expect(vt.calls.length).toBe(opens);
+    });
+
+    // #147: the library's cut of the CSS transition around its own show / hide also overrides a
+    // consumer's inline `style={{ transition }}` (it is `!important`), and puts it back as React
+    // wrote it, so React's next `style` diff finds what it left.
+    it('transition="pop" with an inline style transition: the cut applies and the inline value is restored', async () => {
+      const fade = "opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete";
+      addStyle(`
+        .inline-fade { opacity: 0; }
+        .inline-fade:popover-open { opacity: 1; }
+        @starting-style { .inline-fade:popover-open { opacity: 0; } }
+      `);
+      render(
+        <Popover.Root defaultOpen={false}>
+          <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+          <Popover.Popup
+            data-testid="popup"
+            aria-label="Filters"
+            transition="pop"
+            className="inline-fade"
+            style={{ ...box(200, 100), transition: fade }}
+          >
+            <span data-testid="content">content</span>
+            <Popover.Close data-testid="close">Rename</Popover.Close>
+          </Popover.Popup>
+        </Popover.Root>,
+      );
+      const before = popup().getAttribute("style");
+      const inline = popup().style.getPropertyValue("transition");
+      expect(inline).not.toBe("");
+      trigger().click();
+      await expect.poll(() => vt.calls.length).toBe(1);
+      await vt.transitions[0]!.ready;
+      // No CSS enter under the view transition's enter.
+      expect(getComputedStyle(popup()).opacity).toBe("1");
+      await vt.transitions[0]!.finished;
+      expect(popup().getAttribute("style")).toBe(before);
+
+      screen.getByTestId("close").click();
+      await expect.poll(() => vt.calls.length).toBe(2);
+      await vt.transitions[1]!.ready;
+      // No double image: the closed box is gone from the new snapshot in every engine.
+      expect(getComputedStyle(popup()).display).toBe("none");
+      expect(popup().style.getPropertyValue("transition")).toBe(inline);
+      await vt.transitions[1]!.finished;
+      expect(isOpen()).toBe(false);
+      expect(popup().getAttribute("style")).toBe(before);
+    });
 
     // H1: with `transition` the close commit unmounts the focused Close before `hidePopover()`
     // runs, so the platform (which restores focus only from inside the popover) restores nothing.

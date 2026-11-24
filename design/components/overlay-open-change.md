@@ -753,7 +753,9 @@ on the Popup, in every engine. What goes with it:
   the apply effect, around its own `hidePopover()` / `close()`, when `transition` is set.
 
 **Half 1 remains** and is #147's to decide (recipe, or the library's inline cut after a
-three-engine probe). It is unaffected by this design.
+three-engine probe). It is unaffected by this design. **Decided 2026-11-24: the library's inline
+cut (option B)**, around its own show as well as its hide (conventions 5.1,
+`internal/css-transition-cut.ts`); the recipe line is gone from every stylesheet.
 
 One residual overlap is new only in the sense that it is now the consumer's doing: a controlled
 parent that adopts a fact inside `startTransition` (the late-adoption mistake) gets the

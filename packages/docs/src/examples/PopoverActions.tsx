@@ -64,7 +64,7 @@ export function PopoverActions() {
               <Popover.Trigger className="demo-button" aria-label={`Actions for ${name}`}>
                 {({ pending }) => (pending ? <span className="demo-spinner" aria-hidden /> : "⋯")}
               </Popover.Trigger>
-              <Popover.Popup className="demo-popover demo-popover-vt" align="end" transition="pop">
+              <Popover.Popup className="demo-popover" align="end" transition="pop">
                 <Popover.Title>{name}</Popover.Title>
                 <RowActions
                   id={id}

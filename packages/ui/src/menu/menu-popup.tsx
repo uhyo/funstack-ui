@@ -133,6 +133,9 @@ export interface MenuPopupProps extends Omit<
    * commit and every library-driven close (an item's activation, the Trigger, ArrowLeft, hover
    * leaving a submenu, controlled `open={false}`) in all engines; dismissals (Escape, a click
    * outside, Tab) animate with CSS only. Without it the part renders no `<ViewTransition>`.
+   * While a view transition runs, the popup's CSS transitions are turned off for the moment of the
+   * library's own show or hide (an inline `transition: none !important`, restored right after),
+   * so that show or hide runs no CSS transition (a `@keyframes` animation is not cut).
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */

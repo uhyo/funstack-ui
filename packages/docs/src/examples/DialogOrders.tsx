@@ -69,7 +69,7 @@ export function DialogOrders() {
                 )}
               </Dialog.Trigger>
               <Dialog.Popup
-                className="demo-dialog demo-dialog-vt"
+                className="demo-dialog"
                 lightDismiss
                 initialFocus="[data-autofocus]"
                 transition={{

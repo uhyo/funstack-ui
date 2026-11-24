@@ -8,6 +8,7 @@ import type {
   ViewTransitionClass,
 } from "react";
 import { useContentFocusProbe } from "../internal/content-focus-probe.js";
+import { withCssTransitionCut } from "../internal/css-transition-cut.js";
 import {
   commandOf,
   renderOverlayContent,
@@ -97,7 +98,10 @@ export interface DialogPopupProps extends Omit<
    * part, a Form submit or settled action, a foreign close command, a controlled
    * `open={false}`), in all engines; dismissals (Escape, a click outside: `onOpenChange`) are the
    * browser's and animate with CSS only, never with a view transition. Ignored (dev warning) in
-   * JS-free mode.
+   * JS-free mode. While a view transition runs, the dialog's CSS transitions are turned off for
+   * the moment of the library's own show or close (an inline `transition: none !important`,
+   * restored right after), so that show or close runs no CSS transition (a `@keyframes`
+   * animation is not cut).
    *
    * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
    * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
@@ -268,8 +272,12 @@ export function DialogPopup({
     const added = target !== null && !target.hasAttribute("autofocus");
     if (added) target.setAttribute("autofocus", "");
     try {
-      if (modal) element.showModal();
-      else element.show();
+      // A view transition animates the open: the CSS enter does not run next to it (conventions
+      // 5.1).
+      withCssTransitionCut(element, transition !== undefined, () => {
+        if (modal) element.showModal();
+        else element.show();
+      });
     } finally {
       if (added) target.removeAttribute("autofocus");
     }
@@ -310,7 +318,8 @@ export function DialogPopup({
         // controlled close.
         ctx.recordCloseIntent(undefined);
         libraryClose.current = true;
-        element.close(ctx.takeCloseReturnValue());
+        const returnValue = ctx.takeCloseReturnValue();
+        withCssTransitionCut(element, transition !== undefined, () => element.close(returnValue));
         // The close commit may have unmounted the focused content before `close()`: a
         // non-modal dialog restores focus only from inside, so do it now (a modal one always
         // restores it on `close()`).

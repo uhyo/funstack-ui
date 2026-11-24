@@ -601,8 +601,6 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         <CodeBlock>{`<Dialog.Popup transition={{ "fsui-dialog-open": "pop", "fsui-dialog-close": "pop", default: "none" }}>`}</CodeBlock>
         <CodeBlock language="css">{`::view-transition-new(.pop) { animation: 180ms ease-out both pop-in; }
 ::view-transition-old(.pop) { animation: 140ms ease-in both pop-out; }
-/* Keep the CSS exit above for dismissals, but not while a view transition runs. */
-html:active-view-transition .dialog { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
 }`}</CodeBlock>
@@ -615,8 +613,10 @@ html:active-view-transition .dialog { transition: none; }
             carries none.
           </li>
           <li>
-            Dismissals (Escape, a click outside) animate with the CSS exit only: keep it, and cut it
-            while a view transition runs, as above (
+            Dismissals (Escape, a click outside) animate with the CSS exit only: keep it next to{" "}
+            <code>transition</code>. The library turns the dialog&apos;s CSS transitions off for the
+            moment of its own show and hide while a view transition runs, so you need no extra rule
+            (
             <a href="/concepts/transitions#css-exit">
               A popup with a CSS exit and a view transition
             </a>

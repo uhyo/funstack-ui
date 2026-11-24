@@ -2,6 +2,7 @@
 import { useCallback, useEffectEvent, useLayoutEffect, useRef } from "react";
 import type { ReactNode, RefObject, ViewTransitionClass } from "react";
 import { useContentFocusProbe } from "./content-focus-probe.js";
+import { withCssTransitionCut } from "./css-transition-cut.js";
 import { closedByPopoverTarget } from "./invokers.js";
 import { supportsFocusVisibleOption } from "./focus-visible.js";
 import type { QuietFocusTarget } from "./focus-visible.js";
@@ -104,6 +105,9 @@ export function usePopoverPopup(
 ): PopoverPopupHook {
   const { part, initialFocus, transition } = options;
   const isLibrary = ctx.mode === "library";
+  // The library's own shows and hides cut the popup's CSS transitions while a view transition
+  // runs (conventions 5.1).
+  const hasTransition = transition !== undefined;
   const { popupRef, triggerRef, setShown } = ctx;
 
   // The opening `beforetoggle` lets this one through: the library's own `showPopover()`.
@@ -183,7 +187,9 @@ export function usePopoverPopup(
     opening.current = true;
     try {
       const source = options.source !== undefined ? options.source() : triggerRef.current;
-      element.showPopover(source != null && source.isConnected ? { source } : undefined);
+      withCssTransitionCut(element, hasTransition, () =>
+        element.showPopover(source != null && source.isConnected ? { source } : undefined),
+      );
     } finally {
       opening.current = false;
       autofocused?.removeAttribute("autofocus");
@@ -202,8 +208,11 @@ export function usePopoverPopup(
     // move); the hide half needs none, only an opening `beforetoggle` reads it.
     reshowing.current = true;
     try {
-      element.hidePopover();
-      showPopup(element);
+      // One cut around both halves (the show's own cut, nested, does nothing).
+      withCssTransitionCut(element, hasTransition, () => {
+        element.hidePopover();
+        showPopup(element);
+      });
     } finally {
       reshowing.current = false;
     }
@@ -251,7 +260,7 @@ export function usePopoverPopup(
         // reports nothing.
         ctx.recordCloseIntent(undefined);
         libraryHide.current = true;
-        element.hidePopover();
+        withCssTransitionCut(element, hasTransition, () => element.hidePopover());
         // The close commit may have unmounted the focused content before the hide: the
         // platform restores focus only from inside the popover, so do it now.
         if (focusWasInside.current) returnFocus(element);

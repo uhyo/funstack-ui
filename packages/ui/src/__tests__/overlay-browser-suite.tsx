@@ -13,7 +13,7 @@
 // - Firefox animates no CSS exit of a popover or a dialog (bug 1834877): the exit rows branch on
 //   what `getAnimations()` found when the popup closed; Chromium must find something.
 // - WebKit (CI, Playwright's WebKit build, 2026-10): a closing box is already `display: none` at
-//   `ready` with or without the recipe, yet WebKit lists the animation of its group under
+//   `ready` with or without the library's CSS transition cut (#147), yet WebKit lists the animation of its group under
 //   `::view-transition-new(<name>)` and none under `old`. The names are not reliable there, so the
 //   WebKit rows assert the box's `display` only.
 import { act, render, screen } from "@testing-library/react";
@@ -24,6 +24,7 @@ import {
   animationsFinished,
   flushFor,
   leaveActEnvironment,
+  onCleanup,
   quietPeriod,
   settle,
   sleep,
@@ -194,8 +195,8 @@ export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
 /**
  * A CSS exit on a popup (design 10.1): `opacity` with `display` and `overlay` held for
  * `duration`. `openPseudo` `":open"` (a modal dialog) also fades the `::backdrop`.
- * `instantEnter`: no enter fade. `recipe`: the docs' rule that cuts the fade while a view
- * transition runs (review M2 of Dialog #46).
+ * `instantEnter`: no enter fade. No consumer rule for view transitions: the library cuts the fade
+ * around its own show and hide while one runs (#147).
  */
 export function addExitStyle(
   className: string,
@@ -203,8 +204,7 @@ export function addExitStyle(
   {
     openPseudo,
     instantEnter = false,
-    recipe = false,
-  }: { openPseudo: ":open" | ":popover-open"; instantEnter?: boolean; recipe?: boolean },
+  }: { openPseudo: ":open" | ":popover-open"; instantEnter?: boolean },
 ): void {
   const boxes = (state = "") =>
     openPseudo === ":open"
@@ -217,7 +217,6 @@ export function addExitStyle(
     }
     ${boxes(openPseudo)} { opacity: 1;${instantEnter ? " transition-duration: 0s;" : ""} }
     ${instantEnter ? "" : `@starting-style { ${boxes(openPseudo)} { opacity: 0; } }`}
-    ${recipe ? `html:active-view-transition .${className} { transition: none; }` : ""}
   `);
 }
 
@@ -612,56 +611,95 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
         expect(vt.calls).toHaveLength(1);
       });
 
-      it.each([false, true])(
-        'transition="pop" plus a CSS exit (recipe=%s): a dismissal runs no view transition; the CSS exit alone animates it',
-        async (recipe) => {
-          addExitStyle("fade", "200ms", { openPseudo, recipe });
-          render(<Plain transition="pop" className="fade" />);
+      it('transition="pop" plus a CSS exit: a dismissal runs no view transition; the CSS exit alone animates it', async () => {
+        addExitStyle("fade", "200ms", { openPseudo });
+        render(<Plain transition="pop" className="fade" />);
+        await vt.open();
+        expect(vt.calls).toHaveLength(1);
+        await animationsFinished(popup()); // the enter fade
+        await dismiss();
+        // The fact's commit is urgent (#148): the content is held for the CSS fade, released
+        // by a normal update; neither starts a document view transition.
+        await expect.poll(() => content(), { timeout: 2000 }).toBeNull();
+        await quietPeriod(100, "neither the fact nor the release may start a view transition");
+        expect(vt.calls).toHaveLength(1);
+      });
+
+      // The library cuts the popup's CSS transitions around its own show and hide while a view
+      // transition runs (conventions 5.1, #147), so no consumer rule is needed. Without the cut,
+      // Chromium keeps a closed popup rendered through its CSS fade and the close's new snapshot
+      // captures it as a live `::view-transition-new` next to the old image (a double image);
+      // Firefox and WebKit close at once either way. Inline `transition` is restored right after.
+      it.each(partCloses.map((close) => [close.name, close] as const))(
+        'transition="pop" plus a CSS exit: %s has the old image only, no live new image; the content is not re-mounted',
+        async (_, partClose) => {
+          addExitStyle("fade", "200ms", { openPseudo });
+          render(<Plain transition="pop" className="fade" controlled={partClose.controlled} />);
           await vt.open();
-          expect(vt.calls).toHaveLength(1);
           await animationsFinished(popup()); // the enter fade
-          await dismiss();
-          // The fact's commit is urgent (#148): the content is held for the CSS fade, released
-          // by a normal update; neither starts a document view transition.
-          await expect.poll(() => content(), { timeout: 2000 }).toBeNull();
-          await quietPeriod(100, "neither the fact nor the release may start a view transition");
-          expect(vt.calls).toHaveLength(1);
+          const style = popup().getAttribute("style");
+          // The close commit unmounted the content inside the view transition: no hold may
+          // bring it back for the CSS exit (the old snapshot already carried it out).
+          const remounts = countMounts(popup(), "content");
+          partClose.close();
+          await expect.poll(() => vt.calls.length).toBe(2);
+          await vt.transitions[1]!.ready;
+          const fading = getComputedStyle(popup()).display !== "none";
+          const seen = JSON.stringify({ names: pseudoNames(), fading });
+          expect(fading, seen).toBe(false);
+          expect(popup().style.getPropertyValue("transition")).toBe("");
+          if (namesReliable) {
+            expect(popupImages("old").length, seen).toBeGreaterThan(0);
+            expect(popupImages("new"), seen).toEqual([]);
+          }
+          await vt.transitions[1]!.finished;
+          expect(isOpen()).toBe(false);
+          // React's own inline style is back as it was before the close.
+          expect(popup().getAttribute("style")).toBe(style);
+          await quietPeriod(100, "the release of the hold must not start a view transition");
+          expect(vt.calls).toHaveLength(2);
+          expect(remounts.stop()).toBe(0);
         },
       );
 
-      // Chromium keeps a closed popup rendered through its CSS fade, so a library-driven close's
-      // new snapshot captures it as a live `::view-transition-new` next to the old image (a
-      // double image); the recipe cuts the fade while a view transition runs. Firefox closes at
-      // once: the old image only either way. If the recipe=false row starts failing, an engine
-      // changed; re-check the docs' recipe.
-      describe.each([false, true])("a CSS exit (recipe=%s)", (recipe) => {
-        it.each(partCloses.map((close) => [close.name, close] as const))(
-          'transition="pop": %s has the old image, a live new image only where the box still fades (Chromium, recipe=false); the content is not re-mounted',
-          async (_, partClose) => {
-            addExitStyle("fade", "200ms", { openPseudo, recipe });
-            render(<Plain transition="pop" className="fade" controlled={partClose.controlled} />);
-            await vt.open();
-            await animationsFinished(popup()); // the enter fade
-            // The close commit unmounted the content inside the view transition: no hold may
-            // bring it back for the CSS exit (the old snapshot already carried it out).
-            const remounts = countMounts(popup(), "content");
-            partClose.close();
-            await expect.poll(() => vt.calls.length).toBe(2);
-            await vt.transitions[1]!.ready;
-            const fading = getComputedStyle(popup()).display !== "none";
-            const seen = JSON.stringify({ names: pseudoNames(), fading });
-            expect(fading, seen).toBe(!recipe && browserName === "chromium");
-            if (namesReliable) {
-              expect(popupImages("old").length, seen).toBeGreaterThan(0);
-              expect(popupImages("new").length > 0, seen).toBe(fading);
-            }
-            await vt.transitions[1]!.finished;
-            expect(isOpen()).toBe(false);
-            await quietPeriod(100, "the release of the hold must not start a view transition");
-            expect(vt.calls).toHaveLength(2);
-            expect(remounts.stop()).toBe(0);
-          },
-        );
+      // The open: the view transition animates it, the CSS enter (`@starting-style`) does not run
+      // under it (#147). The dialog's `::backdrop` is not the popup: its enter fade still runs.
+      it('transition="pop" plus a CSS enter: the open runs the view transition only, the popup is opaque at ready', async () => {
+        addExitStyle("fade", "200ms", { openPseudo });
+        render(<Plain transition="pop" className="fade" />);
+        trigger().click();
+        await expect.poll(() => vt.calls.length).toBe(1);
+        await vt.transitions[0]!.ready;
+        expect(isOpen()).toBe(true);
+        expect(getComputedStyle(popup()).opacity).toBe("1");
+        expect(popup().style.getPropertyValue("transition")).toBe("");
+        await vt.transitions[0]!.finished;
+      });
+
+      // The cut is scoped to the library's own calls: an unrelated view transition of the page
+      // during a dismissal's CSS fade leaves the fade alone (the old consumer rule
+      // `html:active-view-transition .popup { transition: none }` cut it).
+      it("a dismissal's CSS fade keeps running through an unrelated view transition", async () => {
+        addExitStyle("fade", "400ms", { openPseudo, instantEnter: true });
+        render(<Plain transition="pop" className="fade" />);
+        await vt.open();
+        const exit = watchExit(popup(), config.dismissEvent);
+        await dismiss();
+        const animations = await exit;
+        // Chromium animates the exit; Firefox (bug 1834877) does not, so there is nothing to cut.
+        if (browserName === "chromium") expect(animations.length).toBeGreaterThan(0);
+        const fadingBefore = getComputedStyle(popup()).display !== "none";
+        // Through the spy: the suite's afterEach waits for it to finish.
+        const unrelated = document.startViewTransition(() => {
+          document.body.dataset["unrelated"] = "1";
+        });
+        onCleanup(() => delete document.body.dataset["unrelated"]);
+        await unrelated.ready;
+        expect(getComputedStyle(popup()).display !== "none").toBe(fadingBefore);
+        if (fadingBefore) {
+          expect(Number(getComputedStyle(popup()).opacity)).toBeGreaterThan(0);
+        }
+        await unrelated.finished;
       });
 
       it("without transition: no view transition for an open, a part-initiated close or a dismissal", async () => {
