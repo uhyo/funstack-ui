@@ -77,3 +77,49 @@
   back to asserting the old behaviour there (option (a)), not to `.focus()`.
 - The light-dismiss row's selection check (`setSelectionRange` at `click`) and event order
   (`inner:blur, outside:focus`) should hold in WebKit, which focuses an input on mousedown.
+
+## Follow-up: 4218f0a (non-modal Dialog, wording fixes), 2026-11-24
+
+**Verdict: mergeable.** One low test gap, optional.
+
+Ran: jsdom dialog + popover 507 passed; browser dialog + popover on Chromium + Firefox 247 passed,
+9 skipped; typecheck, lint (no errors), format:check clean.
+
+### Flag lifecycle (`dialog-popup.tsx` `refusedFact`)
+
+Mirrors `usePopoverPopup`: set in `onClose` after the `echo` return (so neither the library's own
+`close()` nor JS-free mode sets it), cleared by any apply-effect run with `committed` false,
+consumed (always, also when modal) by `openDialog`. Checked with scratch jsdom rows (not
+committed), all passing on the branch:
+
+- adopted dismissal, then a controlled `open={true}`: initial focus target focused;
+- refused non-modal dismissal (focus stays outside), then controlled close and open: initial
+  focus again;
+- modal refused re-open consumes the flag (focus moves inside, as before), and a later
+  non-modal open after a close focuses normally: a `modal` prop change cannot leave a stale flag;
+- library Close (`openChangeAction` adopts): next open focuses.
+
+`form method=dialog`: the library path cancels the native close and closes with its own
+`close()` (echo, no flag); a consumer's `stopPropagation()` opt-out lets the browser close it,
+which is a fact by design, so a refused re-open of that is inert like any other fact. Correct.
+Modal path: `refused` is `false` whenever `modal`, so `showModal()` runs exactly as before (the
+modal row asserts `inert` was absent during the call and the target got focus). `inert` removal
+is in the same `finally` as `autofocus`.
+
+### Tests
+
+- Mutation "never set the flag": the branch's non-modal row fails. Good.
+- **Low:** mutation "never clear the flag on `committed` false" fails none of the branch's
+  tests (only my scratch rows), so the "adopted dismissal, then a new open gets initial focus"
+  path is unpinned for Dialog (Menu has the equivalent browser row for usePopoverPopup). A jsdom
+  row like the first scratch row above would pin it.
+- **Low:** no browser row for the non-modal Dialog re-show; jsdom only, through the shim. The
+  platform mechanism (dialog focusing steps skip an inert dialog) is the one the Popover browser
+  rows already exercise, so the risk is small.
+
+### Docs
+
+Findings 1-3 and nits 5-6 addressed. overlay-open-change.md 2.4, dialog.md, popover.md 6.1,
+BrowserOwnedStatePage and DialogPage now match the code: modal is the default and is the only
+exception; non-modal re-show leaves focus where the dismissal put it; the CSS-exit sentence names
+its subject. No inaccuracies found.
