@@ -323,7 +323,7 @@ action settles (section 9.5).
 
 `value` is library-owned, but the browser can still change which radio is checked without a click
 the library saw. Each path dispatches through the same `valueChangeAction` with
-`details.reason: "platform"` (conventions 3.5, the "residual browser path" row), and the DOM
+`details.reason: "platform"` (conventions 3.5, "Residual browser paths"), and the DOM
 is then re-synced by React's normal `checked` prop writes once the action settles.
 
 Both paths read the DOM the same way: the Root queries `input[type="radio"]` inside the fieldset,
