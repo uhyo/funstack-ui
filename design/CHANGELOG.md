@@ -10682,3 +10682,10 @@ had drifted from the code (found while extracting `internal/use-step-commit.ts`)
 The 2.4 pseudocode of both documents, which restated the code, is replaced by present-tense
 bullets (as dialog.md 2.5 and popover.md 2.5). Sections changed: slider.md 2 (table), 2.2, 2.4;
 number-field.md 2 (table), 2.2, 2.4, 4.3.
+
+## 2026-11-24: slider.md 4.1 and 12 name `gestureThumb` (#157)
+
+Review of `refactor/157-step-commit` (nit 3): the `pointerdown` row of 4.1 wrote
+`gesture = { thumb: index }` and the walkthroughs of section 12 `G={thumb:0}`, after the state
+table had become `gestureThumb: number | null`. Now `gestureThumb = index`, and `G` is
+`gestureThumb` in the walkthrough notation (`G=0`, `G=null`). Docs only.

@@ -539,7 +539,7 @@ when the last step differs from it.
 
 | Event | Where | Behaviour |
 | --- | --- | --- |
-| `pointerdown` (primary button, not `disabled`) | Thumb | `preventDefault()` (no text selection, no focus change through the compat `mousedown`); `setPointerCapture` on the Thumb; `gesture = { thumb: index }`; `gestureStart` = shown; the input is focused (`:focus-visible` does not match after a pointer press, so no ring appears, as on a native range); `step` with the value under the pointer if it differs. **Stacked thumbs**: when the pressed thumb shares its value with neighbours, the Track's tie rule applies to the stack: a pointer above the value picks the last thumb of the stack, below it the first; exactly on it the press is undecided (the pressed thumb shows `data-dragging` and takes focus) until the first move off the value picks, moving `data-dragging` and focus to the chosen thumb. Without this a stack at `max` could never be pulled apart: the top thumb's bounds are its neighbour's value (review M1). `pointermove`, `pointerup`, `pointercancel` and `lostpointercapture` listeners are attached to the captured element for the gesture's duration (`addEventListener`, removed at its end). |
+| `pointerdown` (primary button, not `disabled`) | Thumb | `preventDefault()` (no text selection, no focus change through the compat `mousedown`); `setPointerCapture` on the Thumb; `gestureThumb = index`; `gestureStart` = shown; the input is focused (`:focus-visible` does not match after a pointer press, so no ring appears, as on a native range); `step` with the value under the pointer if it differs. **Stacked thumbs**: when the pressed thumb shares its value with neighbours, the Track's tie rule applies to the stack: a pointer above the value picks the last thumb of the stack, below it the first; exactly on it the press is undecided (the pressed thumb shows `data-dragging` and takes focus) until the first move off the value picks, moving `data-dragging` and focus to the chosen thumb. Without this a stack at `max` could never be pulled apart: the top thumb's bounds are its neighbour's value (review M1). `pointermove`, `pointerup`, `pointercancel` and `lostpointercapture` listeners are attached to the captured element for the gesture's duration (`addEventListener`, removed at its end). |
 | `pointerdown` | Track (no gesture already begun for this pointer) | Same, with the **nearest thumb** by value distance to the pointer's value; on a tie (two thumbs at one value) the thumb that can move toward the pointer. Capture on the Track. |
 | `pointermove` (the captured `pointerId` only) | captured element | `step(thumb, valueFromPointer)`. |
 | `pointerup`, `pointercancel`, `lostpointercapture` | captured element | `pointerup` first takes a last `step` at the release position when it differs from the last move (an engine may coalesce the final move into the `pointerup`; `details.event` is then the `pointerup`, review L3); `pointercancel` / `lostpointercapture` keep the last move's value. Then `gesture = null`; `commit(thumb, "activate", event)`; listeners removed. A cancelled gesture commits where it stopped (the user's last intent; leaving the value uncommitted would strand the preview). |
@@ -1108,10 +1108,10 @@ and `fsui-slider-commit`. A rollback carries none (conventions 5.3).
 ## 12. Async walkthroughs
 
 Notation: `L` = `live`, `O` = optimistic, `C` = committed, `S` = shown (2.2), `P` = Root pending,
-`G` = gesture. One thumb, `min 0`, `max 100`, `step 1`.
+`G` = `gestureThumb`. One thumb, `min 0`, `max 100`, `step 1`.
 
 1. **Uncontrolled, `valueCommitAction={save}` (800 ms), drag 40 → 70.** `pointerdown` on the
-   track at 55: prevented, captured, input focused, `G={thumb:0}`, `gestureStart=[40]`,
+   track at 55: prevented, captured, input focused, `G=0`, `gestureStart=[40]`,
    `step([55])`: `L=[55]`, `S=[55]` in the same event, `stepHeld=true`; `valueChangeAction` is
    absent, so no step transition starts and nothing is pending during the drag. Moves:
    `L=[60]`, `[66]`, `[70]`, each a step. `pointerup`: a last step at the release position if
