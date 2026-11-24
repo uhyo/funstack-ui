@@ -49,7 +49,10 @@ export interface UseControllableActionOptions<T, Details extends ActionDetails> 
 }
 
 export interface ControllableAction<T, Details extends ActionDetails> {
-  /** Committed value (`x ?? internal`). Content regions render this. */
+  /**
+   * Committed value (`x` when it is not `undefined`, else internal state). Content regions
+   * render this.
+   */
   readonly committed: T;
   /** Optimistic value; trigger parts render this. */
   readonly optimistic: T;

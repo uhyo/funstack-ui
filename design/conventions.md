@@ -1125,7 +1125,8 @@ const { committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFa
   useControllableAction({ controlled, defaultValue, initialValue, action, transitionTypes, reducer, warn });
 ```
 
-- `committed` is `controlled ?? internal`; `optimistic` is `useOptimistic(committed, …)`,
+- `committed` is `controlled` when it is not `undefined`, else the internal state (never `??`:
+  a controlled `null` is a value); `optimistic` is `useOptimistic(committed, …)`,
   always in its reducer form so that stacked optimistic updates are re-based onto a changed
   `committed`; `pending` is the hook's own `useTransition`.
 - `dispatch(next, details)` is the execution contract of 2.3 in the owner's transition: the
@@ -1200,8 +1201,9 @@ if (!started) event.preventDefault();                        // ignored while pe
   go through `usePureTrigger({ whilePending, defaultWhilePending, openGeneration? })`
   (`internal/use-pure-trigger.ts`), which resolves `(whilePending ?? default) === "ignore"`
   per render, cancels an ignored activation (`runActivation`) and returns the owned pending
-  keys (`pendingProps`: `aria-disabled` and `data-pending`, 3.6). The continuous controls call
-  `useActionTrigger` directly and run every step.
+  keys (`pendingProps`: `aria-disabled` and `data-pending`, 3.6). The continuous controls
+  reach `useActionTrigger` without `usePureTrigger` (through `useStepCommit`) and run every
+  step.
 - `then` runs once per burst of overlapping runs: when the last run in flight settles, and only
   if the latest run resolved (it is the latest run's `then`). With one run at a time this is
   the run's own `then` when it resolves. A rejection skips `then`; where it goes is 2.4.
@@ -1367,7 +1369,8 @@ engine. Three traps, and the rule for each (the helpers are `internal/invokers.t
    exempt.** A part that closes through its action therefore names the popup with
    `popovertarget` and cancels its click so the activation never runs (`usePopoverTrigger`
    does both for Popover and Menu; Combobox's Trigger writes the attribute through its ref
-   after hydration, 7.4). The exemption exists for `<button>`s only, so a Trigger rendered as
+   after hydration, 7.4, because a pre-hydration activation would open an empty, mis-anchored
+   popup). The exemption exists for `<button>`s only, so a Trigger rendered as
    another element through `render` keeps a browser-shaped close in library mode (a fact with
    reason `"activate"`, nothing awaited, no veto, no exit transition); the guarantee is stated
    for a `<button>` Trigger and the non-button development warning says so (popover.md 2.7).
@@ -1474,7 +1477,7 @@ the list of them plus the rules they implement (numbered: the source cites "3.8 
 | Helper (`internal/`) | Used by | What it is |
 | --- | --- | --- |
 | `useFormOwnerEvent(ref, type, handler, options?)` (`use-form-owner-event.ts`) | `useFormReset`; `Field.Root` (`input` / `change` for cross-field `validate`, `submit` and `reset` for its flags) | The stable subscription of rule 4 for any event of the form owner (`ref.current.form`; an `<input>`, `<select>` or `<fieldset>`, all honouring `form=`). |
-| `useFormReset(ref, onReset, onResetEvent?)` (`use-form-reset.ts`) | the hooks below, Combobox | The `reset` subscription: `onResetEvent(event)` synchronously in the event (rule 6's mirror write), then `onReset(event)` in a microtask unless the reset was cancelled (rules 5, 7). |
+| `useFormReset(ref, onReset, onResetEvent?)` (`use-form-reset.ts`) | the hooks below, Combobox, `Select.Value` (the `<selectedcontent>` refresh), `CheckboxGroup.Parent` | The `reset` subscription: `onResetEvent(event)` synchronously in the event (rule 6's mirror write), then `onReset(event)` in a microtask unless the reset was cancelled (rules 5, 7). |
 | `useResetTarget(value, defaultValue)` (`use-form-reset.ts`) | Slider, NumberField, Select, Combobox (value and text) | Rule 6's target by mode; `undefined` when absent, and the caller adds its fallback. |
 | `useNativeChecked(options)` (`use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent` | Per element: the ref callback with the dev tag / `type` check, the re-apply effect of rule 8 and, unless `group: true`, the two residual paths of a single control, reported through `onPlatformChange(next, event)`. With `group: true` it reports nothing and calls the group's `onItemMounted` (rule 3). |
 | `useNativeGroupReconciliation<T>(options)` (`use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, `CheckboxGroup.Root`: `element` is the `<fieldset>`); `useNativeSelectValue`; Slider (through its first Thumb's input, with `readDefault` returning the JS-computed target and `onResetEvent` passed through) and NumberField | Mount reconciliation (`readCurrent()` against `base()`) and form reset (`readDefault()` against `base()`), **one dispatch per group** through `onPlatformChange(next, event, path)`; returns the stable `{ onItemMounted }` for late members (rule 3). Comparison is the `equals` option (default `Object.is`; `CheckboxGroup.Root` passes set equality). |
@@ -1485,7 +1488,7 @@ the list of them plus the rules they implement (numbered: the source cites "3.8 
 | `useItemOrder(options)` (`use-item-order.ts`) | `CheckboxGroup.Root`, `ToggleGroup.Root` | The Items' document order kept in state for the Root state's `value` (the optimistic set in document order, values with no Item last); re-read after each Root commit, re-rendering only when what renders from it changed. Set and order arithmetic: `value-set.ts` (Accordion too) and `dom-order.ts`. |
 | `useFieldControl(options)` (`use-field-control.ts`) | `Field.Control` and the owner part of every FUNSTACK form control: `Checkbox`, `Switch`, the group Roots (their `<fieldset>`, `labelable: false`), `Select.Root`, `Combobox.Input`, `Slider` (one thumb: its input; several: the group element, `labelable: false`), `NumberField.Input` (the visible input, with the hidden number input as `validityElement`) | How a control becomes a Field's control. Outside a `Field.Root`: `inField: false`, nothing to merge. Inside: a **ref callback** that registers `{ element, labelable, required, disabled }` with the Field (no extra render), the resolved `name` / `disabled` / `required` / `id`, and `attributes`, the owned layer the part spreads: `id` (labelable only), `aria-labelledby` (groups), `aria-describedby` (token-merged by the part), `aria-invalid` (a `group` such as CheckboxGroup moves it to its items), `data-invalid`. **No `data-pending`**: a control keeps its own (2.7). The **Field** attaches its listeners to the registered element and resolves the **validity element** (the element itself when it is a form control, else the first named `willValidate` member of a `<fieldset>`, else the first control inside; or `validityElement()` when given, 3.6). Two registrations in one Field warn (`design/components/field-form.md` 7). |
 | `useFieldValueChange(value, takeEdit?)` (`use-field-control.ts`) | every owner part whose DOM value can change **without** an `input` / `change` event the Field hears: `Combobox.Root` (a pick), `CheckboxGroup.Root` (a Parent click, the derived `required`), `Checkbox`, `Switch`, `RadioGroup.Root`, `Select.Root` (a controlled change from outside, a rollback), `Slider` (a pointer gesture), `NumberField.Root` (a step or commit writes the hidden input through the ref) | When `value` changed in a commit (never at mount) it calls the Field's `notifyChange(edit)`: the Field re-reads validity and recomputes its slot (dismissing a shown server error when `edit`, as an `input` event would) and asks the `Form.Root` to refresh its other Fields; outside a `Form.Root` only the control's own Field. Not a synthetic event: the consumer's handlers do not see it (`design/components/field-form.md` 7.1). |
-| `resolveFieldDefaults(field, own)` (`use-field-control.ts`) | `useFieldControl`; `NumberField.Root` | The one "own or the Field's" rule: `name` falls back to the Field's, `disabled` and `required` are either's. `FieldControlBinding.fieldName` is the Field's own `name` for a control that must tell the two apart (Slider). |
+| `resolveFieldDefaults(field, own)` (`use-field-control.ts`) | `useFieldControl`; `NumberField.Root`, `Combobox.Root` | The one "own or the Field's" rule: `name` falls back to the Field's, `disabled` and `required` are either's. `FieldControlBinding.fieldName` is the Field's own `name` for a control that must tell the two apart (Slider). |
 | `intendedValue(latestInFlight, optimistic)` (`use-controllable-action.ts`) | the group Roots' residual paths, `useNativeChecked`, Accordion, the overlay Roots' `intended()`, `Dialog.Root` | Rule 1's base, with the explicit null check, in one place. |
 
 Rules, which component docs cite instead of restating:
@@ -2037,7 +2040,7 @@ Per kind of part:
 | Part renders | Animate with | Why |
 | --- | --- | --- |
 | Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
-| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. A boundary that mounts _under a new DOM element_ is shielded: Dialog's children mount under the `<dialog>` element on a plain open, so a plain open starts no view transition even with `transition` set; only a nested Popup mounting together with outer content, or a Root inserted by a transition, pays. |
+| Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. A boundary that mounts *under a new DOM element* is shielded: Dialog's children mount under the `<dialog>` element on a plain open, so a plain open starts no view transition even with `transition` set; only a nested Popup mounting together with outer content, or a Root inserted by a transition, pays. |
 | `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
 | Any part with `transition` absent | nothing (no boundary rendered) | Baseline timing; a switch or open calls no `startViewTransition`. |
 
@@ -2232,10 +2235,11 @@ no wrapper is needed.
 the top of each (verified against tsdown 0.23.1; the default bundled build strips it with a
 warning). `sideEffects: false` stays.
 
-The configuration is `packages/ui/tsdown.config.ts`: `entry` lists the root `src/index.ts` and
-every component's `src/<component>/index.ts` (plus `src/csp/index.ts`), `format` is ESM only,
-`unbundle` and `dts` are on, and `exports` generates the package's exports map from the entry
-list (9.2).
+The configuration is `packages/ui/tsdown.config.ts`: `entry` lists the root `src/index.ts`,
+every component's `src/<component>/index.ts`, `src/csp/index.ts` and the skill-installer bin
+(`src/bin/skill-installer.ts`); `format` is ESM only; `unbundle` and `dts` are on; and
+`exports` generates the package's exports map from the entry list (9.2), with the bin excluded
+from the map and declared as the package's `bin`.
 
 **Development text never reaches a consumer's production bundle.** The build is unbundled, so
 `dist` legitimately keeps every warning string; it is the consumer's bundler that folds them

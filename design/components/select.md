@@ -748,7 +748,7 @@ Uncontrolled, `defaultValue=""`, placeholder first, inside `<form action={order}
    `fruit=banana` from the DOM.
 2. Success: React calls `form.reset()` during commit. The browser restores selectedness from
    `defaultSelected` (the library's mirror: the placeholder); `<selectedcontent>` should
-   re-clone the placeholder, and in Chromium 156 does not for a `defaultSelected` option,
+   re-clone the placeholder, and in Chromium 156 does not for a `defaultSelected` option (#52),
    so `Select.Value`'s own `reset` listener refreshes it in a microtask (6.3). The Root's
    `reset` listener schedules a microtask; by then the Root's layout
    effect has already re-applied `O="banana"` to the DOM, so the microtask reads the reset target

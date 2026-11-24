@@ -737,9 +737,9 @@ the pointer axis is the Track's block axis, and the custom properties count from
 **Direction.** A horizontal slider inherits the page's or container's `direction`: the
 Track's computed `direction` mirrors the pointer math and logical insets mirror the CSS, so
 `min` is drawn on the right. The arrow keys are **not** left to the browser under RTL: Chromium
-and Firefox mirror ArrowLeft / ArrowRight on a native range, WebKit does not (left to the
-browser, ArrowRight in Safari increases the value and moves the thumb **left**, the opposite of
-the key and of the same page in Chrome and Firefox). The library reads `getComputedStyle(input).direction`
+and Firefox mirror ArrowLeft / ArrowRight on a native range, WebKit does not (if left to the
+browser, ArrowRight in Safari would increase the value and move the thumb **left**, the
+opposite of the key and of the same page in Chrome and Firefox). The library reads `getComputedStyle(input).direction`
 at each `keydown` and, when it is `rtl`, handles ArrowLeft (+ step) and ArrowRight (− step)
 itself through the vertical normalisation's path, so every engine behaves as Chromium and
 Firefox did natively and LTR stays fully native. The cost is the vertical row's: those two keys
@@ -827,7 +827,7 @@ DOM write the library makes outside render is the reset mirror of 9.2.
 
 ### 9.4 Inside a `Field`
 
-Accepted, including the dev warning for `Field.Root required` around a Slider. If a
+This section is accepted, including the dev warning for `Field.Root required` around a Slider. If a
 screen-reader pass finds group descriptions unread, moving `aria-describedby` onto each thumb
 input is pre-approved as a follow-up. The wiring follows Field 7.1 / 7.2 (`useFieldValueChange`,
 no `data-pending` from the hook, per-item `aria-invalid` for a `group`). Everything below is
