@@ -26,3 +26,10 @@ Tests (browser): Menu refused Escape / Tab out (focus outside after re-open), Me
 then keyboard open (first item focused again), Popover `<div>` vs `<dialog>`, Combobox
 focus-leave. Mutation: with the skip disabled the Menu rows (4, Chromium + Firefox) and the
 Popover `<div>` row fail.
+
+## Review fixes (memo/reviewer/review-147-155.md)
+
+Rebased onto the fixed #147 branch. M1: one clause in overlay-open-change.md 2.4 and PopoverPage
+(a `<dialog popover>` re-opened after a refused click outside takes focus back from the clicked
+element; design question filed as #156). L1: BrowserOwnedStatePage now names a `<div>` Popover
+with Menu and Combobox.

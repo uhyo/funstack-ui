@@ -205,7 +205,9 @@ the DOM after every commit, shows it again (`showPopover({ source })` / `showMod
   default, Dialog): the browser's dialog focusing steps run on every `showPopover()` /
   `show()` / `showModal()` whatever the library does, so the library still names its
   `initialFocus` target there (a modal dialog must hold focus; a Popover does not close on Tab,
-  so it is no trap); with a CSS exit in flight the
+  so it is no trap). One consequence for a `<dialog popover>`: re-opened after a refused click
+  outside, it takes focus back from the element the user clicked (#156 asks whether to return
+  focus there instead, a `.focus()` against design 6.1); with a CSS exit in flight the
   browser reverses it. The children were never unmounted (committed never left `true`), so
   their state is kept.
 - No callback is called for the re-open: the parent was told `false` and chose `true`.
