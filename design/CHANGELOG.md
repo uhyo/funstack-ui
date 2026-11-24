@@ -10643,3 +10643,16 @@ where this document and the conventions disagree, the conventions win.
 
 Status: **proposed** (2026-10-15, GitHub issue #9). Follows `design/conventions.md` (accepted);
 where this document and the conventions disagree, the conventions win.
+
+## 2026-11-24, #157: shared popup flags and show wrapper
+
+Refactoring wave #157, phase 2 (overlay safe steps; user decision 2026-11-24: share the show
+wrapper and the refused-reopen flags first, reassess the full merge afterwards). Internal only,
+no behaviour change.
+
+- `design/conventions.md` 9.1: the `internal/` listing gains `overlay-show.ts`
+  (`createPopupFlags`, `showWithFocus`), which `internal/use-popover-popup.ts` and
+  `dialog/dialog-popup.tsx` now both use for `awaitingClose`, the library echo
+  (`libraryHide` / `libraryClose`) and `refusedFact`, and for the `inert` + `autofocus` +
+  `try/finally` around the show. The rules (3.9.2, 3.9.4, popover.md 2.5, dialog.md 2.3) are
+  unchanged; Dialog still applies the refused re-open to non-modal dialogs only.
