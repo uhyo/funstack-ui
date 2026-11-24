@@ -150,3 +150,22 @@ issue numbers that name open work (#34, #52, #77, #89, #91, #92, #124), dialog.m
 - Inline history in tooltip.md, context-menu.md, field-form.md, menu.md, dialog.md.
 - CLAUDE.md still does not mention `design/CHANGELOG.md` or what `pnpm lint` checks in
   `design/` (the user's file).
+
+## After the review (memo/reviewer/review-157-spec-slim-2.md) and the split
+
+- L1 to L5 and N1 to N6 are fixed. The citation check now fails on a document name that
+  resolves nowhere (a memo is cited with its `memo/` path) and on a number with a letter glued
+  to it; the other false negatives are listed in the script's header as known gaps.
+- The split was decided by the product owner. Done: `design/placement.md` (12, 13),
+  `design/testing.md` (10), `design/internal-hooks.md` (3.4, 3.8, the `internal/` index of
+  9.1). Text verbatim, numbers unchanged, a stub per moved heading; the check script follows a
+  "Moved to `design/<file>.md`" stub into that file. 9.1 stays (the layout rules are
+  conventions); only its file index moved.
+- Not done: `design/overlay-open-state.md` (3.9 and the traps of 3.5). `fix/159` had not merged
+  into master (73d67ef) when the split was made, so 3.9 stays where the fix expects it.
+- conventions.md: 3,192 lines at the start of the pass, 3,018 after the rewrite, 2,444 after
+  the split (192 k characters). With 3.9 and the traps moved it would be about 2,120. The
+  1,500 to 1,800 target would still need the Decisions table and sections 2.2, 2.5 and 5.1
+  shortened or moved.
+- CLAUDE.md was not edited: an agent's message cannot authorise a change to that file. The
+  line to change is the `design/` bullet; proposed text is in the report to the coordinator.

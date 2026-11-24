@@ -12370,3 +12370,32 @@ the text as it was.
 - select.md 6.2: "developer deviation 1, accepted", "review P1b".
 - toast.md 4.4: "(GitHub issue #63; accepted and implemented 2026-10-18, ada1cba)".
 - slider.md's heading "9.4 Inside a `Field` (issue #60)" is "9.4 Inside a `Field`".
+
+## 2026-11-24, #157: conventions.md split into four documents
+
+Refactoring wave #157; decided by the product owner (it only reorganises internal documents).
+No rule changed and no text was rewritten: the sections moved verbatim and keep their numbers.
+
+| Sections of `design/conventions.md` | Now in |
+| --- | --- |
+| 12 (shipped functional CSS), 13 (anchored placement, 13.1 to 13.5) | `design/placement.md` |
+| 10 (testing conventions, 10.1 and 10.2) | `design/testing.md` |
+| 3.4 (the shared hook), 3.8 (native checkable inputs, rules 1 to 9) | `design/internal-hooks.md` |
+| 9.1's one-line-per-file index of `packages/ui/src/internal/` | `design/internal-hooks.md`, "The files of `internal/`"; 9.1 itself stays, with the layout rules |
+
+- `design/conventions.md` keeps each moved heading with a stub ("Moved to `design/<file>.md`,
+  same number", and one line that says what the section rules), so "conventions 13.2" or
+  "conventions 3.8 rule 6" in a source comment or a component design still names one place.
+  `scripts/check-design-refs.mjs` resolves a citation through such a stub into the named file.
+- Each new document says at its top that a section number which is not one of its own headings
+  is a section of `design/conventions.md`; the cross-references inside the moved text were not
+  touched.
+- Not moved: 3.9 (overlay open state) and the light-dismiss traps of 3.5, planned as
+  `design/overlay-open-state.md`. #159 was changing that text on another branch when this was
+  done; move it after that fix has merged.
+- `design/conventions.md`: 3,018 lines before the split, 2,444 after.
+
+Also on this branch, after its review (`memo/reviewer/review-157-spec-slim-2.md`): 3.4 says
+`committed` is the controlled value when it is not `undefined` (the second pass first
+wrote "`controlled ?? internal`", which is wrong for a controlled `null`), and the callers of
+`useFormReset` and `resolveFieldDefaults` in 3.8 are complete.

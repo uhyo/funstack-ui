@@ -8,6 +8,15 @@ This document states the current rules only. How each rule came to be (amendment
 and open questions, review corrections) is in `design/CHANGELOG.md`, which is append-only: a rule
 is changed by editing it here and adding a changelog entry in the same commit.
 
+Some parts of the conventions are documents of their own, with the same status. Their sections
+keep their numbers, and this document keeps each heading as a stub that names the file:
+
+| Sections | Document |
+| --- | --- |
+| 3.4, 3.8, and the index of `internal/` that 9.1 points to | `design/internal-hooks.md` |
+| 10 | `design/testing.md` |
+| 12, 13 | `design/placement.md` |
+
 Inputs: `docs/vision.md`, `docs/research/react-async-apis.md`, `docs/research/popover-anchor-tooltip.md`,
 `docs/research/modern-platform-survey.md`, `docs/research/form-controls.md` prior art (Base UI, React Aria Components, Radix,
 Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
