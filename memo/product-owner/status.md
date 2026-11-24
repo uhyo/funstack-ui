@@ -419,3 +419,6 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - MERGED refactor/157-pure-trigger c9e106e (#158 closed, incl. L2 user decision: action Buttons too; L4 input type), refactor/157-apply-open bce647a (use-apply-open-state.ts). #159 filed (Dialog remount mid-close stuck awaitingClose; Popover may share; M3 rows depend on it).
 - Running: refactor/157-split-combobox-toast (#12), refactor/157-helpers (#7 + #10; skips combobox-root/toast-viewport until split merges).
 - Left: #11 overlay hook interfaces (after split), internal/ reorg (last), conventions.md second pass, section-citation check (L7), #159, Dialog listeners → callback ref (optional), helpers in combobox/toast after split.
+- MERGED split d313c54, #160 4ba75d0 (PO self-review; small), helpers f0a7fac (8/10 helpers; focusable selector not unified — reviewer: not worth asking user, comment instead). #161 filed (Select dev text in prod bundle).
+- Running: refactor/157-helpers-followup (skipped sites, StrictMode counts, 7.2 message rule, nits, Menu open-cause jsdom test, #161), refactor/157-overlay-interfaces (#11).
+- Then: #159 (after #11), internal/ reorg, conventions.md second pass, section-citation check. Consider release after this batch.
