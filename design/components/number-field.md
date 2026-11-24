@@ -251,7 +251,9 @@ the gesture's commit resolves (Slider 2.3). Consequences, documented on the comp
 
 ### 2.4 Step, commit, and the `"dismiss"` revert
 
-The Root has two internal entry points, Slider's, with the draft folded in:
+The Root has two internal entry points, Slider's, with the draft folded in (the shared
+`internal/use-step-commit.ts`; the rounding, the draft, the hidden input and the announcement
+are its options):
 
 ```ts
 function step(next: number | null, source: Source, reason: ChangeReason, event: Event | undefined): boolean {
