@@ -10353,3 +10353,293 @@ them; the "Inside a Field" test row gains NumberField (conventions 10.1).
   props tables are updated by hand (CLAUDE.md, docs site).
 
 ---
+
+---
+
+# Component documents: the Status paragraphs as they stood (master bda96ce, 2026-11-24)
+
+The slimmed documents carry a two-line status. These are the paragraphs they replaced, verbatim.
+Body text that the fold replaced with the current rule (superseded rules, "Amended ..." notes
+inside sections, stale pseudo-code) was removed, not moved: `git show bda96ce:design/components/<doc>.md`
+has it.
+
+## accordion.md
+
+Status: **proposed** (2026-10-15, GitHub issue #8). Follows `design/conventions.md` (accepted).
+Deviations from it are listed in "Conventions feedback" at the end.
+
+## button.md
+
+Status: **Accepted by the product owner** (2026-10-22, GitHub issue #79, wave 8 tracker #80;
+drafted 2026-10-18). Every recommendation accepted as recommended; user decisions: **`Toolbar.Button`
+is removed now** (a breaking change, section 7.3 and the migration note in 14) and
+`focusableWhenDisabled` ships in v1. The follow-up for the other pure triggers is **#81**.
+Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
+the conventions win. The conventions amendments this design asks for are applied to
+`design/conventions.md` in the same commit (resolved question 34).
+
+## checkbox-group.md
+
+Status: **accepted** (2026-10-17, GitHub issue #33; the product owner accepted all eight questions
+as recommended, see the end of this document; the implementation-review corrections of
+`memo/reviewer/checkbox-group.md` and the product owner's decision on disabled Items under a
+Parent (decision 9) were folded in the same day from the landed fix, a58143a). Follows
+`design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win. **Read
+`design/components/radio-group.md` first**: it specifies the `<fieldset>` Root + `Label`
+(`<legend>`) + native-input `Item` anatomy, the one-dispatch-per-group residual browser paths
+(mount reconciliation, form reset) through `useNativeGroupReconciliation`, and the
+`checked={optimistic}` rule for controlled native inputs. Then `design/components/checkbox.md`
+for `indeterminate`. This document repeats only what differs and adds the multi-value state, the
+`Parent` part and group-level `required`.
+
+## checkbox.md
+
+Status: **accepted** (2026-10-16, GitHub issue #27, closed; the implementation-review corrections
+in `memo/developer/switch-checkbox.md` folded in: `disabled` is owned, section 7). Follows
+`design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win. The platform facts come
+from `docs/research/form-controls.md` (binding). **Read `design/components/switch.md` first**: it
+specifies the native-input model (optimistic `checked` on a controlled input), the shared hook
+`useNativeChecked` with both residual browser paths (mount reconciliation, form reset), the
+`preventDefault()` rule and the Server Function / form independence. This document repeats only
+what differs and adds `indeterminate`.
+
+## combobox.md
+
+Status: **accepted** (2026-10-17, wave 4, GitHub issue #50; the product owner accepted questions
+1 to 5 and 7 to 11 as recommended and the user overrode question 6: a default English
+announcement ships, see "Decisions recorded" at the end). **Revised after review** (2026-10-17,
+`memo/reviewer/combobox.md` and `memo/developer/combobox.md`; the product owner's decisions are
+in "Review revisions" at the end: the loading state and `aria-busy`, the active option cleared by
+typing, the rollback outside the transition, and the accepted implementation deviations).
+**Amended 2026-10-23 (#96, user decision)**: the urgent lane is a handler, `onInputValueChange:
+UrgentChangeHandler`, no longer `inputValueChangeAction: UrgentChangeAction`; edited in place
+(decision 3, 2.2, 3, 3.1, 3.6, 4, 6.2, 9, 10, 11.2, 12.1, 14), migration and implementation
+checklist in the amendment at the end; the historical sections keep the old names.
+**Amended 2026-11-24 (#148, user decision; implemented 2026-11-24)**: `onInputValueChange` follows
+the library-wide handler rule (a returned promise is allowed, no warning, rejection or throw to
+`reportError`; edited in place in 4, 9 and 12.1), and `open` gains `onOpenChange` for
+dismissals (amendment at the end, which overrides what 3.1, 5.4 and 5.5 say about dismissals).
+Follows `design/conventions.md`
+(accepted); where this document and the conventions disagree, the conventions win. **Read
+`design/components/popover.md` and `design/components/menu.md` first**: Combobox is built on
+the same internal hooks (`useOverlayRoot`, `usePopoverPopup`, `useActionTrigger`), the same
+ownership split (library-owned open and part-initiated closes, browser-owned dismissals), the
+same apply effect, close intents and `<ViewTransition>` wiring around the top-layer element, and
+Menu's "stay open with `data-pending` on the item, close in the commit that ends the action"
+rule. Then `design/components/select.md` for the boundary between the two components. This
+document repeats only what differs and adds what a combobox is: a text input whose typing is
+**urgent**, a listbox whose results render from a **deferred** query inside Suspense, virtual
+focus through `aria-activedescendant`, and a selection that is a library-owned value with a
+hidden form field.
+
+## context-menu.md
+
+Status: **accepted** (2026-10-22, GitHub issue #45, wave 10 tracker #86; the product owner
+accepted every decision as proposed, and the user approved the positioning-only shipped CSS of
+section 4.2, see "Decisions recorded" at the end). **Implemented** in 27c6c11 (docs page
+dc64c68, playground 9c69548) and reviewed the same day (`memo/reviewer/context-menu.md`,
+a8d09c7): the ten accepted deviations and the review corrections (H1, M1 and the design-text
+items) are folded into the sections below and listed at the end of this document. Follows
+`design/conventions.md` (accepted); where this document and the conventions disagree, the
+conventions win. **Read `design/components/menu.md` first** (accepted, implemented): a context
+menu is the Menu popup opened from a different trigger. Items, checkbox and radio items, groups,
+submenus, typeahead, roving focus, Tab-closes-stack, item activation through the root Root and
+`<ViewTransition>` are Menu's and are not repeated here. This document adds the trigger region,
+placement at a point, the right-button interplay with popover light dismiss, touch, and the
+accessibility stance.
+
+## dialog.md
+
+Status: **accepted** (2026-10-16, GitHub issue #26; all product-owner questions accepted as
+recommended, implementation deviations folded in from `memo/developer/dialog.md` the same day,
+and the implementation-review fixes (light dismiss press-and-click, nested Escape, Form
+`closeOnSettle` / `method`, Trigger `pending`, owned `disabled`, the nested-confirm pattern)
+folded in on 2026-10-17). **Amended 2026-10-17 (issue #46): part-initiated closes are
+library-owned**, so the `<ViewTransition>` exit runs in every engine, Firefox included, as in
+Popover; dismissals stay the browser's. The amendment is folded into the sections it touches
+(2.3, 2.5, 3.1, 3.3 to 3.5, 4, 7, 8.1, 10.3, 11, 13, 14) and summarised, with the developer's
+implementation notes and test plan, in "Amendment: library-owned part-initiated closes" at the
+end. The amendment is implemented (#46), and the review of that implementation
+(`memo/reviewer/dialog-46.md`; fixes in commits 56e1ea8..bcdb7e1, notes in
+`memo/developer/dialog.md`) is folded in on 2026-10-18, see "Review corrections (#46)" at the
+end. **Amended 2026-10-18 (issue #59): `Dialog.Form`'s settle close is error-aware when the
+form is rendered as a `Form.Root`** (no new props; accepted, implemented in 32611fd, docs in
+8cbde22, folded into row 9, 3.5, 8.1, 13.2, 14, see "Dialog.Form and Form.Root (#59)" at the
+end). The code under `packages/ui/src/dialog/` is the ground truth where this document is silent.
+Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
+conventions win.
+
+## field-form.md
+
+Status: **accepted** (2026-10-18, wave 5, GitHub issue #54; research issue #55; all eleven
+product-owner items accepted as recommended, see "Accepted by the product owner" at the end).
+The review of the implementation (`memo/reviewer/field-form.md`, merge e172925) and its fixes
+(ae4640d library and tests, 30a4bb2 docs) are folded in on 2026-10-18, see "Review corrections
+(#54)" at the end. The code under `packages/ui/src/field/`, `packages/ui/src/form/` and the
+`internal/` helpers it names is the ground truth where this document is silent.
+Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
+the conventions win. The conventions changes listed under "Conventions feedback (proposed)"
+were **applied** to `design/conventions.md` on 2026-10-18 (resolved question 30); the 3.8 hook
+rows were corrected with the review fold (`useFieldValueChange`, no `data-pending` from the hook).
+Amended 2026-10-18 with the NumberField design (#67): the registration's optional
+`validityElement` and the Field-side mirror, see 7.1 and "Amendment: `validityElement`" at the end.
+
+## menu.md
+
+Status: **accepted** (2026-10-17, GitHub issue #39; the product owner accepted all eleven
+questions as recommended, see the end of this document). **Implemented** in #41 (a456681; the
+shared `useActionTrigger` in ac7064e) and reviewed the same day: the review corrections and the
+six accepted deviations are folded into the sections below and listed at the end of this
+document. **Amended 2026-10-22 with the context menu** (#45, `design/components/context-menu.md`,
+accepted the same day): `Menu.ContextTrigger` in 1 and 3.9, the outside right- / middle-click close for every
+menu in 2.2, `data-context`, the point placement and the owned `onContextMenu` in 3.3, the
+placement in 14. Follows `design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win. **Read
+`design/components/popover.md` first** (accepted): Menu is built on its internal hooks
+(`useOverlayRoot`, `usePopoverPopup`, `usePopoverTrigger`), its ownership split (library-owned
+open and part-initiated closes, browser-owned dismissals), its apply effect, close intents,
+nested focus-return rule, deferred unmount, `aria-expanded` handling, positioning helper and
+`<ViewTransition>` wiring around the top-layer element. This document repeats only what differs
+and adds what a menu is: items with actions, checkbox and radio items with optimistic state,
+the APG keyboard model, typeahead, submenus with hover intent, and the `focusgroup="menu"` flag.
+
+## number-field.md
+
+Status: **Accepted by the product owner** (2026-10-18, wave 6, GitHub issue #67; all fourteen
+items of "For the product owner" accepted as written, see the end of this document; the
+conventions changes are applied in 29a94c5, conventions resolved question 33, and the Field
+amendment is in `design/components/field-form.md`, "Amendment: `validityElement`").
+Implemented in c31588b (playground 0a2c701, docs bff9672); the review
+(`memo/reviewer/number-field.md`, "acceptable with minor fixes") and its fixes (6742cb0,
+36b48f4) are folded in on 2026-10-18, see "Review corrections (#67)" at the end; the wave 16
+refactoring (#100, 2026-10-24) into sections 6 and 15 and the superseded-rejection rows; #145
+(2026-11-23: a superseded rejection goes to `reportError`, the shared capture of #100 is gone)
+into 6, 12, 14 and 15. The code under
+`packages/ui/src/number-field/` is the ground truth where this document is silent. Follows
+`design/conventions.md` (accepted); where this document and the conventions disagree, the
+conventions win.
+
+## popover.md
+
+Status: **accepted** (2026-10-17, GitHub issue #38; the product owner accepted all eight
+questions as recommended, see the end of this document; the Dialog view-transition close
+follow-up is issue #46). **Implemented** (#40); the review's corrections
+(`memo/reviewer/popover.md`, fixes in commit 35e57e1) are folded in, see "Review corrections"
+at the end; the Dialog #46 review's M2 (keep the CSS exit next to `transition`, cut it while a
+view transition runs) applies to Popover too and is folded into 10.2 and 13.3 (2026-10-18, commit
+5dcce5f). The code under `packages/ui/src/popover/` and `src/internal/use-popover-*.ts` is the
+ground truth where this document is silent. Follows `design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win. **Read
+`design/components/dialog.md` first**: Popover is the Dialog's two-mode model (JS-free mode
+through Invoker Commands, library mode with a library-owned open keyed on committed state)
+applied to a `popover="auto"` element, and it reuses Dialog's `initialFocus`, close intents,
+apply effect, mount reconciliation and deferred unmount. Then `design/components/tooltip.md` for
+the Popover API half: `showPopover({ source })`, the implicit anchor, `side` / `align`, and the
+no-portal, no-positioner rule. This document repeats only what differs.
+
+## progress.md
+
+Status: **accepted** (2026-10-18, wave 6, GitHub issue #68; research issue #65,
+`docs/research/wave6.md` §3; the product owner accepted all twelve items of "For the product
+owner" as recommended, see the end of this document; the conventions proposals were applied in
+f3ab2e4, conventions resolved question 32). Implemented in 6fef197; the review
+(`memo/reviewer/progress-meter.md`) and its fixes (ab22773) are folded in on 2026-10-18, see
+"Review corrections (#68)" at the end. The code under `packages/ui/src/progress/`,
+`packages/ui/src/meter/` and the `internal/` helpers it names is the ground truth where this
+document is silent. Follows `design/conventions.md` (accepted); where this document and the
+conventions disagree, the conventions win. Open human checks: the Next.js provider pattern and
+the screen-reader pass (#73); the docs build's silence on an RSC render error (#72).
+
+## radio-group.md
+
+Status: **accepted** (2026-10-16, GitHub issue #28; review corrections from
+`memo/reviewer/radio-group.md` folded in the same day). Follows `design/conventions.md`
+(accepted); where this document and the conventions disagree, the conventions win.
+
+## select.md
+
+Status: **accepted** (2026-10-17, GitHub issue #50; the product owner accepted questions 1 to 3
+and 5 to 8 as recommended and decided question 4 against the warning, see "Decisions recorded"
+at the end; **implemented** in 1114850 and reviewed the same day, `memo/reviewer/select.md`,
+with the review's corrections and the accepted deviations folded in, see "Review corrections"
+at the end). Follows `design/conventions.md`
+(accepted); where this document and the conventions disagree, the conventions win. **Read
+`design/components/radio-group.md` first**: it defines the model for a library-owned value held
+in a controlled native form control (`value` / `defaultValue` / `valueChangeAction`, optimistic
+DOM state, one dispatch per state owner on the residual browser paths, the form-reset listener).
+This document repeats only what differs for a `<select>`.
+
+## slider.md
+
+Status: **accepted** (2026-10-18, wave 5, GitHub issue #54; the product owner accepted all
+twelve items of "For the product owner" as recommended, see the end of this document; the
+conventions changes are applied, see "Conventions feedback (applied)" and conventions resolved
+question 29). Implemented in 6cef8e7; the review (`memo/reviewer/slider.md`) and its fixes
+(3b96bcb, 8fffbca, 330ba8c) are folded in on 2026-10-18, see "Review corrections (#54)" at the
+end; the wave 16 refactoring (#100, 2026-10-24) into section 15 and the superseded-rejection
+rows; #145 (2026-11-23: a superseded rejection goes to `reportError`, the shared capture of #100
+is gone) into 2.4, 6, 14 and 15. The code under `packages/ui/src/slider/` is the ground truth where this document is silent.
+Follows `design/conventions.md` (accepted); where this document and the conventions disagree,
+the conventions win.
+
+## switch.md
+
+Status: **accepted** (2026-10-16, GitHub issue #27, closed; the implementation-review corrections
+in `memo/developer/switch-checkbox.md`, among them owned `disabled`, are reflected in section
+12.2). Follows `design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win. The platform facts come
+from `docs/research/form-controls.md` (binding); this document adds the probes recorded in
+`memo/architect/switch-checkbox-notes.md` (react-dom 19.3.1 source reading and
+`memo/architect/probes/checkbox-form-reset-ordering.mjs`).
+
+## tabs.md
+
+Status: **proposed** (2026-10-15, GitHub issue #7). Follows `design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win.
+
+## toast.md
+
+Status: **accepted** (proposed 2026-10-17, GitHub issue #54, wave 5; accepted by the product
+owner on 2026-10-18 with the server-side no-op amendment, section 19). Implemented in
+3266e4e..fa6e481 (merged at 03404ef). The review of that implementation (`memo/reviewer/toast.md`,
+2805959; fixes in eeacdbf, docs page in 906702d, the developer's reasoning in
+`memo/developer/toast.md` "Review fixes") is folded in on 2026-10-18 into the sections it touches
+and audited in "Review corrections (#54)" at the end; the leftovers are GitHub issue #63, and
+section 21 (`Toast.Root fallback`, for its timer item) was **accepted on 2026-10-18** and
+awaits implementation. The code under
+`packages/ui/src/toast/` is the ground truth where this document is silent. Follows
+`design/conventions.md` (accepted, with the section 18 amendments applied; **amended
+2026-11-24, #148, user decision, implemented 2026-11-24: `closeAction` is renamed `onClose` and is
+a handler, not an action**, section 22; decisions 6, 3.3, 3.4, 9.3, 11, 12, 16.1 and 17 are
+edited in place, the other mentions of `closeAction` below read as `onClose`); where this document
+and the conventions disagree, the conventions win.
+
+## toggle-group.md
+
+Status: **Accepted by the product owner** (2026-10-18, GitHub issue #66, wave 6). Draft 90d9375; recommendations 1-12 accepted as written.
+Implementation d5af7f5 (playground 5068d22, docs a621645), the review
+`memo/reviewer/toggle-group-toolbar.md` (d03c398, "acceptable with minor fixes") and its fixes
+881cb37 (library, tests) and b185942 (docs) are folded in on 2026-10-18: see "Implementation and
+review fold (#66)" and "Open questions" at the end. The code under `packages/ui/src/toggle-group/`,
+`packages/ui/src/toolbar/` and `packages/ui/src/internal/use-roving-focus.ts` is the ground truth
+where this document is silent. Wave 7 (tracker #78, 2026-10-18): sections 17 and 18 make #74
+(native radios inside a Toolbar, probed in Chromium) and #75 (Tooltip's composite check) ready to
+implement; accepted in advance by the product owner on the condition, met, that the probe confirms
+the proposal. Implemented in 5eef360 (library, Tooltip), 9e6feba (docs) and 2a836ec (WebKit test
+branch); the developer's three deviations (`memo/developer/toggle-group.md`, "Wave 7") are folded
+into 17.1, 17.2, 18 and rows 25, 27 and 28.
+Follows `design/conventions.md` (accepted); where this document and the conventions disagree, the
+conventions win. The conventions amendments this design asks for are listed at the end and were
+applied to `design/conventions.md` in the same commit, marked as pending this design's acceptance.
+
+## toggle.md
+
+Status: **proposed** (2026-10-15, GitHub issue #6). Follows `design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win.
+
+## tooltip.md
+
+Status: **proposed** (2026-10-15, GitHub issue #9). Follows `design/conventions.md` (accepted);
+where this document and the conventions disagree, the conventions win.
