@@ -1347,6 +1347,34 @@ describe("Accordion", () => {
     });
 
     // #153: like ToggleGroup, the exclusive/multiple mode is fixed at mount.
+    it("JS-free: `name` keeps its mount-time presence when `exclusive` changes", () => {
+      const consoleError = silenceErrors();
+      const ui = (exclusive: boolean) => (
+        <Accordion.Root {...(exclusive ? { exclusive: true as const } : {})}>
+          <Accordion.Item value="a" data-testid="item-a">
+            <Accordion.Trigger>A</Accordion.Trigger>
+          </Accordion.Item>
+          <Accordion.Item value="b" data-testid="item-b">
+            <Accordion.Trigger>B</Accordion.Trigger>
+          </Accordion.Item>
+        </Accordion.Root>
+      );
+      const { rerender, unmount } = render(ui(true));
+      const name = item("a").getAttribute("name");
+      expect(name).toBeTruthy();
+      rerender(ui(false));
+      expect(item("a")).toHaveAttribute("name", name!);
+      expect(item("b")).toHaveAttribute("name", name!);
+      expect(consoleError.mock.calls[0]?.[0]).toMatch(/`exclusive` changed after mount/);
+      unmount();
+      consoleError.mockClear();
+      const multiple = render(ui(false));
+      multiple.rerender(ui(true));
+      expect(item("a")).not.toHaveAttribute("name");
+      expect(item("b")).not.toHaveAttribute("name");
+      expect(consoleError).toHaveBeenCalledTimes(1);
+    });
+
     it("warns when `exclusive` changes after mount and keeps the mounted mode", async () => {
       const consoleError = silenceErrors();
       const action = vi.fn<ActionFn>();

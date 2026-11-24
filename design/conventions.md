@@ -1199,14 +1199,17 @@ Details of the replay:
   optimistic patches onto a changed committed value (section 3.4), and it replays resolved
   changes at commit. It must therefore read the change from `details` (the patch or the item),
   not from `next`.
-- **Absolute dispatches.** A reducer may adopt `next` whole for a dispatch that is not a change
-  by the user but the whole value the browser left behind. Two exist: CheckboxGroup's **form
-  reset** (`reason: "platform"` with `details.event` set, the `reset` event: a reset replaces the
-  value, so a change rejected after it cannot survive it), and Accordion's **mount
-  reconciliation** in multiple mode (`reason: "platform"` without an event: all pre-hydration
-  clicks as one `next`). CheckboxGroup's mount and late-mount reconciliations stay patches.
-  The two components use opposite tests on `details.event` on purpose; each is stated in its
-  design.
+- **Absolute dispatches.** A dispatch that is not a change by the user but the whole value the
+  browser left behind is made with the internal option `dispatch(next, details, { whole: true })`:
+  its `next` bypasses the reducer, in the optimistic step and in the replay. The reducer itself
+  never decides it (before #153 the two components inferred it from whether `details.event` was
+  set, which rested on which platform paths happen to pass an event). Two exist: CheckboxGroup's
+  **form reset** (a reset replaces the value, so a change rejected after it cannot survive it),
+  recognised from the path `useNativeGroupReconciliation` names in `onPlatformChange`'s third
+  argument (`NativeGroupPath`: `"reset"` from its `reset` listener, `"mount"` from the mount and
+  late-mount reconciliations, which stay patches); and Accordion's **mount reconciliation** in
+  multiple mode (all pre-hydration clicks as one `next`), dispatched whole from the Root's mount
+  layout effect. The option is internal and appears in no public details type.
 - **Exclusive modes pass no reducer.** `exclusive` ToggleGroup and Accordion are single-valued:
   the optimistic value is `next` and the latest dispatch commits it, exactly like Tabs. (A patch
   reducer there would bring a replaced item back: a rejected press followed by a resolved
@@ -1327,7 +1330,8 @@ optimistic value is re-based change by change, and the uncontrolled commit becom
 section 3.3. Rules for a reducer:
 
 - It reads the change from `details` (a patch's `added` / `removed`, or `item` and `open`), not
-  from `next`, except for a dispatch it documents as absolute (3.3).
+  from `next`. It has no exception to make: an absolute dispatch is made with `{ whole: true }`
+  and never reaches the reducer (3.3).
 - It is pure and does not depend on the optimistic value at dispatch time: it runs again, later,
   against a different base.
 - A mode that is single-valued passes `undefined`, not a "replace" reducer; with a reducer the

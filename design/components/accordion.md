@@ -463,8 +463,8 @@ pre-hydration clicks as one `next` and names only one of the items in `details`,
 dispatched with the internal `whole` option of `useControllableAction`'s `dispatch`: its `next`
 bypasses the reducer, in the optimistic step and in the uncontrolled replay (#153; before, the
 reducer recognised it as "`reason: "platform"` without an event", which rested on which platform
-paths happen to pass an event). It cannot sit in a burst behind a click whose action later rejects: it
-runs from the Root's mount layout effect, the Root's first possible dispatch, and again only when
+paths happen to pass an event). It cannot sit in a burst behind a click whose action later
+rejects: it runs from the Root's mount layout effect, the Root's first possible dispatch, and again only when
 an `<Activity>` re-shows the Root, where a pending click's item already has DOM `open` equal to
 the intended value and nothing is dispatched. A find-in-page reveal (`reason: "platform"` with
 the `toggle` event) is one item's change and is replayed like a click.

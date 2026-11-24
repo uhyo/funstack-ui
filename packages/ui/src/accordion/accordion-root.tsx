@@ -283,12 +283,12 @@ export function AccordionRoot(props: AccordionRootProps) {
     // commits it, like Tabs.
     //
     // The mount reconciliation folds every pre-hydration click into one `next` and is dispatched
-    // with `whole` (adopted whole, bypassing the reducer). It never sits in a burst behind a click whose action later
-    // rejects: it runs only from the Root's mount layout effect, the Root's first possible
-    // dispatch (children do not dispatch from layout effects, and no user event can run between
-    // a commit and its layout effects). It runs again only when an `<Activity>` re-shows the
-    // Root; a pending click's item then has DOM `open` equal to the optimistic value, so `next`
-    // equals the intended value and nothing is dispatched.
+    // with `whole` (adopted whole, bypassing the reducer). It never sits in a burst behind a
+    // click whose action later rejects: it runs only from the Root's mount layout effect, the
+    // Root's first possible dispatch (children do not dispatch from layout effects, and no user
+    // event can run between a commit and its layout effects). It runs again only when an
+    // `<Activity>` re-shows the Root; a pending click's item then has DOM `open` equal to the
+    // optimistic value, so `next` equals the intended value and nothing is dispatched.
     reducer: exclusive
       ? undefined
       : (prev, _next, details) => reduce(prev, details.item, details.open, false),
