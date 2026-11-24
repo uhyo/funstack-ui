@@ -180,11 +180,15 @@ export function usePopoverPopup(
   };
 
   const showPopup = (element: HTMLElement): void => {
-    // A `<dialog>` (Popover's default) runs the dialog focusing steps on every show whatever the
-    // library does, so the skip applies where the platform focuses nothing itself (Menu, a
-    // `<div>` Popover; Combobox never moves focus).
-    const refused = refusedFact.current && element.tagName !== "DIALOG";
+    // A refused re-open never moves focus (#155, #156): no initial focus target. A `<dialog>`
+    // (Popover's default) runs the dialog focusing steps on every show anyway; with the popup
+    // `inert` for the duration of the call they find nothing focusable and do nothing, so the
+    // element the dismissal focused sees no blur. Other popups focus nothing without `autofocus`.
+    // A consumer's own `inert` is left alone.
+    const refused = refusedFact.current;
     refusedFact.current = false;
+    const inerted = refused && element.tagName === "DIALOG" && !element.hasAttribute("inert");
+    if (inerted) element.setAttribute("inert", "");
     const focus = refused ? null : resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps
     // for a <dialog>, in every engine); React drops `autoFocus` on client-rendered content.
@@ -203,6 +207,7 @@ export function usePopoverPopup(
     } finally {
       opening.current = false;
       autofocused?.removeAttribute("autofocus");
+      if (inerted) element.removeAttribute("inert");
     }
     if (focus?.quiet === true && isPopoverOpen(element) && element.contains(focus.target)) {
       focus.target.focus({ focusVisible: false } as FocusOptions);

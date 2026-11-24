@@ -33,7 +33,8 @@
 //   steps (an `autofocus` descendant, else the first sequentially focusable descendant, else the
 //   dialog itself), any other popover focuses only itself with `autofocus` or an `autofocus`
 //   descendant. Chromium, Firefox and WebKit all do this for `<dialog popover>`
-//   (popover.browser.test.tsx, platform probe).
+//   (popover.browser.test.tsx, platform probe). An `inert` popover focuses nothing (the
+//   focusing steps find no focusable area; #156).
 // - Hiding an `auto` popover hides the `auto` popovers nested in it first (DOM descendants, or
 //   opened with a `source` inside it), each with its own events: the hide half of "hide all
 //   popovers until" (design/components/menu.md 14). Opening one does not close unrelated ones.
@@ -97,6 +98,8 @@ function firstSequentiallyFocusable(root: HTMLElement): HTMLElement | null {
 
 /** HTML's popover focusing steps, run by `showPopover()` once the popover is shown. */
 function popoverFocusingSteps(popover: HTMLElement): void {
+  // An inert popover has no focusable area: the focusing steps do nothing (jsdom ignores `inert`).
+  if (popover.closest("[inert]") !== null) return;
   const autofocus = popover.querySelector<HTMLElement>("[autofocus]");
   if (popover.localName === "dialog") {
     const control = autofocus ?? firstSequentiallyFocusable(popover);

@@ -1649,6 +1649,62 @@ describe("Popover", () => {
   });
 
   describe("focus", () => {
+    // #156: a refused re-open of the default <dialog> is shown `inert`, so the dialog focusing
+    // steps focus nothing; a consumer's own `inert` is not touched.
+    function Refusing({ inert }: { inert?: boolean }) {
+      return (
+        <>
+          <Popover.Root open openChangeAction={() => {}} onOpenChange={() => {}}>
+            <Popover.Trigger data-testid="trigger">Filters</Popover.Trigger>
+            <Popover.Popup data-testid="popup" aria-label="Filters" inert={inert}>
+              <input data-testid="inner" />
+            </Popover.Popup>
+          </Popover.Root>
+          <input data-testid="outside" />
+        </>
+      );
+    }
+
+    it.each([
+      ["without a consumer inert", undefined],
+      ["with the consumer's inert", true],
+    ] as const)(
+      "a refused dismissal re-shows the <dialog> without moving focus (#156), %s",
+      async (_, inert) => {
+        render(<Refusing inert={inert} />);
+        await flushTasks(2);
+        const popupEl = screen.getByTestId("popup");
+        expect(popupEl.matches(":popover-open")).toBe(true);
+        const outside = screen.getByTestId("outside");
+        outside.focus();
+        const blur = vi.fn();
+        outside.addEventListener("blur", blur);
+        const inertDuringShow: boolean[] = [];
+        const show = HTMLElement.prototype.showPopover;
+        vi.spyOn(HTMLElement.prototype, "showPopover").mockImplementation(function (
+          this: HTMLElement,
+          options,
+        ) {
+          inertDuringShow.push(this.hasAttribute("inert"));
+          show.call(this, options);
+        });
+        await act(async () => popupEl.hidePopover());
+        await flushTasks(2);
+        expect(popupEl.matches(":popover-open")).toBe(true);
+        expect(inertDuringShow).toEqual([true]);
+        expect(outside).toHaveFocus();
+        expect(blur).not.toHaveBeenCalled();
+        if (inert === true) {
+          expect(popupEl).toHaveAttribute("inert");
+        } else {
+          expect(popupEl).not.toHaveAttribute("inert");
+          // A later show (not a re-open of a refused fact) is not inert.
+          screen.getByTestId("inner").focus();
+          expect(screen.getByTestId("inner")).toHaveFocus();
+        }
+      },
+    );
+
     it("initialFocus (ref): autofocus is on the target while showPopover runs, removed after", async () => {
       const user = setupUser();
       let autofocusDuringShow: boolean | undefined;
