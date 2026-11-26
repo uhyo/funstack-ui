@@ -342,8 +342,8 @@ is n/a; use `data-*` attributes.
     now in the latest stable of all three engines: **adopt**. The summary table row above keeps
     the verdict of the research date. The "Scroll areas" docs recipe uses them for edge fades,
     behind `@supports (animation-timeline: scroll())`; its browser test ran the recipe in
-    Chromium, in Playwright's Firefox 157 (no support: no fade, as the `@supports` guard intends)
-    and in that Firefox with the pref on (the recipe works).
+    Chromium, in WebKit (branch CI), in Playwright's Firefox 157 (no support: no fade, as the
+    `@supports` guard intends) and in that Firefox with the pref on (the recipe works).
 - Scroll snap: Baseline. `scrollsnapchange`/`scrollsnapchanging` events are Chromium only.
   `scrollend` is Baseline since Safari 26.2.
 - `scroll-state()` queries (`stuck`, `snapped`, `scrollable`, `scrolled`): Chrome 133/144 only.

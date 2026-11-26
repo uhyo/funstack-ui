@@ -35,3 +35,9 @@ is another developer's (`feat/171-otp-field`); otp-field.md untouched here.
   `::-webkit-scrollbar` variant are described on the page but not run by any test.
 - The no-script paint row screenshots a 40px avatar; antialiasing is avoided by having no
   border-radius in the test CSS.
+
+## CI
+
+- Run 45831842711 (head 95424b27): WebKit failed only the recipe's fade row (`9.999999px`).
+  Fixed by rounding (dc46b76d). Run 45832566374 (dc46b76d): ci, chromium, firefox, webkit all
+  green.

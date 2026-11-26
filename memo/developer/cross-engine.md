@@ -240,3 +240,6 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
 - react-dom 19.3.1 under `<ViewTransition>` + `startTransition`: an `<img>` without `onLoad` is
   `complete` when its ref attaches (the commit was held for `decode()`); with `onLoad` it is not.
   Chromium and Firefox; WebKit via branch CI.
+- WebKit (branch CI run 45832566374): every Avatar browser row passes, including the commit wait
+  and the no-script paint. The recipe's fade at `scrollTop = 10` computes `9.999999px` in WebKit
+  (exact `10px` in Chromium and pref-on Gecko): the test rounds to whole pixels.
