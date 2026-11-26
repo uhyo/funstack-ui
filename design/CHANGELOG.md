@@ -12651,3 +12651,50 @@ The points left to verify by the entry above:
   list named by the Label with `focusable` list items; CDP shows no `posinset` / `setsize` for
   them (Chromium computes the position in the platform layer), so what a screen reader speaks
   is part of the same manual pass.
+
+## 2026-11-26, #164: Combobox `multiple`, review amendments
+
+From the review of the implementation (`memo/reviewer/review-164.md` on `review/164`); m1 is a
+product-owner decision. Sections changed: combobox.md 15.6, 15.7; conventions 1.1 (wording).
+
+- **M1, the removal announcement's text fallback (15.7).** It was the chip's `textContent`,
+  which reads an `aria-hidden` "×" (the docs example announced "TypeScript× removed"). It is now
+  the chip's text nodes, skipping `[aria-hidden="true"]` subtrees and the `ChipRemove` (whose
+  elements register with the Root), whitespace collapsed and trimmed. `ChipRemove` content is
+  never part of the label.
+- **M2, a focused chip that unmounts (15.6).** New rule: when a focused chip unmounts for a
+  reason other than its own Backspace / Delete (a rolled-back addition, a controlled parent
+  dropping the value, a form reset), focus goes to the next chip, else the previous one, else
+  the Input. Implemented from the Chip's registration cleanup (which runs before the host node
+  is removed) and a Root layout effect that runs after the chips' re-registration, so a chip
+  that only re-registered keeps focus.
+- **m1, Enter while an open is on its way (15.6, product-owner decision).** With `multiple`,
+  Enter with typed text while the listbox is intended open but not committed yet (a slow
+  `openChangeAction`, or the keystroke's own open still rendering) is prevented and the text is
+  kept: the user typed a search and is about to pick, never "submit this". Judged on committed
+  state, so Escape-then-Enter (committed still open until the `toggle` fact) keeps the rules of
+  section 8 unchanged.
+- **m2, a chip focused while an open is on its way (15.6).** Focus arriving on a chip also
+  cancels an open that is requested but not shown, with a close request, so the listbox never
+  shows under a focused chip.
+- **m3, printable keys on a chip (15.6).** Printable means one code point
+  (`[...key].length === 1`, astral characters included) other than Space. Ctrl / Meta are
+  checked for the navigation keys only; a character typed with AltGr
+  (`getModifierState("AltGraph")`, Ctrl+Alt on Windows) is handed over; an IME start
+  (`key === "Process"`, `keyCode` 229) focuses the Input too. Whether the composition then runs
+  in the Input is part of the manual pass (no engine automates an IME on a chip here).
+- **n1 (15.7).** While `Chips` is empty it carries no name at all: the consumer's `aria-label` /
+  `aria-labelledby` are removed with the library's (a role-less `div` may not be named).
+- **n2 (types, docs only).** `ComboboxRootProps` is a union, so `Partial<ComboboxRootProps>` is
+  not assignable to either member and no longer spreads into `Combobox.Root`; a wrapper types
+  its partial props as `Partial<ComboboxSingleProps>` (or the multiple variant). Noted on the
+  docs page.
+- **n3.** conventions 1.1 had two "A second exception" paragraphs: the Combobox one is now the
+  third, after NumberField's. No rule changed.
+- **n5 (15.7).** The removal is announced optimistically, in the event; a rejection brings the
+  chip back without a second announcement.
+- **m4 (docs).** The JSDoc and docs rows of `allowCustomValue` and `defaultInputValue` describe
+  the multiple behaviour; the props table's type column shows both variants' types.
+- Tests (jsdom, `combobox-multiple.test.tsx`, "review fixes"): one row per finding, plus a
+  Combobox row for the #151 rule (a reset equal to the intended value dispatched while changes
+  are in flight, the final value the reset target).

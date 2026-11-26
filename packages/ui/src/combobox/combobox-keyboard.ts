@@ -11,7 +11,10 @@ export interface ComboboxKeyboardOptions {
   readonly disabled: boolean;
   readonly loop: boolean;
   readonly allowCustomValue: boolean;
-  readonly popover: Pick<PopoverRootValue, "popupRef" | "requestOpen" | "requestClose">;
+  readonly popover: Pick<
+    PopoverRootValue,
+    "popupRef" | "requestOpen" | "requestClose" | "intended" | "committed"
+  >;
   readonly options: Pick<OptionRegistry, "registry" | "orderedOptions">;
   readonly active: Pick<ActiveOption, "activeRef" | "setActive" | "pendingEdgeRef">;
   /** Accepts an option (design 5.2). */
@@ -142,6 +145,15 @@ export function createComboboxKeyDown({
             return true;
           }
           if (multiple.textRef.current === "") return false;
+          // An open on its way (requested, not committed yet: a slow `openChangeAction`, or the
+          // keystroke's own open still rendering): the user typed a search and is about to
+          // pick, so Enter is prevented and the text is kept (design 15.6). Not after Escape:
+          // there the committed state is still open until the `toggle` fact runs, and Enter
+          // keeps the closed rules below (design 8).
+          if (popover.intended() && !popover.committed) {
+            event.preventDefault();
+            return true;
+          }
           if (allowCustomValue) {
             // The user is adding an item, not submitting the form (design 15.9).
             event.preventDefault();

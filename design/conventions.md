@@ -120,15 +120,15 @@ the control as a **visually hidden child** of its one styled element (`Slider.Th
 goes to the styled element, a documented `inputRef` to the control, and the props the control
 needs (`name`, `form`, the `aria-label` / `aria-labelledby` / `aria-describedby` trio) are
 listed as forwarded to it rather than landing on the styled element.
-A second exception (Combobox): a `Root` that has no element of its own renders the form
-value as hidden inputs, one for a single selection and **one per value** with `multiple`
-(`design/components/combobox.md` 15.8); they are form plumbing, take no `ref`, `className` or
-`render`, and sit before the children, outside every `<ViewTransition>`.
 A second exception (NumberField): a part whose user surface is itself a native input and
 whose form control must be a different element renders the control as a **visually hidden
 sibling immediately after it** (`NumberField.Input`): `ref` goes to the visible input, a
 documented `hiddenInputRef` to the control, and the props the control needs (`name`, `form`,
 `min`, `max`, `step`, `required`) are listed as forwarded to it.
+A third exception (Combobox): a `Root` that has no element of its own renders the form
+value as hidden inputs, one for a single selection and **one per value** with `multiple`
+(`design/components/combobox.md` 15.8); they are form plumbing, take no `ref`, `className` or
+`render`, and sit before the children, outside every `<ViewTransition>`.
 
 ### 1.2 Element polymorphism: `render`
 

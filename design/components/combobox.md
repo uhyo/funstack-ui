@@ -1665,6 +1665,7 @@ In the Input, in addition to section 8 (and with its two changed rows):
 | Alt+ArrowUp | open | close; the active option is **not** accepted | yes |
 | Backspace | the text is `""`, at least one chip, not a key repeat | remove the **last** chip (`removed: [last]`, the `keydown` as `details.event`); the removal is announced (15.7) | no |
 | Inline-start arrow (ArrowLeft; ArrowRight when the input's computed `direction` is `rtl`) | caret at 0, no selection, at least one chip | DOM focus moves to the last chip | yes |
+| Enter | text not empty, an open requested but not committed yet (intended open, committed closed: a slow `openChangeAction`, the keystroke's own open still rendering) | nothing: the text is kept, the form does **not** submit (the user typed a search and is about to pick). After Escape the committed state is still open until the `toggle` fact runs, so Escape-then-Enter keeps the closed rows below (section 8) | yes |
 | Enter | closed, `allowCustomValue`, text not empty | add the text as a value (15.9); the form does **not** submit | yes |
 | Enter | closed, no `allowCustomValue`, text not empty | the text is cleared (`"dismiss"`, in `flushSync`), then the key's default runs: a form submits without the unmatched text (15.8) | no |
 
@@ -1680,7 +1681,7 @@ On a focused chip (handled by `Chips`; "previous" and "next" follow the inline d
 | Home / End | the first / last chip |
 | Backspace, Delete | remove this chip; focus moves, before the dispatch, to the next chip, else the previous one, else the Input |
 | Escape | the Input; the key is prevented, so an enclosing Dialog or Popover does not close |
-| A printable key | the Input is focused in the `keydown`, so the character is typed there |
+| A printable key | the Input is focused in the `keydown`, so the character is typed there. Printable: one code point (`[...key].length === 1`, so astral characters count) other than Space; Ctrl / Meta make it a shortcut and it is left alone, except with AltGr (`getModifierState("AltGraph")`, reported as Ctrl+Alt on Windows). An IME start (`key === "Process"`, `keyCode` 229) hands over the same way. Ctrl / Meta are checked for the navigation keys of this table only |
 | Tab / Shift+Tab | the browser's: chips are `tabindex="-1"`, so Tab goes on from the chip's place in the document (the Input, in the usual layout) |
 | Enter, Space | nothing: a chip has no action of its own |
 
@@ -1696,7 +1697,12 @@ Focus rules:
   and `Chips` as one region: moving to a chip does not clear the text and commits no custom
   value. It does **close the listbox** (the library's immediate `hidePopover()`, a `"dismiss"`
   fact): with focus on a chip the listbox has no `aria-activedescendant` and cannot be
-  operated. Focus leaving a chip for anything outside the region is focus leaving the combobox.
+  operated. An open still on its way when a chip takes focus (requested, not shown yet) is
+  cancelled with a close request, so it never shows under the chip. Focus leaving a chip for
+  anything outside the region is focus leaving the combobox.
+- **A focused chip that unmounts for any other reason** (a rolled-back addition, a controlled
+  parent dropping the value, a form reset) passes focus on as Backspace and Delete do: the next
+  chip, else the previous one, else the Input, so focus is never dropped on the document.
 - **A press in `Chips` does not take focus from the Input**: `pointerdown` and `mousedown` are
   prevented on `Chips` (chips and `ChipRemove` included), and a click there focuses the Input.
   Pointer users remove with `ChipRemove`; chips are focused by keys only.
@@ -1712,7 +1718,7 @@ Focus rules:
 | List | `aria-multiselectable="true"` |
 | Option | `aria-selected` `"true"` / `"false"` on **every** option (already the case), optimistic |
 | Input | unchanged (`role="combobox"`, `aria-activedescendant`, …); `aria-required="true"` when `required` (15.8) |
-| Chips | `role="list"` while not empty (an empty `list` lacks its required children, so the role is dropped), `aria-labelledby` → the Label (or the consumer's `aria-label`) |
+| Chips | `role="list"` while not empty (an empty `list` lacks its required children, so the role is dropped), `aria-labelledby` → the Label (or the consumer's `aria-label`); while empty no name at all, the consumer's `aria-label` / `aria-labelledby` removed too (a role-less `div` may not be named) |
 | Chip | `role="listitem"`, `tabindex="-1"`; `aria-description` passes through (for "Press Backspace to remove", the consumer's string) |
 | ChipRemove | `tabindex="-1"`, the consumer's `aria-label` |
 
@@ -1724,8 +1730,12 @@ single mode. Toggling the active option needs no announcement from the library: 
 not even move, so the Root announces it with `ariaNotify()` on the Input: `announceRemoved`,
 default English `"Japan removed"` (labels joined with `", "`), a built-in string under
 conventions 11. The label is the Chip's `label` prop, else the label cache's entry, else the
-chip's trimmed `textContent` read before it unmounts (so a `ChipRemove` whose content is a
-"×" character belongs in an `aria-hidden` element or in CSS).
+chip's text read before it unmounts: its text nodes, skipping `[aria-hidden="true"]` subtrees
+and the `ChipRemove` (so a "×" in the remove button, or in an `aria-hidden` element, is not
+read), whitespace collapsed and trimmed. The removal is announced **optimistically**, in the
+event, before its action settles; a rejection brings the chip back silently (no "restored"
+announcement: the error goes to the boundary or `reportError`, as for every optimistic
+change).
 
 ### 15.8 Form, `required`, `disabled`
 

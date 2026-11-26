@@ -259,20 +259,20 @@ export function ComboboxPage() {
           },
           {
             name: "value",
-            type: "string | null",
+            type: "string | null; string[] with multiple",
             description:
               "Controlled selection. `null`: nothing selected. `undefined` means uncontrolled. With `multiple`: `string[]`, `[]` for nothing; the order is the chip order, duplicates are ignored.",
           },
           {
             name: "defaultValue",
-            type: "string | null",
+            type: "string | null; string[] with multiple",
             default: "null",
             description:
               "Initial selection when uncontrolled; what a form reset returns to. With `multiple`: `string[]`, default `[]`.",
           },
           {
             name: "valueChangeAction",
-            type: "ChangeAction<string | null, ComboboxValueChangeDetails>",
+            type: "ChangeAction<string | null, ComboboxValueChangeDetails>; with multiple ChangeAction<string[], ComboboxMultipleValueChangeDetails>",
             description:
               "Runs in the Root's transition when the user accepts an option, commits free text, presses Clear, or the form resets. Awaited; the listbox closes in the commit that ends it; a rejection rolls the text and the selection back and leaves the listbox open. May be a Server Function. A `setState` after your own `await` needs `startTransition`. With `multiple`: `ChangeAction<string[], ComboboxMultipleValueChangeDetails>`, called for every change (a pick, a removed chip, Clear, free text, a reset); the listbox does not close; a rejection undoes that change only.",
           },
@@ -286,7 +286,7 @@ export function ComboboxPage() {
             type: "string",
             default: '""',
             description:
-              "Initial text when uncontrolled, and the visible input's form-reset target. Pass the selected option's label together with `defaultValue`.",
+              "Initial text when uncontrolled, and the visible input's form-reset target. Single selection: pass the selected option's label together with `defaultValue`. With `multiple` the text is only a search (usually left empty).",
           },
           {
             name: "onInputValueChange",
@@ -323,7 +323,7 @@ export function ComboboxPage() {
             type: "boolean",
             default: "false",
             description:
-              "Free text is a value (Enter with no active option, focus leaving), dispatched with `details.custom: true`. Otherwise unmatched text reverts when focus leaves.",
+              "Free text is a value (Enter with no active option, focus leaving), dispatched with `details.custom: true`. Otherwise unmatched text reverts when focus leaves. With `multiple`: Enter (prevented, open or closed) and focus leaving add the text as a value (`added: [text]`) and clear it; without it unmatched text is cleared.",
           },
           {
             name: "autoHighlight",
@@ -346,7 +346,7 @@ export function ComboboxPage() {
           },
           {
             name: "announce",
-            type: "(count: number, state: ComboboxRootState) => string | null",
+            type: "(count: number, state: ComboboxRootState) => string | null; ComboboxMultipleRootState with multiple",
             default: '"No results" / "1 result" / "N results"',
             description:
               "The message `ariaNotify()` announces on the List when the results settle. Override for localisation; return `null` to announce nothing. Ignored where `ariaNotify` is missing.",
@@ -378,7 +378,7 @@ export function ComboboxPage() {
           },
           {
             name: "children",
-            type: "ReactNode | ((state: ComboboxRootState) => ReactNode)",
+            type: "ReactNode | ((state: ComboboxRootState) => ReactNode); ComboboxMultipleRootState with multiple",
             description:
               "The parts, or a function of the Root's state (`ComboboxMultipleRootState` with `multiple`).",
           },
@@ -392,7 +392,7 @@ export function ComboboxPage() {
           "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden input(s) when `name` is given."
         }
         note={
-          "The props type is `ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps`, discriminated on `multiple`."
+          "The props type is `ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps`, discriminated on `multiple`. `Partial<ComboboxRootProps>` is not assignable to either member, so a wrapper that spreads one into `Combobox.Root` types it as `Partial<ComboboxSingleProps>` (or the multiple one) instead."
         }
       />
       <p>
@@ -682,7 +682,7 @@ export function ComboboxPage() {
         rows={[
           ...functionProps(
             "ComboboxChipRemoveState",
-            "Content, usually an icon in an `aria-hidden` element (the chip's text is the announcement's fallback); give the button an `aria-label` (development warns without a name).",
+            "Content, usually an icon in an `aria-hidden` element (never read as part of the chip's text in the removal announcement, nor is any `aria-hidden` content); give the button an `aria-label` (development warns without a name).",
           ),
           renderProp("button", "ComboboxChipRemoveState"),
         ]}
@@ -811,6 +811,11 @@ export function ComboboxPage() {
           ],
           [
             "Enter",
+            "opening (requested, not shown yet), text typed",
+            "Nothing: prevented, the text is kept (you are about to pick). Right after Escape the closed rule below applies.",
+          ],
+          [
+            "Enter",
             "closed, text typed",
             "`allowCustomValue`: adds the text (prevented, the form does not submit). Otherwise clears the text, then a form submits.",
           ],
@@ -830,7 +835,11 @@ export function ComboboxPage() {
       <p>
         Screen readers hear a toggled option through its <code>aria-selected</code> under{" "}
         <code>aria-activedescendant</code>; a chip removed outside the listbox is announced with{" "}
-        <code>ariaNotify()</code> on the Input (<code>"Japan removed"</code>):
+        <code>ariaNotify()</code> on the Input (<code>"Japan removed"</code>). The label is the
+        Chip's <code>label</code>, else the option text the library saw, else the chip's text
+        without its <code>ChipRemove</code> and without <code>aria-hidden</code> content. The
+        announcement is optimistic: if the removal's save fails the chip comes back without a second
+        announcement. Localise it with:
       </p>
       <CodeBlock>{`<Combobox.Root multiple announceRemoved={(labels) => \`\${labels.join("、")}を削除しました\`}>`}</CodeBlock>
 

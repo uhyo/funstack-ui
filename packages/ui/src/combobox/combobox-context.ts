@@ -101,6 +101,8 @@ export interface ComboboxChipsValue {
   readonly labelOf: (value: string) => string | undefined;
   /** Registers a mounted Chip; returns the unregistration. */
   readonly registerChip: (value: string, entry: ComboboxChipEntry) => () => void;
+  /** Registers a mounted `ChipRemove` element (skipped in a chip's announced text). */
+  readonly registerRemove: (element: Element) => () => void;
   /** `Combobox.ChipRemove`'s click: remove `value`, announce it, focus the Input. */
   readonly removeChip: (value: string, event: Event) => void;
   /** The keys of a focused chip (design 15.6), run by `Chips`' `onKeyDown`. */

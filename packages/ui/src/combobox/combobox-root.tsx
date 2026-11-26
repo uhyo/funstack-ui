@@ -35,6 +35,7 @@ import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { toSet } from "../internal/value-set.js";
 import type { SetPatch } from "../internal/value-set.js";
 import { ComboboxContext } from "./combobox-context.js";
+import { chipText } from "./chip-text.js";
 import { useActiveOption } from "./use-active-option.js";
 import { useComboboxForm } from "./use-combobox-form.js";
 import { createComboboxKeyDown } from "./combobox-keyboard.js";
@@ -134,8 +135,9 @@ export interface ComboboxRootBaseProps {
   /** Controlled input text. `undefined`: uncontrolled. */
   inputValue?: string;
   /**
-   * Initial input text. Pass the selected value's label when `defaultValue` is
-   * set: the library never derives the text from the value.
+   * Initial input text. Single selection: pass the selected value's label when `defaultValue`
+   * is set (the library never derives the text from the value). With `multiple` the text is only
+   * a search and usually starts empty; the chips show the selection.
    *
    * @defaultValue `""`
    */
@@ -178,7 +180,9 @@ export interface ComboboxRootBaseProps {
    * Free text is a value: Enter with no active option, or focus leaving with text that is not
    * the selected option's label, dispatches the text with `details.custom: true` (empty text
    * dispatches `null`). When `false`, unmatched text reverts to the selection's label when focus
-   * leaves.
+   * leaves. With `multiple`: Enter with no active option (the key prevented, listbox open or
+   * closed) or focus leaving **adds** the text as a value (`added: [text]`, `custom: true`) and
+   * clears it; text already selected adds nothing. When `false`, unmatched text is cleared.
    *
    * @defaultValue `false`
    */
@@ -760,23 +764,80 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   // --- Chips (design 15.1, 15.6, 15.7) -------------------------------------------------------
 
   const [chipRegistry] = useState(() => new Map<string, ComboboxChipEntry>());
+  /** The mounted `ChipRemove` elements: left out of a chip's announced text (design 15.7). */
+  const [chipRemoves] = useState(() => new Set<Element>());
+  const registerRemove = useCallback(
+    (element: Element) => {
+      chipRemoves.add(element);
+      return () => {
+        chipRemoves.delete(element);
+      };
+    },
+    [chipRemoves],
+  );
+  /** The mounted chips in document order. Reads the DOM: handlers and effects only. */
+  const orderedChips = useCallback(
+    (): { value: string; element: HTMLElement }[] =>
+      sortByDocumentOrder(
+        [...chipRegistry]
+          .filter(([, entry]) => entry.element.isConnected)
+          .map(([chipValue, entry]) => ({ value: chipValue, element: entry.element })),
+        (chip) => chip.element,
+      ),
+    [chipRegistry],
+  );
+  /**
+   * A chip that held focus as its registration ended (design 15.6): the element, and the chips
+   * that may take focus over, next ones first, then the previous ones nearest first.
+   */
+  const focusedChipGone = useRef<{
+    element: HTMLElement;
+    candidates: readonly string[];
+  } | null>(null);
   const registerChip = useCallback(
     (chipValue: string, entry: ComboboxChipEntry) => {
       chipRegistry.set(chipValue, entry);
       return () => {
+        // A layout cleanup runs before React removes the host node, so focus is still there.
+        const element = entry.element;
+        if (element.contains(element.ownerDocument.activeElement)) {
+          const chips = orderedChips();
+          const index = chips.findIndex((chip) => chip.element === element);
+          if (index >= 0) {
+            focusedChipGone.current = {
+              element,
+              candidates: [...chips.slice(index + 1), ...chips.slice(0, index).reverse()].map(
+                (chip) => chip.value,
+              ),
+            };
+          }
+        }
         if (chipRegistry.get(chipValue) === entry) chipRegistry.delete(chipValue);
       };
     },
-    [chipRegistry],
+    [chipRegistry, orderedChips],
   );
-  /** The mounted chips in document order. Reads the DOM: handlers only. */
-  const orderedChips = (): { value: string; element: HTMLElement }[] =>
-    sortByDocumentOrder(
-      [...chipRegistry]
-        .filter(([, entry]) => entry.element.isConnected)
-        .map(([chipValue, entry]) => ({ value: chipValue, element: entry.element })),
-      (chip) => chip.element,
-    );
+  // A focused chip unmounted by anything but its own keys (a rolled-back addition, a controlled
+  // parent dropping the value, a reset): focus goes to the next chip, else the previous one,
+  // else the Input, as Backspace and Delete on a chip move it (design 15.6). After the children's
+  // layout effects: a chip that only re-registered (a new `label`) is still connected.
+  useLayoutEffect(() => {
+    const gone = focusedChipGone.current;
+    if (gone === null) return;
+    focusedChipGone.current = null;
+    if (gone.element.isConnected) return;
+    const doc = gone.element.ownerDocument;
+    const active = doc.activeElement;
+    if (active !== null && active !== doc.body) return;
+    for (const candidate of gone.candidates) {
+      const element = chipRegistry.get(candidate)?.element;
+      if (element !== undefined && element.isConnected) {
+        element.focus();
+        return;
+      }
+    }
+    inputRef.current?.focus();
+  });
 
   /**
    * Announces removed chips on the Input (design 15.7): the Chip's `label`, else the cache's
@@ -787,7 +848,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     if (removed.length === 0 || input === null || !canAnnounce(input)) return;
     const chipTexts = removed.map((v) => {
       const entry = chipRegistry.get(v);
-      const text = (entry?.element.textContent ?? "").trim();
+      const text = entry === undefined ? "" : chipText(entry.element, (el) => chipRemoves.has(el));
       return entry?.label ?? labels.get(v) ?? (text !== "" ? text : v);
     });
     const compose = propsRef.current.announceRemoved ?? defaultRemovedAnnouncement;
@@ -993,10 +1054,25 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
 
   /** The keys of a focused chip (design 15.6). */
   const chipKeyDown = (event: KeyboardEvent): void => {
-    if (disabled || !multiple || event.ctrlKey || event.metaKey) return;
+    if (disabled || !multiple) return;
     const chips = orderedChips();
     const index = chips.findIndex((chip) => chip.element === event.target);
     if (index < 0) return;
+    // AltGr is reported as Ctrl+Alt on Windows: a character typed with it is still a character.
+    const modified = (event.ctrlKey || event.metaKey) && !event.getModifierState?.("AltGraph");
+    // A printable key types into the Input: focused in the `keydown`, the character lands there
+    // (an astral character is one code point, two code units). An IME start (`"Process"`,
+    // keyCode 229) hands over the same way, so the composition runs in the Input. Space does
+    // nothing (a chip has no action of its own).
+    if (event.key === "Process" || event.keyCode === 229) {
+      focusInput();
+      return;
+    }
+    if ([...event.key].length === 1 && event.key !== " ") {
+      if (!modified) focusInput();
+      return;
+    }
+    if (modified) return;
     const element = chips[index]!.element;
     const rtl = element.ownerDocument.defaultView?.getComputedStyle(element).direction === "rtl";
     const focusChip = (i: number): void => {
@@ -1035,25 +1111,28 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
         event.preventDefault();
         focusInput();
         return;
-      default:
-        // A printable key types into the Input: focused in the `keydown`, the character lands
-        // there. Space and Enter do nothing (a chip has no action of its own).
-        if (event.key.length === 1 && event.key !== " " && !event.isComposing) focusInput();
     }
+    // Enter and the rest: nothing.
   };
 
   const chips: ComboboxChipsValue = {
     chipsRef,
     labelOf: (chipValue) => chipLabels.get(chipValue),
     registerChip,
+    registerRemove,
     removeChip: (chipValue, event) => {
       removeValue(chipValue, event);
       focusInput();
     },
     keyDown: chipKeyDown,
     focusIn: (event) => {
-      // With focus on a chip the listbox has no active descendant and cannot be operated.
+      // With focus on a chip the listbox has no active descendant and cannot be operated: a shown
+      // one hides at once, an open still on its way (a slow `openChangeAction`, a commit not
+      // landed yet) is cancelled by a close request, so it never shows under the chip.
+      const popup = popover.popupRef.current;
+      const shown = popup !== null && isPopoverOpen(popup);
       hideListbox(event);
+      if (!shown && popover.intended()) popover.requestClose(event, "dismiss");
       focusIn(event);
     },
     focusOut,

@@ -929,6 +929,195 @@ describe("Combobox multiple (jsdom)", () => {
     });
   });
 
+  describe("review fixes (#164 review)", () => {
+    it("M1: the announcement's text fallback skips ChipRemove and aria-hidden content", async () => {
+      const notify = stubAriaNotify();
+      const user = setupUser();
+      render(
+        <Harness
+          root={{ defaultValue: ["TypeScript"] }}
+          chip={(v) => (
+            <Combobox.Chip key={v} value={v} data-testid={`chip-${v}`}>
+              <span aria-hidden="true">#</span>
+              {v}
+              <Combobox.ChipRemove aria-label={`Remove ${v}`}>
+                <span aria-hidden>×</span>
+              </Combobox.ChipRemove>
+              <Combobox.ChipRemove aria-label={`Remove ${v} too`}>x</Combobox.ChipRemove>
+            </Combobox.Chip>
+          )}
+        />,
+      );
+      await user.click(input());
+      await user.keyboard("{Backspace}");
+      expect(notify).toHaveBeenCalledWith(input(), "TypeScript removed");
+    });
+
+    it("M2: a focused chip unmounted by a rollback passes focus to the next chip", async () => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const first = deferred();
+      const second = deferred();
+      const saves = [first, second];
+      const user = setupUser();
+      render(
+        <Harness
+          root={{ defaultValue: ["xx"], valueChangeAction: () => saves.shift()!.promise }}
+        />,
+      );
+      await typeText(user, "fr");
+      await user.click(option("fr"));
+      await typeText(user, "ger");
+      await user.click(option("de"));
+      await user.keyboard("{ArrowLeft}{ArrowLeft}");
+      expect(document.activeElement).toBe(chip("fr"));
+      await act(async () => first.reject(new Error("superseded")));
+      await act(async () => second.resolve());
+      expect(screen.queryByTestId("chip-fr")).toBeNull();
+      expect(document.activeElement).toBe(chip("de"));
+      vi.unstubAllGlobals();
+    });
+
+    it("M2: a controlled parent dropping the focused chip: the previous chip, then the Input", async () => {
+      const ui = (value: string[]) => <Harness root={{ value, valueChangeAction: () => {} }} />;
+      const { rerender } = render(ui(["jp", "fr"]));
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("{ArrowLeft}");
+      expect(document.activeElement).toBe(chip("fr"));
+      rerender(ui(["jp"]));
+      expect(document.activeElement).toBe(chip("jp"));
+      rerender(ui([]));
+      expect(document.activeElement).toBe(input());
+      // A chip that only re-renders keeps focus.
+      rerender(ui(["jp"]));
+      await user.keyboard("{ArrowLeft}");
+      expect(document.activeElement).toBe(chip("jp"));
+      rerender(ui(["jp"]));
+      expect(document.activeElement).toBe(chip("jp"));
+    });
+
+    it("m1: Enter with text while an open is on its way is prevented and keeps the text; after Escape the closed rule holds", async () => {
+      const open = deferred();
+      const action = vi.fn<Action>();
+      const user = setupUser();
+      render(
+        <Harness root={{ openChangeAction: () => open.promise, valueChangeAction: action }} />,
+      );
+      await typeText(user, "ja");
+      expect(isOpen()).toBe(false);
+      expect(fireEvent.keyDown(input(), { key: "Enter" })).toBe(false);
+      expect(input().value).toBe("ja");
+      await act(async () => open.resolve());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      // Escape-then-Enter: the platform hid the listbox, its `toggle` fact is still queued.
+      popup().hidePopover();
+      expect(fireEvent.keyDown(input(), { key: "Enter" })).toBe(true);
+      await flushTasks(2);
+      expect(input().value).toBe("");
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it("m2: a chip focused while an open is on its way cancels it", async () => {
+      const opens: ReturnType<typeof deferred<void>>[] = [];
+      const openAction = vi.fn((_next: boolean) => {
+        const d = deferred();
+        opens.push(d);
+        return d.promise;
+      });
+      const user = setupUser();
+      render(<Harness root={{ defaultValue: ["jp"], openChangeAction: openAction }} />);
+      await typeText(user, "j");
+      await user.keyboard("{Home}{ArrowLeft}");
+      expect(document.activeElement).toBe(chip("jp"));
+      expect(openAction.mock.calls.map(([next]) => next)).toEqual([true, false]);
+      await act(async () => {
+        for (const d of opens) d.resolve();
+      });
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+    });
+
+    it("m3: AltGr characters, IME starts and astral characters hand over to the Input; Ctrl+letter does not", async () => {
+      const user = setupUser();
+      render(<Harness root={{ defaultValue: ["jp"] }} />);
+      const focusChip = async () => {
+        await user.click(input());
+        await user.keyboard("{ArrowLeft}");
+        expect(document.activeElement).toBe(chip("jp"));
+      };
+      await focusChip();
+      fireEvent.keyDown(chip("jp"), { key: "a", ctrlKey: true });
+      expect(document.activeElement).toBe(chip("jp"));
+      fireEvent.keyDown(chip("jp"), {
+        key: "@",
+        ctrlKey: true,
+        altKey: true,
+        modifierAltGraph: true,
+      } as KeyboardEventInit);
+      expect(document.activeElement).toBe(input());
+      await focusChip();
+      fireEvent.keyDown(chip("jp"), { key: "Process", keyCode: 229 });
+      expect(document.activeElement).toBe(input());
+      await focusChip();
+      fireEvent.keyDown(chip("jp"), { key: "😀" });
+      expect(document.activeElement).toBe(input());
+    });
+
+    it("n1: an empty Chips carries no name, the consumer's aria-label included", () => {
+      const ui = (value: string[]) => (
+        <Combobox.Root multiple value={value} valueChangeAction={() => {}}>
+          <Combobox.Chips data-testid="chips" aria-label="Selected">
+            {({ value: v }) => v.map((x) => <Combobox.Chip key={x} value={x} />)}
+          </Combobox.Chips>
+          <Combobox.Input aria-label="Countries" />
+        </Combobox.Root>
+      );
+      const { rerender } = render(ui([]));
+      expect(chipsEl()).not.toHaveAttribute("aria-label");
+      expect(chipsEl()).not.toHaveAttribute("role");
+      rerender(ui(["jp"]));
+      expect(chipsEl()).toHaveAttribute("aria-label", "Selected");
+      expect(chipsEl()).toHaveAttribute("role", "list");
+    });
+
+    it("n4: a reset equal to the intended value is dispatched while changes are in flight (#151)", async () => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const add = deferred();
+      const remove = deferred();
+      const actions: ComboboxMultipleValueChangeDetails[] = [];
+      const user = setupUser();
+      render(
+        <Harness
+          root={{
+            name: "countries",
+            defaultValue: ["jp"],
+            valueChangeAction: (_next, details) => {
+              actions.push(details);
+              if (details.reason === "platform") return undefined;
+              return details.added.length > 0 ? add.promise : remove.promise;
+            },
+          }}
+        />,
+      );
+      await typeText(user, "fr");
+      await user.click(option("fr"));
+      await user.click(option("fr"));
+      expect(formValues()).toEqual(["jp"]);
+      await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+      await flushTasks(1);
+      expect(actions.map((d) => d.reason)).toEqual(["activate", "activate", "platform"]);
+      expect(actions[2]).toMatchObject({ added: [], removed: [] });
+      await act(async () => add.resolve());
+      await act(async () => remove.reject(new Error("superseded")));
+      expect(formValues()).toEqual(["jp"]);
+      expect(chipTexts()).toEqual(["Japan"]);
+      vi.unstubAllGlobals();
+    });
+  });
+
   describe("dev warnings (15.2)", () => {
     it("Chips, Chip and ChipRemove under a single Root warn; ChipRemove outside a Chip throws", () => {
       const error = silenceErrors();

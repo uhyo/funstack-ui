@@ -12,6 +12,7 @@ import type {
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { BUTTON_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -111,11 +112,14 @@ export function ComboboxChips({ className, style, children, render, ...rest }: C
 
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
     role: empty ? undefined : "list",
-    // Named like the List: by the Label while one is mounted, else the Field's label.
-    ...(!empty &&
-      (ctx.hasLabel
+    // Named like the List: by the Label while one is mounted, else the Field's label. While
+    // empty there is no role, and a role-less `div` may not be named: the consumer's
+    // `aria-label` / `aria-labelledby` are removed too (owned keys set to `undefined`).
+    ...(empty
+      ? { "aria-label": undefined, "aria-labelledby": undefined }
+      : ctx.hasLabel
         ? { "aria-labelledby": ctx.ids.label }
-        : ctx.fieldLabelId !== undefined && { "aria-labelledby": ctx.fieldLabelId })),
+        : ctx.fieldLabelId !== undefined && { "aria-labelledby": ctx.fieldLabelId }),
     onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => chips.keyDown(event.nativeEvent),
     // The Input keeps focus (a chip is focused by keys only, design 15.6).
     onPointerDown: (event: PointerEvent<HTMLDivElement>) => preventDefault(event),
@@ -305,8 +309,8 @@ export interface ComboboxChipRemoveProps extends Omit<
   /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, ComboboxChipRemoveState>;
   /**
-   * Content, or a function of the part's state. A visible "×" belongs in an `aria-hidden`
-   * element or in CSS: the chip's text is the removal announcement's fallback.
+   * Content, or a function of the part's state, usually an icon ("×", best in an `aria-hidden`
+   * element). It is never part of the chip's text in the removal announcement.
    */
   children?: StateValue<ReactNode, ComboboxChipRemoveState>;
   /** Should render a `<button>`. */
@@ -344,10 +348,17 @@ export function ComboboxChipRemove({
       "Combobox.ChipRemove: rendered under a Combobox.Root without `multiple`. Chips show a multiple selection; " +
         "add `multiple` to the Root.",
   );
-  const ref = useNameWarning(
+  const nameWarning = useNameWarning(
     isDev && "Combobox.ChipRemove: the button has no accessible name. Give it an `aria-label`.",
     BUTTON_NAME,
   );
+  const { registerRemove } = ctx.chips;
+  // Registered so that its content (a "×") is not read as part of the chip's label (15.7).
+  const registerRef = useCallback(
+    (element: HTMLElement) => registerRemove(element),
+    [registerRemove],
+  );
+  const ref = useMergedRefs<HTMLElement>(registerRef, nameWarning);
   const disabled = ctx.disabled;
   const state: ComboboxChipRemoveState = {
     value,
