@@ -1,6 +1,7 @@
 # Combobox
 
-Status: **accepted**, implemented. History (decisions, review revisions, amendments,
+Status: **accepted**, implemented, section 15 (`multiple`, #164) included. History (decisions,
+review revisions, amendments,
 implementation notes, the test plan): `design/CHANGELOG.md`, parts "combobox.md". Follows
 `design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
@@ -41,7 +42,7 @@ and a hidden input that follows the optimistic value.
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | One component | **One `Combobox` with `allowCustomValue`**, not a separate Autocomplete (recommendation; question 1). Markup, keyboard, popover, async results and virtual focus are identical; the two differ only in what an unmatched text means on commit (reverted, or dispatched as the value). React Aria and Ark take this shape; Base UI splits. |
-| 2 | Anatomy | `Combobox.Root` (no DOM, except one `<input type="hidden">` when `name` is given), `Combobox.Label` (`label[for]`), `Combobox.Input` (`input[role=combobox]`), `Combobox.Trigger` (`button`, optional), `Combobox.Clear` (`button`, optional), `Combobox.Popup` (`div[popover=auto]`), `Combobox.List` (`div[role=listbox]`), `Combobox.Option` (`div[role=option]`), `Combobox.Group` / `Combobox.GroupLabel`, `Combobox.Empty`, `Combobox.Status` (`div`: `role="status"` in the Popup; inside the List it is the loading fallback and has no role, 6.3). No Portal, Positioner, Arrow, Chips. |
+| 2 | Anatomy | `Combobox.Root` (no DOM, except one `<input type="hidden">` when `name` is given), `Combobox.Label` (`label[for]`), `Combobox.Input` (`input[role=combobox]`), `Combobox.Trigger` (`button`, optional), `Combobox.Clear` (`button`, optional), `Combobox.Popup` (`div[popover=auto]`), `Combobox.List` (`div[role=listbox]`), `Combobox.Option` (`div[role=option]`), `Combobox.Group` / `Combobox.GroupLabel`, `Combobox.Empty`, `Combobox.Status` (`div`: `role="status"` in the Popup; inside the List it is the loading fallback and has no role, 6.3). With `multiple`: `Combobox.Chips` (`div[role=list]`), `Combobox.Chip` (`div[role=listitem]`), `Combobox.ChipRemove` (`button`), and one hidden input per value (section 15). No Portal, Positioner, Arrow. |
 | 3 | Two library-owned states, two lanes | `value` (`string \| null`): `value` / `defaultValue` / `valueChangeAction`, a transition with `useOptimistic`, as every other value. `inputValue` (`string`): `inputValue` / `defaultInputValue` / `onInputValueChange`, the **urgent** state the vision reserved for this component (section 4). Same `x` / `defaultX` pair, different lane, and a **handler** instead of an action: `onInputValueChange` is the library's one `on*` prop, named as a handler because it is called synchronously in the event and never wrapped in a transition (conventions 2.1, 2.6). `fooAction` keeps meaning "a transition" everywhere. |
 | 4 | Results | The library filters nothing. `query` is `useDeferredValue(inputValue)`; `Combobox.List`'s function `children` (and Root's) receive `{ query }` and render the `Option`s for it, under a consumer-owned `<Suspense>` for async search. While `inputValue !== query` the Popup and List carry `data-stale`; the List is `aria-busy="true"` while stale **or loading** (a `Status` mounted inside it, 6.3); the previous results stay visible. No out-of-order results: React renders only the latest deferred value (section 6). |
 | 5 | Active option | `aria-activedescendant` on the input, never DOM focus on options (research). The active option is **urgent library state** (it is focus; focus is never a transition anywhere in the library), exposed as `data-active` on the Option, revalidated whenever the mounted options change; ids are derived from the value so an option keeps its id across result sets. Typing, Home, End, Left and Right clear it (APG: visual focus returns to the textbox), so Enter never accepts an option the user has typed past; `autoHighlight` (default `false`) activates the first option only once results settle (not stale, not loading; 6.5). |
@@ -53,8 +54,9 @@ and a hidden input that follows the optimistic value.
 | 11 | Announcements | `ariaNotify()` on the List when results settle (not while stale or loading; the counts are read through refs, 6.4); no live region. **A default English message ships** (`"No results"`, `"1 result"`, `"N results"`; user decision on question 6), overridable through `announce(count, state)` for localisation. The library's first built-in UI string; the convention it sets (built-in strings are English defaults, always overridable) is in conventions 11. |
 | 12 | Pending and state exposure | `data-pending` on Input (value or open in flight), Trigger (open in flight), the optimistic target Option; `data-open` on Input and Trigger; `data-selected`, `data-active`, `data-disabled` on Option; `data-stale` on Popup and List; `aria-busy` on the List while stale or loading; `data-empty` on List. |
 | 13 | ViewTransition | `transition` on `Combobox.Popup`, wrapping the `<div popover>` itself (conventions 5.1): library-driven opens and closes animate in every engine. A deferred results render also activates the boundary (React rule), so the docs recommend a type map with `default: "none"`. Types `fsui-combobox`, `fsui-combobox-open` / `-close`, `fsui-combobox-select`. |
-| 14 | Not in v1 | `multiple` (chips), inline autocompletion (`aria-autocomplete="both"`), virtualization, a built-in filter, `Separator`, `Combobox.Input` inside the popup (searchable select), context-menu-style anchors. Section 13. |
+| 14 | Not in v1 | Inline autocompletion (`aria-autocomplete="both"`), virtualization, a built-in filter, `Separator`, `Combobox.Input` inside the popup (searchable select), context-menu-style anchors. Section 13. |
 | 15 | Files | Every part file is `"use client"`. Before hydration the Input is a plain text field (typing works and is adopted at mount); nothing opens. |
+| 16 | Multiple selection | `Combobox.Root multiple` (fixed at mount; single stays the default and is unchanged): `value` is `string[]` in pick order, `valueChangeAction(next, { added, removed, … })` under the set-valued rules (conventions 2.2, 2.5, 3.3: every resolved change is kept). A pick **toggles** the option, **clears the text** and **leaves the listbox open**; `aria-multiselectable` on the List. Chips render from the optimistic value (`Chips` / `Chip` / `ChipRemove`); Backspace in the empty input removes the last chip, the inline-start arrow at the caret's start moves focus into the chips. One hidden input per value; `required` on the Input means "at least one". Section 15. |
 
 ---
 
@@ -336,7 +338,7 @@ export interface ComboboxRootProps {
 
   open?: boolean;
   defaultOpen?: boolean;
-  /** As Popover, requests only: awaited for opens and for the close after an accepted option. Never called for a dismissal. */
+  /** As Popover, requests only: awaited for opens and for the closes a part asks for (an accepted option, the Trigger, Alt+ArrowUp; with `multiple`, the cancel when a chip takes focus during an open, 15.6). Never called for a dismissal. */
   openChangeAction?: ChangeAction<boolean, ComboboxOpenChangeDetails>;
   /** As Popover, facts only: a dismissal (Escape, focus leaving, light dismiss, a foreign invoker). Always `false`; synchronous, not awaited (5.6). */
   onOpenChange?: UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>;
@@ -375,7 +377,8 @@ export interface ComboboxRootProps {
 ```
 
 No `ref`, `className`, `style` (no element of its own); no `required` (it is the Input's, native);
-no `filter` / `items` (section 6.1); no `multiple` (section 13).
+no `filter` / `items` (section 6.1). The props above are the single-selection variant of the
+`ComboboxRootProps` union; `multiple: true` selects the other one (15.2).
 
 ### 3.2 `Combobox.Input`
 
@@ -788,7 +791,7 @@ dismisses; conventions 3.9).
 | --- | --- | --- | --- |
 | Typing; ArrowDown / ArrowUp / Alt+ArrowDown while closed; Trigger click while closed; a pointer click in the input with `openOnClick`; a foreign open | `openChangeAction` | `true` | `"activate"` |
 | Found open at mount (only script can cause it here) | `openChangeAction` | `true` | `"platform"` |
-| The close after an accepted option (after `valueChangeAction` settled); re-accepting the selected option; Trigger click while open; Alt+ArrowUp | `openChangeAction` | `false` | `"activate"` |
+| The close after an accepted option (after `valueChangeAction` settled); re-accepting the selected option; Trigger click while open; Alt+ArrowUp; with `multiple`, a chip taking focus while an open is requested but not shown (the cancel of 15.6) | `openChangeAction` | `false` | `"activate"` |
 | Escape while open | **`onOpenChange`** | `false` | `"dismiss"` |
 | Focus leaving the input to outside the popup (the library's immediate `hidePopover()`) | **`onOpenChange`** | `false` | `"dismiss"` |
 | Light dismiss; another `auto` popover or modal dialog opening outside; a `Clear` click while open (the button is outside the popup) | **`onOpenChange`** | `false` | `"dismiss"` |
@@ -1061,7 +1064,7 @@ Typeahead does not exist (the input *is* the typeahead).
 | Trigger | `tabindex="-1"`, `popovertarget` after hydration and **no `aria-expanded`** on a `<button>` (a non-button `render` renders it from `shown`), `aria-controls` → List id, `aria-label` from the consumer (dev warning without a name) |
 | Clear | `tabindex="-1"`, `aria-label` from the consumer |
 | Popup | `popover="auto"`, `id`; no role |
-| List | `role="listbox"`, `id`, `aria-labelledby` → Label id while a `Label` is mounted (the Label registers with the Root; token-merged with the consumer's; never a dangling IDREF), otherwise the consumer's `aria-label` on the List names it (pass-through; dev warning when it has neither), `aria-busy="true"` while stale or loading; no `aria-multiselectable` in v1 |
+| List | `role="listbox"`, `id`, `aria-labelledby` → Label id while a `Label` is mounted (the Label registers with the Root; token-merged with the consumer's; never a dangling IDREF), otherwise the consumer's `aria-label` on the List names it (pass-through; dev warning when it has neither), `aria-busy="true"` while stale or loading; `aria-multiselectable="true"` with `multiple` (15.7), absent otherwise |
 | Option | `role="option"`, `id`, `aria-selected` (optimistic; `"true"` on the selected option only, not on the active one: the APG distinguishes selected from focused, and `aria-activedescendant` conveys focus), `aria-disabled` |
 | Group / GroupLabel | `role="group"` + `aria-labelledby`; the label has the `id` |
 | Status | `role="status"` in the Popup; `role="none"` inside the List, where the busy listbox carries the meaning (6.3) |
@@ -1298,10 +1301,9 @@ Moved to `design/CHANGELOG.md` (part "combobox.md"). Not part of the contract: t
 
 ## 13. Not in v1
 
-- **`multiple`** (chips, `aria-multiselectable`, a `Combobox.Chips` / `Chip` area): the value
-  becomes `string[]` with `details.added` / `removed` (CheckboxGroup's diff shape); the text
-  stays single; the keyboard gains Backspace-removes-last-chip. The anatomy leaves room (a
-  `Value` / `Chips` part before the Input). Deferred until a consumer case; question 7.
+- **More for `multiple`** (section 15): splitting typed or pasted text at a delimiter into
+  several values, a maximum number of values, reordering chips (drag or keys), a `disabled`
+  chip that cannot be removed, a "+3 more" overflow part. Later, each on a consumer case.
 - **Inline autocompletion** (`aria-autocomplete="both"` / `"inline"`: the input completes the
   active option's text with the completion selected). Needs caret manipulation the library
   would own; Base UI's `mode: "both" | "inline"`. Later.
@@ -1329,3 +1331,504 @@ Moved to `design/CHANGELOG.md` (part "combobox.md"). Not part of the contract: t
 ## 14. Implementation notes
 
 Moved to `design/CHANGELOG.md` (part "combobox.md"). Not part of the contract: the code and the tests are the reference.
+***
+
+## 15. Multiple selection (`multiple`)
+
+Status: **decided** (#164; the user accepted the six recommendations on 2026-11-26, recorded in
+`design/CHANGELOG.md`), implemented. `Combobox.Root multiple` turns the selection into
+a list of values shown as chips. Everything in sections 1 to 11 holds unless this section says
+otherwise: the text stays one urgent string, results are still the consumer's render for the
+deferred `query`, the active option is still virtual focus, the popup is the same popover.
+What changes is what a pick means. In single mode the text *is* the selection's label and a
+pick ends the interaction; with `multiple` the text is only a **search**, the selection lives
+in the chips, and a pick is one change to a set, after which the user goes on picking.
+
+Prior art: Base UI (`multiple`, `Chips` / `Chip` / `ChipRemove`; a pick clears the text;
+Left Arrow from the start of the input focuses the chips, Backspace or Delete removes one),
+React Aria (`selectionMode="multiple"`; the selection is rendered by the consumer as a
+`TagGroup`, a grid with its own Tab stop), Ark UI (`multiple` forces `selectionBehavior:
+"clear"`; chips are the consumer's, or a `TagsInput`), Headless UI (`multiple`, the popup stays
+open). The WAI-ARIA APG has no multi-select combobox and no chip pattern; the pieces used here
+are its listbox rules (`aria-multiselectable`, `aria-selected` on every option) and, for the
+chips, what the token fields above agree on.
+
+### 15.1 Anatomy
+
+```tsx
+<Combobox.Root multiple name="countries" defaultValue={["jp"]} valueChangeAction={saveCountries}>
+  <Combobox.Label>Countries</Combobox.Label>
+  <div className="field">                       {/* the consumer's box around chips and input */}
+    <Combobox.Chips className="chips">
+      {({ value }) => value.map((code) => (
+        <Combobox.Chip key={code} value={code} className="chip">
+          {({ label }) => (
+            <>
+              {label ?? countryNames[code]}
+              <Combobox.ChipRemove aria-label={`Remove ${label ?? countryNames[code]}`} />
+            </>
+          )}
+        </Combobox.Chip>
+      ))}
+    </Combobox.Chips>
+    <Combobox.Input placeholder="Add a country" required />
+  </div>
+  <Combobox.Popup>
+    <Combobox.List>{({ query }) => /* Options, as in single mode */}</Combobox.List>
+    <Combobox.Empty>No country matches.</Combobox.Empty>
+  </Combobox.Popup>
+</Combobox.Root>
+```
+
+Rendered HTML (closed, the value is `["jp", "fr"]`, no text):
+
+```html
+<input type="hidden" name="countries" value="jp" />
+<input type="hidden" name="countries" value="fr" />
+<label for="_r_1_-input" id="_r_1_-label">Countries</label>
+<div class="field">
+  <div role="list" aria-labelledby="_r_1_-label" class="chips">
+    <div role="listitem" tabindex="-1" class="chip">
+      Japan <button type="button" tabindex="-1" aria-label="Remove Japan"></button>
+    </div>
+    <div role="listitem" tabindex="-1" class="chip">
+      France <button type="button" tabindex="-1" aria-label="Remove France"></button>
+    </div>
+  </div>
+  <input
+    id="_r_1_-input"
+    type="text"
+    role="combobox"
+    autocomplete="off"
+    aria-required="true"
+    aria-autocomplete="list"
+    aria-expanded="false"
+    aria-controls="_r_1_-list"
+    value=""
+    data-selected=""
+  />
+</div>
+<div id="_r_1_-popup" popover="auto" style="…">
+  <div id="_r_1_-list" role="listbox" aria-multiselectable="true" aria-labelledby="_r_1_-label">
+    …
+  </div>
+</div>
+```
+
+| Part | Element | Role | Renders from | Notes |
+| --- | --- | --- | --- | --- |
+| `Chips` | `div` | `list` while there is at least one value, none while empty | optimistic value | The container of the chips, **not** of the Input (a list may own only list items). `aria-labelledby` → the Label while one is mounted and the list is not empty (token-merged, as the List; a role-less `div` may not be named), `onFocus` / `onBlur` owned (the leave rule of 15.6), `data-empty`, `data-pending`, `data-disabled`. Function `children` receive `{ value }`. Always rendered. |
+| `Chip` | `div` | `listitem` | optimistic value, committed value (for `pending`) | `value` required; `label` optional. `tabindex="-1"`: focusable by the keys of 15.6, never a Tab stop. `data-pending`, `data-disabled`. |
+| `ChipRemove` | `button` | button | | Inside a `Chip`. `type="button"`, `tabindex="-1"`, `pointerdown` and `mousedown` prevented (the input keeps focus, as `Clear`); click removes the chip's value and focuses the input. Needs an accessible name from the consumer (dev warning without one). `data-pending`, `data-disabled`. |
+| `Root` | one `input[type=hidden]` **per value** when `name` is given | | optimistic value | 15.8. The one place a part renders more than one element (conventions 1.1). |
+
+Why this shape:
+
+- **`Chips` does not wrap the Input.** Base UI's `Chips` is the whole field box. Here it is the
+  list of selected items, so that a screen reader can say "Countries, list, 2 items", and a
+  list cannot own a textbox. The box around both is the consumer's element. The listbox still
+  anchors to the Input (`showPopover({ source: input })`); to make it as wide as the box, the
+  consumer names the box as the anchor, the recipe of 7.2:
+  `.field { anchor-name: --field }` and `style={{ positionAnchor: "--field", minWidth:
+  "anchor-size(--field width)" }}` on the Popup.
+- **A chip is rendered by the consumer, from the value.** The library filters nothing and
+  derives no label from a value (2.2), so it cannot render the chips itself: `Chips` hands
+  over the optimistic `value` and the consumer maps it. What the library does know is the text
+  of every option it has seen: `Chip`'s state carries `label`, the label cache's entry for the
+  value (2.3; written at the pick, before the render that shows the chip), or `undefined` for
+  a value no Option was ever mounted for (a preselected value before the popup first opens).
+  With no `children` a Chip renders `label ?? value`. This is what makes an async search
+  usable without the consumer keeping its own map of picked items.
+- **`ChipRemove` is optional.** Every chip can be removed without it (15.6), and the selected
+  option in the listbox can be toggled off.
+- **No `Value` part.** A single-line summary ("3 countries") is `children(state)` on the Root.
+
+### 15.2 Props and types
+
+The Root's props are a union discriminated on `multiple`, as ToggleGroup's and Accordion's are
+on `exclusive`. Single selection is the variant without the flag, so every existing call site
+type-checks and behaves as before. The mode is **fixed at mount** (the state hook is built with
+or without a reducer; a later change warns in development and is ignored).
+
+```ts
+/** Details of `valueChangeAction` with `multiple`. */
+export interface ComboboxMultipleValueChangeDetails extends ActionDetails {
+  /**
+   * "activate": the user toggled an option (Enter, click), added free text (`allowCustomValue`),
+   * removed a chip (Backspace or Delete: the `keydown`; `ChipRemove`: the `click`) or pressed Clear.
+   * "platform": a form reset (`details.event` is the `reset` event).
+   */
+  readonly reason: ChangeReason;
+  /** Values this dispatch added, in the order they join the value. */
+  readonly added: readonly string[];
+  /** Values this dispatch removed, in value order. */
+  readonly removed: readonly string[];
+  /** `true` when `added` is free text committed under `allowCustomValue`. */
+  readonly custom: boolean;
+}
+
+/** As `ComboboxRootState`, with the selection as a list. */
+export interface ComboboxMultipleRootState extends Omit<ComboboxRootState, "value"> {
+  /** Optimistic selection, in pick order. Content rendered from it must not suspend. */
+  readonly value: readonly string[];
+}
+
+interface ComboboxRootBaseProps { /* every prop of 3.1 except the five below */ }
+
+export interface ComboboxSingleProps extends ComboboxRootBaseProps {
+  multiple?: false;
+  value?: string | null;
+  defaultValue?: string | null;
+  valueChangeAction?: ChangeAction<string | null, ComboboxValueChangeDetails>;
+  announce?: (count: number, state: ComboboxRootState) => string | null;
+  children?: StateValue<ReactNode, ComboboxRootState>;
+}
+
+export interface ComboboxMultipleProps extends ComboboxRootBaseProps {
+  /** The selection is a list of values, shown as chips. */
+  multiple: true;
+  /** Controlled selection. `[]`: nothing selected. `undefined`: uncontrolled. The order is the chip order; duplicates are ignored. */
+  value?: string[];
+  /** Initial selection in uncontrolled mode. Default `[]`. Also the form-reset target (latest value). */
+  defaultValue?: string[];
+  /**
+   * Runs inside the Root's transition for every change of the selection. `next` is the whole
+   * intended selection as a fresh array; `details.added` / `details.removed` say what this
+   * dispatch changed. Awaited; a rejection rolls this change back (the chip, `data-selected`)
+   * and nothing else. May be a Server Function. Persist the diff, not `next` (15.4).
+   */
+  valueChangeAction?: ChangeAction<string[], ComboboxMultipleValueChangeDetails>;
+  /**
+   * The message `ariaNotify()` announces on the Input when chips are removed outside the
+   * listbox (Backspace, Delete, `ChipRemove`, Clear), from the removed chips' labels.
+   * Default (English): the labels joined with `", "`, then `" removed"`. Return `null` to
+   * announce nothing.
+   */
+  announceRemoved?: (labels: readonly string[], state: ComboboxMultipleRootState) => string | null;
+  announce?: (count: number, state: ComboboxMultipleRootState) => string | null;
+  children?: StateValue<ReactNode, ComboboxMultipleRootState>;
+}
+
+export type ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps;
+
+export interface ComboboxChipsState { readonly value: readonly string[]; readonly pending: boolean; readonly disabled: boolean; }
+export interface ComboboxChipsProps
+  extends Omit<ComponentPropsWithRef<"div">, "role" | "onKeyDown" | "onPointerDown" | "onMouseDown" | "onClick" | "onFocus" | "onBlur" | "className" | "style" | "children"> {
+  className?: StateValue<string | undefined, ComboboxChipsState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxChipsState>;
+  /** Usually a function of `{ value }` rendering one `Chip` per value, keyed by the value. */
+  children?: StateValue<ReactNode, ComboboxChipsState>;
+  render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxChipsState>;
+}
+
+export interface ComboboxChipState {
+  readonly value: string;
+  /** The text of the option with this value as the library last saw it; `undefined` if it never saw one. */
+  readonly label: string | undefined;
+  /** The Root's value action is pending and this value is not in the committed selection yet. */
+  readonly pending: boolean;
+  readonly disabled: boolean;
+}
+export interface ComboboxChipProps
+  extends Omit<ComponentPropsWithRef<"div">, "role" | "tabIndex" | "className" | "style" | "children"> {
+  value: string;
+  /** The chip's text for the removal announcement. Default: `state.label`, else the element's trimmed `textContent`. */
+  label?: string;
+  className?: StateValue<string | undefined, ComboboxChipState>;
+  style?: StateValue<CSSProperties | undefined, ComboboxChipState>;
+  /** Default: `label ?? value`. */
+  children?: StateValue<ReactNode, ComboboxChipState>;
+  render?: RenderProp<ComponentPropsWithRef<"div">, ComboboxChipState>;
+}
+
+export interface ComboboxChipRemoveState { readonly value: string; readonly pending: boolean; readonly disabled: boolean; }
+export interface ComboboxChipRemoveProps
+  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "onPointerDown" | "onMouseDown" | "tabIndex" | "disabled" | "className" | "style" | "children"> { … }
+```
+
+- `value` is `string[]`, as CheckboxGroup's and ToggleGroup's, so a `useState<string[]>` setter
+  plugs into `valueChangeAction`. "Nothing selected" is `[]`.
+- **The order is the value's own**: the order of `value` / `defaultValue`, then the order of
+  the picks (a new value is appended). It is the chip order, the order of the hidden inputs
+  and so of `formData.getAll(name)`, and "the last chip" of Backspace. CheckboxGroup's document
+  order has no meaning here: most options are not mounted. Every comparison the library makes
+  is still set equality.
+- The states of the parts that are not generic keep their shape and gain one field:
+  `ComboboxInputState` and `ComboboxClearState` get `values: readonly string[]` (the optimistic
+  selection as a list; `[value]` or `[]` in single mode), and their `value: string | null`
+  is always `null` with `multiple`. Trade-off: two fields for one thing on these two parts,
+  instead of a `value` whose type no caller could narrow. `ComboboxOptionState` is unchanged.
+- `Chips`, `Chip` and `ChipRemove` under a Root without `multiple` warn in development; `Chips`
+  then renders its element with an empty value. A `Chip` whose `value` is not in the optimistic
+  selection warns too.
+- The namespace gains `Chips`, `Chip`, `ChipRemove`; the exports gain the types above.
+
+### 15.3 What a pick does
+
+Enter on the active option, or a click on an option:
+
+```ts
+function accept(option: { value: string; label: string }, event: Event): void {
+  if (text !== "") setInputText("", { reason: "activate", event }); // urgent (2.2): the search is used up
+  const patch = optimistic.has(option.value)
+    ? { added: [], removed: [option.value] } // a pick toggles
+    : { added: [option.value], removed: [] };
+  dispatch(
+    next(patch),
+    createActionDetails(event, { reason: "activate", custom: false, ...patch }),
+  );
+  // no close: the listbox stays open
+}
+```
+
+| | Single | `multiple` |
+| --- | --- | --- |
+| The option | becomes the selection; re-accepting it dispatches nothing | **toggles**: a selected option is removed. There is no no-op pick |
+| The text | becomes the option's label | **cleared** (`""`, `reason: "activate"`): it was a search, and the next pick starts a new one |
+| The listbox | closes in the commit that ends the action | **stays open**; it closes as it does otherwise (Escape, focus leaving, light dismiss, the Trigger, Alt+ArrowUp) |
+| A rejection | text and `data-selected` roll back, the listbox stays open | the chip and `data-selected` roll back; the text is **not** restored (the user may be typing the next search) |
+| The active option | the accepted option | stays on the accepted option while it is mounted in the new results (6.5), so ArrowDown continues from it; `autoHighlight` is re-armed by the text change |
+
+Consequences:
+
+- The library writes the text in fewer cases than 2.2: typing, the clear after a pick,
+  `Clear`, focus leaving (always to `""`, `reason: "dismiss"`; there is no label to revert to),
+  form reset and mount reconciliation. Nothing depends on a rollback of the text, so the
+  per-dispatch text record of single mode does not exist. The development warning for a
+  value without `defaultInputValue` does not apply.
+- Clearing the text makes the results stale until those for `""` render (6.2): the old list
+  stays, with the picked option now `data-selected`. With a synchronous filter this is one
+  frame.
+- Selected options **stay in the list** (`aria-selected="true"`). The library filters nothing;
+  a consumer who wants "selected items disappear from the results" filters by `state.value`.
+- `Clear` empties the text and dispatches one change that removes every value
+  (`removed`: the whole selection), unless it is already empty.
+
+### 15.4 The value: a set under the shared rules
+
+`multiple` makes the Root a set-valued owner (conventions 2.2, 2.5, 3.3), with CheckboxGroup's
+machinery and no new rule:
+
+- The value is normalised to a set at the prop boundary (insertion-ordered, so the order above
+  is kept) and `useControllableAction` gets the patch reducer: remove `details.removed`, then
+  append the values of `details.added` that are missing.
+- **Optimistic.** Stacked dispatches re-base: pick A then B while A's save runs shows both
+  chips; if A rejects, B's chip stays.
+- **Uncontrolled commit.** Every resolved change is kept: when the last overlapping dispatch
+  settles, the resolved ones are replayed in dispatch order onto the committed value; a
+  rejected one leaves no trace. Pick A (rejects), pick B (resolves): the value is `[B]`.
+- **`next` is the intended selection**, so it can contain a change that fails later. An action
+  that persists should persist `details.added` / `details.removed`, and a controlled "update on
+  success" parent should apply them as a functional update:
+
+  ```tsx
+  <Combobox.Root multiple value={tags} valueChangeAction={async (_next, { added, removed }) => {
+    await saveTags({ added, removed });
+    startTransition(() => setTags((tags) => [...tags.filter((t) => !removed.includes(t)), ...added.filter((t) => !tags.includes(t))]));
+  }}>
+  ```
+
+- **Errors**: the latest dispatch's rejection reaches the boundary above the Root, a
+  superseded one goes to `reportError` (conventions 2.4). Either way only that change is undone.
+- **Form reset** is the one absolute dispatch (`{ whole: true }`, conventions 3.3): the reset
+  target (15.8) replaces the value, with `reason: "platform"` and the diff against the intended
+  value in `added` / `removed`. A reset equal to the intended value is still dispatched while a
+  dispatch is in flight, as CheckboxGroup's (conventions 3.3, last rule).
+- Transition types: `fsui-combobox` on every value dispatch, `fsui-combobox-select` when
+  `added` is non-empty, `fsui-combobox-deselect` when `removed` is non-empty. Chips have no
+  `transition` prop; a consumer who wants them to animate wraps each in its own
+  `<ViewTransition>` and keys on these types.
+
+### 15.5 Pending
+
+| Where | `data-pending` |
+| --- | --- |
+| Input | the Root's `pending` (a value or open transition in flight), as in single mode |
+| Option | the value action is pending and the option's optimistic selection differs from its committed one (CheckboxGroup 5.3): an option being added **and** one being removed |
+| Chip, ChipRemove | the same test. Chips render from the optimistic value, so it is true exactly for a chip whose addition is not committed yet |
+| Chips | the value action is pending |
+
+**A removed chip disappears at once** and comes back if its action rejects: the chips are the
+selection's trigger surface and render optimistic state (conventions 3.2), as an unchecked
+box in a CheckboxGroup is unchecked at once. While its removal is pending the progress is on
+the Input, on `Chips` and, when it is mounted, on the option in the listbox. The alternative,
+keeping the chip with `data-pending` until the removal settles, would show the user a
+selection they have already changed.
+
+### 15.6 Keyboard and focus
+
+In the Input, in addition to section 8 (and with its two changed rows):
+
+| Key | Condition | Behaviour | `preventDefault` |
+| --- | --- | --- | --- |
+| Enter | open, active option | toggle it (15.3); the listbox stays open | yes |
+| Alt+ArrowUp | open | close; the active option is **not** accepted | yes |
+| Backspace | the text is `""`, at least one chip, not a key repeat | remove the **last** chip (`removed: [last]`, the `keydown` as `details.event`); the removal is announced (15.7) | no |
+| Inline-start arrow (ArrowLeft; ArrowRight when the input's computed `direction` is `rtl`) | caret at 0, no selection, at least one chip | DOM focus moves to the last chip | yes |
+| Enter | text not empty, an open requested but not committed yet (intended open, committed closed: a slow `openChangeAction`, the keystroke's own open still rendering) | nothing: the text is kept, the form does **not** submit (the user typed a search and is about to pick). After Escape the committed state is still open until the `toggle` fact runs, so Escape-then-Enter keeps the closed rows below (section 8) | yes |
+| Enter | closed, `allowCustomValue`, text not empty | add the text as a value (15.9); the form does **not** submit | yes |
+| Enter | closed, no `allowCustomValue`, text not empty | the text is cleared (`"dismiss"`, in `flushSync`), then the key's default runs: a form submits without the unmatched text (15.8) | no |
+
+A held Backspace that has emptied the text does not go on to eat chips: `event.repeat` is
+ignored, the user releases and presses again.
+
+On a focused chip (handled by `Chips`; "previous" and "next" follow the inline direction):
+
+| Key | Behaviour |
+| --- | --- |
+| Previous arrow | the previous chip; on the first chip: stays |
+| Next arrow | the next chip; on the last chip: the Input |
+| Home / End | the first / last chip |
+| Backspace, Delete | remove this chip; focus moves, before the dispatch, to the next chip, else the previous one, else the Input |
+| Escape | the Input; the key is prevented, so an enclosing Dialog or Popover does not close |
+| A printable key | the Input is focused in the `keydown`, so the character is typed there. Printable: one code point (`[...key].length === 1`, so astral characters count) other than Space; Ctrl / Meta make it a shortcut and it is left alone, except with AltGr (`getModifierState("AltGraph")`, reported as Ctrl+Alt on Windows). An IME start (`key === "Process"`, `keyCode` 229) hands over the same way. Ctrl / Meta are checked for the navigation keys of this table only |
+| Tab / Shift+Tab | the browser's: chips are `tabindex="-1"`, so Tab goes on from the chip's place in the document (the Input, in the usual layout) |
+| Enter, Space | nothing: a chip has no action of its own |
+
+Focus rules:
+
+- **The combobox has one Tab stop, the Input.** Chips and `ChipRemove` buttons are
+  `tabindex="-1"`. This is Base UI's model. React Aria's separate grid (its own Tab stop,
+  cell navigation) is the APG's layout-grid answer and costs a second stop and two more roles
+  for the same reach; Ark's `TagsInput` keeps focus in the input and "highlights" a tag, which
+  a screen reader does not hear without an announcement for every move. Real focus on the chip
+  is announced by the platform.
+- **Focus on a chip is inside the combobox.** The leave rule of 5.4 treats the Input, the Popup
+  and `Chips` as one region: moving to a chip does not clear the text and commits no custom
+  value. It does **close the listbox** (the library's immediate `hidePopover()`, a `"dismiss"`
+  fact): with focus on a chip the listbox has no `aria-activedescendant` and cannot be
+  operated. An open still on its way when a chip takes focus (requested, not shown yet) is
+  cancelled with a close request, so it never shows under the chip: a **request**, not a
+  dismissal (nothing was shown), so `openChangeAction(false)` runs with `reason: "activate"`, as
+  for Alt+ArrowUp, and `onOpenChange` is not called. Focus leaving a chip for
+  anything outside the region is focus leaving the combobox.
+- **A focused chip that unmounts for any other reason** (a rolled-back addition, a controlled
+  parent dropping the value, a form reset) passes focus on as Backspace and Delete do: the next
+  chip, else the previous one, else the Input, so focus is never dropped on the document.
+- **A press in `Chips` does not take focus from the Input**: `pointerdown` and `mousedown` are
+  prevented on `Chips` (chips and `ChipRemove` included), and a click there focuses the Input.
+  Pointer users remove with `ChipRemove`; chips are focused by keys only.
+- **A press on `ChipRemove` while the listbox is open is a light dismiss**, as `Clear`'s (5.4):
+  the button is outside the popup. The listbox closes as a `"dismiss"` fact and is not
+  re-opened; the chip is removed by the click.
+- A chip that reappears after a rejected removal does not take focus back.
+
+### 15.7 ARIA
+
+| Part | Attributes |
+| --- | --- |
+| List | `aria-multiselectable="true"` |
+| Option | `aria-selected` `"true"` / `"false"` on **every** option (already the case), optimistic |
+| Input | unchanged (`role="combobox"`, `aria-activedescendant`, …); `aria-required="true"` when `required` (15.8) |
+| Chips | `role="list"` while not empty (an empty `list` lacks its required children, so the role is dropped), `aria-labelledby` → the Label (or the consumer's `aria-label`); while empty no name at all, the consumer's `aria-label` / `aria-labelledby` removed too (a role-less `div` may not be named) |
+| Chip | `role="listitem"`, `tabindex="-1"`; `aria-description` passes through (for "Press Backspace to remove", the consumer's string) |
+| ChipRemove | `tabindex="-1"`, the consumer's `aria-label` |
+
+ARIA allows a combobox's listbox popup to be multiselectable; the APG's multi-select listbox
+toggles with Space, which is a character in a textbox, so Enter toggles here, as it accepts in
+single mode. Toggling the active option needs no announcement from the library: its
+`aria-selected` changes under `aria-activedescendant`. A chip removed **outside the listbox**
+(Backspace, Delete, `ChipRemove`, Clear) has no such feedback, and with Backspace focus does
+not even move, so the Root announces it with `ariaNotify()` on the Input: `announceRemoved`,
+default English `"Japan removed"` (labels joined with `", "`), a built-in string under
+conventions 11. The label is the Chip's `label` prop, else the label cache's entry, else the
+chip's text read before it unmounts: its text nodes, skipping `[aria-hidden="true"]` subtrees
+and the `ChipRemove` (so a "×" in the remove button, or in an `aria-hidden` element, is not
+read), whitespace collapsed and trimmed. The removal is announced **optimistically**, in the
+event, before its action settles; a rejection brings the chip back silently (no "restored"
+announcement: the error goes to the boundary or `reportError`, as for every optimistic
+change).
+
+### 15.8 Form, `required`, `disabled`
+
+- **`name`** on the Root renders one `<input type="hidden" name value>` **per optimistic
+  value**, in value order, before the children; `form` goes on each. The posted shape is that
+  of same-named checkboxes or a `<select multiple>`: `formData.getAll(name)`, and nothing for
+  an empty selection. While the selection is empty the Root renders one hidden input **without
+  a `name`** instead: it posts nothing, and the reset listener and an enclosing Field always
+  have a form-associated element with the Root's `form`.
+- **Form reset**: the target is computed in JS as in 11.1 (uncontrolled: the latest
+  `defaultValue ?? []`; controlled: the mount-time `value`) and dispatched whole (15.4); the
+  text resets as in single mode.
+- **`required`** stays where it is, on `Combobox.Input`, and with `multiple` it means **"at
+  least one value"**. The text of a multiple combobox is empty most of the time, so the native
+  attribute cannot simply be passed through: the Input renders native `required` **only while
+  the optimistic value is empty** (a computed native validity attribute, conventions 3.6;
+  CheckboxGroup section 7), and `aria-required="true"` whenever the prop is set. While nothing
+  is selected the empty input is `valueMissing`, with the browser's localised message and
+  `:user-invalid` on the visible field; once something is selected nothing is required. It
+  follows optimistic state: removing the last chip marks the input required at once, a rollback
+  un-marks it. Unmatched text never satisfies it at a submit: focus leaving clears the text
+  (15.3), and Enter in a closed combobox clears it before the implicit submission (15.6).
+  Before hydration the attribute is what the server rendered (`required` exactly when the
+  default selection is empty).
+- **Inside a `Field.Root`**: as single mode (the Input is the control and the validity
+  element). `validate`'s `value` is the first value; a rule over the selection reads
+  `formData.getAll(name)`. Every value dispatch is an edit for the Field.
+- **`disabled`** on the Root also disables every `ChipRemove` (native) and marks `Chips` and
+  each `Chip` `data-disabled`; chips are then not focusable by the keys (the Input that owns
+  them is disabled) and nothing dispatches. The hidden inputs still post, as in 11.1. Nothing
+  is disabled while pending.
+- **Before hydration** the chips of the default selection are in the server HTML and the
+  hidden inputs post it; `ChipRemove` buttons do nothing yet.
+
+### 15.9 Free text (`allowCustomValue`)
+
+Enter with no active option and text that is not empty **adds the text as a value**
+(`added: [text]`, `custom: true`) and clears the text, with the listbox open or closed; the key
+is prevented in both cases (the user is adding an item, not submitting the form). Text that is
+already a value adds nothing and is cleared. **Focus leaving the combobox** with such text adds
+it the same way (the `focusout` as `details.event`), as single mode commits on leave: a typed
+address followed by a click on Submit must not be lost. Without `allowCustomValue`, text is
+never a value and is cleared when focus leaves. The text is taken as typed (no trimming, no
+splitting at commas: section 13).
+
+### 15.10 Walkthroughs
+
+Notation as section 10, with `V` and `O` as lists. Uncontrolled, `defaultValue={[]}`.
+
+1. **Pick two, slow saves, out of order.** Type "ja", ArrowDown, Enter: `T=""` (urgent),
+   dispatch `added: ["jp"]`: `O=["jp"]`, a Japan chip with `data-pending`, the option
+   `data-selected data-pending`, a hidden input `value="jp"`; the listbox stays open and shows
+   the results for `""` once they render. ArrowDown to France, Enter: `O=["jp","fr"]`, two
+   pending chips. France's save resolves first: nothing is committed yet (one dispatch is in
+   flight). Japan's resolves: both are replayed in dispatch order, `V=["jp","fr"]`, `P=false`.
+2. **The first save rejects.** As 1, but Japan's save rejects after France's resolved:
+   `V=["fr"]`; the Japan chip and its hidden input are gone, the option loses `data-selected`;
+   the rejection is a superseded one and goes to `reportError`. Had Japan been the only
+   dispatch, the error would reach the boundary above the Root. The text is untouched.
+3. **Backspace.** `V=["jp","fr"]`, empty text. Backspace: dispatch `removed: ["fr"]`; the
+   France chip disappears, `ariaNotify("France removed")`; `data-pending` on the Input. A
+   rejection brings the chip back in its old place (`V` never changed).
+4. **Into the chips and back.** ArrowLeft at the caret's start: the listbox, if open, closes
+   (`onOpenChange(false, { reason: "dismiss" })`); focus is on the France chip. ArrowLeft:
+   Japan. Delete: focus moves to France, then dispatch `removed: ["jp"]`. Typing "g": the
+   Input is focused in the `keydown`, `T="g"`, the listbox opens.
+5. **Toggle off in the listbox.** Japan is selected; the user finds it and presses Enter:
+   dispatch `removed: ["jp"]`, the chip disappears, the option shows `aria-selected="false"`
+   and `data-pending` until the action settles.
+6. **Required, last chip removed, submit.** One chip, `required`. `ChipRemove` click:
+   `O=[]`, the Input gets native `required` in the same render. Submit while the removal is
+   pending: blocked by `valueMissing` on the visible input. The removal rejects: the chip
+   returns and `required` leaves.
+7. **Form reset during a save.** `defaultValue={["jp"]}`, the user added France (pending).
+   Reset: an absolute dispatch of `["jp"]` (`removed: ["fr"]`, `reason: "platform"`). If
+   France's save resolves later, the replay applies its patch first and the reset after it, in
+   dispatch order, so the value ends as `["jp"]`.
+
+### 15.11 What `Select multiple` (#165) can reuse
+
+Not a design of Select; the parts of this section that do not depend on a text input:
+
+- The value contract: `string[]`, the `added` / `removed` details, the patch reducer with the
+  replay of resolved changes, the absolute reset, "persist the diff".
+- The props shape: a `multiple: true` variant of the Root's props union, fixed at mount, with
+  single selection as the unflagged variant.
+- The listbox rules: `aria-multiselectable`, a pick toggles and does not close, per-option
+  `data-pending` from optimistic against committed.
+- If Select shows chips: the `Chips` / `Chip` / `ChipRemove` vocabulary, the optimistic chip
+  rule of 15.5, and the chip keys of 15.6, which would then move to a shared internal hook.
+
+What is Combobox's own: the text rules (15.3, 15.9), Backspace and the arrow from the input,
+the hidden inputs and the computed `required` (a native `<select multiple>` posts and
+validates by itself).

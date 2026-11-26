@@ -12646,3 +12646,208 @@ Developer, after the review of `feat/163-collapsible` (memo/reviewer/review-163.
   message: Accordion keeps "toggle, find-in-page, exclusive groups", Collapsible says "toggle,
   find-in-page, ::details-content" (it owns `name` and has no exclusive group).
 - Not changed: the echo rule (review finding 3) is left for a separate issue.
+
+## 2026-11-26, #164: Combobox `multiple` with chips (proposed)
+
+Design for GitHub issue #164 (part of #162, wave 23). **Proposed**: written by the architect,
+not yet accepted by the user and not implemented. The open decisions are listed at the end;
+working notes in `memo/architect/combobox-multiple-notes.md`.
+
+Sections changed:
+
+- combobox.md: new section 15 (the whole design of `multiple`); decisions table row 2 (the
+  chip parts and the hidden inputs), row 14 (no longer lists `multiple`), new row 16; 3.1 (the
+  props shown are the single variant of a union); 9 (`aria-multiselectable`); 13 (the
+  `multiple` item is replaced by what stays out: delimiters, a maximum, reordering, a disabled
+  chip, an overflow part); the Status line.
+- conventions.md 1.1: a second exception to "each part renders at most one DOM element", the
+  hidden inputs of a Combobox Root (one per value with `multiple`). This is the one rule that
+  changes. 2.5 (the list of set-valued owners names Combobox with `multiple`), 5.3 (the
+  Combobox row: `fsui-combobox-deselect`) and 11 (the removal announcement) are additions to
+  lists, not new rules.
+
+The reasoning worth keeping:
+
+- **Single mode is untouched.** `multiple: true` selects a second variant of the Root's props
+  union (the `exclusive` pattern of ToggleGroup and Accordion with the default the other way
+  round, because single selection shipped first). The mode is fixed at mount.
+- **The text changes meaning, not shape.** In single mode the text is the selection's label,
+  so the library writes it on a pick and rolls it back on a rejection. With `multiple` the
+  text is only a search: a pick clears it and nothing ever rolls it back. That removes the
+  per-dispatch text record and the "close in the commit that ends the action" path from the
+  multiple mode instead of adding to them.
+- **Set-valued rules apply as written** (conventions 2.2, 2.5, 3.3): `added` / `removed`, the
+  patch reducer, the replay of resolved changes, the absolute form reset. The one difference
+  from CheckboxGroup is order: pick order (the value's own order), because most options are
+  not mounted and document order means nothing.
+- **Chips render optimistic state**, so a removed chip disappears at once and a chip can only
+  be pending while it is being added. Considered and not chosen: rendering the union of the
+  optimistic and committed values so that a chip being removed stays with `data-pending`.
+- **`Chips` is a list, not the field box** (Base UI's `Chips` wraps the Input). A `list` may
+  not own a textbox, and without a list a screen reader has no "2 items".
+- **Chip labels.** The library derives no label from a value, and with an async search the
+  consumer may hold nothing but the value. `Chip`'s state therefore carries `label` from the
+  label cache (2.3), which is written at the pick.
+- **Real focus on chips, one Tab stop** (Base UI's model). Rejected: React Aria's separate
+  grid (a second Tab stop and two more roles), Ark `TagsInput`'s highlight without focus
+  (silent for a screen reader), and Backspace-only (no keyboard path to a chip that is not
+  the last one except through the listbox).
+- **`required` is computed** on the Input (conventions 3.6, CheckboxGroup 7): rendered only
+  while the optimistic value is empty. A `required` on the Root was not chosen: the Input is
+  where it is in single mode and where the browser shows the message. Unmatched text must not
+  satisfy it, which is why focus leaving and Enter in a closed combobox clear the text.
+- **One hidden input per value** rather than one hidden `<select multiple>`: a hidden select
+  would be one element and post natively, but Firefox restores a select's state on reload and
+  its reset algorithm would run against `selected` attributes React does not keep in step.
+  While the selection is empty one nameless hidden input keeps a form-associated element for
+  the reset listener and the Field.
+- **A press on `ChipRemove` while the listbox is open closes it** (light dismiss, as `Clear`).
+  Capturing the pointer to the Popup, the Input's trick, would retarget the click away from
+  the button.
+
+Open decisions for the user (recommendation first):
+
+1. The text after a pick: cleared / kept / a prop.
+2. The listbox after a pick: stays open / closes / a `closeOnSelect`-style prop.
+3. Chip keyboard: real focus with arrows, Backspace and Delete / Backspace on the empty
+   input only.
+4. A chip whose removal is pending: disappears at once / stays with `data-pending`.
+5. `allowCustomValue` text when focus leaves: added as a value / discarded.
+6. The built-in English removal announcement (`announceRemoved`): ship it / no announcement.
+
+To verify in a browser at implementation: focusing the Input in a chip's `keydown` delivers the
+character to the Input in Chromium, Firefox and WebKit; screen readers announce the
+`aria-selected` change of the active option in a multiselectable listbox (NVDA, JAWS,
+VoiceOver), else the toggle needs an announcement too; a focusable `listitem` is read with its
+position.
+
+## 2026-11-26, #164: Combobox `multiple` decided and implemented
+
+The user accepted the six recommendations of the entry above (issue comment, 2026-11-26):
+
+1. The text is **cleared** after a pick.
+2. The listbox **stays open** after a pick.
+3. Chips take **real focus**, with one Tab stop (the Input).
+4. A chip whose removal is pending **disappears at once** and comes back on rejection.
+5. `allowCustomValue` text is **added as a value** when focus leaves.
+6. `announceRemoved` **ships** (default English `"Japan removed"`).
+
+combobox.md section 15 is now "decided"; the Status line no longer excludes it. No rule of
+section 15 changed with the decisions: the section was written with the recommendations.
+
+Amendments made at implementation (combobox.md 15.1, 15.2, 15.6):
+
+- `Combobox.Chips` owns `onFocus` / `onBlur` as well (added to the `Omit` of
+  `ComboboxChipsProps`): focus arriving on a chip closes the listbox and starts the press watch
+  of the leave rule, and focus leaving a chip for outside the combobox is focus leaving. The
+  Input owns the same pair for the same reason (3.2); `onFocusCapture` / `onBlurCapture` pass
+  through.
+- `Chips` renders `aria-labelledby` only while it has the `list` role (not empty): a role-less
+  `div` may not be named.
+- Escape on a chip is prevented as it moves focus to the Input, so the close request of an
+  enclosing Dialog or Popover does not run (verified in Chromium and Firefox, browser row
+  "Escape on a chip inside a modal Dialog").
+
+Implementation notes (not rules):
+
+- The Root keeps one component: both selection hooks are called on every render, the one for
+  the other mode idle (no props, no action). The multiple one is
+  `packages/ui/src/combobox/use-multiple-selection.ts` (the patch reducer, `change`, the whole
+  form reset with the #151 rule of CheckboxGroup); Option, Chip and ChipRemove read
+  `isSelected` / `isPending` from the context, so they do not branch on the mode.
+- Chip labels are render state: a snapshot map written in the pick's event (before the
+  dispatch, so the chip's first render has the label), when an Option for a selected value
+  registers, and in a layout effect when values arrive from outside. The cache itself stays a
+  ref map read by handlers only.
+- `useComboboxForm` takes `resetValue(event)`; the Root computes the reset target per mode.
+  `useDeferredLeave` takes `chipsRef` as a third inside region.
+- Tests: the shared value-action suite runs against `Combobox.Root multiple` (driver
+  `packages/ui/src/__tests__/drivers/combobox-multiple.tsx`, including the transition-type rows
+  in `packages/ui/src/combobox/combobox-multiple-transition-types.test.tsx`);
+  `packages/ui/src/combobox/combobox-multiple.test.tsx` (jsdom) and
+  `packages/ui/src/combobox/combobox-multiple.browser.test.tsx`.
+
+The points left to verify by the entry above:
+
+- **A printable key on a chip lands in the Input** (the Input focused in the chip's `keydown`):
+  verified with the real keyboard in Chromium 156 and Firefox 157 (a letter, a shifted letter,
+  a digit); WebKit through CI (`workflow_dispatch` on the work branch), WebKit cannot run on the
+  development machine.
+- **Screen readers and the `aria-selected` change** of the active option in a multiselectable
+  listbox: not verifiable in the automated suite. Chromium's accessibility tree (CDP) exposes
+  `multiselectable` on the listbox and `selected` on each option, toggled by a pick. The NVDA,
+  JAWS and VoiceOver pass is still to be done by hand; until it is, no extra announcement for a
+  toggle.
+- **A focusable `listitem` read with its position**: Chromium's tree exposes the chips as a
+  list named by the Label with `focusable` list items; CDP shows no `posinset` / `setsize` for
+  them (Chromium computes the position in the platform layer), so what a screen reader speaks
+  is part of the same manual pass.
+
+## 2026-11-26, #164: Combobox `multiple`, review amendments
+
+From the review of the implementation (`memo/reviewer/review-164.md` on `review/164`); m1 is a
+product-owner decision. Sections changed: combobox.md 15.6, 15.7; conventions 1.1 (wording).
+
+- **M1, the removal announcement's text fallback (15.7).** It was the chip's `textContent`,
+  which reads an `aria-hidden` "×" (the docs example announced "TypeScript× removed"). It is now
+  the chip's text nodes, skipping `[aria-hidden="true"]` subtrees and the `ChipRemove` (whose
+  elements register with the Root), whitespace collapsed and trimmed. `ChipRemove` content is
+  never part of the label.
+- **M2, a focused chip that unmounts (15.6).** New rule: when a focused chip unmounts for a
+  reason other than its own Backspace / Delete (a rolled-back addition, a controlled parent
+  dropping the value, a form reset), focus goes to the next chip, else the previous one, else
+  the Input. Implemented from the Chip's registration cleanup (which runs before the host node
+  is removed) and a Root layout effect that runs after the chips' re-registration, so a chip
+  that only re-registered keeps focus.
+- **m1, Enter while an open is on its way (15.6, product-owner decision).** With `multiple`,
+  Enter with typed text while the listbox is intended open but not committed yet (a slow
+  `openChangeAction`, or the keystroke's own open still rendering) is prevented and the text is
+  kept: the user typed a search and is about to pick, never "submit this". Judged on committed
+  state, so Escape-then-Enter (committed still open until the `toggle` fact) keeps the rules of
+  section 8 unchanged.
+- **m2, a chip focused while an open is on its way (15.6).** Focus arriving on a chip also
+  cancels an open that is requested but not shown, with a close request, so the listbox never
+  shows under a focused chip.
+- **m3, printable keys on a chip (15.6).** Printable means one code point
+  (`[...key].length === 1`, astral characters included) other than Space. Ctrl / Meta are
+  checked for the navigation keys only; a character typed with AltGr
+  (`getModifierState("AltGraph")`, Ctrl+Alt on Windows) is handed over; an IME start
+  (`key === "Process"`, `keyCode` 229) focuses the Input too. Whether the composition then runs
+  in the Input is part of the manual pass (no engine automates an IME on a chip here).
+- **n1 (15.7).** While `Chips` is empty it carries no name at all: the consumer's `aria-label` /
+  `aria-labelledby` are removed with the library's (a role-less `div` may not be named).
+- **n2 (types, docs only).** `ComboboxRootProps` is a union, so `Partial<ComboboxRootProps>` is
+  not assignable to either member and no longer spreads into `Combobox.Root`; a wrapper types
+  its partial props as `Partial<ComboboxSingleProps>` (or the multiple variant). Noted on the
+  docs page.
+- **n3.** conventions 1.1 had two "A second exception" paragraphs: the Combobox one is now the
+  third, after NumberField's. No rule changed.
+- **n5 (15.7).** The removal is announced optimistically, in the event; a rejection brings the
+  chip back without a second announcement.
+- **m4 (docs).** The JSDoc and docs rows of `allowCustomValue` and `defaultInputValue` describe
+  the multiple behaviour; the props table's type column shows both variants' types.
+- Tests (jsdom, `combobox-multiple.test.tsx`, "review fixes"): one row per finding, plus a
+  Combobox row for the #151 rule (a reset equal to the intended value dispatched while changes
+  are in flight, the final value the reset target).
+
+## 2026-11-26, #164: Combobox `multiple`, re-review follow-ups
+
+From the follow-up section of `memo/reviewer/review-164.md` (re-review of 33fdcb17). F2 is a
+product-owner decision. Sections changed: combobox.md 3.1 (the `openChangeAction` comment),
+5.6 (the requests table), 15.6.
+
+- **F1 (implementation only, no rule changed).** The record of a focused chip whose
+  registration ended (M2 of the entry above) is good for its own commit only: it is dropped in
+  a microtask. A chip cleanup in a commit the Root is not part of (a `label` from state below
+  the Root, a boundary inside it toggled from below) left a record behind, and a later Root
+  commit that removed that chip pulled focus back into the combobox from wherever it had gone.
+  The Root's layout effect runs before microtasks when the Root commits in the same commit, so
+  the M2 cases are unchanged. jsdom row "F1".
+- **F2 (15.6, 5.6, 3.1).** The cancel of an open still on its way when a chip takes focus (m2 of
+  the entry above) was `requestClose` with `reason: "dismiss"`, so `openChangeAction(false)` ran
+  with a dismissal reason, against "never called for a dismissal". It is a **request**, as
+  Alt+ArrowUp is: `openChangeAction(false, { reason: "activate" })`, `details.event` the
+  `focusin`, and `onOpenChange` is not called (nothing was shown). Listed among the requests in
+  the 5.6 table, the `openChangeAction` comment of 3.1, the JSDoc of `openChangeAction` and
+  `ComboboxOpenChangeDetails.reason`, and the docs row. The jsdom row "m2" asserts the reason
+  and that `onOpenChange` is not called.

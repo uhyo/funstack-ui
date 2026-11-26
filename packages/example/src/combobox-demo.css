@@ -22,6 +22,38 @@
   outline-offset: 1px;
 }
 
+/* `multiple`: the chips sit in the field box next to the input (Chips is the list, not the box). */
+.cb-chips-field {
+  flex-wrap: wrap;
+  max-inline-size: 32em;
+  padding-inline-start: 2px;
+}
+.cb-chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+.cb-chip {
+  display: inline-flex;
+  align-items: center;
+  margin: 2px;
+  padding: 0.1em 0.2em 0.1em 0.55em;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cb-accent) 15%, transparent);
+}
+.cb-chip:focus-visible {
+  outline: 2px solid var(--cb-accent);
+}
+.cb-chip[data-pending] {
+  opacity: 0.6;
+}
+.cb-chip-remove {
+  border: 0;
+  background: none;
+  padding: 0 0.35em;
+  font: inherit;
+  cursor: pointer;
+}
+
 .cb-input {
   border: 0;
   outline: none;

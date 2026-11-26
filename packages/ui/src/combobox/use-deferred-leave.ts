@@ -6,7 +6,12 @@ import { useLatest } from "../internal/use-latest.js";
 export interface DeferredLeaveOptions {
   readonly inputRef: RefObject<HTMLInputElement | null>;
   readonly popupRef: RefObject<HTMLElement | null>;
-  /** Focus has left the input and the popup (design 5.4). */
+  /**
+   * `Combobox.Chips` (`multiple`, design 15.6): a third region inside the combobox. Focus moving
+   * between the input and a chip is not focus leaving.
+   */
+  readonly chipsRef: RefObject<HTMLElement | null>;
+  /** Focus has left the input, the popup and the chips (design 5.4, 15.6). */
   readonly leave: (event: Event) => void;
 }
 
@@ -24,16 +29,26 @@ export interface DeferredLeave {
  * release. A window blur forgets the presses (a release it swallowed would otherwise hold the
  * check back), and so does focus arriving in the input.
  *
- * Returns the Input's `focus` and `blur` handlers: `focusIn` starts the tracking, `focusOut`
- * calls `leave` at once when focus moved to an element outside the input and the popup, and
+ * Returns the `focus` and `blur` handlers of the Input and of `Chips`: `focusIn` starts the
+ * tracking, `focusOut` calls `leave` at once when focus moved to an element outside the input,
+ * the popup and the chips, and
  * decides one task after the press is released (or one task later) when it moved nowhere.
  */
 export function useDeferredLeave({
   inputRef,
   popupRef,
+  chipsRef,
   leave,
 }: DeferredLeaveOptions): DeferredLeave {
   const leaveRef = useLatest(leave);
+  const inside = (node: Node | null): boolean => {
+    if (node === null) return false;
+    if (node === inputRef.current) return true;
+    const popup = popupRef.current;
+    if (popup !== null && popup.contains(node)) return true;
+    const chips = chipsRef.current;
+    return chips !== null && chips.contains(node);
+  };
 
   const presses = useRef(new Set<number>());
   const afterPress = useRef<(() => void) | null>(null);
@@ -44,10 +59,10 @@ export function useDeferredLeave({
     presses.current.clear();
     afterPress.current = null;
   };
-  const watchPresses = (input: HTMLInputElement): void => {
+  const watchPresses = (element: HTMLElement): void => {
     presses.current.clear();
     if (unwatchPresses.current !== null) return;
-    const doc = input.ownerDocument;
+    const doc = element.ownerDocument;
     const win = doc.defaultView;
     const released = (): void => {
       const check = afterPress.current;
@@ -86,15 +101,14 @@ export function useDeferredLeave({
   }, [inputRef]);
 
   const focusIn = (event: FocusEvent): void => {
-    watchPresses(event.currentTarget as HTMLInputElement);
+    watchPresses(event.currentTarget as HTMLElement);
   };
 
   const focusOut = (event: FocusEvent): void => {
     const input = inputRef.current;
-    const popup = popupRef.current;
     const next = event.relatedTarget;
     if (next instanceof Node) {
-      if (next === input || (popup !== null && popup.contains(next))) return;
+      if (inside(next)) return;
       unwatch();
       leave(event);
       return;
@@ -109,10 +123,7 @@ export function useDeferredLeave({
     const doc = input.ownerDocument;
     const check = () => {
       if (!doc.hasFocus()) return;
-      const active = doc.activeElement;
-      if (active === input || (active !== null && popup !== null && popup.contains(active))) {
-        return;
-      }
+      if (inside(doc.activeElement)) return;
       if (input.isConnected) leaveRef.current(event);
     };
     if (presses.current.size > 0) {

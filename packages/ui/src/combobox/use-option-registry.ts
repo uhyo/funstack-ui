@@ -2,6 +2,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { sortByDocumentOrder } from "../internal/dom-order.js";
+import { useLatest } from "../internal/use-latest.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import type { ComboboxOptionEntry } from "./combobox-context.js";
 
@@ -33,7 +34,12 @@ export interface OptionRegistry {
  * The Options, Statuses and Labels mounted in a Combobox (design/components/combobox.md 2, 6.5).
  * An Option's label is learnt into `labels` (design 2.3) as it registers.
  */
-export function useOptionRegistry(labels: Map<string, string>): OptionRegistry {
+export function useOptionRegistry(
+  labels: Map<string, string>,
+  /** Called with every label learnt from a registering Option (for the chips, design 15.1). */
+  onLabel?: (value: string, label: string) => void,
+): OptionRegistry {
+  const onLabelRef = useLatest(onLabel);
   const [registry] = useState(() => new Map<string, ComboboxOptionEntry>());
   const [optionCount, setOptionCount] = useState(0);
   const {
@@ -61,14 +67,16 @@ export function useOptionRegistry(labels: Map<string, string>): OptionRegistry {
         );
       }
       registry.set(optionValue, entry);
-      labels.set(optionValue, entry.label ?? (entry.element.textContent ?? "").trim());
+      const label = entry.label ?? (entry.element.textContent ?? "").trim();
+      labels.set(optionValue, label);
+      onLabelRef.current?.(optionValue, label);
       setOptionCount(registry.size);
       return () => {
         if (registry.get(optionValue) === entry) registry.delete(optionValue);
         setOptionCount(registry.size);
       };
     },
-    [registry, labels],
+    [registry, labels, onLabelRef],
   );
 
   const orderedOptions = useCallback((): OrderedOption[] => {
