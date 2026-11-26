@@ -1,0 +1,89 @@
+.otp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-block: 0.4rem;
+  border-radius: 8px;
+}
+
+.otp-input {
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+}
+
+.otp-input::selection {
+  background: transparent;
+}
+
+.otp:has(.otp-input:focus-visible) .otp-slot[data-active] {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.otp-slot {
+  display: grid;
+  place-items: center;
+  inline-size: 2.4rem;
+  block-size: 2.8rem;
+  border: 1px solid #9ca3af;
+  border-radius: 8px;
+  font:
+    600 1.2rem / 1 ui-monospace,
+    monospace;
+}
+
+.otp-slot[data-active] {
+  border-color: #2563eb;
+}
+
+.otp-slot[data-active]:not([data-filled])::after {
+  content: "";
+  inline-size: 1px;
+  block-size: 1.2em;
+  background: currentColor;
+  animation: otp-caret 1s steps(1) infinite;
+}
+
+@keyframes otp-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.otp[data-pending] .otp-slot {
+  opacity: 0.5;
+}
+
+.otp[data-invalid] .otp-slot {
+  border-color: #dc2626;
+}
+
+.otp-dash {
+  margin: 0;
+  border: 0;
+  inline-size: 0.6rem;
+  block-size: 2px;
+  background: #9ca3af;
+}
+
+.otp-error {
+  color: #dc2626;
+}
+
+.otp-form {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+}
+
+.otp-log {
+  font-size: 0.8rem;
+  color: #4b5563;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otp-slot::after {
+    animation: none;
+  }
+}

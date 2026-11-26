@@ -21,6 +21,7 @@ import { FieldFormDemo } from "./field-form-demo.js";
 import { ProgressMeterDemo } from "./progress-meter-demo.js";
 import { ToolbarDemo } from "./toolbar-demo.js";
 import { NumberFieldDemo } from "./number-field-demo.js";
+import { OTPFieldDemo } from "./otp-field-demo.js";
 import { SeparatorDemo } from "./separator-demo.js";
 
 export function App() {
@@ -54,6 +55,7 @@ export function App() {
       <MultiSelectDemo />
       <SliderDemo />
       <NumberFieldDemo />
+      <OTPFieldDemo />
       <ProgressMeterDemo />
       <SeparatorDemo />
       {/* The toast region (a Toast.Viewport) that renders the toasts ToastDemo queues. */}
