@@ -100,9 +100,9 @@ export function CollapsiblePage() {
           {
             name: "defaultOpen",
             type: "boolean",
-            default: "false",
+            default: "none (JS-free mode)",
             description:
-              "Initial open state, uncontrolled; read once. Its presence selects library mode, false included.",
+              "Initial open state, uncontrolled; read once. Its presence selects library mode, false included. Library mode without it (open or openChangeAction only) starts closed, as false.",
           },
           {
             name: "openChangeAction",
@@ -309,8 +309,9 @@ export function CollapsiblePage() {
             The browser opens a closed Collapsible when find-in-page or a text fragment matches its
             content. That is dispatched as <code>reason: "platform"</code> with the{" "}
             <code>toggle</code> event; the content stays visible while the action runs. If a
-            controlled parent does not adopt the change, or the action rejects, it is closed again
-            when the action settles. A disabled Collapsible is re-closed without dispatching.
+            controlled parent does not adopt the change, it is closed again when the action settles;
+            a rejection goes to the nearest Error Boundary. A disabled Collapsible is re-closed
+            without dispatching.
           </p>
         </Callout>
       </BehaviourSection>

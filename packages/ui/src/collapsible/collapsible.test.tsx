@@ -624,9 +624,12 @@ describe("Collapsible", () => {
         </Collapsible.Root>,
       );
       const messages = consoleError.mock.calls.map((c) => String(c[0]));
-      expect(
-        messages.some((m) => /^Collapsible\.Root: expected to render a <details>/.test(m)),
-      ).toBe(true);
+      const details = messages.find((m) =>
+        /^Collapsible\.Root: expected to render a <details>/.test(m),
+      );
+      // Collapsible's own semantics: it has no exclusive group (`name` is owned).
+      expect(details).toMatch(/\(toggle, find-in-page, ::details-content\)/);
+      expect(details).not.toMatch(/exclusive/);
       expect(
         messages.some((m) => /^Collapsible\.Trigger: expected to render a <summary>/.test(m)),
       ).toBe(true);
@@ -717,6 +720,47 @@ describe("Collapsible", () => {
         });
         expect(boundary).toHaveBeenCalledTimes(1);
         expect(committed()).toBe("false");
+      });
+    });
+
+    renderBoth("superseded reveal", (mode) => {
+      it("a reveal superseded by a click, then rejected, goes to reportError; the Root stays", async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const ds = sequencedDeferreds(2);
+        const boundary = vi.fn();
+        const action = vi.fn<ActionFn>(() => ds.next());
+        render(<Harness mode={mode} action={action} boundary={boundary} />);
+
+        act(() => {
+          root().setAttribute("open", "");
+        });
+        await flushToggle();
+        expect(root().open).toBe(true); // revealed, pending
+        // The user closes it again while the reveal's action runs.
+        await setupUser().click(trigger());
+        expect(action.mock.calls.map(([next, details]) => [next, details.reason])).toEqual([
+          [true, "platform"],
+          [false, "activate"],
+        ]);
+        expect(trigger()).not.toHaveAttribute("data-open");
+
+        const err = new Error("reveal not saved");
+        await act(async () => {
+          ds[0]!.reject(err);
+        });
+        expect(reportError).toHaveBeenCalledExactlyOnceWith(err);
+        expect(boundary).not.toHaveBeenCalled();
+        expect(screen.getByTestId("root")).toBeInTheDocument();
+
+        await act(async () => {
+          ds[1]!.resolve();
+        });
+        // The DOM follows the later dispatch: closed.
+        expect(root().open).toBe(false);
+        expect(trigger()).not.toHaveAttribute("data-open");
+        expect(committed()).toBe("false");
+        expectNotPending(root());
       });
     });
 

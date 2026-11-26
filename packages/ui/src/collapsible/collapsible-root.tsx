@@ -73,9 +73,10 @@ export interface CollapsibleRootProps extends Omit<
   open?: boolean;
   /**
    * Initial open state, uncontrolled. Read once. Its presence selects library mode,
-   * `defaultOpen={false}` included.
+   * `defaultOpen={false}` included. Library mode without it (`open` or `openChangeAction` only)
+   * starts closed, as `false`.
    *
-   * @defaultValue `false`
+   * @defaultValue none (JS-free mode)
    */
   defaultOpen?: boolean;
   /**
@@ -84,8 +85,10 @@ export interface CollapsibleRootProps extends Omit<
    * mode.
    *
    * Also called with `details.reason === "platform"` when the browser opened or closed the
-   * `<details>` itself (find-in-page, a click before hydration); committed state is re-applied to
-   * the DOM once the action settles.
+   * `<details>` itself (find-in-page, a click before hydration). The revealed content stays
+   * visible while the action runs; if a controlled parent does not adopt the change, committed
+   * state is re-applied to the DOM (closed again) once the action settles. A rejection goes to the
+   * Error Boundary like any other.
    *
    * A `setState` placed after your own `await` is not a Transition update; wrap it in
    * `startTransition` (React limitation).
@@ -183,7 +186,10 @@ export function CollapsibleRoot({
   );
 
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
-  const checkElement = useDetailsCheck("Collapsible.Root");
+  const checkElement = useDetailsCheck(
+    "Collapsible.Root",
+    isDev && "toggle, find-in-page, ::details-content",
+  );
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
       checkElement?.(element);

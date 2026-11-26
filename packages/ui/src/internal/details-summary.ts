@@ -52,16 +52,21 @@ export function interceptSummaryClick(event: MouseEvent<HTMLElement>): boolean {
 
 /**
  * The development check of a part that must render a `<details>` (`Accordion.Item`,
- * `Collapsible.Root`); `part` is its public name. A no-op returning `undefined` in production
- * (`useElementCheck`). Call the result from the part's own ref.
+ * `Collapsible.Root`); `part` is its public name and `semantics` the platform behaviours the
+ * part relies on, named in the message. Pass `semantics` as `isDev && "..."` so the text folds
+ * away in production, where the hook is a no-op returning `undefined` (`useElementCheck`). Call
+ * the result from the part's own ref.
  */
-export function useDetailsCheck(part: string): ElementCheck<HTMLDetailsElement> | undefined {
+export function useDetailsCheck(
+  part: string,
+  semantics: string | false,
+): ElementCheck<HTMLDetailsElement> | undefined {
   return useElementCheck<HTMLDetailsElement>(
     isDev &&
       ((element) =>
         element.tagName !== "DETAILS"
           ? `${part}: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
-            "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>."
+            `The platform semantics (${String(semantics)}) need a real <details>.`
           : null),
   );
 }

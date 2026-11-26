@@ -181,9 +181,10 @@ fragment matching closed content, a click before hydration, and a consumer's DOM
   dispatches once with `reason: "platform"` and `event: undefined`. The `<details>` carries
   `suppressHydrationWarning` in both modes.
 - Once the Root is no longer pending, a layout effect re-applies the committed value to
-  `details.open`. So the content the browser revealed stays visible while the action runs; an
-  action that rejects, or a controlled parent that does not adopt, closes it again when the
-  transition ends.
+  `details.open`. So the content the browser revealed stays visible while the action runs; a
+  controlled parent that does not adopt it closes it again when the transition ends. A rejection
+  of the latest dispatch goes to the Error Boundary (which replaces the Root); a superseded
+  rejection goes to `reportError` and the DOM follows the later dispatch.
 
 These are requests, not facts: the DOM is the optimistic state and restoring it is cheap
 (conventions 2.1, 3.5 "residual browser paths"). The Collapsible therefore has **no
@@ -237,7 +238,7 @@ export interface CollapsibleOpenChangeDetails extends ActionDetails {
 | Prop | Type | Default | Notes |
 | --- | --- | --- | --- |
 | `open` | `boolean` | none | Controlled. `undefined` means uncontrolled. |
-| `defaultOpen` | `boolean` | `false` | Read once. Its presence selects library mode. |
+| `defaultOpen` | `boolean` | none (JS-free mode) | Read once. Its presence selects library mode; library mode without it starts as `false`. |
 | `openChangeAction` | `ChangeAction<boolean, CollapsibleOpenChangeDetails>` | none | Requests only; there are no facts (2.2). |
 | `disabled` | `boolean` | `false` | Section 6. |
 | `experimental_interpolateSize` | `boolean` | `false` | Section 8.2. Both modes. |

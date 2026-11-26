@@ -12630,3 +12630,19 @@ Notes from the implementation (memo/developer/issue-163.md):
 - `::details-content` transitions are not listed by `getAnimations()` in Chromium, and in
   Firefox an `opacity` transition on `::details-content` does not run while the
   `grid-template-rows` one does. The browser row observes the box height instead.
+
+## 2026-11-26, #163: Collapsible review fixes
+
+Developer, after the review of `feat/163-collapsible` (memo/reviewer/review-163.md on branch
+`review/163`). Wording only; no behaviour changed.
+
+- Design 2.2, the re-apply bullet: a refused reveal is closed again; a rejection of the latest
+  dispatch goes to the Error Boundary (the Root is replaced, so nothing is "closed again"); a
+  superseded rejection goes to `reportError` and the DOM follows the later dispatch. The earlier
+  text said a rejecting action closes the reveal again. A jsdom row covers the superseded case.
+- Design 3.1, the `defaultOpen` row: default "none (JS-free mode)"; library mode without it
+  starts as `false`.
+- `useDetailsCheck` (`internal/details-summary.ts`) takes the platform semantics to name in its
+  message: Accordion keeps "toggle, find-in-page, exclusive groups", Collapsible says "toggle,
+  find-in-page, ::details-content" (it owns `name` and has no exclusive group).
+- Not changed: the echo rule (review finding 3) is left for a separate issue.

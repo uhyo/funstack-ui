@@ -121,7 +121,10 @@ export function AccordionItem({
   );
 
   const registerItem = root?.registerItem;
-  const checkElement = useDetailsCheck("Accordion.Item");
+  const checkElement = useDetailsCheck(
+    "Accordion.Item",
+    isDev && "toggle, find-in-page, exclusive groups",
+  );
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
       checkElement?.(element);
