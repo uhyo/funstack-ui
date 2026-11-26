@@ -35,10 +35,29 @@ export interface DialogContextValue extends OverlayRootValue<
 
 export const DialogContext = createContext<DialogContextValue | null>(null);
 
+/**
+ * The namespace whose part names a shared part body uses in its messages: `Dialog`, or
+ * `AlertDialog`, whose parts run the Dialog parts' code (design/components/alert-dialog.md 8).
+ */
+export type DialogNamespace = "Dialog" | "AlertDialog";
+
+/**
+ * The parts of `Dialog` and `AlertDialog` (design/components/alert-dialog.md 8) share this
+ * context. `part` is the public name (`"AlertDialog.Cancel"`); the error names the Root of the
+ * same namespace.
+ */
 export function useDialogContext(part: string): DialogContextValue {
   const context = use(DialogContext);
   if (context === null) {
-    throw new Error(`${part} must be rendered inside a Dialog.Root.`);
+    const root = rootPartOf(part);
+    throw new Error(
+      `${part} must be rendered inside ${/^[AEIOU]/.test(root) ? "an" : "a"} ${root}.`,
+    );
   }
   return context;
+}
+
+/** `"AlertDialog.Cancel"` -> `"AlertDialog.Root"`. */
+export function rootPartOf(part: string): string {
+  return `${part.slice(0, part.indexOf("."))}.Root`;
 }

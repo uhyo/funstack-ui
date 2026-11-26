@@ -13273,3 +13273,70 @@ next to live buttons without an Error Boundary, because an action that catches i
 resolves and a resolved action closes the dialog. The Form shape with `Form.Root` covers it.
 A "resolve but stay open" signal on Close parts would be a conventions question (actions
 return nothing today).
+## 2026-11-26, #167: `AlertDialog` decided and implemented
+
+The user accepted the seven recommendations of the entry above (issue comment, 2026-11-26):
+
+1. A separate namespace, `AlertDialog` (`@funstack/ui/alert-dialog`).
+2. Escape always closes the dialog, as a fact.
+3. An `Action` with `action` renders no native command: a click before hydration does nothing.
+   Whether `Dialog.Close` and `Popover.Close` with an `action` follow is #182; they are
+   unchanged.
+4. The Cancel stays active while an Action is pending.
+5. `AlertDialog.Form` is in the namespace.
+6. Dialog's transition types (`fsui-dialog*`) and data attributes.
+7. A development warning for a missing Description.
+
+alert-dialog.md is now "decided and implemented". Conventions registry lists updated (no rule
+changes): 1.1 gains the `Cancel` and `Action` part rows (and AlertDialog in the `Form` and
+`Description` rows), 2.1 the `AlertDialog.Root` `onOpenChange` in both handler lists, 2.5.1 the
+AlertDialog parts in the Close rows and `AlertDialog.Form` in the form-channel row, 5.3 an
+AlertDialog row that points to Dialog's types. internal-hooks.md: the `nativeCommand` option of
+`useOverlayClose`.
+
+Amendments made at implementation:
+
+- **Walkthrough 4 (Cancel while the confirm is pending) was wrong on timing.** In library mode
+  the Cancel's close is a Root transition, and React entangles it with the Action's pending
+  transition (conventions 2.3 item 5): the dialog stays open, the Trigger pending, until the
+  action settles; then the close commits and the Action's own close is a no-op (a rejection
+  still reaches the boundary, and the dialog closes). In JS-free mode the Cancel is the
+  browser's command and closes at once, as Escape does in both modes. Decision 4 stands (the
+  Cancel is not disabled by the library); the walkthrough and the docs say what happens.
+- **8: where the Cancel context lives.** The Popup, not the Root, provides it (whether a Cancel
+  is the default target, and the registry): `initialFocus` is the Popup's prop, and a nested
+  AlertDialog's Popup scopes its own Cancels. The registry also skips a Cancel inside a nested
+  `<dialog>`.
+- **3.4, JS-free mode: the Cancel writes its own `autofocus`.** The design had the Popup's
+  mount effect write it on a client render; the Cancel's ref does instead, which also covers a
+  Cancel that mounts later, and removes it when the Cancel becomes disabled or a target stops
+  being the default. React's `autoFocus` is rendered only on an enabled Cancel, so the server
+  HTML never marks a disabled one.
+- **8: the shared bodies are hooks.** `useDialogRoot`, `useDialogTrigger`, `useDialogPopup`,
+  `useDialogTitle`, `useDialogDescription`, `useDialogClose`, `useDialogForm` in the Dialog part
+  files; `useDialogPopup`'s `defaultInitialFocus` (used only without `initialFocus`) replaces the
+  silent variant of `useInitialFocusTarget`. The context error of a part outside its Root names
+  the Root of its own namespace ("AlertDialog.Cancel must be rendered inside an
+  AlertDialog.Root."); the other Dialog development messages are worded with the namespace.
+
+The points left to verify by the entry above, as found (`alert-dialog.browser.test.tsx`):
+
+- React's `autoFocus` on a Cancel that mounts into an already open JS-free dialog calls
+  `.focus()` and takes focus, in Chromium, Firefox and WebKit. Kept: the case is an Error
+  Boundary fallback with its own Cancel, where focus would otherwise be lost to the body. Into a
+  closed dialog (and at hydration, the dialog closed) it moves nothing.
+- The dialog focusing steps skip a disabled element carrying `autofocus` and take the next
+  element carrying it; with none left, the first focusable element. Chromium, Firefox and
+  WebKit. The library removes the attribute from a disabled Cancel anyway; the platform rule is
+  the backstop for a server-rendered Cancel disabled before the user opens the dialog.
+- Not probed: Base UI's Escape defaults; the screen-reader announcement (NVDA, JAWS,
+  VoiceOver). Chromium's accessibility tree exposes the Popup as `alertdialog`, modal, named by
+  the Title and described by the Description.
+
+Implementation notes (not rules):
+
+- Tests: `packages/ui/src/alert-dialog/alert-dialog.test.tsx` runs the shared open-state suite
+  and the shared Close-part suite (the Action as the part) against an AlertDialog harness
+  (`packages/ui/src/__tests__/alert-dialog-harness.tsx`), plus the AlertDialog rows;
+  `alert-dialog-transition-types.test.tsx`; `alert-dialog.browser.test.tsx`. Notes in
+  `memo/developer/issue-167.md`.

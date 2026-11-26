@@ -1,7 +1,7 @@
 # AlertDialog
 
-Status: **proposed** (#167, part of #162), not implemented. The points the user is asked to
-decide are in the 2026-11-26 #167 entry of `design/CHANGELOG.md`. Follows
+Status: **decided and implemented** (#167, part of #162). The decisions and the implementation
+notes are in the 2026-11-26 #167 entries of `design/CHANGELOG.md`. Follows
 `design/conventions.md`; where this document and the conventions disagree, the conventions win.
 **Read `design/components/dialog.md` first**: an AlertDialog is a Dialog, and every rule of that
 document applies unless this one says otherwise. This document states only what differs.
@@ -279,12 +279,16 @@ dialog completes something that cannot be undone. That is the Cancel.
   `autofocus` on it, then removes it after the open: Dialog's mechanism (`dialog.md` 6.1), with
   the Cancel in place of a consumer's ref. The library never calls `.focus()`.
 - **JS-free mode.** The browser opens the dialog itself, so the attribute has to be there
-  already. A Cancel renders React's `autoFocus` when the Popup has no `initialFocus` (the Popup
-  tells its descendants through context, so this is decided during the server render): the
-  attribute is in the server HTML and the focus is right before hydration. On a client render
-  React does not write the attribute; the Popup's mount effect writes it, as it does for
-  `initialFocus` (`dialog.md` 6.1). With several Cancels each carries the attribute and the
-  platform takes the first.
+  already. An enabled Cancel renders React's `autoFocus` when the Popup has no `initialFocus`
+  (the Popup tells its descendants through context, so this is decided during the server
+  render): the attribute is in the server HTML and the focus is right before hydration. On a
+  client render React does not write the attribute; the Cancel's ref writes it, and removes it
+  when the Cancel becomes disabled or stops being the target. With several Cancels each enabled
+  one carries the attribute and the platform takes the first; the dialog focusing steps skip a
+  disabled element that carries it (verified in the three engines). React's `autoFocus` also
+  calls `.focus()` when a Cancel mounts into an already open JS-free dialog (an Error Boundary
+  fallback with its own Cancel): the Cancel takes focus, which is wanted there (verified in the
+  three engines); into a closed dialog it does nothing.
 - **Opting out.** `initialFocus` on the Popup wins (a ref or a selector), and then no Cancel
   renders `autoFocus`. The APG's other advice still applies to a long message: point
   `initialFocus` at the Title with `tabIndex={-1}` so the text is read from the top.
@@ -460,9 +464,13 @@ Library mode, uncontrolled, unless stated. `C` committed open, `O` optimistic op
    When it rejects, the Action has unmounted with the content (or is hidden), so the error
    follows conventions 2.4's owner-gone route. The docs say: dismissing a pending confirmation
    hides it, it does not abort it.
-4. **Cancel while the confirm is pending.** The same outcome through the other channel: the
-   Cancel's close is a Root request (`openChangeAction(false, "activate")`), the dialog closes
-   when it settles, the action keeps running and its own close is then a no-op. The library
+4. **Cancel while the confirm is pending.** The same outcome through the other channel, later:
+   the Cancel's close is a Root request (`openChangeAction(false, "activate")`), and React
+   entangles its transition with the Action's pending one (conventions 2.3 item 5), so in
+   library mode the dialog stays open, the Trigger pending, until the **action** settles; then
+   the close commits and the Action's own close is a no-op. A rejection still reaches the
+   boundary above the Action, and the dialog closes. In JS-free mode the Cancel is the browser's
+   command and closes the dialog at once, as Escape does in both modes. The library
    does not disable the Cancel while an Action is pending: Escape cannot be held either, so
    "the dialog can leave while the work runs" is true whatever the Cancel does, and one rule
    covers both. A consumer who wants the Cancel unavailable meanwhile says so with their own
@@ -493,18 +501,21 @@ props type and JSDoc, and each calls the code of a Dialog part:
 
 | AlertDialog part | Runs | With |
 | --- | --- | --- |
-| `Root` | the body of `DialogRoot` (`useOverlayRoot`, `requestClose`, the `returnValue` ref, `DialogContext`) | `modal: true`; `part: "AlertDialog.Root"` for the messages; a second, small context for the Cancel registry of 3.4 |
+| `Root` | the body of `DialogRoot` (`useOverlayRoot`, `requestClose`, the `returnValue` ref, `DialogContext`) | `modal: true`; `part: "AlertDialog.Root"` for the messages |
 | `Trigger` | the body of `DialogTrigger` | part name |
-| `Popup` | the body of `DialogPopup` | `role: "alertdialog"` as an owned key, `lightDismiss: false`, `experimental_closedBy: false`, the default initial focus target, the Description warning, part name |
+| `Popup` | the body of `DialogPopup` | `role: "alertdialog"` as an owned key, `lightDismiss: false`, `experimental_closedBy: false`, the default initial focus target, the Description warning, part name; it provides the small context of 3.4 (whether a Cancel is the default target, and the Cancel registry), since `initialFocus` is the Popup's prop |
 | `Title`, `Description`, `Form` | the bodies of the Dialog parts | part name |
-| `Cancel` | the body of `DialogClose` (`useOverlayClose`) | part name; registers its element as a focus candidate; `autoFocus` in JS-free mode (3.4) |
+| `Cancel` | the body of `DialogClose` (`useOverlayClose`) | part name; registers its element as a focus candidate; in JS-free mode, while enabled and the default target, React's `autoFocus` (server HTML) and the attribute written by its ref (a client render), removed when it stops being the target (3.4) |
 | `Action` | the body of `DialogClose` (`useOverlayClose`) | part name; no invoker attributes when `action` is given (one new option of `useOverlayClose`) |
 
-To make that possible the Dialog part files export their bodies in a form that takes the part
-name and the fixed options (an internal hook or an inner component per part; the public
-`Dialog.*` components become callers of the same thing), and `useInitialFocusTarget` accepts a
-default target that may be absent without the "resolved to no element" warning. No Dialog
-behaviour changes.
+To make that possible the Dialog part files export their bodies as hooks that take the
+namespace (or part name) and the fixed options (`useDialogRoot`, `useDialogTrigger`,
+`useDialogPopup`, `useDialogTitle`, `useDialogDescription`, `useDialogClose`, `useDialogForm`;
+the public `Dialog.*` components call them with `"Dialog"`), and `useDialogPopup` takes a
+`defaultInitialFocus` resolver used only without `initialFocus`, which bypasses
+`useInitialFocusTarget` and its "resolved to no element" warning. The files are
+`packages/ui/src/alert-dialog/alert-dialog-*.tsx`, with the Cancel context in
+`alert-dialog-context.ts`. No Dialog behaviour changes.
 
 Shared with Dialog without a second name: the transition types (`fsui-dialog`,
 `fsui-dialog-open`, `fsui-dialog-close`; conventions 5.3 has no AlertDialog row because an

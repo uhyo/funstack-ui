@@ -288,7 +288,7 @@ packages/ui/src/internal/
     overlay-popup.tsx     # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
     overlay-show.ts       # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
     use-apply-open-state.ts # useApplyOpenState: the apply effect (popover.md 2.5, dialog.md 2.5) both Popup implementations share, over an `isShown` / `show` / `hide` driver
-    use-overlay-close.ts  # useOverlayClose: the one Close part of Popover and Dialog
+    use-overlay-close.ts  # useOverlayClose: the one Close part of Popover and Dialog (and AlertDialog's Cancel and Action; `nativeCommand: false` for an Action with `action`)
     content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
     use-exit-animation.ts # held content while an exit animates (popover.md 4.4)
     popover-open.ts       # isPopoverOpen(element); directive-free

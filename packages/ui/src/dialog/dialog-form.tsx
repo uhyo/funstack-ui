@@ -8,6 +8,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { hasAnyError } from "../internal/form/validity.js";
 import { useDialogContext } from "./dialog-context.js";
+import type { DialogNamespace } from "./dialog-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -96,17 +97,27 @@ export interface DialogFormProps extends Omit<
  *
  * @see https://ui.funstack.work/components/dialog
  */
-export function DialogForm({
-  action,
-  closeOnSettle = true,
-  method,
-  className,
-  style,
-  children,
-  render,
-  ...rest
-}: DialogFormProps) {
-  const ctx = useDialogContext("Dialog.Form");
+export function DialogForm(props: DialogFormProps) {
+  return useDialogForm(props, "Dialog");
+}
+
+DialogForm.displayName = "DialogForm";
+
+/** The body of `Dialog.Form`, also run by `AlertDialog.Form` (alert-dialog.md 8). */
+export function useDialogForm(
+  {
+    action,
+    closeOnSettle = true,
+    method,
+    className,
+    style,
+    children,
+    render,
+    ...rest
+  }: DialogFormProps,
+  namespace: DialogNamespace,
+): ReactNode {
+  const ctx = useDialogContext(`${namespace}.Form`);
   const { popupRef, recordCloseIntent, requestClose } = ctx;
   const isLibrary = ctx.mode === "library";
   const [pending, setPending] = useState(false);
@@ -176,6 +187,7 @@ export function DialogForm({
       <>
         {resolveStateValue(children, s)}
         <DialogFormSettle
+          namespace={namespace}
           watches={watches}
           missingAction={action === undefined}
           onPendingChange={setPending}
@@ -194,8 +206,6 @@ export function DialogForm({
   });
 }
 
-DialogForm.displayName = "DialogForm";
-
 /**
  * Rendered among the form's children, so it reads the `FormContext` exactly when the form is a
  * `Form.Root` (either orientation of the `render` composition): the settle close then waits for
@@ -203,11 +213,13 @@ DialogForm.displayName = "DialogForm";
  * included).
  */
 function DialogFormSettle({
+  namespace,
   watches,
   missingAction,
   onPendingChange,
   onSettled,
 }: {
+  readonly namespace: DialogNamespace;
   readonly watches: boolean;
   readonly missingAction: boolean;
   readonly onPendingChange: (pending: boolean) => void;
@@ -217,9 +229,9 @@ function DialogFormSettle({
   useDevWarning(
     form !== null && missingAction,
     isDev &&
-      "Dialog.Form: rendered as a `Form.Root`, it needs a function `action`; without one the form " +
-        "navigates instead of closing the dialog. Render a plain `<Dialog.Form>` for a " +
-        '`method="dialog"` form.',
+      `${namespace}.Form: rendered as a \`Form.Root\`, it needs a function \`action\`; without ` +
+        "one the form navigates instead of closing the dialog. Render a plain " +
+        `\`<${namespace}.Form>\` for a \`method="dialog"\` form.`,
   );
   const isForm = form !== null;
   const errors = form?.errors;

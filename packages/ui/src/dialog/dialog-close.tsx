@@ -10,6 +10,7 @@ import type {
 } from "../internal/types.js";
 import { useOverlayClose } from "../internal/overlay/use-overlay-close.js";
 import { useDialogContext } from "./dialog-context.js";
+import type { DialogNamespace } from "./dialog-context.js";
 
 /**
  * State of `Dialog.Close`, passed to the function forms of `className`, `style`, `children` and
@@ -92,26 +93,50 @@ export interface DialogCloseProps extends Omit<
  *
  * @see https://ui.funstack.work/components/dialog
  */
-export function DialogClose({
-  action,
-  whilePending,
-  value,
-  disabled = false,
-  className,
-  style,
-  children,
-  render,
-  ...rest
-}: DialogCloseProps) {
-  const ctx = useDialogContext("Dialog.Close");
+export function DialogClose(props: DialogCloseProps) {
+  return useDialogClose(props, { part: "Dialog.Close" });
+}
+
+DialogClose.displayName = "DialogClose";
+
+/** What a caller of `useDialogClose` sets (design/components/alert-dialog.md 8). */
+export interface DialogCloseOptions {
+  /** Public name of the part (`"AlertDialog.Cancel"`). */
+  readonly part: `${DialogNamespace}.${string}`;
+  /** `false`: no `commandfor` / `command` (AlertDialog.Action with `action`). Default `true`. */
+  readonly nativeCommand?: boolean;
+  /** Extra owned keys (AlertDialog.Cancel's `autoFocus`). */
+  readonly ownProps?: ComponentPropsWithRef<"button">;
+}
+
+/**
+ * The body of `Dialog.Close`, also run by `AlertDialog.Cancel` and `AlertDialog.Action`
+ * (alert-dialog.md 8).
+ */
+export function useDialogClose(
+  {
+    action,
+    whilePending,
+    value,
+    disabled = false,
+    className,
+    style,
+    children,
+    render,
+    ...rest
+  }: DialogCloseProps,
+  { part, nativeCommand, ownProps }: DialogCloseOptions,
+): ReactNode {
+  const ctx = useDialogContext(part);
   const { popupRef, recordCloseIntent } = ctx;
   const isLibrary = ctx.mode === "library";
   return useOverlayClose({
-    part: "Dialog.Close",
+    part,
     noun: "dialog",
     isLibrary,
     popupId: ctx.ids.popup,
     command: "request-close",
+    nativeCommand,
     openGeneration: ctx.openGeneration,
     action,
     whilePending,
@@ -130,7 +155,7 @@ export function DialogClose({
       recordCloseIntent({ reason: "activate", event });
       dialog.close(returnValue);
     },
-    ownProps: { value },
+    ownProps: { value, ...ownProps },
     disabled,
     className,
     style,
@@ -139,5 +164,3 @@ export function DialogClose({
     rest,
   });
 }
-
-DialogClose.displayName = "DialogClose";

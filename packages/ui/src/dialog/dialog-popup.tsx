@@ -31,6 +31,7 @@ import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import type { DialogNamespace } from "./dialog-context.js";
 import { listenDialogDismiss } from "./dialog-dismiss.js";
 
 /**
@@ -152,19 +153,48 @@ function valueOf(element: unknown): string {
  *
  * @see https://ui.funstack.work/components/dialog
  */
-export function DialogPopup({
-  keepMounted,
-  initialFocus,
-  lightDismiss = false,
-  experimental_closedBy = false,
-  transition,
-  className,
-  style,
-  children,
-  render,
-  ...rest
-}: DialogPopupProps) {
-  const ctx = useDialogContext("Dialog.Popup");
+export function DialogPopup(props: DialogPopupProps) {
+  return useDialogPopup(props, { namespace: "Dialog" });
+}
+
+DialogPopup.displayName = "DialogPopup";
+
+/** What a caller of `useDialogPopup` fixes (design/components/alert-dialog.md 8). */
+export interface DialogPopupOptions {
+  readonly namespace: DialogNamespace;
+  /** An owned `role` (`"alertdialog"`); without it `role` passes through. */
+  readonly role?: string;
+  /**
+   * The initial focus target when `initialFocus` is not given (AlertDialog: the first enabled
+   * Cancel), resolved right before a library open. `null` leaves the choice to the platform,
+   * without a warning.
+   */
+  readonly defaultInitialFocus?: (dialog: HTMLDialogElement) => HTMLElement | null;
+  /** Wraps the rendered children (AlertDialog's Cancel context). */
+  readonly wrapChildren?: (children: ReactNode) => ReactNode;
+}
+
+/**
+ * The body of `Dialog.Popup`, also run by `AlertDialog.Popup` with `role`, no light dismiss and
+ * a default initial focus target (alert-dialog.md 8).
+ */
+export function useDialogPopup(
+  {
+    keepMounted,
+    initialFocus,
+    lightDismiss = false,
+    experimental_closedBy = false,
+    transition,
+    className,
+    style,
+    children,
+    render,
+    ...rest
+  }: DialogPopupProps,
+  { namespace, role, defaultInitialFocus, wrapChildren }: DialogPopupOptions,
+): ReactNode {
+  const part = `${namespace}.Popup`;
+  const ctx = useDialogContext(part);
   const isLibrary = ctx.mode === "library";
   const { modal, ids, popupRef, triggerRef } = ctx;
   const [dialog, setDialog] = useState<HTMLDialogElement | null>(null);
@@ -173,7 +203,7 @@ export function DialogPopup({
   // also while a part's close is in flight) and `refusedFact` (conventions 3.9.4), as
   // usePopoverPopup's.
   const [flags] = useState(createPopupFlags);
-  const initialFocusTarget = useInitialFocusTarget("Dialog.Popup", "dialog");
+  const initialFocusTarget = useInitialFocusTarget(part, "dialog");
 
   // `held`: children stay mounted while the close animates (design 4.4).
   const exit = useCloseHold(ctx.committed, isLibrary, transition);
@@ -186,13 +216,13 @@ export function DialogPopup({
   // Toast's Viewport moves its region into the topmost open modal (design/components/toast.md 4.3).
   useModalRegistration(dialog);
 
-  useJsFreePropWarnings("Dialog.Popup", "dialog", isLibrary, transition, keepMounted);
+  useJsFreePropWarnings(part, "dialog", isLibrary, transition, keepMounted);
 
   const checkElement = useElementCheck<HTMLDialogElement>(
     isDev &&
       ((element) =>
         element.tagName !== "DIALOG"
-          ? `Dialog.Popup: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
+          ? `${part}: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
             "Top layer, backdrop, focus and Escape all come from a real <dialog>."
           : null),
   );
@@ -209,7 +239,11 @@ export function DialogPopup({
     // Otherwise the platform's dialog focusing steps honour `autofocus` (design 6.1).
     showWithFocus(element, {
       refused,
-      autofocus: refused ? null : initialFocusTarget(element, initialFocus),
+      autofocus: refused
+        ? null
+        : initialFocus === undefined && defaultInitialFocus !== undefined
+          ? defaultInitialFocus(element)
+          : initialFocusTarget(element, initialFocus),
       // A view transition animates the open: the CSS enter does not run next to it (conventions
       // 5.1).
       show: () =>
@@ -445,7 +479,7 @@ export function DialogPopup({
     dialog,
     !isLibrary || ctx.committed,
     isDev &&
-      "Dialog.Popup: the dialog has no accessible name. Render a Dialog.Title, or give the " +
+      `${part}: the dialog has no accessible name. Render a ${namespace}.Title, or give the ` +
         "Popup an `aria-label`.",
   );
 
@@ -454,7 +488,9 @@ export function DialogPopup({
 
   const content = (s: DialogPopupState): ReactNode =>
     renderOverlayContent({ isLibrary, keepMounted, visible, wrapContent }, () =>
-      resolveStateValue(children, s),
+      wrapChildren === undefined
+        ? resolveStateValue(children, s)
+        : wrapChildren(resolveStateValue(children, s)),
     );
 
   const libraryProps: ComponentPropsWithRef<"dialog"> & DataAttributes = {
@@ -466,6 +502,8 @@ export function DialogPopup({
     "aria-labelledby": ids.title,
     "aria-describedby": ids.description,
     "data-modal": dataAttr(modal),
+    // Owned when fixed (AlertDialog's `alertdialog`): a consumer's `role` is dropped.
+    ...(role !== undefined && { role }),
     // A pre-hydration open leaves an `open` attribute the server did not render (design 2.4).
     suppressHydrationWarning: true,
   };
@@ -482,7 +520,5 @@ export function DialogPopup({
     ref: libraryRef,
   });
 
-  return useTransitionBoundary("Dialog.Popup", isLibrary ? transition : undefined, element);
+  return useTransitionBoundary(part, isLibrary ? transition : undefined, element);
 }
-
-DialogPopup.displayName = "DialogPopup";

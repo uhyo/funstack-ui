@@ -13,7 +13,7 @@ import { intendedValue } from "../internal/action/use-controllable-action.js";
 import { useOverlayRoot } from "../internal/overlay/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
-import type { DialogContextValue } from "./dialog-context.js";
+import type { DialogContextValue, DialogNamespace } from "./dialog-context.js";
 
 /** Details passed as the second argument of `openChangeAction` and `onOpenChange`. */
 export interface DialogOpenChangeDetails extends ActionDetails {
@@ -121,19 +121,31 @@ const isDialogOpen = (dialog: HTMLDialogElement): boolean => dialog.open;
  *
  * @see https://ui.funstack.work/components/dialog
  */
-export function DialogRoot({
-  open,
-  defaultOpen,
-  openChangeAction,
-  onOpenChange,
-  modal = true,
-  children,
-}: DialogRootProps) {
+export function DialogRoot({ modal = true, ...props }: DialogRootProps) {
+  return useDialogRoot(props, { namespace: "Dialog", modal });
+}
+
+DialogRoot.displayName = "DialogRoot";
+
+/** What a caller of `useDialogRoot` fixes (design/components/alert-dialog.md 8). */
+export interface DialogRootOptions {
+  readonly namespace: DialogNamespace;
+  readonly modal: boolean;
+}
+
+/**
+ * The body of `Dialog.Root`, also run by `AlertDialog.Root` with `modal` fixed to `true`
+ * (design/components/alert-dialog.md 8).
+ */
+export function useDialogRoot(
+  { open, defaultOpen, openChangeAction, onOpenChange, children }: Omit<DialogRootProps, "modal">,
+  { namespace, modal }: DialogRootOptions,
+): ReactNode {
   // The popover machinery (design/components/popover.md 14.1) with the `<dialog>`'s `open` and
   // `returnValue` in the details: an open's `returnValue` is an own `undefined`.
   const root = useOverlayRoot<DialogOpenChangeDetails, HTMLDialogElement, [returnValue: string]>({
     component: "dialog",
-    part: "Dialog.Root",
+    part: `${namespace}.Root`,
     open,
     defaultOpen,
     openChangeAction,
@@ -179,5 +191,3 @@ export function DialogRoot({
 
   return <DialogContext value={context}>{resolveStateValue(children, state)}</DialogContext>;
 }
-
-DialogRoot.displayName = "DialogRoot";

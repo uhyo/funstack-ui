@@ -25,6 +25,12 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
   /** The popup's id (`commandfor`) and the native command. */
   readonly popupId: string;
   readonly command: "hide-popover" | "request-close";
+  /**
+   * Render `commandfor` / `command` (default `true`). `false` for a part whose click must never
+   * close natively: AlertDialog.Action with an `action`, which before hydration would close the
+   * dialog without running it (design/components/alert-dialog.md 3.2). Only with `action`.
+   */
+  readonly nativeCommand?: boolean;
   readonly openGeneration: () => number;
   readonly action: Action<[details: Details]> | undefined;
   /** The part's `whilePending` prop; `"ignore"` when omitted (conventions 2.5.1). */
@@ -57,6 +63,7 @@ export function useOverlayClose<Details extends ActionDetails>(
   options: OverlayCloseOptions<Details>,
 ): ReactNode {
   const { part, noun, isLibrary, popupId, command, action, disabled, render } = options;
+  const nativeCommand = options.nativeCommand ?? true;
   // The library owns the close, so a Close ignores clicks while pending by default (2.5.1).
   const trigger = usePureTrigger({
     whilePending: options.whilePending,
@@ -101,8 +108,10 @@ export function useOverlayClose<Details extends ActionDetails>(
     // Owned: a render element must not re-enable a disabled Close.
     disabled: disabledProps.props.disabled,
     // Only on a button (or a component, assumed to render one): another element is no invoker.
-    commandfor: disabledProps.invoker && rendersButton(render) ? popupId : undefined,
-    command: disabledProps.invoker && rendersButton(render) ? command : undefined,
+    // Not rendered at all for a part that opts out (`nativeCommand: false`).
+    commandfor:
+      nativeCommand && disabledProps.invoker && rendersButton(render) ? popupId : undefined,
+    command: nativeCommand && disabledProps.invoker && rendersButton(render) ? command : undefined,
     ...options.ownProps,
     ...(installClick && { onClick }),
     // JS-free mode without `action`, disabled in the `aria-disabled` branch (a host link):

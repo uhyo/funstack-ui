@@ -3,6 +3,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import type { DialogNamespace } from "./dialog-context.js";
 import type { DialogPopupState } from "./dialog-popup.js";
 
 /** State of `Dialog.Title`: the Popup's state. */
@@ -34,8 +35,18 @@ export interface DialogTitleProps extends Omit<
  *
  * @see https://ui.funstack.work/components/dialog
  */
-export function DialogTitle({ className, style, children, render, ...rest }: DialogTitleProps) {
-  const ctx = useDialogContext("Dialog.Title");
+export function DialogTitle(props: DialogTitleProps) {
+  return useDialogTitle(props, "Dialog");
+}
+
+DialogTitle.displayName = "DialogTitle";
+
+/** The body of `Dialog.Title`, also run by `AlertDialog.Title` (alert-dialog.md 8). */
+export function useDialogTitle(
+  { className, style, children, render, ...rest }: DialogTitleProps,
+  namespace: DialogNamespace,
+): ReactNode {
+  const ctx = useDialogContext(`${namespace}.Title`);
   const state: DialogTitleState = { open: ctx.committed, modal: ctx.modal };
   return useRender<ComponentPropsWithRef<"h2">, DialogTitleState>({
     defaultElement: "h2",
@@ -48,5 +59,3 @@ export function DialogTitle({ className, style, children, render, ...rest }: Dia
     libraryProps: { id: ctx.ids.title },
   });
 }
-
-DialogTitle.displayName = "DialogTitle";
