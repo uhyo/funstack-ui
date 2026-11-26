@@ -1,0 +1,60 @@
+.av {
+  display: inline-grid;
+  inline-size: 3.5rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: clip;
+}
+.av > * {
+  grid-area: 1 / 1;
+}
+.av-image {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.av-fallback {
+  display: grid;
+  place-items: center;
+  background: #e5e7eb;
+  color: #111827;
+  font-weight: 600;
+}
+.av:has(img) .av-fallback {
+  animation: av-fallback-in 1ms 400ms backwards;
+}
+@keyframes av-fallback-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (scripting: enabled) {
+  .av-image {
+    transition: opacity 150ms;
+  }
+  .av-image[data-status="loading"] {
+    opacity: 0;
+  }
+}
+
+.av-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-block: 0.5rem 1rem;
+}
+.av-figure {
+  display: grid;
+  justify-items: center;
+  gap: 0.25rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+.av-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  inline-size: fit-content;
+}

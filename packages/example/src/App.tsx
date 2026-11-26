@@ -22,6 +22,7 @@ import { ProgressMeterDemo } from "./progress-meter-demo.js";
 import { ToolbarDemo } from "./toolbar-demo.js";
 import { NumberFieldDemo } from "./number-field-demo.js";
 import { SeparatorDemo } from "./separator-demo.js";
+import { AvatarDemo } from "./avatar-demo.js";
 
 export function App() {
   return (
@@ -55,6 +56,7 @@ export function App() {
       <SliderDemo />
       <NumberFieldDemo />
       <ProgressMeterDemo />
+      <AvatarDemo />
       <SeparatorDemo />
       {/* The toast region (a Toast.Viewport) that renders the toasts ToastDemo queues. */}
       <Notifications />
