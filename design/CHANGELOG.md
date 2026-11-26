@@ -13206,3 +13206,70 @@ Implementation notes (not rules):
   function read in the layout effect (the Status's ref count): render state missed a Status
   that registered in the open commit itself.
 - `use-multiple-selection.ts` casts the component's extra fields, not the whole details.
+## 2026-11-26, #167: `AlertDialog`, the design (proposed)
+
+Architect, for the product owner and the user; part of #162 (wave 24). New document:
+`design/components/alert-dialog.md`. Not implemented. Also touched, without a rule change:
+`design/overlay-open-state.md` 3.9 (one sentence: `AlertDialog.Root` is `Dialog.Root` with
+`modal` fixed) and dialog.md 3.3 (the `role` pass-through points to AlertDialog). Notes:
+`memo/architect/alert-dialog-notes.md`.
+
+What the document proposes:
+
+- A separate namespace `AlertDialog` at `@funstack/ui/alert-dialog` (`Root`, `Trigger`,
+  `Popup`, `Title`, `Description`, `Cancel`, `Action`, `Form`), every part running the code of
+  a Dialog part with props fixed. Chosen over a preset prop on `Dialog.Root` because the
+  preset would have to reach two other parts and would leave `modal={false}` and
+  `lightDismiss` on the types of a component that must reject them.
+- Fixed: modal, `role="alertdialog"` (owned), no light dismiss (no `closedby` attribute is
+  needed: a modal dialog's default is `closerequest` in every engine).
+- Escape closes, as a fact. The APG's alert dialog pattern has no keyboard section and points
+  to Dialog (Modal); Radix closes on Escape as well. `closedby="none"` was not taken: Chromium
+  and Firefox only, cannot be emulated in Safari (the anti-abuse rule), and it does not stop
+  `requestClose()`.
+- Initial focus on the first enabled Cancel through Dialog's `autofocus` mechanism; in JS-free
+  mode the Cancel renders `autoFocus` so the server HTML has it.
+- `Action` is `Dialog.Close` with an `action` (own transition, `whilePending` default
+  `"ignore"`, close on resolve, open on rejection), except that with `action` it renders no
+  native close command: a click before hydration must not close the dialog as if the work had
+  been done.
+- The confirm without JavaScript is `AlertDialog.Form action={serverFunction}`.
+- Requests and facts are Dialog's, unchanged. No conventions rule changes.
+
+Open decisions for the user (recommendation first):
+
+1. **Separate namespace** (recommended) or a preset on Dialog.
+2. **Escape closes** (recommended), or an opt-in that renders `closedby="none"` and works in
+   two engines of three.
+3. **An Action with `action` is no native close invoker** (recommended), or the same markup as
+   `Dialog.Close`. If accepted: whether `Dialog.Close` and `Popover.Close` with an `action`
+   should follow (a separate issue; it changes shipped behaviour before hydration).
+4. **`AlertDialog.Form` in the namespace** (recommended), or `Dialog.Form` used inside an
+   AlertDialog and documented.
+5. **The Cancel stays active while an Action is pending** (recommended; the consumer disables
+   it with their own optimistic state), or the library ignores the Cancel and renders
+   `aria-disabled` on it while any Action of the Root is pending.
+6. **Dialog's transition types and data attributes** (recommended: one stylesheet for both),
+   or `fsui-alert-dialog*` types of its own.
+7. **A development warning for a missing Description** (recommended), or none, as Dialog.
+
+Not verified; to check at implementation:
+
+- React's `autoFocus` on a Cancel that mounts while a JS-free alert dialog is already open
+  calls `.focus()` and takes focus; the design accepts it (the content of a JS-free dialog is
+  mounted with the page). If it turns out to bite, the fallback is the Popup's mount effect
+  alone, with focus before hydration left to the platform's first-focusable rule.
+- A disabled Cancel carrying `autofocus` is skipped by the dialog focusing steps in the three
+  engines (the rule says "first enabled Cancel"; in JS-free mode the attribute is rendered on
+  each Cancel).
+- Base UI's AlertDialog is not in the design's section 4 table: its docs page (read
+  2026-11-26) lists `escape-key` and `outside-press` as change reasons but does not state the
+  defaults. The APG and Radix rows were read the same day; "Radix does not close on a click
+  outside" is from its source as remembered, not from the docs page.
+- Screen readers announce title and description with the role on open (NVDA, JAWS, VoiceOver).
+
+Gap recorded, not solved here: an action-prop confirm that fails cannot show an inline error
+next to live buttons without an Error Boundary, because an action that catches its error
+resolves and a resolved action closes the dialog. The Form shape with `Form.Root` covers it.
+A "resolve but stay open" signal on Close parts would be a conventions question (actions
+return nothing today).

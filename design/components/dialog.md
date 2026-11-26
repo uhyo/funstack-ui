@@ -705,7 +705,9 @@ Owned keys: `id`, `open` (never rendered; owned so a `render` element cannot add
 on a hydrated `<dialog>` (react/react#37261) and a consumer relying on them would be misled;
 `onCancel` and `onClose` are typed, work, and pass through (the library's own `close` and
 `cancel` listeners are native, section 14). `role` passes through: `role="alertdialog"` is a
-consumer choice that keeps all native behaviour. `tabIndex` passes through for the rare
+consumer choice that keeps all native behaviour; a confirmation is better written as an
+`AlertDialog` (`alert-dialog.md`), which adds the focus on the Cancel and removes the props an
+alert dialog must not have. `tabIndex` passes through for the rare
 "focus the dialog itself" case.
 
 ### 3.4 `Dialog.Close`

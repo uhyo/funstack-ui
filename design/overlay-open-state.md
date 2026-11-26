@@ -18,7 +18,8 @@ of the user (a fact, `onOpenChange`). This section is the rule for the five over
 `Combobox.Root` (`open` only), `Dialog.Root` and `HoverCard.Root`. All five run on
 `internal/overlay/use-overlay-root.ts`. Each component doc has a table of which cause goes to
 which channel: `popover.md` 2.8, `menu.md` 2.4, `combobox.md` 5.6, `dialog.md` 2.7,
-`hover-card.md` 2.5. Tooltip has no `open` prop and no callback
+`hover-card.md` 2.5. `AlertDialog.Root` is `Dialog.Root` with `modal` fixed
+(`alert-dialog.md` 5): what this section says of Dialog holds for it. Tooltip has no `open` prop and no callback
 (`tooltip.md` 4.1); a toast has no open state, its fact is `onClose` (`toast.md` 9).
 
 ### 3.9.1 The props
