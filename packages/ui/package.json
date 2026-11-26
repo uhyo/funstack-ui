@@ -37,6 +37,7 @@
     "./button": "./dist/button/index.mjs",
     "./checkbox": "./dist/checkbox/index.mjs",
     "./checkbox-group": "./dist/checkbox-group/index.mjs",
+    "./collapsible": "./dist/collapsible/index.mjs",
     "./combobox": "./dist/combobox/index.mjs",
     "./csp": "./dist/csp/index.mjs",
     "./dialog": "./dist/dialog/index.mjs",

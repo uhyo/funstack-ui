@@ -50,6 +50,17 @@ export type {
   AccordionPanelState,
 } from "./accordion/index.js";
 
+export { Collapsible } from "./collapsible/index.js";
+export type {
+  CollapsibleRootProps,
+  CollapsibleRootState,
+  CollapsibleOpenChangeDetails,
+  CollapsibleTriggerProps,
+  CollapsibleTriggerState,
+  CollapsiblePanelProps,
+  CollapsiblePanelState,
+} from "./collapsible/index.js";
+
 export { Tabs } from "./tabs/index.js";
 export type {
   TabsRootProps,

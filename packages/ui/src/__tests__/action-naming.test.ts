@@ -98,6 +98,9 @@ type PublicProps = {
   CheckboxGroupParentProps: UI.CheckboxGroupParentProps;
   CheckboxGroupRootProps: UI.CheckboxGroupRootProps;
   CheckboxProps: UI.CheckboxProps;
+  CollapsiblePanelProps: UI.CollapsiblePanelProps;
+  CollapsibleRootProps: UI.CollapsibleRootProps;
+  CollapsibleTriggerProps: UI.CollapsibleTriggerProps;
   ComboboxClearProps: UI.ComboboxClearProps;
   ComboboxEmptyProps: UI.ComboboxEmptyProps;
   ComboboxGroupLabelProps: UI.ComboboxGroupLabelProps;
@@ -212,6 +215,9 @@ const listedKeys = {
   CheckboxGroupParentProps: true,
   CheckboxGroupRootProps: true,
   CheckboxProps: true,
+  CollapsiblePanelProps: true,
+  CollapsibleRootProps: true,
+  CollapsibleTriggerProps: true,
   ComboboxClearProps: true,
   ComboboxEmptyProps: true,
   ComboboxGroupLabelProps: true,

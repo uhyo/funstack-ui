@@ -9,9 +9,9 @@ import type {
 } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { useDetailsCheck } from "../internal/details-summary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext, AccordionRootContext } from "./accordion-context.js";
 import type { AccordionItemContextValue } from "./accordion-context.js";
@@ -121,14 +121,7 @@ export function AccordionItem({
   );
 
   const registerItem = root?.registerItem;
-  const checkElement = useElementCheck<HTMLDetailsElement>(
-    isDev &&
-      ((element) =>
-        element.tagName !== "DETAILS"
-          ? `Accordion.Item: expected to render a <details> element but got <${element.tagName.toLowerCase()}>. ` +
-            "The platform semantics (toggle, find-in-page, exclusive groups) need a real <details>."
-          : null),
-  );
+  const checkElement = useDetailsCheck("Accordion.Item");
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
       checkElement?.(element);

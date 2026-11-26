@@ -1,6 +1,7 @@
 # Collapsible
 
-Status: **proposed** (#163), not implemented. History and the test plan: `design/CHANGELOG.md`.
+Status: **decided** (#163), implemented in `packages/ui/src/collapsible/` (shared with Accordion:
+`internal/details-summary.ts`). History and the test plan: `design/CHANGELOG.md`.
 Follows `design/conventions.md`; where this document and the conventions disagree, the
 conventions win.
 

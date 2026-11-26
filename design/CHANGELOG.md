@@ -12595,3 +12595,38 @@ Test plan (conventions 10.1; jsdom unless noted):
 - Browser: `experimental_interpolateSize` (computed `interpolate-size` on the `<details>`),
   the `::details-content` transition, and one `transition` run with the types. Find-in-page is
   not scriptable.
+
+## 2026-11-26, #163: Collapsible decided and implemented
+
+Developer, wave 23 (#162). `design/components/collapsible.md` status proposed -> decided. The
+user accepted the four recommendations of the design handback (issue comment, 2026-11-26):
+
+1. `defaultOpen` selects library mode (design 2.1), `defaultOpen={false}` included.
+2. `openChangeAction` only, no `onOpenChange` (design 2.2): the `on*` allow-list of conventions
+   2.1 is unchanged, and the action-naming guard (`__tests__/action-naming.test.ts`) lists the
+   three Collapsible Props types.
+3. `<details>` is the only base; the Trigger must be the first child of the Root.
+4. A standalone `Accordion.Item` (no Root) keeps working as a JS-free disclosure; the docs point
+   to Collapsible for one disclosure. Recorded as a rule in `accordion.md` section 1.
+
+Implementation: `packages/ui/src/collapsible/` (context, Root, Trigger, Panel; all `"use
+client"`), subpath `@funstack/ui/collapsible`, root re-export. Sharing with Accordion as
+planned: the Trigger click rule (nested interactive content, `preventDefault`) and the
+`<details>` / `<summary>` element checks moved to `internal/details-summary.ts` (flat, a client
+module because the checks are hooks); `Accordion.Item` and `Accordion.Trigger` use it, with
+their messages unchanged (the part name is a parameter). The state side is not shared.
+
+Registry rows added (no rule changed): conventions 1.1 (`Root` may be the `<details>`, `Panel`
+lists Collapsible), 2.5 (single-valued list), 3.5 (examples), 3.7 (no `keepMounted`), 4.1 (the
+`open` row), 5.3 (the types row), 7.3 (Collapsible next to Accordion), 8 (the
+`experimental_interpolateSize` row); `internal-hooks.md` 3.4 (no reducer) and the file index.
+
+Notes from the implementation (memo/developer/issue-163.md):
+
+- The `toggle` handler treats `details.open === committed` as the library's own echo, as the
+  design says. Consequence: while a close is pending (committed still open), a browser that
+  closes and then re-opens the `<details>` is not dispatched; the close then commits. Accordion
+  has the same rule.
+- `::details-content` transitions are not listed by `getAnimations()` in Chromium, and in
+  Firefox an `opacity` transition on `::details-content` does not run while the
+  `grid-template-rows` one does. The browser row observes the box height instead.
