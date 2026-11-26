@@ -485,9 +485,15 @@ and its own re-show lose the platform's interest relationship, so the platform f
 `loseinterest` on the popup but does not hide it. Lost interest **during a pending interest
 open** cancels the open (a request: dispatch `false`, same reason and event), so a hover card
 whose content is still loading does not appear under a pointer that has left. Nothing changes
-in JS-free mode, where the platform's own interest relationship is intact. No prop is added;
-Tooltip remains the component for `role="tooltip"` content, an `interestfor` Popover is a hover
-card with interactive content.
+in JS-free mode, where the platform's own interest relationship is intact. No prop is added.
+The rows below are for a button that does nothing else to the popup. **A button that opens the
+popup on activation should not also carry `interestfor` for it**, the Trigger included: the
+Popup is rich content, and HTML's author guidance for interest invokers (whatwg/html PR #11006;
+`docs/research/wave23-hovercard-select-multiple.md` 1.1) rules out one element that shows the
+same rich target on interest and on activation, because the interest relation then replaces
+the `popovertarget` one in the accessibility mapping. "Hover to preview, click to pin" is
+therefore not a pattern the library recommends. The component for a hover preview is HoverCard
+(`hover-card.md`), in every engine; Tooltip remains the component for `role="tooltip"` content.
 
 | Situation (library mode, Chromium) | What happens | `reason` | `details.event` |
 | --- | --- | --- | --- |
@@ -519,9 +525,9 @@ library does the same here: a flag set in the task before `hidePopover()` and co
 behaves identically (focus to the previous element, else `<body>`). Nested interest-opened
 popups therefore leave focus on `<body>` after a lost-interest hide, as the platform does.
 Other engines: `interestfor` is inert in Firefox and WebKit, so the button does nothing there;
-a consumer who needs the hover card everywhere makes the button the Trigger (click opens in
-every engine, interest adds hover on Chromium). Menu and Combobox inherit the rows (shared
-hook); nothing composes `interestfor` with them today.
+a hover preview that works in every engine is a HoverCard (`hover-card.md`), whose JS path
+supplies the interest signal. Menu and Combobox inherit the rows (shared hook); HoverCard's
+flagged path is built on them.
 
 ---
 

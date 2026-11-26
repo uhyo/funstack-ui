@@ -12515,3 +12515,85 @@ modules). No code, rule or public path changed: the 25 consumer bundles are byte
 - The file index in `design/internal-hooks.md` is grouped by folder. Code spans in the design
   documents name the new paths. Entries above this one, the memos and `docs/research/` keep the
   old flat paths on purpose: they are history.
+
+## 2026-11-26, #166: hover-card.md, the HoverCard design (proposed)
+
+Wave 23, part of #162. Written by the architect from
+`docs/research/wave23-hovercard-select-multiple.md` part 1; **proposed**, not yet decided by
+the user. New document `design/components/hover-card.md`. Working notes:
+`memo/architect/hovercard-notes.md`; probe `memo/architect/probes-166/interest-rules.mjs`
+(Chromium 156).
+
+What the design takes from the research, and where it differs:
+
+- Taken: a library-mode Popover base with a link Trigger and the Popup right after it;
+  `manual` by default, `hint` and `interestfor` behind flags, never `auto`; Tab from the
+  Trigger enters the card; no `aria-describedby` and no `aria-expanded`; nothing on touch on
+  the JS path; the Trigger is a link or a button that opens nothing on click.
+- Different: **focus inside the card does not keep it open against the pointer.** The research
+  said "focus inside the card keeps it open". The probe shows Chromium's native rule is "the
+  latest event wins" (a hover-opened card whose button was clicked closes when the pointer
+  leaves; a focus-opened card closes when the pointer crosses and leaves it), and the design
+  follows that on the JS path so the two paths agree and the timer pair stays Tooltip's.
+- Different: no `aria-details` from the library (the research offered it as an option). The
+  Popup follows the Trigger in the DOM, which is the case in which HTML-AAM drops the relation
+  for a `popovertarget` popover.
+- Added: one mode only (no JS-free mode; opening is always a request, so content loads on
+  interest and Suspense holds the open); every user close is a fact with reason `"dismiss"`;
+  a press on the Trigger closes the card and cancels a coming open, on both paths (Chromium's
+  native behaviour keeps it open); "no open until fresh interest" after Escape, a Trigger
+  press and the library's focus return, enforced at the `beforetoggle` interception on the
+  flagged path; `interestfor` written after hydration; every show is a no-focus show; the
+  `<span>` Popup for cards inside running text; `role="group"` as the default role; delays of
+  600 / 300 ms.
+
+Changed in other documents, in the same commit:
+
+- `popover.md` 2.9: the recommendation to put `interestfor` on the Trigger ("click opens in
+  every engine, interest adds hover on Chromium") is withdrawn. HTML's author guidance (added
+  to whatwg/html PR #11006 on 2026-11-24) says not to combine interest and activation for the
+  same rich target on one element. The rows of 2.9 stay: they describe what a consumer's own
+  `interestfor` button does, and HoverCard's flagged path runs on them. No code change follows
+  from the edit.
+- `tooltip.md` 4.1: the sentence that called a pinned tooltip "a Popover with `commandfor` +
+  `interestfor`" now says that pattern is not offered.
+
+Conventions: **no rule changes.** HoverCard applies 3.9 (requests and facts), 3.5, 5.1, 8 and
+13 as written. When the component is implemented, the enumerations that name the overlay
+components need HoverCard added, without a change of rule: `overlay-open-state.md` 3.9 ("the
+four overlay Roots"), 3.9.11 (no JS-free mode), 3.9.13 (the warning's Roots); `conventions.md`
+2.2 (the `"activate"` and `"dismiss"` rows: interest and lost interest, which Popover 2.8
+already uses), 5.3 (the types `fsui-hover-card`, `-open`, `-close`), 8 (the two flags), 9.1 /
+9.2 (the folder and the `./hover-card` export).
+
+Open for the user (the product owner escalates; recommendation first):
+
+1. The name: `HoverCard` (recommended) or `PreviewCard`.
+2. Keyboard model: Tab enters the open card (recommended, the platform's model) or the card is
+   kept out of the Tab order (Radix).
+3. Popover 2.9: withdraw "hover to preview, click to pin" as documented here (recommended),
+   and whether `Popover.Trigger` should also warn in development when given `interestfor`.
+4. A press on the Trigger closes the card on both paths (recommended) or the card stays as in
+   Chromium's native behaviour.
+5. Default delays: 600 / 300 ms (recommended) or Tooltip's 250 / 150 ms (Chromium's
+   `interest-delay` defaults).
+6. Ship `experimental_interestFor` in the first version (recommended by the research) or add
+   it after Chromium 160's specification alignment has been re-probed.
+
+Checks for the implementation (not rules; the tests will be the reference):
+
+- Browser rows, all three engines: Tab from the Trigger enters an adjacent card; a `manual`
+  `<div popover>` shown `inert` moves no focus even with an `autofocus` descendant; Escape with
+  focus inside returns focus to the Trigger and no card re-opens; a press outside with focus
+  inside leaves focus where the press landed; the pointer leaving a card that holds focus
+  closes it; a card inside a modal Dialog and inside a Menu; a nested card; Escape with a Menu
+  open inside the card closes the Menu only.
+- Chromium only, flagged: the rows of probe `interest-rules.mjs` through the real component;
+  an interest timer running when the Trigger is pressed opens nothing; long-press is not
+  testable in Playwright.
+- Re-probe on Chromium 160 (`InterestForSpecAlignment`): "suppress next focus interest" may
+  make the library's flag redundant for the focus return; the `loseinterest`-without-hide
+  behaviour of a re-shown popover (popover.md 2.9) must still hold.
+- Safari: the hoisted Popup (hover-card.md 1.1, shape 2) is not after the Trigger in the Tab
+  order. Documented degradation, not a library bug.
+- jsdom covers the timers, the request / fact routing, pending and the overlap walkthroughs.

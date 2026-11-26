@@ -418,10 +418,10 @@ state write, so it has no `state.instant` counterpart for the same reason there 
 `state.open` (conventions 7.4; the amendment for #93).
 
 Controlled `open` (pinned or programmatic tooltips) is out of scope for v0. A pinned tooltip is
-click-driven, which makes it a Popover with `commandfor` + `interestfor` ("hover to preview,
-click to pin", research "Invoker Commands"). That component will define controlled popover state
-once, following conventions 3.5 ("it follows the browser, it does not gate it"), and Tooltip can
-reuse it if a real need appears.
+click-driven, which makes it a Popover. One button that previews on hover and pins on click is
+not offered: HTML's author guidance for interest invokers rules it out for rich content
+(popover.md 2.9). Popover defines controlled popover state, following conventions 3.5 ("it
+follows the browser, it does not gate it"), and Tooltip can reuse it if a real need appears.
 
 ### 4.2 Async React edge cases
 
