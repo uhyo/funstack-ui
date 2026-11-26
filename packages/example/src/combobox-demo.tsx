@@ -181,6 +181,84 @@ function TagInput() {
   );
 }
 
+function CountryChips() {
+  const [saved, setSaved] = useState<string[]>(["jp"]);
+  const [fail, setFail] = useState(false);
+  return (
+    <section>
+      <h3>Multiple: chips, async search, slow saves of the diff</h3>
+      <p>
+        <code>multiple</code>: a pick toggles the option, clears the text and keeps the list open.
+        Each chip renders from the optimistic value (an added one is pending until its save settles;
+        a removed one is gone at once and returns if the save fails). The chip text is the option
+        text the library saw, so the async search needs no map. Backspace in the empty input removes
+        the last chip; ArrowLeft at the start moves into the chips (arrows, Home / End, Delete,
+        Escape; a letter types into the input). One hidden input per value.
+      </p>
+      <label className="cb-toggle">
+        <input type="checkbox" checked={fail} onChange={(e) => setFail(e.target.checked)} /> Make
+        the saves fail
+      </label>
+      <DemoErrorBoundary className="cb-error-box">
+        <Combobox.Root
+          multiple
+          name="countries"
+          defaultValue={["jp"]}
+          valueChangeAction={async (_next, { added, removed }) => {
+            await fakeSave("countries", { added, removed }, { fail, ms: 900 });
+            startTransition(() =>
+              setSaved((prev) => [
+                ...prev.filter((v) => !removed.includes(v)),
+                ...added.filter((v) => !prev.includes(v)),
+              ]),
+            );
+          }}
+        >
+          <Combobox.Label className="cb-label">Countries</Combobox.Label>
+          <div className="cb-field cb-chips-field">
+            <Combobox.Chips className="cb-chips">
+              {({ value }) =>
+                value.map((code) => (
+                  <Combobox.Chip key={code} value={code} className="cb-chip">
+                    {({ label }) => (
+                      <>
+                        {label ?? code}
+                        <Combobox.ChipRemove
+                          className="cb-chip-remove"
+                          aria-label={`Remove ${label ?? code}`}
+                        >
+                          <span aria-hidden>×</span>
+                        </Combobox.ChipRemove>
+                      </>
+                    )}
+                  </Combobox.Chip>
+                ))
+              }
+            </Combobox.Chips>
+            <Combobox.Input className="cb-input" placeholder="Add a country" />
+            <Combobox.Clear className="cb-icon-button" aria-label="Clear all">
+              ×
+            </Combobox.Clear>
+            <Combobox.Popup className="cb-popup">
+              <Combobox.List className="cb-list">
+                {({ query }) => (
+                  <Suspense
+                    fallback={<Combobox.Status className="cb-status">Searching…</Combobox.Status>}
+                  >
+                    <CountryOptions query={query} />
+                  </Suspense>
+                )}
+              </Combobox.List>
+              <Combobox.Empty className="cb-status">No country matches.</Combobox.Empty>
+            </Combobox.Popup>
+          </div>
+        </Combobox.Root>
+      </DemoErrorBoundary>
+      <p className="cb-note">Saved: {saved.join(", ") || "(none)"}</p>
+    </section>
+  );
+}
+
 function InDialog() {
   return (
     <section>
@@ -234,6 +312,7 @@ export function ComboboxDemo() {
       </p>
       <CountryPicker />
       <TagInput />
+      <CountryChips />
       <InDialog />
     </Demo>
   );
