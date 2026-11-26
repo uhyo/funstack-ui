@@ -37,7 +37,8 @@ Branch `feat/164-combobox-multiple` (from `design/164-combobox-multiple`, merged
 ## Verification (unverified points of the design entry)
 
 - Printable key on a chip → Input: Chromium 156 + Firefox 157 OK locally (letter, Shift+letter,
-  digit). WebKit: cannot launch locally (missing libsecret-1.so.0); CI dispatch on the branch.
+  digit). WebKit: cannot launch locally (missing libsecret-1.so.0); CI dispatch on the branch
+  (run 45749815317, head 829d98d5): all four jobs green, WebKit included.
 - SR announcement of `aria-selected` toggles, chip position: manual NVDA / JAWS / VoiceOver
   pass needed (human). CDP: listbox `multiselectable: true`, option `selected` true/false,
   chips `list` named "Countries", items `listitem`, `focusable: true`, `level: 1`, no
