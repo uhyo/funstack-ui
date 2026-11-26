@@ -9,6 +9,7 @@ export default defineConfig({
     "src/collapsible/index.ts",
     "src/tabs/index.ts",
     "src/tooltip/index.ts",
+    "src/hover-card/index.ts",
     "src/switch/index.ts",
     "src/checkbox/index.ts",
     "src/dialog/index.ts",

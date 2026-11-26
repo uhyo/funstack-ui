@@ -47,13 +47,13 @@ export function ExperimentalPage() {
             "`experimental_interestFor`",
             "`interestfor`",
             "Chromium",
-            "[Tooltip.Trigger](/components/tooltip#props), [Tooltip skip-delay](/components/tooltip#skip-delay)",
+            "[Tooltip.Trigger](/components/tooltip#props), [Tooltip skip-delay](/components/tooltip#skip-delay), [HoverCard.Trigger](/components/hover-card#props)",
           ],
           [
             "`experimental_hint`",
             '`popover="hint"`',
             "Chromium, Firefox (Safari 27.0 treats it as `manual`)",
-            "[Tooltip.Popup](/components/tooltip#props)",
+            "[Tooltip.Popup](/components/tooltip#props), [HoverCard.Popup](/components/hover-card#props)",
           ],
           [
             "`experimental_closedBy`",

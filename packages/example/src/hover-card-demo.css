@@ -1,0 +1,51 @@
+.hc-link {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.hc-link[data-open] {
+  text-decoration: underline;
+}
+
+.hc-link[data-pending] {
+  cursor: progress;
+  text-decoration: underline dotted;
+}
+
+.hc-card {
+  inset: auto;
+  margin: 6px 0;
+  inline-size: 15rem;
+  padding: 10px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+
+.hc-card:popover-open {
+  opacity: 1;
+}
+
+@starting-style {
+  .hc-card:popover-open {
+    opacity: 0;
+  }
+}
+
+.hc-name,
+.hc-bio {
+  display: block;
+  margin-block-end: 6px;
+}
+
+.hc-log {
+  font-family: monospace;
+  font-size: 0.85rem;
+}

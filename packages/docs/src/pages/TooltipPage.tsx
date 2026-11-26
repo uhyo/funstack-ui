@@ -404,7 +404,11 @@ export function TooltipPage() {
           The trigger must be focusable. A natively <code>disabled</code> button never shows a
           tooltip; use <code>aria-disabled="true"</code> on a control that needs one.
         </li>
-        <li>Tooltips must not contain interactive content. Use a dialog or popover for that.</li>
+        <li>
+          Tooltips must not contain interactive content. For a rich preview with links and buttons,
+          use a <a href="/components/hover-card">HoverCard</a>; for content the user works in, a
+          dialog or popover.
+        </li>
         <li>
           Do not put the only copy of important information in a tooltip: touch users may never see
           it.

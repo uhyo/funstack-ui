@@ -1,0 +1,65 @@
+Chromium 156.0.8078.4
+
+== popover=hint intercept=false
+A hover: {"open":true,"src":true,"focus":"BODY","log":["interest","before:open(src)","toggle:open"]}
+A click Follow: {"open":true,"src":true,"focus":"follow","log":[]}
+A pointer left, focus inside: {"open":false,"src":false,"focus":"BODY","log":["loseinterest","before:closed(src)","toggle:closed"]}
+A Escape (focus inside, hover-opened): {"open":false,"src":false,"focus":"BODY","log":[]}
+A +600ms: {"open":false,"src":false,"focus":"BODY","log":[]}
+B Tab to link: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open"]}
+B Tab into card: {"open":true,"src":true,"focus":"cardLink","log":[]}
+B Escape inside: {"open":false,"src":false,"focus":"inv","log":["loseinterest","before:closed(src)","inv-focus","toggle:closed"]}
+B +600ms (re-open?): {"open":false,"src":false,"focus":"inv","log":[]}
+B2 Escape on link: {"open":false,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open","loseinterest","before:closed(src)","toggle:closed"]}
+B2 script refocus: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open"]}
+C keyboard open, pointer in+out of card: {"open":false,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open","loseinterest","before:closed(src)","toggle:closed"]}
+E click on invoker while open: {"open":true,"src":true,"focus":"inv","log":["interest","before:open(src)","toggle:open","inv-focus"]}
+E then leave: {"open":false,"src":false,"focus":"inv","log":["loseinterest","before:closed(src)","toggle:closed"]}
+
+== popover=manual intercept=false
+A hover: {"open":true,"src":true,"focus":"BODY","log":["interest","before:open(src)","toggle:open"]}
+A click Follow: {"open":true,"src":true,"focus":"follow","log":[]}
+A pointer left, focus inside: {"open":false,"src":false,"focus":"BODY","log":["loseinterest","before:closed(src)","toggle:closed"]}
+A Escape (focus inside, hover-opened): {"open":false,"src":false,"focus":"BODY","log":[]}
+A +600ms: {"open":false,"src":false,"focus":"BODY","log":[]}
+B Tab to link: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open"]}
+B Tab into card: {"open":true,"src":true,"focus":"cardLink","log":[]}
+B Escape inside: {"open":false,"src":false,"focus":"BODY","log":["loseinterest","before:closed(src)","toggle:closed"]}
+B +600ms (re-open?): {"open":false,"src":false,"focus":"BODY","log":[]}
+B2 Escape on link: {"open":false,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open","loseinterest","before:closed(src)","toggle:closed"]}
+B2 script refocus: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open"]}
+C keyboard open, pointer in+out of card: {"open":false,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","toggle:open","loseinterest","before:closed(src)","toggle:closed"]}
+E click on invoker while open: {"open":true,"src":true,"focus":"inv","log":["interest","before:open(src)","toggle:open","inv-focus"]}
+E then leave: {"open":false,"src":false,"focus":"inv","log":["loseinterest","before:closed(src)","toggle:closed"]}
+
+== popover=hint intercept=true
+A hover: {"open":true,"src":true,"focus":"BODY","log":["interest","before:open(src)","before:open(src)","toggle:open"]}
+A click Follow: {"open":true,"src":true,"focus":"follow","log":[]}
+A pointer left, focus inside: {"open":true,"src":false,"focus":"follow","log":["loseinterest"]}
+A Escape (focus inside, hover-opened): {"open":false,"src":false,"focus":"BODY","log":["before:closed","toggle:closed"]}
+A +600ms: {"open":false,"src":false,"focus":"BODY","log":[]}
+B Tab to link: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest","before:open(src)","before:open(src)","toggle:open"]}
+B Tab into card: {"open":true,"src":true,"focus":"cardLink","log":[]}
+B Escape inside: {"open":false,"src":false,"focus":"inv","log":["loseinterest","before:closed","inv-focus","toggle:closed"]}
+B +600ms (re-open?): {"open":false,"src":false,"focus":"inv","log":[]}
+B2 Escape on link: {"open":false,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","before:open(src)","toggle:open","loseinterest","before:closed","toggle:closed"]}
+B2 script refocus: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest","before:open(src)","before:open(src)","toggle:open"]}
+C keyboard open, pointer in+out of card: {"open":true,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","before:open(src)","toggle:open","loseinterest"]}
+E click on invoker while open: {"open":true,"src":true,"focus":"inv","log":["interest","before:open(src)","before:open(src)","toggle:open","inv-focus"]}
+E then leave: {"open":true,"src":false,"focus":"inv","log":["loseinterest"]}
+
+== popover=manual intercept=true
+A hover: {"open":true,"src":true,"focus":"BODY","log":["interest","before:open(src)","before:open(src)","toggle:open"]}
+A click Follow: {"open":true,"src":true,"focus":"follow","log":[]}
+A pointer left, focus inside: {"open":true,"src":false,"focus":"follow","log":["loseinterest"]}
+A Escape (focus inside, hover-opened): {"open":true,"src":false,"focus":"follow","log":[]}
+A +600ms: {"open":true,"src":false,"focus":"follow","log":[]}
+B Tab to link: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest","before:open(src)","before:open(src)","toggle:open"]}
+B Tab into card: {"open":true,"src":true,"focus":"cardLink","log":[]}
+B Escape inside: {"open":true,"src":false,"focus":"cardLink","log":["loseinterest"]}
+B +600ms (re-open?): {"open":true,"src":false,"focus":"cardLink","log":[]}
+B2 Escape on link: {"open":true,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","before:open(src)","toggle:open","loseinterest"]}
+B2 script refocus: {"open":true,"src":true,"focus":"inv","log":["inv-focus","interest"]}
+C keyboard open, pointer in+out of card: {"open":true,"src":false,"focus":"inv","log":["inv-focus","interest","before:open(src)","before:open(src)","toggle:open","loseinterest"]}
+E click on invoker while open: {"open":true,"src":true,"focus":"inv","log":["interest","before:open(src)","before:open(src)","toggle:open","inv-focus"]}
+E then leave: {"open":true,"src":false,"focus":"inv","log":["loseinterest"]}

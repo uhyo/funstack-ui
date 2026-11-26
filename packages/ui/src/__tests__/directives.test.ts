@@ -46,6 +46,13 @@ const clientFiles = [
   "tooltip/tooltip-popup.mjs",
   "tooltip/use-tooltip-interaction.mjs",
   "tooltip/tooltip-arrow.mjs",
+  // Every HoverCard part and its context are client modules (design/components/hover-card.md,
+  // Decisions 17).
+  "hover-card/hover-card-context.mjs",
+  "hover-card/hover-card-root.mjs",
+  "hover-card/hover-card-trigger.mjs",
+  "hover-card/hover-card-popup.mjs",
+  "hover-card/use-hover-card-interest.mjs",
   // The resolved-placement observer shared by Tooltip, Popover and Menu (conventions 13.2).
   "internal/overlay/use-resolved-placement.mjs",
   // Switch, Checkbox and the shared native-input machinery (design/components/switch.md row 25,
@@ -228,6 +235,7 @@ const directiveFreeFiles = [
   "tabs/index.mjs",
   "tabs/tabs-ids.mjs",
   "tooltip/index.mjs",
+  "hover-card/index.mjs",
   "switch/index.mjs",
   "checkbox/index.mjs",
   "dialog/index.mjs",

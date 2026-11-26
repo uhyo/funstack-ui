@@ -230,7 +230,7 @@ function clearLater<Popup extends HTMLElement>(
 }
 
 /** What the popup is called in the controlled-without-`onOpenChange` warning. */
-const nouns: Record<string, string> = { combobox: "listbox" };
+const nouns: Record<string, string> = { combobox: "listbox", "hover-card": "card" };
 
 /** The `details` of a popover-like component: `{ reason }` (and `event`). */
 export const popoverDetails = (event: Event | undefined, reason: ChangeReason): OverlayDetails =>

@@ -93,6 +93,19 @@ export type {
   TooltipArrowState,
 } from "./tooltip/index.js";
 
+export { HoverCard } from "./hover-card/index.js";
+export type {
+  HoverCardRootProps,
+  HoverCardRootState,
+  HoverCardOpenChangeDetails,
+  HoverCardTriggerProps,
+  HoverCardTriggerState,
+  HoverCardPopupProps,
+  HoverCardPopupState,
+  HoverCardSide,
+  HoverCardAlign,
+} from "./hover-card/index.js";
+
 export { Switch } from "./switch/index.js";
 export type { SwitchProps, SwitchState, SwitchCheckedChangeDetails } from "./switch/index.js";
 

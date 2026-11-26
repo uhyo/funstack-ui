@@ -63,6 +63,7 @@ export const routes = [
               page("/components/accordion", "AccordionPage"),
               page("/components/collapsible", "CollapsiblePage"),
               page("/components/tooltip", "TooltipPage"),
+              page("/components/hover-card", "HoverCardPage"),
               page("/components/dialog", "DialogPage"),
               page("/components/popover", "PopoverPage"),
               page("/components/menu", "MenuPage"),

@@ -42,6 +42,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/accordion", label: "Accordion", group: "Disclosure" },
   { path: "/components/collapsible", label: "Collapsible", group: "Disclosure" },
   { path: "/components/tooltip", label: "Tooltip", group: "Overlays" },
+  { path: "/components/hover-card", label: "HoverCard", group: "Overlays" },
   { path: "/components/popover", label: "Popover", group: "Overlays" },
   { path: "/components/dialog", label: "Dialog", group: "Overlays" },
   { path: "/components/menu", label: "Menu", group: "Overlays" },

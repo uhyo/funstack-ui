@@ -1,0 +1,88 @@
+/* HoverCard: the Trigger is a link (`data-open` optimistic, `data-pending` while the card
+   loads); the Popup is a manual popover right after it. Open state is `:popover-open`. */
+
+.demo-mention {
+  color: var(--color-link, #2563eb);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.demo-mention[data-open] {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+/* The card is loading: a quiet hint on the link. */
+.demo-mention[data-pending] {
+  cursor: progress;
+  text-decoration: underline dotted;
+}
+
+.demo-card {
+  /* The popover UA stylesheet sets `inset: 0; margin: auto`: reset both for anchored placement. */
+  inset: auto;
+  margin: 6px 0;
+  /* A <span> card works too: the popover's `position: fixed` makes it a block box. */
+  inline-size: 16rem;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  font-weight: normal;
+}
+
+.demo-card-name,
+.demo-card-bio,
+.demo-card-row {
+  display: block;
+  margin: 0 0 6px;
+}
+
+.demo-card-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.demo-skeleton {
+  color: var(--color-text-secondary);
+}
+
+.demo-repo-list {
+  display: flex;
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Every close the user causes is a fact, so CSS is the animation for a HoverCard: the enter
+   everywhere, the exit in Chromium (with `overlay`) and Safari. */
+.demo-card {
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+
+.demo-card:popover-open {
+  opacity: 1;
+}
+
+@starting-style {
+  .demo-card:popover-open {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-card {
+    transition: none;
+  }
+}

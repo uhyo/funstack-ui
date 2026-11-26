@@ -12851,3 +12851,178 @@ product-owner decision. Sections changed: combobox.md 3.1 (the `openChangeAction
   the 5.6 table, the `openChangeAction` comment of 3.1, the JSDoc of `openChangeAction` and
   `ComboboxOpenChangeDetails.reason`, and the docs row. The jsdom row "m2" asserts the reason
   and that `onOpenChange` is not called.
+
+## 2026-11-26, #166: hover-card.md, the HoverCard design (proposed)
+
+Wave 23, part of #162. Written by the architect from
+`docs/research/wave23-hovercard-select-multiple.md` part 1; **proposed**, not yet decided by
+the user. New document `design/components/hover-card.md`. Working notes:
+`memo/architect/hovercard-notes.md`; probe `memo/architect/probes-166/interest-rules.mjs`
+(Chromium 156).
+
+What the design takes from the research, and where it differs:
+
+- Taken: a library-mode Popover base with a link Trigger and the Popup right after it;
+  `manual` by default, `hint` and `interestfor` behind flags, never `auto`; Tab from the
+  Trigger enters the card; no `aria-describedby` and no `aria-expanded`; nothing on touch on
+  the JS path; the Trigger is a link or a button that opens nothing on click.
+- Different: **focus inside the card does not keep it open against the pointer.** The research
+  said "focus inside the card keeps it open". The probe shows Chromium's native rule is "the
+  latest event wins" (a hover-opened card whose button was clicked closes when the pointer
+  leaves; a focus-opened card closes when the pointer crosses and leaves it), and the design
+  follows that on the JS path so the two paths agree and the timer pair stays Tooltip's.
+- Different: no `aria-details` from the library (the research offered it as an option). The
+  Popup follows the Trigger in the DOM, which is the case in which HTML-AAM drops the relation
+  for a `popovertarget` popover.
+- Added: one mode only (no JS-free mode; opening is always a request, so content loads on
+  interest and Suspense holds the open); every user close is a fact with reason `"dismiss"`;
+  a press on the Trigger closes the card and cancels a coming open, on both paths (Chromium's
+  native behaviour keeps it open); "no open until fresh interest" after Escape, a Trigger
+  press and the library's focus return, enforced at the `beforetoggle` interception on the
+  flagged path; `interestfor` written after hydration; every show is a no-focus show; the
+  `<span>` Popup for cards inside running text; `role="group"` as the default role; delays of
+  600 / 300 ms.
+
+Changed in other documents, in the same commit:
+
+- `popover.md` 2.9: the recommendation to put `interestfor` on the Trigger ("click opens in
+  every engine, interest adds hover on Chromium") is withdrawn. HTML's author guidance (added
+  to whatwg/html PR #11006 on 2026-11-24) says not to combine interest and activation for the
+  same rich target on one element. The rows of 2.9 stay: they describe what a consumer's own
+  `interestfor` button does, and HoverCard's flagged path runs on them. No code change follows
+  from the edit.
+- `tooltip.md` 4.1: the sentence that called a pinned tooltip "a Popover with `commandfor` +
+  `interestfor`" now says that pattern is not offered.
+
+Conventions: **no rule changes.** HoverCard applies 3.9 (requests and facts), 3.5, 5.1, 8 and
+13 as written. When the component is implemented, the enumerations that name the overlay
+components need HoverCard added, without a change of rule: `overlay-open-state.md` 3.9 ("the
+four overlay Roots"), 3.9.11 (no JS-free mode), 3.9.13 (the warning's Roots); `conventions.md`
+2.2 (the `"activate"` and `"dismiss"` rows: interest and lost interest, which Popover 2.8
+already uses), 5.3 (the types `fsui-hover-card`, `-open`, `-close`), 8 (the two flags), 9.1 /
+9.2 (the folder and the `./hover-card` export).
+
+Open for the user (the product owner escalates; recommendation first):
+
+1. The name: `HoverCard` (recommended) or `PreviewCard`.
+2. Keyboard model: Tab enters the open card (recommended, the platform's model) or the card is
+   kept out of the Tab order (Radix).
+3. Popover 2.9: withdraw "hover to preview, click to pin" as documented here (recommended),
+   and whether `Popover.Trigger` should also warn in development when given `interestfor`.
+4. A press on the Trigger closes the card on both paths (recommended) or the card stays as in
+   Chromium's native behaviour.
+5. Default delays: 600 / 300 ms (recommended) or Tooltip's 250 / 150 ms (Chromium's
+   `interest-delay` defaults).
+6. Ship `experimental_interestFor` in the first version (recommended by the research) or add
+   it after Chromium 160's specification alignment has been re-probed.
+
+Checks for the implementation (not rules; the tests will be the reference):
+
+- Browser rows, all three engines: Tab from the Trigger enters an adjacent card; a `manual`
+  `<div popover>` shown `inert` moves no focus even with an `autofocus` descendant; Escape with
+  focus inside returns focus to the Trigger and no card re-opens; a press outside with focus
+  inside leaves focus where the press landed; the pointer leaving a card that holds focus
+  closes it; a card inside a modal Dialog and inside a Menu; a nested card; Escape with a Menu
+  open inside the card closes the Menu only.
+- Chromium only, flagged: the rows of probe `interest-rules.mjs` through the real component;
+  an interest timer running when the Trigger is pressed opens nothing; long-press is not
+  testable in Playwright.
+- Re-probe on Chromium 160 (`InterestForSpecAlignment`): "suppress next focus interest" may
+  make the library's flag redundant for the focus return; the `loseinterest`-without-hide
+  behaviour of a re-shown popover (popover.md 2.9) must still hold.
+- Safari: the hoisted Popup (hover-card.md 1.1, shape 2) is not after the Trigger in the Tab
+  order. Documented degradation, not a library bug.
+- jsdom covers the timers, the request / fact routing, pending and the overlap walkthroughs.
+
+## 2026-11-26, #166: HoverCard decided and implemented
+
+The user's decisions on the six open questions of the design entry above (and a seventh), all
+as the design recommended:
+
+1. The name is `HoverCard` (`@funstack/ui/hover-card`).
+2. Tab from the Trigger enters the open card (the platform's model).
+3. Popover 2.9's "hover to preview, click to pin" recommendation is withdrawn as the design
+   entry describes; `Popover.Trigger` gets **no** development warning for `interestfor`.
+4. A press on the Trigger closes the card and cancels a coming open, on both paths.
+5. The default delays are 600 / 300 ms.
+6. `experimental_interestFor` ships in the first version; a re-probe on Chromium 160
+   (`InterestForSpecAlignment`) is a follow-up (`memo/developer/issue-166.md`).
+7. The close of a shown card on lost interest is a fact (`onOpenChange`), not a held request.
+
+`hover-card.md` status: decided. Implemented in `packages/ui/src/hover-card/` (Root, Trigger,
+Popup, `use-hover-card-interest.ts`), with jsdom and three-engine browser tests, a docs page
+and a playground demo.
+
+Enumerations extended without a change of rule, as the design entry listed:
+`overlay-open-state.md` 3.9 (five overlay Roots, `hover-card.md` 2.5 in the per-component
+list), 3.9.2 (HoverCard's lost-interest hide, Escape and press outside among the facts the
+library triggers; the `openChangeAction` / `"dismiss"` crossover row), 3.9.11 (no JS-free mode),
+3.9.13 (five Roots); `conventions.md` Decisions 11 and 2.1 (the `onOpenChange` handlers), 2.2
+(the `"activate"` row names interest, the `"dismiss"` row lost interest, the crossover row a
+HoverCard's Escape or press while its open is pending), 5.3 (the `fsui-hover-card` types), 8
+(both flags); `testing.md` (five overlay Roots); `internal-hooks.md` (the `usePopoverPopup`
+options below). Conventions 9.1 and 9.2 enumerate no components, so nothing changed there.
+
+Shared code changed for HoverCard (no behaviour change for the other components):
+
+- `usePopoverPopup` gains three options: `quietShow` (every library show is a no-focus show,
+  the refused re-open's `inert` path), `allowOpen` (a predicate on every routed foreign or
+  interest open at `beforetoggle`; `false` cancels it and dispatches nothing) and `elements`
+  (the tag names of the development element check; HoverCard allows `<span>`).
+- `usePopoverPopup` reports a recorded close intent's `event` as recorded, `undefined`
+  included, instead of falling back to the `toggle` event (hover-card.md 2.5: the close when
+  `disabled` becomes true has no event). Every other popover-like intent records an event, so
+  nothing else changes.
+- The controlled-without-`onOpenChange` warning calls the popup "card".
+
+Refinements of the design while implementing, edited into `hover-card.md` in the same commit:
+
+- 2.4: one "no open until fresh interest" flag for both paths. The design had a one-shot flag
+  around the JS path's focus return; the flag is now set before the hide (a `hint` popover
+  restores focus to the Trigger inside `hidePopover()`), read by the JS path's `focus`
+  listener, and cleared by the Trigger's `pointerenter` as well as `pointerleave` and `blur`
+  (without `pointerenter`, a pointer coming onto the Trigger after an Escape that returned
+  focus there could not open the card until it had left once).
+- 2.2, the document Escape row: `preventDefault()` only when a shown card closed. An Escape
+  that cancels an open nobody can see yet passes through (inside a modal dialog it closes the
+  dialog), as Tooltip's "Escape while closed passes through".
+- 6.2 "a dismissal can say that it returns no focus to the Trigger" (section 12): implemented
+  in HoverCard's own dismissal, not as a hook option. For lost interest and a press outside
+  with focus inside the card, the library blurs the focused element before `hidePopover()`,
+  so neither the hook's focus-return fallback nor a `hint` popover's own focus restore moves
+  focus to the Trigger; focus goes to `<body>`, and a press then puts it where it lands.
+  Escape with focus inside focuses the Trigger itself, right after the hide, under the flag.
+
+Not changed, for review: hover-card.md 2.2's paragraph after the table still says "focus inside
+the card keeps it open" among the differences from Tooltip, which contradicts Decisions 6 and
+2.1 ("the latest event wins", the probe). The implementation follows Decisions 6.
+## 2026-11-26, #166: HoverCard review fixes
+
+Developer, after the review of `feat/166-hovercard` (memo/reviewer/review-166.md on branch
+`review/166`).
+
+- Fixed (review finding 1): with both flags, focus inside the card and lost interest, the
+  flagged path's lost-interest hide (`use-interest-dismiss.ts`) called `hidePopover()` with
+  focus inside, so a `hint` card restored focus to the link (the element focused at its show).
+  That broke hover-card.md 6.2 and, as focus on an `interestfor` invoker is interest, re-opened
+  the card. `useInterestDismiss` takes a `beforeHide` callback and `usePopoverPopup` a
+  `beforeInterestHide` option; HoverCard passes the same blur of the element focused inside the
+  card that its own dismissal uses. Other components pass nothing: no behaviour change. A
+  Chromium row (both flags, Tab in, the pointer crosses the card and leaves: focus not on the
+  link, the card closed for 600 ms) and a jsdom row cover it; both fail without the fix.
+- Fixed (finding 5): on the flagged path the document Escape and outside-press listeners now
+  attach at the dispatch of a routed interest open (`usePopoverPopup`'s new `onRoutedOpen`
+  option), as the JS path's open timer already did, instead of in the passive effect after the
+  optimistic commit. jsdom row: Escape right after the interest show cancels the pending open.
+- Test (finding 4): the Chromium "Escape with focus inside" row asserts that
+  `openChangeAction` only ever saw `true`.
+- Design text (finding 3), `hover-card.md`: 2.2's list of differences from Tooltip now says
+  focus moving into the card cancels the close timer but the latest event wins; 2.4 states the
+  one-flag rule once (set by Escape, a press and before the focus return; cleared by the
+  Trigger's `pointerenter`, `pointerleave` and `blur`; read by the JS path's `focus` listener
+  and at the `beforetoggle` interception); section 12 lists the hook options HoverCard passes
+  and says the "no focus return" is HoverCard's own blur. `internal-hooks.md` names the new
+  options.
+- Not changed here: findings 2 (a non-modal Dialog's Escape and a `manual` popover inside it,
+  which predates HoverCard) and 6 (the Chromium 160 re-probe) go to issues filed by the
+  coordinator.

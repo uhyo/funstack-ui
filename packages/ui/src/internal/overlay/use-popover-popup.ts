@@ -55,6 +55,36 @@ export interface UsePopoverPopupOptions {
    * (design/components/context-menu.md 14).
    */
   readonly source?: () => HTMLElement | null;
+  /**
+   * Every library show is a no-focus show (HoverCard, design/components/hover-card.md 6.2): no
+   * initial focus target, and the popup is `inert` for the `showPopover()` call, as for the
+   * re-open of a refused fact, so no focusing step (a consumer's `autofocus`) can move focus.
+   */
+  readonly quietShow?: boolean | undefined;
+  /**
+   * Called for every open the library did not start (a foreign invoker, a script
+   * `showPopover()`, an interest show) at its `beforetoggle`, before it is routed through the Root.
+   * `false` cancels the open and dispatches nothing (HoverCard's "no open until fresh interest",
+   * hover-card.md 2.4). Default: every open is routed.
+   */
+  readonly allowOpen?: ((event: ToggleEvent) => boolean) | undefined;
+  /**
+   * The tag names the popup element may have (the development element check). Default
+   * `["DIALOG", "DIV"]`; HoverCard adds `"SPAN"` for a card inside running text.
+   */
+  readonly elements?: readonly string[] | undefined;
+  /**
+   * Called right before the lost-interest hide of an interest-opened popup
+   * (`use-interest-dismiss.ts`). HoverCard blurs focus inside the card there, so neither the
+   * focus-return fallback nor a `hint` popover's own restore moves focus to the Trigger
+   * (hover-card.md 6.2).
+   */
+  readonly beforeInterestHide?: ((popup: HTMLElement) => void) | undefined;
+  /**
+   * Called when a routed foreign or interest open passed `allowOpen`, right before it is
+   * dispatched (HoverCard attaches its document listeners there).
+   */
+  readonly onRoutedOpen?: ((event: ToggleEvent) => void) | undefined;
 }
 
 export interface PopoverPopupHook {
@@ -83,6 +113,16 @@ export interface PopoverPopupHook {
 }
 
 const isDev = process.env.NODE_ENV !== "production";
+
+const DEFAULT_ELEMENTS: readonly string[] = ["DIALOG", "DIV"];
+
+/** `["DIALOG", "DIV"]` as "a <dialog> or a <div>". */
+function describeElements(elements: readonly string[]): string {
+  const names = elements.map((tag) => `a <${tag.toLowerCase()}>`);
+  return names.length <= 1
+    ? (names[0] ?? "")
+    : `${names.slice(0, -1).join(", ")} or ${names.at(-1) ?? ""}`;
+}
 
 /** The popup roles that require a name (a listbox's name is checked on the List). */
 function needsName(element: Element): boolean {
@@ -130,7 +170,11 @@ export function usePopoverPopup(
   const focusWasInside = useRef(false);
   const initialFocusTarget = useInitialFocusTarget(part, "popup");
   // `interestfor` (library mode, popover.md lost-interest amendment).
-  const interest = useInterestDismiss(ctx);
+  // The latest render's callback, read at the hide (an insertion-effect ref).
+  const beforeInterestHide = useLatest(options.beforeInterestHide);
+  const interest = useInterestDismiss(ctx, {
+    beforeHide: (element) => beforeInterestHide.current?.(element),
+  });
   // The cleanup of `whileShown` while the popup is shown.
   const stopWhileShown = useRef<(() => void) | null>(null);
   const stopListeningWhileShown = (): void => {
@@ -182,7 +226,7 @@ export function usePopoverPopup(
     // A refused re-open never moves focus (#155, #156): no initial focus target, and the popup is
     // `inert` for the call (showWithFocus), whether the focusing steps are the dialog focusing
     // steps of a `<dialog>` (Popover's default) or a consumer's own `autofocus` in any popup.
-    const refused = flags.takeRefusedFact();
+    const refused = flags.takeRefusedFact() || options.quietShow === true;
     const focus = refused ? null : resolveFocusTarget(element);
     // Otherwise the popover focusing steps honour `autofocus` (and run the dialog focusing steps
     // for a <dialog>, in every engine). Never `.focus()` (6.1) except for the quiet target above.
@@ -274,7 +318,12 @@ export function usePopoverPopup(
       // a foreign `show-popover` / `toggle-popover` invoker, a script `showPopover()`.
       if (isLibrary && !opening.current) {
         event.preventDefault();
+        if (options.allowOpen !== undefined && !options.allowOpen(toggle)) {
+          contentProbe.forget();
+          return;
+        }
         interest.noteOpen(toggle);
+        options.onRoutedOpen?.(toggle);
         ctx.requestOpen(event, "activate");
       } else if (!reshowing.current) {
         // A Close action that resolves after this open must not close it (design 3.4). A re-show
@@ -323,7 +372,9 @@ export function usePopoverPopup(
       // event's commit) and `onOpenChange(false)` (conventions 3.9.3).
       if (!echo) {
         flags.markFact();
-        ctx.notifyClosed(intent?.event ?? event, intent?.reason ?? "dismiss");
+        // A recorded intent names its event, `undefined` included (HoverCard's close when it
+        // becomes disabled, hover-card.md 2.5); without one it is this `toggle`.
+        ctx.notifyClosed(intent !== undefined ? intent.event : event, intent?.reason ?? "dismiss");
       }
     }
   };
@@ -403,11 +454,12 @@ export function usePopoverPopup(
   // the element (no passive-effect window, no extra render). JS-free mode: there is no "right
   // before showPopover()" (the browser runs the command), so the `autofocus` attribute stays on
   // the `initialFocus` target while it is mounted (as Dialog).
+  const elements = options.elements ?? DEFAULT_ELEMENTS;
   const checkElement = useElementCheck(
     isDev &&
       ((element) =>
-        element.tagName !== "DIALOG" && element.tagName !== "DIV"
-          ? `${part}: expected to render a <dialog> or a <div> but got ` +
+        !elements.includes(element.tagName)
+          ? `${part}: expected to render ${describeElements(elements)} but got ` +
             `<${element.tagName.toLowerCase()}>.`
           : null),
   );

@@ -277,8 +277,8 @@ packages/ui/src/internal/
     validity.ts, focus-first-invalid.ts # Field helpers; directive-free
     form-status-watcher.tsx # the useFormStatus edge watcher of Form.Root and Dialog.Form
   overlay/                # open state, popups, placement, the modal stack (3.9, 13); imports action/ and flat modules
-    use-overlay-root.ts   # useOverlayRoot, OverlayRootValue (section 3.9; Dialog), usePopoverRoot, PopoverRootValue (plus the `shown` mirror; Popover, Menu, Combobox), popoverDetails
-    use-popover-popup.ts, use-popover-trigger.ts # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger
+    use-overlay-root.ts   # useOverlayRoot, OverlayRootValue (section 3.9; Dialog), usePopoverRoot, PopoverRootValue (plus the `shown` mirror; Popover, Menu, Combobox, HoverCard), popoverDetails
+    use-popover-popup.ts, use-popover-trigger.ts # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger. HoverCard uses the Popup hook only, with `quietShow` (every show a no-focus show), `allowOpen` (its "no open until fresh interest" at the `beforetoggle` interception), `elements` (a `<span>` card), `beforeInterestHide` (passed on to `useInterestDismiss`: blur before the lost-interest hide) and `onRoutedOpen`; hover-card.md 12
     overlay-popup.tsx     # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
     overlay-show.ts       # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
     use-apply-open-state.ts # useApplyOpenState: the apply effect (popover.md 2.5, dialog.md 2.5) both Popup implementations share, over an `isShown` / `show` / `hide` driver
@@ -292,6 +292,6 @@ packages/ui/src/internal/
     use-resolved-placement.ts # useResolvedPlacement, useAnchoredPlacement (13.2)
     css-transition-cut.ts # withCssTransitionCut (5.1); directive-free
     trigger-ref.ts        # the Root's triggerRef, with the second-Trigger dev warning
-    use-interest-dismiss.ts # the lost-interest hide of an interest-opened popup (popover.md 2.9)
+    use-interest-dismiss.ts # the lost-interest hide of an interest-opened popup (popover.md 2.9); `beforeHide` runs right before it
     modal-registry.ts, use-modal-registration.ts # the stack of open modal dialogs (section 3.5); the registry is directive-free
 ```
