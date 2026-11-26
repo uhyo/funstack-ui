@@ -7,13 +7,14 @@ import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { ComboboxCountry } from "../examples/ComboboxCountry.js";
 import { ComboboxDrink } from "../examples/ComboboxDrink.js";
 import { ComboboxSlowOpen } from "../examples/ComboboxSlowOpen.js";
+import { ComboboxTags } from "../examples/ComboboxTags.js";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
 export function ComboboxPage() {
   return (
     <DocPage
       title="Combobox"
-      description="An editable combobox with list autocomplete: urgent typing, results from a deferred query inside Suspense, aria-activedescendant, an async valueChangeAction with the option pending, free text, forms and ariaNotify."
+      description="An editable combobox with list autocomplete: urgent typing, results from a deferred query inside Suspense, aria-activedescendant, an async valueChangeAction with the option pending, free text, multiple selection with chips, forms and ariaNotify."
     >
       <p className="page-intro">
         A text input with a listbox of suggestions (the WAI-ARIA "editable combobox with list
@@ -173,6 +174,76 @@ export function ComboboxPage() {
         leaves (<code>reason: "dismiss"</code>), so the field never shows a value it does not have.
       </p>
 
+      <h4 id="multiple">Multiple selection</h4>
+      <Example file="ComboboxTags.tsx" css="combobox.css">
+        <ComboboxTags />
+      </Example>
+      <p>
+        <code>multiple</code> on the Root turns the selection into a list of values (
+        <code>string[]</code>, in pick order) shown as chips. The text is then only a search:
+      </p>
+      <ul>
+        <li>
+          <strong>A pick toggles</strong> the option (a selected option is removed), clears the text
+          and leaves the listbox open for the next pick. The listbox is{" "}
+          <code>aria-multiselectable</code> and every option keeps its <code>aria-selected</code>. A
+          rejection rolls back that one change (the chip and <code>data-selected</code>), never the
+          text.
+        </li>
+        <li>
+          <strong>The value follows the set rules</strong> of CheckboxGroup: each dispatch is one
+          change, with <code>details.added</code> and <code>details.removed</code>; picks made while
+          an earlier save runs stack, and only the changes whose action resolved are kept. Persist
+          the diff, not <code>next</code>, which may contain a change that fails later.
+        </li>
+        <li>
+          <strong>
+            <code>Combobox.Chips</code>
+          </strong>{" "}
+          is a list of the optimistic values (a removed chip disappears at once and comes back if
+          its save fails); you map them to <code>Combobox.Chip</code>s. A chip's <code>label</code>{" "}
+          state is the text of the option the library last saw for its value, so an async search
+          needs no map of its own. It is the list of chips only, not the field box: put the Input
+          next to it in your own element.
+        </li>
+        <li>
+          <strong>Keys:</strong> Backspace in the empty input removes the last chip; the
+          inline-start arrow (Left, Right in RTL) at the caret's start moves focus into the chips,
+          where the arrows, Home and End move, Backspace or Delete remove, Escape goes back and a
+          letter types into the input. The combobox keeps one Tab stop. Chips removed outside the
+          listbox are announced (<code>"Japan removed"</code>, <code>announceRemoved</code> to
+          localise).
+        </li>
+        <li>
+          <strong>Forms:</strong> one hidden input per value (<code>formData.getAll(name)</code>
+          ), nothing for an empty selection. <code>required</code> on the Input means "at least
+          one": native <code>required</code> is rendered only while nothing is selected, and{" "}
+          <code>aria-required</code> always. Unmatched text is cleared when focus leaves and by
+          Enter in a closed listbox, so it never satisfies <code>required</code>. With{" "}
+          <code>allowCustomValue</code>, Enter (prevented, the form does not submit) and focus
+          leaving add the text as a value instead.
+        </li>
+      </ul>
+      <CodeBlock>{`<Combobox.Root multiple name="countries" defaultValue={["jp"]} valueChangeAction={saveCountries}>
+  <Combobox.Label>Countries</Combobox.Label>
+  <div className="field">                                {/* your box around chips and input */}
+    <Combobox.Chips>                                     {/* div[role=list] */}
+      {({ value }) => value.map((code) => (
+        <Combobox.Chip key={code} value={code}>          {/* div[role=listitem][tabindex=-1] */}
+          {({ label }) => (
+            <>
+              {label ?? code}
+              <Combobox.ChipRemove aria-label={\`Remove \${label ?? code}\`} />  {/* button */}
+            </>
+          )}
+        </Combobox.Chip>
+      ))}
+    </Combobox.Chips>
+    <Combobox.Input placeholder="Add a country" required />
+  </div>
+  <Combobox.Popup>…</Combobox.Popup>
+</Combobox.Root>`}</CodeBlock>
+
       <h3 id="props">Props</h3>
       <h4>
         <code>Combobox.Root</code>
@@ -180,22 +251,30 @@ export function ComboboxPage() {
       <PropsTable
         rows={[
           {
-            name: "value",
-            type: "string | null",
+            name: "multiple",
+            type: "boolean",
+            default: "false",
             description:
-              "Controlled selection. `null`: nothing selected. `undefined` means uncontrolled.",
+              "`true`: the selection is a list of values shown as chips ([Multiple selection](#multiple)); `value`, `defaultValue`, `valueChangeAction`, `announce` and `children` take the multiple types below. Fixed at mount (development warns on a change).",
+          },
+          {
+            name: "value",
+            type: "string | null; string[] with multiple",
+            description:
+              "Controlled selection. `null`: nothing selected. `undefined` means uncontrolled. With `multiple`: `string[]`, `[]` for nothing; the order is the chip order, duplicates are ignored.",
           },
           {
             name: "defaultValue",
-            type: "string | null",
+            type: "string | null; string[] with multiple",
             default: "null",
-            description: "Initial selection when uncontrolled; what a form reset returns to.",
+            description:
+              "Initial selection when uncontrolled; what a form reset returns to. With `multiple`: `string[]`, default `[]`.",
           },
           {
             name: "valueChangeAction",
-            type: "ChangeAction<string | null, ComboboxValueChangeDetails>",
+            type: "ChangeAction<string | null, ComboboxValueChangeDetails>; with multiple ChangeAction<string[], ComboboxMultipleValueChangeDetails>",
             description:
-              "Runs in the Root's transition when the user accepts an option, commits free text, presses Clear, or the form resets. Awaited; the listbox closes in the commit that ends it; a rejection rolls the text and the selection back and leaves the listbox open. May be a Server Function. A `setState` after your own `await` needs `startTransition`.",
+              "Runs in the Root's transition when the user accepts an option, commits free text, presses Clear, or the form resets. Awaited; the listbox closes in the commit that ends it; a rejection rolls the text and the selection back and leaves the listbox open. May be a Server Function. A `setState` after your own `await` needs `startTransition`. With `multiple`: `ChangeAction<string[], ComboboxMultipleValueChangeDetails>`, called for every change (a pick, a removed chip, Clear, free text, a reset); the listbox does not close; a rejection undoes that change only.",
           },
           {
             name: "inputValue",
@@ -207,7 +286,7 @@ export function ComboboxPage() {
             type: "string",
             default: '""',
             description:
-              "Initial text when uncontrolled, and the visible input's form-reset target. Pass the selected option's label together with `defaultValue`.",
+              "Initial text when uncontrolled, and the visible input's form-reset target. Single selection: pass the selected option's label together with `defaultValue`. With `multiple` the text is only a search (usually left empty).",
           },
           {
             name: "onInputValueChange",
@@ -231,7 +310,7 @@ export function ComboboxPage() {
             name: "openChangeAction",
             type: "ChangeAction<boolean, ComboboxOpenChangeDetails>",
             description:
-              'Requests only: awaited for opens and for the closes a part asks for (an accepted option, the Trigger, Alt+ArrowUp). Never called for a dismissal (`onOpenChange`). Runs in the Root\'s transition; may be a Server Function. `details.reason`: `"activate"` (typing, ArrowDown / ArrowUp / Alt+ArrowDown, the Trigger, a click on the input with `openOnClick`, an accepted option, Alt+ArrowUp, a foreign `showPopover()`) or `"platform"` (found open on mount, which only script can cause; `event` is `undefined`).',
+              'Requests only: awaited for opens and for the closes a part asks for (an accepted option, the Trigger, Alt+ArrowUp; with `multiple`, a chip taking focus while an open is still on its way cancels it). Never called for a dismissal (`onOpenChange`). Runs in the Root\'s transition; may be a Server Function. `details.reason`: `"activate"` (typing, ArrowDown / ArrowUp / Alt+ArrowDown, the Trigger, a click on the input with `openOnClick`, an accepted option, Alt+ArrowUp, the cancel by a focused chip, a foreign `showPopover()`) or `"platform"` (found open on mount, which only script can cause; `event` is `undefined`).',
           },
           {
             name: "onOpenChange",
@@ -244,7 +323,7 @@ export function ComboboxPage() {
             type: "boolean",
             default: "false",
             description:
-              "Free text is a value (Enter with no active option, focus leaving), dispatched with `details.custom: true`. Otherwise unmatched text reverts when focus leaves.",
+              "Free text is a value (Enter with no active option, focus leaving), dispatched with `details.custom: true`. Otherwise unmatched text reverts when focus leaves. With `multiple`: Enter (prevented, open or closed) and focus leaving add the text as a value (`added: [text]`) and clear it; without it unmatched text is cleared.",
           },
           {
             name: "autoHighlight",
@@ -267,16 +346,23 @@ export function ComboboxPage() {
           },
           {
             name: "announce",
-            type: "(count: number, state: ComboboxRootState) => string | null",
+            type: "(count: number, state: ComboboxRootState) => string | null; ComboboxMultipleRootState with multiple",
             default: '"No results" / "1 result" / "N results"',
             description:
               "The message `ariaNotify()` announces on the List when the results settle. Override for localisation; return `null` to announce nothing. Ignored where `ariaNotify` is missing.",
           },
           {
+            name: "announceRemoved",
+            type: "(labels: readonly string[], state: ComboboxMultipleRootState) => string | null",
+            default: '"Japan removed" (the labels joined with ", ")',
+            description:
+              "`multiple` only. The message `ariaNotify()` announces on the Input when chips are removed outside the listbox (Backspace, Delete, `ChipRemove`, Clear). A label is the Chip's `label`, else the option text the library saw, else the chip's text. Return `null` to announce nothing.",
+          },
+          {
             name: "name",
             type: "string",
             description:
-              'Renders `<input type="hidden" name>` holding the optimistic value (`""` for `null`), the Root\'s only element.',
+              'Renders `<input type="hidden" name>` holding the optimistic value (`""` for `null`), the Root\'s only element. With `multiple`: one hidden input per value, in value order; none named while the selection is empty.',
           },
           {
             name: "form",
@@ -288,23 +374,26 @@ export function ComboboxPage() {
             type: "boolean",
             default: "false",
             description:
-              "Disables the Input, Trigger and Clear; nothing dispatches for user interaction. The hidden input stays enabled, so the selection still posts (wrap in `<fieldset disabled>` to drop it).",
+              "Disables the Input, Trigger and Clear (and every `ChipRemove`); nothing dispatches for user interaction. The hidden input stays enabled, so the selection still posts (wrap in `<fieldset disabled>` to drop it).",
           },
           {
             name: "children",
-            type: "ReactNode | ((state: ComboboxRootState) => ReactNode)",
-            description: "The parts, or a function of the Root's state.",
+            type: "ReactNode | ((state: ComboboxRootState) => ReactNode); ComboboxMultipleRootState with multiple",
+            description:
+              "The parts, or a function of the Root's state (`ComboboxMultipleRootState` with `multiple`).",
           },
         ]}
       />
       <PartFacts
         state={
-          "`ComboboxRootState` is `{ value, inputValue, query, stale, activeValue, open, pending, disabled }`; `value` and `open` are optimistic; `stale` is `inputValue !== query`; `pending` covers the value and the open transitions."
+          "`ComboboxRootState` is `{ value, inputValue, query, stale, activeValue, open, pending, disabled }`; `value` and `open` are optimistic; `stale` is `inputValue !== query`; `pending` covers the value and the open transitions. `ComboboxMultipleRootState` is the same with `value: readonly string[]` (pick order)."
         }
         owned={
-          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden input when `name` is given."
+          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden input(s) when `name` is given."
         }
-        note={"`multiple` is not part of this version."}
+        note={
+          "The props type is `ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps`, discriminated on `multiple`. `Partial<ComboboxRootProps>` is not assignable to either member, so a wrapper that spreads one into `Combobox.Root` types it as `Partial<ComboboxSingleProps>` (or the multiple one) instead."
+        }
       />
       <p>
         <code>ComboboxValueChangeDetails</code>: <code>{"{ reason, custom, event }"}</code>.{" "}
@@ -317,6 +406,19 @@ export function ComboboxPage() {
         found at mount (no event). <code>ComboboxOpenChangeDetails</code>:{" "}
         <code>{"{ reason, event }"}</code>; the reasons are listed with{" "}
         <code>openChangeAction</code> and <code>onOpenChange</code> above.
+      </p>
+      <p>
+        <code>ComboboxMultipleValueChangeDetails</code> (with <code>multiple</code>):{" "}
+        <code>{"{ reason, added, removed, custom, event }"}</code>. <code>added</code> lists the
+        values this dispatch added, in the order they join; <code>removed</code> the values it
+        removed, in value order; <code>custom</code> is <code>true</code> for free text.{" "}
+        <code>reason</code> is <code>"activate"</code> (a toggled option: the <code>keydown</code>{" "}
+        or <code>click</code>; a removed chip: the <code>keydown</code> of Backspace or Delete, the{" "}
+        <code>click</code> of <code>ChipRemove</code>; Clear; free text: the <code>keydown</code> or{" "}
+        <code>focusout</code>) or <code>"platform"</code> (a form reset, dispatched whole with the
+        diff). With <code>multiple</code> the library writes the text on typing, a pick (
+        <code>""</code>, <code>"activate"</code>), Clear, focus leaving (<code>""</code>,{" "}
+        <code>"dismiss"</code>), a reset and at mount.
       </p>
 
       <h4>
@@ -345,16 +447,19 @@ export function ComboboxPage() {
           {
             name: "required",
             type: "boolean",
-            description: "Native: an empty text is `valueMissing`, with the browser's message.",
+            description:
+              "Native: an empty text is `valueMissing`, with the browser's message. With `multiple` it means at least one value: native `required` only while nothing is selected (optimistic), `aria-required` always.",
           },
           ...stylingProps("ComboboxInputState"),
           renderProp("input", "ComboboxInputState"),
         ]}
       />
       <PartFacts
-        state={"`ComboboxInputState` is `{ value, inputValue, open, pending, stale, disabled }`."}
+        state={
+          "`ComboboxInputState` is `{ value, values, inputValue, open, pending, stale, disabled }`. `values` is the optimistic selection as a list (`[value]` or `[]` in single mode); with `multiple`, `value` is always `null`."
+        }
         owned={
-          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`.'
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. With `multiple` also `required` and `aria-required`.'
         }
         note={
           "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
@@ -382,13 +487,13 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, inputValue, disabled }`."
+          "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, values, inputValue, disabled }` (`values` as on the Input)."
         }
         owned={
           "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (only when it is no invoker: a non-button `render`, or while `aria-disabled`), `aria-controls`, `popovertarget` (written as an attribute after hydration, only on a `<button>`, while enabled or natively disabled; not while `aria-disabled`), `data-open`, `data-pending`. Owned on the Trigger and never written as props: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`; these and `aria-expanded` are not in its props type."
         }
         note={
-          "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). A Trigger rendered as another element is light-dismissed before its click and warns in development ([Triggers of a popup](/concepts/browser-owned-state#popup-triggers)). Clear empties the text and dispatches `null` unless nothing is selected; it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
+          "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). A Trigger rendered as another element is light-dismissed before its click and warns in development ([Triggers of a popup](/concepts/browser-owned-state#popup-triggers)). Clear empties the text and dispatches `null` unless nothing is selected (with `multiple`: one change removing every value, announced); it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
         }
       />
 
@@ -439,7 +544,7 @@ export function ComboboxPage() {
       <PartFacts
         state={"`ComboboxListState` is `{ query, stale, empty }`."}
         owned={
-          '`id`, `role` (`"listbox"`), `aria-labelledby` (token-merged with yours; only while a `Combobox.Label` is rendered), `aria-busy`, `data-stale`, `data-empty`.'
+          '`id`, `role` (`"listbox"`), `aria-labelledby` (token-merged with yours; only while a `Combobox.Label` is rendered), `aria-busy`, `data-stale`, `data-empty`; with `multiple`, `aria-multiselectable` (`"true"`).'
         }
         note={
           'Without a Label give the List an `aria-label` (development warns otherwise). `aria-busy="true"` is set while the results are stale or loading (a `Status` fallback inside it); `data-empty` when settled with no options.'
@@ -478,7 +583,7 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxOptionState` is `{ value, selected, active, pending, disabled }`; `selected` is optimistic, `active` is virtual focus, `pending` is true on the option being saved."
+          "`ComboboxOptionState` is `{ value, selected, active, pending, disabled }`; `selected` is optimistic, `active` is virtual focus, `pending` is true on the option being saved (with `multiple`: being added or removed)."
         }
         owned={
           "`id` (derived from `value`), `role`, `aria-selected`, `aria-disabled`, `onClick`, `onPointerDown`, `onMouseDown`, `onPointerMove`, `data-selected`, `data-active`, `data-pending`, `data-disabled`."
@@ -513,6 +618,87 @@ export function ComboboxPage() {
         }
       />
 
+      <h4>
+        <code>Combobox.Chips</code> (with <code>multiple</code>)
+      </h4>
+      <PropsTable
+        rows={[
+          ...functionProps(
+            "ComboboxChipsState",
+            "Usually a function of `{ value }` rendering one `Combobox.Chip` per value, keyed by the value; must not suspend.",
+          ),
+          renderProp("div", "ComboboxChipsState"),
+        ]}
+      />
+      <PartFacts
+        state={
+          "`ComboboxChipsState` is `{ value, pending, disabled }`; `value` is the optimistic selection in pick order, `pending` the value action in flight."
+        }
+        owned={
+          '`role` (`"list"`, absent while empty), `aria-labelledby` (the Label, token-merged; absent while empty), `onKeyDown` (the chip keys), `onPointerDown`, `onMouseDown`, `onClick` (a press keeps focus where it is; a click focuses the Input), `onFocus`, `onBlur` (a chip is inside the combobox: focus on it closes the listbox and keeps the text), `data-empty`, `data-pending`, `data-disabled`.'
+        }
+        note={
+          "The list of chips, not the field box: render the Input next to it, in your own element. Under a Root without `multiple` it warns in development and renders empty."
+        }
+      />
+
+      <h4>
+        <code>Combobox.Chip</code>
+      </h4>
+      <PropsTable
+        rows={[
+          {
+            name: "value",
+            type: "string",
+            description: "Required: a value of the selection (development warns otherwise).",
+          },
+          {
+            name: "label",
+            type: "string",
+            description:
+              "The chip's text for the removal announcement. Default: the state's `label`, else the chip's trimmed text.",
+          },
+          ...functionProps(
+            "ComboboxChipState",
+            "Content, or a function of the chip's state; default `label ?? value`. Must not suspend.",
+          ),
+          renderProp("div", "ComboboxChipState"),
+        ]}
+      />
+      <PartFacts
+        state={
+          "`ComboboxChipState` is `{ value, label, pending, disabled }`. `label` is the text of the option with this value as the library last saw it (written at the pick), `undefined` if no option for it was ever rendered (a preselected value before the listbox first opens). `pending`: its addition is not committed yet."
+        }
+        owned={'`role` (`"listitem"`), `tabIndex` (`-1`), `data-pending`, `data-disabled`.'}
+        note={
+          'Focused by keys only, never a Tab stop. On a focused chip: the previous / next arrow (in the inline direction) moves, the next arrow past the last chip returns to the Input, Home / End go to the first / last chip, Backspace and Delete remove it (focus moves first to the next chip, else the previous, else the Input), Escape returns to the Input, a printable key types into the Input; Enter and Space do nothing. `aria-description` passes through for a hint such as "Press Backspace to remove".'
+        }
+      />
+
+      <h4>
+        <code>Combobox.ChipRemove</code>
+      </h4>
+      <PropsTable
+        rows={[
+          ...functionProps(
+            "ComboboxChipRemoveState",
+            "Content, usually an icon in an `aria-hidden` element (never read as part of the chip's text in the removal announcement, nor is any `aria-hidden` content); give the button an `aria-label` (development warns without a name).",
+          ),
+          renderProp("button", "ComboboxChipRemoveState"),
+        ]}
+      />
+      <PartFacts
+        state={
+          "`ComboboxChipRemoveState` is `{ value, pending, disabled }` (the Chip's value and pending)."
+        }
+        owned={
+          "`type` (on a `<button>`), `tabIndex` (`-1`), `disabled` (the Root's), `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-pending`, `data-disabled`."
+        }
+        note={
+          "Inside a `Combobox.Chip` (outside one it throws). A press keeps focus in the Input; the click removes the chip's value, announces it and focuses the Input. A press while the listbox is open closes it (light dismiss), as Clear's does."
+        }
+      />
+
       <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Hook", "On", "Meaning"]}
@@ -528,8 +714,22 @@ export function ComboboxPage() {
             "A selection or an open is in flight (the Root's `pending`).",
           ],
           ["`data-pending`", "Trigger", "The open (or close) is in flight."],
-          ["`data-pending`", "Option", "The option the in-flight selection is choosing."],
-          ["`data-selected`", "Input", "A value is selected (optimistic, not `null`)."],
+          [
+            "`data-pending`",
+            "Option",
+            "The option the in-flight selection is choosing (with `multiple`: being added or removed).",
+          ],
+          [
+            "`data-pending`",
+            "Chip, ChipRemove",
+            "With `multiple`: the chip's addition is not committed yet (a removed chip is gone at once).",
+          ],
+          ["`data-pending`", "Chips", "With `multiple`: a value action is in flight."],
+          [
+            "`data-selected`",
+            "Input",
+            "A value is selected (optimistic, not `null`; with `multiple`, at least one).",
+          ],
           ["`data-selected`", "Option", "This option is the optimistic selection."],
           ["`data-active`", "Option", "`aria-activedescendant` points here (keyboard or hover)."],
           [
@@ -538,7 +738,12 @@ export function ComboboxPage() {
             "The results shown are for an older text; the List also has `aria-busy`.",
           ],
           ["`data-empty`", "List", "Settled with no options."],
-          ["`data-disabled`", "Input, Trigger, Clear, Option", "Disabled."],
+          ["`data-empty`", "Chips", "With `multiple`: nothing is selected."],
+          [
+            "`data-disabled`",
+            "Input, Trigger, Clear, Option, Chips, Chip, ChipRemove",
+            "Disabled.",
+          ],
           ["`:popover-open`", "Popup", "The listbox is shown (browser-owned, no attribute)."],
         ]}
       />
@@ -591,6 +796,52 @@ export function ComboboxPage() {
         Disabled options are skipped. Keys during an IME composition belong to the composition. Ctrl
         and Meta combinations are left alone.
       </p>
+      <p>
+        With <code>multiple</code>, in the Input (the chip keys are with{" "}
+        <a href="#props">Combobox.Chip</a>):
+      </p>
+      <Table
+        head={["Key", "When", "Behaviour"]}
+        rows={[
+          ["Enter", "open, active option", "Toggles it; the listbox stays open."],
+          [
+            "Enter",
+            "open, no active option",
+            "Adds the text as a value with `allowCustomValue`; otherwise nothing.",
+          ],
+          [
+            "Enter",
+            "opening (requested, not shown yet), text typed",
+            "Nothing: prevented, the text is kept (you are about to pick). Right after Escape the closed rule below applies.",
+          ],
+          [
+            "Enter",
+            "closed, text typed",
+            "`allowCustomValue`: adds the text (prevented, the form does not submit). Otherwise clears the text, then a form submits.",
+          ],
+          ["Alt+ArrowUp", "open", "Closes; the active option is not toggled."],
+          [
+            "Backspace",
+            "empty text",
+            "Removes the last chip and announces it (not on key repeat).",
+          ],
+          [
+            "Left (Right in RTL)",
+            "caret at the start",
+            "Moves focus to the last chip; the listbox closes, the text stays.",
+          ],
+        ]}
+      />
+      <p>
+        Screen readers hear a toggled option through its <code>aria-selected</code> under{" "}
+        <code>aria-activedescendant</code>; a chip removed outside the listbox is announced with{" "}
+        <code>ariaNotify()</code> on the Input (<code>"Japan removed"</code>). The label is the
+        Chip's <code>label</code>, else the option text the library saw, else the chip's text
+        without its <code>ChipRemove</code> and without <code>aria-hidden</code> content. The
+        announcement is optimistic: if the removal's save fails the chip comes back without a second
+        announcement. Localise it with:
+      </p>
+      <CodeBlock>{`<Combobox.Root multiple announceRemoved={(labels) => \`\${labels.join("、")}を削除しました\`}>`}</CodeBlock>
 
       <h4>Accessibility and announcements</h4>
       <ul>
@@ -613,14 +864,14 @@ export function ComboboxPage() {
       <BehaviourSection
         id="transition-types"
         summary={
-          'Every value dispatch: `fsui-combobox` and `fsui-combobox-select`. Opens and closes: `fsui-combobox` plus `fsui-combobox-open` or `fsui-combobox-close`. A deferred results render carries no `fsui-*` type, so give the Popup\'s `transition` a map with `default: "none"`.'
+          'Every value dispatch: `fsui-combobox` and `fsui-combobox-select` (with `multiple`: `-select` when something is added, `fsui-combobox-deselect` when something is removed). Opens and closes: `fsui-combobox` plus `fsui-combobox-open` or `fsui-combobox-close`. A deferred results render carries no `fsui-*` type, so give the Popup\'s `transition` a map with `default: "none"`.'
         }
       />
 
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. The typed text is urgent, not optimistic (a [fact](/concepts/action-props#fact), reported to `onInputValueChange`)."
+          "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. With `multiple` the chips render from the optimistic value: a removed chip disappears at once and returns if its save fails, an added chip has `data-pending` until it is committed. The typed text is urgent, not optimistic (a [fact](/concepts/action-props#fact), reported to `onInputValueChange`)."
         }
       >
         <h4 id="slow-open-change-action">
@@ -684,6 +935,15 @@ export function ComboboxPage() {
           <code>required</code> on the Input is native.
         </li>
         <li>
+          With <code>multiple</code>: one hidden input per value, so the form posts what same-named
+          checkboxes would (<code>formData.getAll(name)</code>, nothing for an empty selection).{" "}
+          <code>required</code> means at least one value (see{" "}
+          <a href="#multiple">Multiple selection</a>). A form reset replaces the whole selection
+          with the reset target, even while saves are still running. Inside a{" "}
+          <code>Field.Root</code>, <code>validate</code> gets the first value; read the others from{" "}
+          <code>formData.getAll(name)</code>.
+        </li>
+        <li>
           A form reset (the Reset button, <code>form.reset()</code>, or React's automatic reset
           after a form action) dispatches <code>valueChangeAction</code> with{" "}
           <code>reason: "platform"</code> and writes the text: uncontrolled, back to the latest{" "}
@@ -721,7 +981,11 @@ export function ComboboxPage() {
       <p>
         Types: every value dispatch adds <code>fsui-combobox</code> and{" "}
         <code>fsui-combobox-select</code>; opens and closes add <code>fsui-combobox-open</code> /{" "}
-        <code>fsui-combobox-close</code>.
+        <code>fsui-combobox-close</code>. With <code>multiple</code>, a value dispatch adds{" "}
+        <code>fsui-combobox-select</code> when it adds a value and{" "}
+        <code>fsui-combobox-deselect</code> when it removes one. Chips have no{" "}
+        <code>transition</code> prop: to animate them, wrap each in your own{" "}
+        <code>{"<ViewTransition>"}</code> and key on these types.
       </p>
       <p>
         Keep the CSS exit above next to <code>transition</code>: it animates the dismissals (focus

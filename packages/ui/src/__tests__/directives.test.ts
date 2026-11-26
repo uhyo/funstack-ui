@@ -19,6 +19,14 @@ const clientFiles = [
   "accordion/accordion-item.mjs",
   "accordion/accordion-trigger.mjs",
   "accordion/accordion-panel.mjs",
+  // The <details>/<summary> click rule and element checks of Accordion and Collapsible.
+  "internal/details-summary.mjs",
+  // Every Collapsible part and its context are client modules (design/components/collapsible.md,
+  // summary row 8).
+  "collapsible/collapsible-context.mjs",
+  "collapsible/collapsible-root.mjs",
+  "collapsible/collapsible-trigger.mjs",
+  "collapsible/collapsible-panel.mjs",
   // Every Tabs part and its context are client modules (design/components/tabs.md, 13.1).
   "tabs/tabs-context.mjs",
   "tabs/tabs-root.mjs",
@@ -215,6 +223,7 @@ const directiveFreeFiles = [
   "toast/toast-timers.mjs",
   "toggle/index.mjs",
   "accordion/index.mjs",
+  "collapsible/index.mjs",
   "internal/action/action-details.mjs",
   "tabs/index.mjs",
   "tabs/tabs-ids.mjs",

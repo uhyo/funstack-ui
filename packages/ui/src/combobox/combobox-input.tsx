@@ -23,8 +23,10 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /** State of `Combobox.Input`, passed to the function forms of `className`, `style` and `render`. */
 export interface ComboboxInputState {
-  /** Optimistic selection. */
+  /** Optimistic selection; always `null` with `multiple` (read `values`). */
   readonly value: string | null;
+  /** Optimistic selection as a list: pick order with `multiple`, `[value]` or `[]` otherwise. */
+  readonly values: readonly string[];
   /** The urgent text. */
   readonly inputValue: string;
   /** Optimistic open state. */
@@ -64,7 +66,11 @@ export interface ComboboxInputProps extends Omit<
   | "style"
   | "children"
 > {
-  /** Native `required`: empty text is `valueMissing`. */
+  /**
+   * Native `required`: empty text is `valueMissing`. With `multiple` it means "at least one
+   * value": native `required` is rendered only while the selection is empty, and
+   * `aria-required="true"` always.
+   */
   required?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ComboboxInputState>;
@@ -86,7 +92,8 @@ export interface ComboboxInputProps extends Omit<
  * listbox is shown captures the pointer to the Popup, so it is no light dismiss), `data-open`,
  * `data-pending`, `data-selected`, `data-stale`, `data-disabled`; inside a `Field.Root` (whose
  * control id it takes) also `required` (own or the Field's), `aria-describedby` (token-merged),
- * `aria-invalid` and `data-invalid`. `onFocusCapture` passes through.
+ * `aria-invalid` and `data-invalid`; with `multiple`, `required` (only while nothing is selected)
+ * and `aria-required`. `onFocusCapture` passes through.
  *
  * @see https://ui.funstack.work/components/combobox
  */
@@ -97,6 +104,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
 
   const state: ComboboxInputState = {
     value: ctx.value,
+    values: ctx.values,
     inputValue: ctx.inputValue,
     open: popover.optimistic,
     pending: ctx.pending,
@@ -145,9 +153,16 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
 
   const searchType = isValidElement<{ type?: unknown }>(render) && render.props.type === "search";
 
+  // `multiple` (design 15.8): `required` means "at least one value", a computed native attribute
+  // (conventions 3.6) that follows the optimistic selection; `aria-required` says it throughout.
+  const required = field.inField ? field.required : rest.required === true;
+  const requiredProps = ctx.multiple
+    ? { required: required && ctx.values.length === 0, "aria-required": required || undefined }
+    : field.inField && { required: field.required };
+
   const libraryProps: ComponentPropsWithRef<"input"> & DataAttributes = {
     ...field.attributes,
-    ...(field.inField && { required: field.required }),
+    ...requiredProps,
     id: ids.input,
     type: searchType ? "search" : "text",
     role: "combobox",
@@ -180,7 +195,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     },
     "data-open": dataAttr(popover.optimistic),
     "data-pending": dataAttr(state.pending),
-    "data-selected": dataAttr(ctx.value !== null),
+    "data-selected": dataAttr(ctx.values.length > 0),
     "data-stale": dataAttr(ctx.stale),
     "data-disabled": dataAttr(ctx.disabled),
   };

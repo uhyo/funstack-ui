@@ -50,6 +50,17 @@ export type {
   AccordionPanelState,
 } from "./accordion/index.js";
 
+export { Collapsible } from "./collapsible/index.js";
+export type {
+  CollapsibleRootProps,
+  CollapsibleRootState,
+  CollapsibleOpenChangeDetails,
+  CollapsibleTriggerProps,
+  CollapsibleTriggerState,
+  CollapsiblePanelProps,
+  CollapsiblePanelState,
+} from "./collapsible/index.js";
+
 export { Tabs } from "./tabs/index.js";
 export type {
   TabsRootProps,
@@ -202,8 +213,12 @@ export type {
 export { Combobox } from "./combobox/index.js";
 export type {
   ComboboxRootProps,
+  ComboboxSingleProps,
+  ComboboxMultipleProps,
   ComboboxRootState,
+  ComboboxMultipleRootState,
   ComboboxValueChangeDetails,
+  ComboboxMultipleValueChangeDetails,
   ComboboxInputValueChangeDetails,
   ComboboxOpenChangeDetails,
   ComboboxLabelProps,
@@ -228,6 +243,12 @@ export type {
   ComboboxEmptyState,
   ComboboxStatusProps,
   ComboboxStatusState,
+  ComboboxChipsProps,
+  ComboboxChipsState,
+  ComboboxChipProps,
+  ComboboxChipState,
+  ComboboxChipRemoveProps,
+  ComboboxChipRemoveState,
 } from "./combobox/index.js";
 
 export { Toast, toast, createToastManager } from "./toast/index.js";

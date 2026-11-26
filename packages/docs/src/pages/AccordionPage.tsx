@@ -21,6 +21,12 @@ export function AccordionPage() {
         <a href="/concepts/pending-and-optimistic#state-owner">state owner</a> with actions,
         optimistic <code>data-open</code> and Suspense-friendly panels.
       </p>
+      <p>
+        For one disclosure on its own, use <a href="/components/collapsible">Collapsible</a>: the
+        same <code>&lt;details&gt;</code> base without the wrapper, with its own <code>open</code> /{" "}
+        <code>openChangeAction</code>. An <code>Accordion.Item</code> outside any Root still works
+        as a JS-free disclosure, but it has no library mode.
+      </p>
 
       <Example file="AccordionFaq.tsx" css="accordion.css">
         <AccordionFaq />

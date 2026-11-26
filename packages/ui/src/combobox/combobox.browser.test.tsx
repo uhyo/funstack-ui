@@ -38,7 +38,7 @@ import type {
   ComboboxInputValueChangeDetails,
   ComboboxOpenChangeDetails,
   ComboboxPopupProps,
-  ComboboxRootProps,
+  ComboboxSingleProps,
   ComboboxTriggerProps,
   ComboboxValueChangeDetails,
 } from "./index.js";
@@ -87,7 +87,7 @@ const optionStyle = { padding: "2px 4px" } as const;
 const labelStyle = { display: "inline-block", padding: 8 } as const;
 
 interface HarnessProps {
-  root?: Partial<ComboboxRootProps>;
+  root?: Partial<ComboboxSingleProps>;
   popup?: Partial<ComboboxPopupProps>;
   results?: (query: string) => ReactNode;
   trigger?: Partial<ComboboxTriggerProps>;
@@ -1261,7 +1261,7 @@ describe("Combobox (browser)", () => {
     const TEXT = "Wide Words";
 
     /** Opens by typing TEXT with every option listed, then leaves the act environment. */
-    async function openWithText(root: Partial<ComboboxRootProps> = {}) {
+    async function openWithText(root: Partial<ComboboxSingleProps> = {}) {
       render(<Harness root={root} results={() => <Options query="" />} />);
       await typeInto(TEXT);
       await settle(() => expect(isOpen()).toBe(true));

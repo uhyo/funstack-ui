@@ -1,4 +1,5 @@
 import { AccordionDemo } from "./accordion-demo.js";
+import { CollapsibleDemo } from "./collapsible-demo.js";
 import { ButtonDemo } from "./button-demo.js";
 import { ToggleDemo } from "./toggle-demo.js";
 import { TabsDemo } from "./tabs-demo.js";
@@ -32,6 +33,7 @@ export function App() {
       <ToolbarDemo />
       <TabsDemo />
       <AccordionDemo />
+      <CollapsibleDemo />
       <TooltipDemo />
       <PopoverDemo />
       <DialogDemo />

@@ -45,6 +45,7 @@ import type {
   ComboboxPopupProps,
   ComboboxPopupState,
   ComboboxRootProps,
+  ComboboxSingleProps,
   ComboboxRootState,
   ComboboxTriggerProps,
   ComboboxTriggerState,
@@ -94,7 +95,7 @@ function Options({ query }: { query: string }) {
 }
 
 interface HarnessProps {
-  root?: Partial<ComboboxRootProps>;
+  root?: Partial<ComboboxSingleProps>;
   trigger?: Partial<ComboboxTriggerProps>;
   popup?: Partial<ComboboxPopupProps>;
   /** List content for a query; default: the countries matching it. */
@@ -2898,7 +2899,7 @@ describe("Combobox", () => {
     const action = vi.fn<ValueAction>();
     const texts = vi.fn<TextAction>();
     const form = () => screen.getByTestId("form") as HTMLFormElement;
-    const ui = (root: Partial<ComboboxRootProps>) => (
+    const ui = (root: Partial<ComboboxSingleProps>) => (
       <form data-testid="form">
         <Harness
           root={{ name: "c", valueChangeAction: action, onInputValueChange: texts, ...root }}
@@ -3117,6 +3118,7 @@ describe("Combobox", () => {
       });
       expect(seen.input).toEqual({
         value: "a",
+        values: ["a"],
         inputValue: "A",
         open: true,
         pending: true,
@@ -3124,7 +3126,12 @@ describe("Combobox", () => {
         disabled: false,
       });
       expect(seen.trigger).toEqual({ open: true, pending: false, disabled: false });
-      expect(seen.clear).toEqual({ value: "a", inputValue: "A", disabled: false });
+      expect(seen.clear).toEqual({
+        value: "a",
+        values: ["a"],
+        inputValue: "A",
+        disabled: false,
+      });
       expect(seen.popup).toEqual({ open: true, stale: false, query: "A" });
       expect(seen.list).toEqual({ query: "A", stale: false, empty: false });
       expect(seen.option).toEqual({
@@ -3243,7 +3250,7 @@ describe("Combobox", () => {
     });
   });
 
-  it("types: UrgentChangeHandler is exported, UrgentChangeAction and inputValueChangeAction are not, multiple is not a prop", () => {
+  it("types: UrgentChangeHandler is exported, UrgentChangeAction and inputValueChangeAction are not; multiple selects the other variant", () => {
     expectTypeOf<ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
       UrgentChangeHandler<string, ComboboxInputValueChangeDetails> | undefined
     >();
@@ -3254,9 +3261,18 @@ describe("Combobox", () => {
     // @ts-expect-error `inputValueChangeAction` was renamed `onInputValueChange` (#96), no alias.
     const renamed: ComboboxRootProps = { inputValueChangeAction: () => {} };
     void renamed;
-    // @ts-expect-error `multiple` is not in v1 (design 13).
-    const props: ComboboxRootProps = { multiple: true };
+    // `multiple` (design 15.2): the variant with a list value.
+    const props: ComboboxRootProps = { multiple: true, defaultValue: ["jp"] };
     void props;
+    // @ts-expect-error a list value needs `multiple`.
+    const listWithoutFlag: ComboboxRootProps = { defaultValue: ["jp"] };
+    void listWithoutFlag;
+    // @ts-expect-error a single value is not a list.
+    const singleWithFlag: ComboboxRootProps = { multiple: true, defaultValue: "jp" };
+    void singleWithFlag;
+    // @ts-expect-error `announceRemoved` is a `multiple` prop.
+    const removedWithoutFlag: ComboboxRootProps = { announceRemoved: () => null };
+    void removedWithoutFlag;
   });
 });
 

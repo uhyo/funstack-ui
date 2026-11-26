@@ -6,6 +6,7 @@ export default defineConfig({
     "src/button/index.ts",
     "src/toggle/index.ts",
     "src/accordion/index.ts",
+    "src/collapsible/index.ts",
     "src/tabs/index.ts",
     "src/tooltip/index.ts",
     "src/switch/index.ts",

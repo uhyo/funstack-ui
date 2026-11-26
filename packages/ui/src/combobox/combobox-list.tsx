@@ -58,7 +58,7 @@ export interface ComboboxListProps extends Omit<
  * rendered as a Suspense fallback inside it marks the results as loading (`aria-busy="true"`).
  *
  * Owned keys (conventions 1.2): `id`, `role`, `aria-labelledby` (token-merged), `aria-busy`,
- * `data-stale`, `data-empty`.
+ * `aria-multiselectable` (with `multiple` only: `"true"`), `data-stale`, `data-empty`.
  *
  * @see https://ui.funstack.work/components/combobox
  */
@@ -100,6 +100,8 @@ export function ComboboxList({ className, style, children, render, ...rest }: Co
       ? { "aria-labelledby": ctx.ids.label }
       : ctx.fieldLabelId !== undefined && { "aria-labelledby": ctx.fieldLabelId }),
     "aria-busy": ctx.stale || ctx.loading ? true : undefined,
+    // `multiple` (design 15.7): every option toggles.
+    ...(ctx.multiple && { "aria-multiselectable": true }),
     "data-stale": dataAttr(ctx.stale),
     "data-empty": dataAttr(ctx.empty),
   };

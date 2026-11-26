@@ -9,9 +9,9 @@ import type {
 } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { interceptSummaryClick, useSummaryCheck } from "../internal/details-summary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
-import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 import type { AccordionItemState } from "./accordion-item.js";
@@ -50,26 +50,6 @@ export interface AccordionTriggerProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"summary">, AccordionTriggerState>;
 }
 
-const NESTED_INTERACTIVE =
-  "a[href], button, label, input, select, textarea, [contenteditable]:not([contenteditable='false'])";
-
-/**
- * Nested controls with an activation behaviour of their own. The browser runs theirs instead of
- * the summary's (no toggle), so their click must keep its default: navigation, check, submit.
- */
-const SELF_ACTIVATING =
-  "a[href], button, label, input:is([type='button'], [type='submit'], [type='reset'], " +
-  "[type='image'], [type='checkbox'], [type='radio'], [type='file'], [type='color'])";
-
-/** The interactive descendant of the summary that was clicked (a link in the heading), if any. */
-function nestedInteractive(target: EventTarget | null, summary: HTMLElement): Element | null {
-  if (!(target instanceof Element) || target === summary) return null;
-  const interactive = target.closest(NESTED_INTERACTIVE);
-  return interactive !== null && interactive !== summary && summary.contains(interactive)
-    ? interactive
-    : null;
-}
-
 /**
  * The item's disclosure control: the `<summary>`, which must be the first child of the Item. In
  * library mode the click is intercepted and dispatched through the Root's transition; the
@@ -101,14 +81,7 @@ export function AccordionTrigger({
   );
 
   const registerTrigger = item.registerTrigger;
-  const checkElement = useElementCheck(
-    isDev &&
-      ((element) =>
-        element.tagName !== "SUMMARY"
-          ? `Accordion.Trigger: expected to render a <summary> element but got <${element.tagName.toLowerCase()}>. ` +
-            "Only a <summary> toggles its parent <details>."
-          : null),
-  );
+  const checkElement = useSummaryCheck("Accordion.Trigger");
   const libraryRef = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);
@@ -132,17 +105,9 @@ export function AccordionTrigger({
   const onClick =
     isLibrary || item.disabled
       ? (event: MouseEvent<HTMLElement>) => {
-          const nested = nestedInteractive(event.target, event.currentTarget);
-          if (nested !== null) {
-            // A nested control never toggles. Controls without their own activation behaviour
-            // (text input, select, textarea, contenteditable) would let the click fall through to
-            // the summary's toggle, so cancel it; focus and pickers happen on mousedown and are
-            // unaffected. Self-activating controls already pre-empt the summary's behaviour.
-            if (!nested.matches(SELF_ACTIVATING)) event.preventDefault();
-            return;
-          }
-          // Cancelling the click is what keeps the browser from touching `open`.
-          event.preventDefault();
+          // A nested control never toggles; any other click is cancelled, which is what keeps the
+          // browser from touching `open`.
+          if (!interceptSummaryClick(event)) return;
           if (item.disabled || !isLibrary) return;
           item.dispatch?.(item.value, !item.optimisticOpen, event.nativeEvent);
         }

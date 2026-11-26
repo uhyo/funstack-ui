@@ -81,12 +81,12 @@ anatomy section says what the part renders there; this table fixes what the name
 
 | Part | Meaning | Default element |
 | --- | --- | --- |
-| `Root` | Owns state, context and the transition. May render no DOM (overlays), a wrapper, the `<form>` itself (Form) or a `div[role=group]` (NumberField); a Root that owns a form value but no visible form element renders exactly one `<input type="hidden">` when `name` is given (Combobox). | `div` / `form` or none |
+| `Root` | Owns state, context and the transition. May render no DOM (overlays), a wrapper, the `<form>` itself (Form), the `<details>` itself (Collapsible) or a `div[role=group]` (NumberField); a Root that owns a form value but no visible form element renders exactly one `<input type="hidden">` when `name` is given (Combobox). | `div` / `form` or none |
 | `List` | Groups triggers and owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (a listbox may contain only options and groups, so the Popup is the container). | `div` |
 | `Item` | One entry in a multi-item component: Accordion's `details`, Menu's `button[role=menuitem]` with an `action`, ToggleGroup's `button[aria-pressed]` whose pressed state is the Root's. | `div` / `details` / `button` |
 | `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
 | `ContextTrigger` | A region whose `contextmenu` (right-click, the keyboard's context-menu keys, a library long-press for touch) opens the owner's `Popup` at the pointer (Menu). A plain element with **no role and no ARIA**; may share a Root with a `Trigger`. | `div` |
-| `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion). | `div` |
+| `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion, Collapsible). | `div` |
 | `Popup` | Content that lives in the top layer. | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
 | `Indicator` | Purely visual element that tracks state: the active tab marker; the fill of a Slider, Progress or Meter, sized by the consumer's CSS from the Root's custom properties. | `span` |
 | `Label` | Names the owner, in the form the owner's element needs: `<legend>` as the first child of a `<fieldset>` Root (RadioGroup, CheckboxGroup); `label[for]` for an input surface (Combobox, NumberField, a one-thumb Slider, Field's control); `label[id]` or `span[id]` referenced through `aria-labelledby` where the owner is a group or is not labelable (a multi-thumb Slider, a Field's group control, Progress, Meter). | `label` / `legend` / `span` |
@@ -125,6 +125,10 @@ whose form control must be a different element renders the control as a **visual
 sibling immediately after it** (`NumberField.Input`): `ref` goes to the visible input, a
 documented `hiddenInputRef` to the control, and the props the control needs (`name`, `form`,
 `min`, `max`, `step`, `required`) are listed as forwarded to it.
+A third exception (Combobox): a `Root` that has no element of its own renders the form
+value as hidden inputs, one for a single selection and **one per value** with `multiple`
+(`design/components/combobox.md` 15.8); they are form plumbing, take no `ref`, `className` or
+`render`, and sit before the children, outside every `<ViewTransition>`.
 
 ### 1.2 Element polymorphism: `render`
 
@@ -660,14 +664,14 @@ the parent needs to veto.
 
 React neither cancels nor orders overlapping actions. The library's stance:
 
-- **Single-valued state (Toggle, Tabs, Select, RadioGroup, an overlay's `open`, Accordion and
-  ToggleGroup with `exclusive`): latest intent wins.** The optimistic value already shows the
+- **Single-valued state (Toggle, Tabs, Select, RadioGroup, an overlay's `open`, Collapsible's
+  `open`, Accordion and ToggleGroup with `exclusive`): latest intent wins.** The optimistic value already shows the
   most recent dispatch; the library commits uncontrolled state only for the most recently
   dispatched action, ignoring earlier ones that resolve later. (Verified: without this guard the
   slowest promise wins.) An earlier action's *rejection* changes nothing on screen; it is
   reported through `reportError` (section 2.4).
-- **Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`): every
-  resolved change is kept**. Each dispatch is one change to the set (a patch: `added` /
+- **Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`; Combobox
+  with `multiple`): every resolved change is kept**. Each dispatch is one change to the set (a patch: `added` /
   `removed`, or one item opened or closed), and the changes are independent intents, so "latest
   wins" would be wrong in both directions: the latest `next` is computed from the intended set
   and so contains earlier in-flight changes, including one whose action later rejects. The
@@ -1140,7 +1144,7 @@ can delay or roll it back. The boundary:
 
 | | Library-owned | Browser-owned |
 | --- | --- | --- |
-| Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant | Tooltip/Popover `open`, `<details open>` in Accordion's static (JS-free) mode, `<dialog open>`; the Toast region (`popover="manual"`), which the library shows and hides in both directions, driven by the urgent queue, and never notifies: it has no `openChangeAction` because nothing a consumer could do with "the region opened" exists |
+| Examples | Toggle `pressed`, Tabs `value`, Accordion `value` in the JS variant, Collapsible `open` in library mode | Tooltip/Popover `open`, `<details open>` in the static (JS-free) mode of Accordion and Collapsible, `<dialog open>`; the Toast region (`popover="manual"`), which the library shows and hides in both directions, driven by the urgent queue, and never notifies: it has no `openChangeAction` because nothing a consumer could do with "the region opened" exists |
 | Who changes it | The library, inside its transition | The browser (top layer, light dismiss, `interestfor`, find-in-page) |
 | Optimistic source | `useOptimistic` | The DOM itself. An ARIA attribute on another element that must report it to assistive technology (`aria-expanded` on a non-button overlay Trigger render or the Combobox Input; a `<button>` Trigger renders none, its `popovertarget` exposes the state) renders an urgent `useState` mirror written from the platform event (`toggle`, reading `:popover-open`), never transition state |
 | `xChangeAction` | Can be awaited; the UI waits for it | Requests only (an overlay's opens and the closes its parts ask for). A change the browser performed is a **fact**, reported to the `on*` handler (`onOpenChange`) synchronously in the platform event (`toggle` / `close`), outside any transition, not awaited |
@@ -1323,9 +1327,9 @@ keepMounted?: boolean | "until-found";
 | `true` | rendered inside `<Activity mode="hidden">` | DOM and state preserved, effects torn down, pre-rendered at low priority. The mode change happens inside the library's transition so nested `<ViewTransition>` boundaries get enter/exit. |
 | `"until-found"` | rendered with `hidden="until-found"` | Find-in-page and text fragments reveal it; the `beforematch` event dispatches the matching change action. Uses the ref-based upgrade from section 7.4 because react-dom serialises `hidden` as a boolean. Incompatible with `<Activity>` on the same element, hence a separate value rather than a second boolean. |
 
-Tabs defines the semantics. Accordion has no `keepMounted`: its Panel is always mounted because
-`<details>` keeps its content in the DOM and reveals it on find-in-page natively
-(`design/components/accordion.md` 4.4). Future content regions that hide content via library
+Tabs defines the semantics. Accordion and Collapsible have no `keepMounted`: their Panel is
+always mounted because `<details>` keeps its content in the DOM and reveals it on find-in-page
+natively (`design/components/accordion.md` 4.4, `design/components/collapsible.md` 4.3). Future content regions that hide content via library
 state reuse the prop, narrowing the type where a value has no meaning: Dialog accepts `boolean`
 only, because `"until-found"` cannot apply inside a closed `display: none` dialog.
 
@@ -1362,7 +1366,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `active` | boolean | `Combobox.Option` | Virtual focus: `aria-activedescendant` points here. Urgent (section 3.2), never a transition. |
 | `stale` | boolean | `Combobox.Popup`, `Combobox.List` (with `aria-busy="true"` on the listbox while stale **or loading**: a `Status` mounted inside the List; loading itself is not a data attribute in v1) | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile. |
 | `empty` | boolean | `Combobox.List`; `Toast.Viewport` | List: no mounted options, not stale and not loading; the same condition under which `Empty` renders. Viewport: no toasts in the queue, the `ending` ones kept mounted included (the region is hidden under it; Toast decision 7), so a layout can collapse the region's reserved space. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits no `data-open` (only `data-modal`, below) because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` in library mode; in JS-free mode `data-open` kept current by a DOM write from the popup's `toggle` listener, section 7.4; a `<button>` Trigger is a `popovertarget` invoker and renders **no `aria-expanded`**, only a non-button `render` renders it, from the Root's urgent `shown` mirror, section 3.2) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open`, no `aria-expanded` on the invoker), Menu `ContextTrigger` (optimistic `data-open`, no ARIA); Combobox `Trigger` likewise and Combobox `Input` (optimistic `data-open`, plus `aria-expanded` from `shown`: it is a `role="combobox"` input, not an invoker), its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
+| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Collapsible `Root` and `Trigger` (optimistic, library mode; the Panel likewise emits only `data-disabled`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits no `data-open` (only `data-modal`, below) because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` in library mode; in JS-free mode `data-open` kept current by a DOM write from the popup's `toggle` listener, section 7.4; a `<button>` Trigger is a `popovertarget` invoker and renders **no `aria-expanded`**, only a non-button `render` renders it, from the Root's urgent `shown` mirror, section 3.2) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open`, no `aria-expanded` on the invoker), Menu `ContextTrigger` (optimistic `data-open`, no ARIA); Combobox `Trigger` likewise and Combobox `Input` (optimistic `data-open`, plus `aria-expanded` from `shown`: it is a `role="combobox"` input, not an invoker), its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
 | `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
 | `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch); Progress, every part (`value` is `null`: derived, not a DOM property, never suspended) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
 | `modal` | boolean | `Dialog.Popup` | The Root's `modal` prop (default `true`): the dialog is opened with `showModal()` (library mode) or the invoker's `show-modal` command (JS-free). A prop echo, not a state: rendered in every mode, server HTML included, so a stylesheet can lay out a non-modal panel (`.dialog:not([data-modal])`) before hydration and while closed, where `:modal` is false either way. |
@@ -1611,6 +1615,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Toggle | `fsui-toggle`, `fsui-toggle-press`, `fsui-toggle-release` |
 | Tabs | `fsui-tabs`, `fsui-tabs-next`, `fsui-tabs-prev` (by DOM order of the target tab relative to the committed tab) |
 | Accordion | `fsui-accordion`, `fsui-accordion-expand`, `fsui-accordion-collapse` |
+| Collapsible | `fsui-collapsible`, `fsui-collapsible-expand`, `fsui-collapsible-collapse` (Accordion's change names) |
 | Switch | `fsui-switch`, `fsui-switch-on`, `fsui-switch-off` |
 | Checkbox | `fsui-checkbox`, `fsui-checkbox-check`, `fsui-checkbox-uncheck` |
 | RadioGroup | `fsui-radio-group` (no direction variants) |
@@ -1618,7 +1623,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
 | Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
 | Select | `fsui-select` (no direction variants) |
-| Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch) |
+| Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch; with `multiple` only when `details.added` is non-empty) and, with `multiple`, `fsui-combobox-deselect` (when `details.removed` is non-empty) |
 | Toast | none (no `transition` prop; every commit is urgent, section 5.1) |
 | Field, Form | none (no `transition` prop: an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
 | Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
@@ -1837,6 +1842,9 @@ client bundle and hydrates to add the action props, controlled mode and animatio
   Server and Client Components, function props allowed) is a **ready plan, not scheduled**;
   revisit if an RSC host learns to skip the runtime for pages with no client references, or if
   users ask.
+- **Collapsible**: as Accordion. All three parts are client modules (the Trigger and Panel read
+  the Root's context); JS-free mode (none of `open`, `defaultOpen`, `openChangeAction`) runs no
+  behaviour JS and works before and without hydration (`design/components/collapsible.md` 2.1).
 - **Progress / Meter**: the Root is already directive-free (below); a variant is not worth a
   second surface.
 
@@ -1934,7 +1942,7 @@ a flag (`docs/vision.md`). Mechanism:
    | `popover="hint"` | Safari 27.0 (TP only) | `Tooltip.Popup experimental_hint` | Popup renders `popover="hint"` instead of the baseline type plus JS Escape/outside-click handling. |
    | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor` | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
    | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup`, `Menu.Popup experimental_focusgroup` (renders `focusgroup="menu wrap\|nowrap"`; items render no `tabindex` on the native path; typeahead, activation, submenu keys and Tab stay JS), `Toolbar.Root experimental_focusgroup` (`focusgroup="toolbar inline\|block wrap\|nowrap"`; the engine writes no `tabindex` and handles no navigation key where native), standalone `ToggleGroup.Root experimental_focusgroup` (the `toolbar` token under an explicit `role="group"`, plus `nomemory` and `focusgroupstart` on the first pressed Item; a ToggleGroup **inside** a Toolbar renders no `focusgroup` whatever its prop says, with a dev warning, because a nested focusgroup splits the Toolbar's single Tab stop) | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex`. |
-   | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize` | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
+   | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize`, `Collapsible.Root experimental_interpolateSize` (the `<details>` itself) | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
    | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute; camelCase like `experimental_interestFor`) | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | **none** (Select design) | The markup (`<button>` + `<selectedcontent>`, rich options, `<legend>` in `<optgroup>`) is parsed everywhere and degrades to the native select; the opt-in is the consumer's CSS (`appearance: base-select`), so no library flag exists. |
    | `<input type="checkbox" switch>` | Blink (proposed), Gecko | `Switch experimental_switch` (future; not added while WebKit-only) | Native switch rendering and semantics; `role="switch"` already gives the semantics everywhere. |
@@ -2106,6 +2114,9 @@ result-count announcement through `ariaNotify`). Rules:
   (following `hotkey`). The name is **static**, so its override is the ordinary `aria-label`
   pass-through rather than a function prop: the function form exists for strings that depend on
   state, and a label with no state would only add a prop.
+- Combobox with `multiple` adds one: the removal announcement (`"Japan removed"`, the removed
+  chips' labels joined with `", "`), overridable through `announceRemoved(labels, state)`,
+  `null` for silence (`design/components/combobox.md` 15.7).
 - Field adds **no** string: `Field.Error`'s default text is the browser's own localised
   `validationMessage` (a platform string, not a library one), and the override is the function
   form of `children` (`({ validity, messages }) => …`), per `ValidityState` key.
