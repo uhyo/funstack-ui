@@ -132,7 +132,7 @@ export function DrawerPage() {
           ],
           [
             "Its `pointerdown` was `preventDefault()`-ed",
-            "Your opt-out, read when the drag would start, so a React handler counts",
+            "Your opt-out, read when the drag would start, so a React handler counts. It also stops a mouse press from focusing or selecting there: use it on non-focusable regions",
           ],
           ["Another element captured the pointer", "A slider thumb, a map, a canvas"],
           ["While the drawer slides out after a release", "One gesture at a time"],
@@ -174,7 +174,8 @@ export function DrawerPage() {
           child also makes it a horizontal scroll container (CSS computes the other axis to{" "}
           <code>auto</code>), so a press in a scrolling child of a side drawer does not drag. To
           drag from such a list, give it <code>overflow-x: hidden</code> and{" "}
-          <code>touch-action: pan-y</code>.
+          <code>touch-action: pan-y pinch-zoom</code> (as in the starter stylesheet). Development
+          warns once when a press in a side drawer is refused by such a list.
         </li>
         <li>
           Add <code>overscroll-behavior: contain</code> on the scrolling body so a scroll that
@@ -477,7 +478,12 @@ export function DrawerPage() {
 }
 
 /* While a pointer drags, the pointer leads. */
-.drawer[data-swiping], .drawer[data-swiping]::backdrop { transition: none; }`}</CodeBlock>
+.drawer[data-swiping], .drawer[data-swiping]::backdrop { transition: none; }
+
+/* A side drawer's vertical list that the swipe may start in (see Scroll inside the drawer). */
+.drawer:where(:not([data-side="top"], [data-side="bottom"])) .drawer-list {
+  overflow-x: hidden; overflow-y: auto; touch-action: pan-y pinch-zoom;
+}`}</CodeBlock>
 
       <h4 id="backdrop-fade">The backdrop follows the drag</h4>
       <p>
@@ -504,13 +510,15 @@ export function DrawerPage() {
 }
 
 /* A slight resistance: the drawer moves at 80% of the pointer. */
-.drawer.stiff:open {
+.drawer.stiff[data-swiping] {
   translate: calc(var(--drawer-swipe-x, 0px) * .8) calc(var(--drawer-swipe-y, 0px) * .8);
 }`}</CodeBlock>
       <p>
-        Do not set the properties yourself: the library writes and removes them. Scaling the
-        properties changes only how far the drawer moves, not where the release decides: the
-        threshold is measured on the pointer.
+        Do not set the properties yourself: the library writes and removes them. Scale them only
+        under <code>[data-swiping]</code>: the release writes the full extent, which an
+        always-scaled rule would stop short of the edge. Scaling changes only how far the drawer
+        moves during the drag, not where the release decides: the threshold is measured on the
+        pointer.
       </p>
 
       <h4 id="reduced-motion">Reduced motion</h4>
@@ -554,6 +562,12 @@ html:has(.drawer:modal) .app { scale: .96; border-radius: 12px; }
       <h4>Opt a region out of the swipe</h4>
       <CodeBlock>{`{/* A map or a canvas with its own drag: prevent the press. */}
 <div className="map" onPointerDown={(event) => event.preventDefault()} />`}</CodeBlock>
+      <p>
+        Preventing the <code>pointerdown</code> also cancels the compatibility{" "}
+        <code>mousedown</code>: a mouse press in that region no longer moves focus or starts a text
+        selection. Use it on regions that are not focusable and hold no text to select (a map, a
+        canvas, a custom slider that handles its own focus), not on a form or a list of links.
+      </p>
     </DocPage>
   );
 }

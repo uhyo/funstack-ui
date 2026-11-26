@@ -13738,3 +13738,42 @@ Implementation notes (not rules):
   rows with synthetic pointer events and a fake `Date`), `drawer-transition-types.test.tsx`,
   `drawer.browser.test.tsx`. The browser `mouse` command's `up` takes `steps` so a flick's last
   move and its release are one command. Notes in `memo/developer/issue-168.md`.
+
+## 2026-11-26, #168: `Drawer`, review amendments
+
+From the review (`memo/reviewer/review-168.md` on `review/168`) and the product owner's
+decision on gap 4:
+
+- **5.1: a development warning for a vertical list in a side drawer** (the reviewer's option D,
+  decided by the PO). The rule is unchanged: a press inside a scroll container along the
+  drawer's axis never drags. The silent case is now reported, once per instance: a press in a
+  side drawer refused by a scroll container whose computed `overflow-x` is `auto`, whose
+  `overflow-y` is not `visible`, and which has no horizontal overflow (`scrollWidth <=
+  clientWidth`). The message gives the recipe, `overflow-x: hidden; touch-action: pan-y
+  pinch-zoom`, which the starter stylesheet of 4.3 now carries (`.drawer-list`). Rejected: the
+  amount of overflow as the rule (mouse and touch would disagree: by touch the child still ends
+  the touch-action chain) and library writes on consumer scrollers.
+- **5.1 recipe: `pan-y pinch-zoom`**, not `pan-y`: the list keeps pinch zoom, as the Popup does.
+- **4.2: a release belongs to its showing.** The slide's wait compares an open generation,
+  bumped at every open (`beforetoggle`), so a dialog closed another way during the slide and
+  opened again before the slide settled is not closed by the old gesture (and takes presses at
+  once). Code only; the text of 4.2 already said "if the dialog is still open".
+- **4.1 Not a start: the text-selection clause reworded.** With real input a mouse drag along
+  the drawer's axis moves the drawer and selects nothing, and a drag across the axis drops the
+  press and selects text; the clause rarely refuses anything.
+- **7: the "no Close" warning described as built**: once per instance, at the close of a
+  showing, when no Close part of the Popup has mounted since the Popup did. The #168
+  implementation entry's "a showing during which none was mounted" overstated it.
+- Docs: the "resistance" recipe scales the swipe variables under `[data-swiping]` only (the
+  release writes the full extent, which an always-scaled rule stopped 20% short of the edge);
+  the `onPointerDown` `preventDefault()` opt-out also stops a mouse press from focusing or
+  selecting, so it is recommended for non-focusable regions only. The agent skill gains the
+  side-drawer list recipe.
+- Code: the Close parts register with the Drawer's development registry only in development
+  (`useMergedRefs(ref, isDev ? reportClose : undefined)`), so production passes a consumer's
+  `ref` through untouched.
+- Tests: the release's wait with a fake finite animation (a press meanwhile starts nothing; a
+  release outliving its showing closes nothing), unmount and a `side` change during a drag and
+  during the wait (`drawer-swipe-lifecycle.test.tsx`), the side-drawer list warning, and a
+  browser row for reduced motion (`transition: none`: the release closes in its own task, a short
+  drag snaps back in the same frame).

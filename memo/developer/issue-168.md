@@ -68,7 +68,7 @@ Branch `feat/168-drawer`, from `design/168-drawer` (837cff30) + master.
    docs example: the action must not run).
 3. A horizontal touch drag on a side drawer (`pan-y pinch-zoom`) drags it; vertical scrolling of
    the side drawer's own content still works by touch.
-4. The side-drawer list recipe (`overflow-x: hidden; touch-action: pan-y` on a child scroller)
+4. The side-drawer list recipe (`overflow-x: hidden; touch-action: pan-y pinch-zoom` on a child scroller)
    lets a horizontal swipe start inside the list.
 5. Pinch zoom still works on a drawer (the `pinch-zoom` keyword).
 6. iOS Safari edge-swipe back navigation versus a left / inline-start drawer swipe.

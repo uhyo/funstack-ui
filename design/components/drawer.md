@@ -178,7 +178,7 @@ is `true`. Pointer Events only.
 | Press | `pointerdown`, `isPrimary`, the primary button. Recorded, nothing else: no capture, no `preventDefault()`, so a tap, a click and a text selection are untouched. |
 | Not a candidate | The press is on the `::backdrop`; inside a nested `<dialog>` or an open popover; on a text-entry or range control (`input`, `textarea`, `select`, `[contenteditable]`); inside a scroll container along the drawer's axis (section 5); or the drawer is closing. |
 | Start | The pointer has moved 6 px, more along the drawer's axis than across it, and toward the edge. The library then takes pointer capture on the dialog (`internal/pointer-capture.ts`) and sets `data-swiping`. A first move in another direction drops the press for good. |
-| Not a start | At that moment the press's `pointerdown` was `defaultPrevented` (a consumer's opt-out, read late so a React handler has run); another element holds the pointer's capture (a Slider thumb, a map); or a mouse press has produced a text selection (dragging over text selects, dragging from an empty area moves). |
+| Not a start | At that moment the press's `pointerdown` was `defaultPrevented` (a consumer's opt-out, read late so a React handler has run); another element holds the pointer's capture (a Slider thumb, a map); or a mouse press has produced a text selection by then. With real input this rarely applies: a mouse drag along the drawer's axis moves the drawer (pointer capture, and the Move row below, keep it from selecting), a drag across the axis drops the press and selects text as usual. |
 | Move | offset = the distance moved toward the edge, never below 0 (no overdrag in v1). Written to the custom properties (4.3) on every `pointermove`. No React render. A text selection a mouse press has made since it went down is removed on each move: Firefox keeps extending it under pointer capture, and a drag moves, it does not select. |
 | Release | `pointerup`. **Dismiss** when the offset is at least 25% of the extent, or the velocity toward the edge over the last 100 ms is at least 0.5 px/ms; **but return** when the pointer was moving back (more than 0.1 px/ms away from the edge). Otherwise return. The press is the gesture's first sample (offset 0 at its time): an engine may coalesce a flick's moves into the one `pointermove` that starts the drag. |
 | Abort | `pointercancel`, a lost capture, a second primary press, the dialog closing for any other reason, the Popup unmounting: return (or just clean up when the dialog is gone). |
@@ -260,6 +260,11 @@ The starter stylesheet (docs, not shipped):
   /* … one line per side used */
 }
 .drawer[data-swiping], .drawer[data-swiping]::backdrop { transition: none; }
+
+/* A side drawer's vertical list that the swipe may start in (5.1) */
+.drawer:where(:not([data-side="top"], [data-side="bottom"])) .drawer-list {
+  overflow-x: hidden; overflow-y: auto; touch-action: pan-y pinch-zoom;
+}
 
 .drawer::backdrop { opacity: 0; transition: opacity 300ms, display 300ms allow-discrete, overlay 300ms allow-discrete; }
 .drawer:open::backdrop { opacity: calc(1 - var(--drawer-swipe-progress, 0)); }
@@ -356,8 +361,12 @@ What follows:
   vertical list inside a side drawer is also a horizontal scroll container and its presses do
   not drag, by mouse or by touch (the touch-action chain ends at that list, whose own
   `touch-action` is `auto`). A side drawer that should drag from its list gives the list
-  `overflow-x: hidden` and `touch-action: pan-y`; one that scrolls in the Popup itself needs
-  nothing.
+  `overflow-x: hidden` and `touch-action: pan-y pinch-zoom`; one that scrolls in the Popup
+  itself needs nothing. The rule stays; the silent failure gets a development warning, once
+  per instance: a press in a side drawer refused by a scroll container whose computed
+  `overflow-x` is `auto`, whose `overflow-y` is not `visible` and which has no horizontal
+  overflow (`scrollWidth <= clientWidth`) logs the recipe. The starter stylesheet (4.3)
+  carries it.
 
 Documented with the rule: `overscroll-behavior: contain` on the scrolling child, so a scroll
 that reaches its end does not chain to the page (Safari applies it only to a container that
@@ -474,7 +483,9 @@ wait for: the drawer closes at the release, or returns in one frame.
 `dialog.md` 6 and 9, unchanged. The swipe is a path-based pointer gesture, so WCAG 2.5.1 asks
 for another way: Escape (modal, and the JS baseline of a non-modal drawer), the backdrop of a
 modal drawer, and the Close part. Development warning, once per instance: a Popup with
-`swipeDismiss` that has shown without any Close part mounted in it. A grabber is decoration
+`swipeDismiss` that closes, at the end of any showing, while no Close part of it has mounted
+since the Popup did (a Close that mounted once counts for the instance's lifetime; the check
+is a hint, not a per-showing audit). A grabber is decoration
 (`aria-hidden`); it is not a button, because it has no action that a key could perform.
 
 ---
