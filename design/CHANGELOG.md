@@ -13569,3 +13569,149 @@ behaviour change. Sections changed: conventions 7.3 (new paragraph), dialog.md 3
   natively, then the same click after hydration running the action and closing.
 - **Docs.** Dialog and Popover pages (the `action` rows, the owned keys, before hydration), the
   roadmap's behaviour changes, the agent skill.
+
+## 2026-11-26, #171: Avatar, ScrollArea, OTP field (proposed)
+
+Architect, wave 25 (#162). Nothing here is accepted by the user or implemented. New documents
+`design/components/avatar.md` and `design/components/otp-field.md` (status proposed). No
+document for ScrollArea: the recommendation is not to build it. No conventions rule changed.
+Notes, the platform table and the ScrollArea recipe draft:
+`memo/architect/avatar-scrollarea-otp-notes.md`. No browser probe was run for this entry; the
+engine facts are from browser-compat-data 8.1.11 (2026-11-26: Chrome 158, Firefox 161, Safari
+27.2), the react-dom 19.3.1 source and vendor trackers, and what is only an expectation is
+listed under "Owed before implementation".
+
+Per part:
+
+- **Avatar: build, small.** `Avatar.Root` (`span`, required `alt`), `Avatar.Image` (`img`),
+  `Avatar.Fallback` (`span`). The `<img>` is in the server HTML and the Fallback is rendered
+  under it until the image has loaded, so the picture works without script and nothing is
+  swapped while it loads: no `delay` prop, no timer. A status (`idle` / `loading` / `loaded` /
+  `error`) mirrors the image urgently, from native `load` / `error` listeners and a read of
+  `img.complete` at mount (an image that failed before hydration fires no event React hears).
+  **Suspense, as the issue suggests: not by the library.** React 19.3 already holds a
+  transition commit for an `<img>` under a `<ViewTransition>` (bounded: up to 800 ms before
+  the commit, 500 ms before the animation), unless the element has an `onLoad` prop or
+  `loading="lazy"` (`maySuspendCommit` in react-dom). The part therefore listens natively and
+  never renders `onLoad`; a library-owned `use()` would lose the server HTML, have no bound and
+  own a boundary against conventions 6. The accessible name is on the Root (`role="img"` +
+  `aria-label`, or `aria-hidden` for `alt=""`), so it is the same in every state and the inner
+  `<img alt="">` paints nothing when broken.
+- **ScrollArea: do not build.** `scrollbar-width`, `scrollbar-color` and `scrollbar-gutter`
+  are in all three engines (Safari 18.2 / 26.2 / 18.2); `::-webkit-scrollbar` is Chromium and
+  desktop Safari only and is switched off by the standard properties in Chromium;
+  scroll-driven animations reached Firefox 159, so overflow-edge fades need no script
+  anywhere. What is left for a custom-drawn bar is thumb shape in Firefox and on iOS, and
+  overlay or auto-hiding bars on classic-scrollbar platforms. It pays for that with the
+  user's scrollbar settings and forced colours, a small pointer target, reimplemented track
+  behaviour and script on every scroll, and it has no state, action or pending in it. Radix's
+  own docs say to prefer native scrolling. The one native gap is keyboard access in Safari
+  (WebKit bug 277290 is still open), which is `tabindex="0"` plus a role and a name on a
+  scroller without focusable content: an author's decision, shown in a recipe. Proposed: a
+  docs page with the recipe drafted in the notes.
+- **OTP field: build, as `OTPField`.** One `<input type="text"
+  autocomplete="one-time-code">` covering a row of `aria-hidden` `OTPField.Slot` spans, not N
+  inputs: one labelled field for a screen reader, the platform's own SMS and password-manager
+  autofill and paste, native `name` / `required` / `pattern` / reset, and `Field.Control`'s
+  registration inside a Field with no hidden input and no validity mirror. The text is a fact
+  (`value` / `defaultValue` / `onValueChange`, the urgent lane); the library filters each
+  `input` event (charset, length, overtype) and writes the result back. Completion is the
+  request: `completeAction(value, details)` in the Root's transition with `data-pending`, and
+  `submitOnComplete` for the form channel. WebOTP behind `experimental_webOTP` (no Firefox).
+  **Not a NumberField-like model**: NumberField has two inputs because the text shown is not
+  the value posted; here it is.
+
+Open decisions for the user:
+
+1. **Avatar: build or recipe.** (a) Build the three parts as designed (recommended). (b) A
+   docs recipe: `<img>` with a ref callback that checks `complete` and listens for `error`.
+2. **Avatar: where the name goes.** (a) `alt`, required, on `Avatar.Root` (`role="img"`; the
+   inner image is `alt=""`) (recommended: one name in every state, and the no-script fallback
+   depends on the empty inner `alt`). (b) `alt` on `Avatar.Image` as in Radix and Base UI,
+   with the Fallback taking `role="img"` and the name after hydration when the image failed;
+   the server HTML and a failed image before hydration then expose the initials.
+3. **OTPField: the action's name.** (a) `completeAction(value, details)`, with a new row in
+   conventions 2.1 for a pure trigger named after its event (recommended; the vision's
+   `fooAction` wording). (b) bare `action`. (c) `valueCommitAction`.
+4. **OTPField: `submitOnComplete`.** (a) Include it, default `false`, with the WCAG 3.2.2
+   notice in the docs (recommended). (b) Leave it out; the recipe is `completeAction={() =>
+   formRef.current.requestSubmit()}`.
+5. **OTPField: text typed before hydration is not visible** until hydration (transparent
+   input in the server HTML). (a) Accept, with the `scripting: none` recipe (recommended).
+   (b) Apply the overlay styles after mount: visible typing before hydration, and a plain
+   input that turns into boxes on every load.
+6. **OTPField: the name.** (a) `OTPField`, `@funstack/ui/otp-field` (recommended; Base UI's
+   name, next to `NumberField`). (b) `PinInput`. (c) `OneTimeCodeField`.
+7. **OTPField: WebOTP.** (a) `experimental_webOTP`, off by default (recommended). (b) Not in
+   v1; `autocomplete="one-time-code"` only.
+8. **ScrollArea.** (a) No part; a docs recipe page (recommended). (b) A single-element
+   `ScrollArea` that is a native scroller made focusable and named when it overflows and has
+   no focusable content, nothing drawn. (c) Custom-drawn bars as in Radix and Base UI.
+
+To do when decided (registry rows and amendments, none made yet):
+
+- Conventions 1.1: `Image`, `Fallback` and `Slot` in the part vocabulary; the `Input` row
+  gains OTPField. 2.1: the action-name row of decision 3 and `onValueChange`
+  (`OTPField.Root`) in the handler list and the type guard's allow-list; 2.5.1: a pure
+  trigger that carries a value has no `whilePending`. 2.6: OTPField's text as the next user of
+  the urgent lane, Avatar's status as a mirror of a browser-owned fact. 4.1: `status`
+  (Avatar), `filled` (Slot), and OTPField added to `complete`, `active`, `index`, `pending`,
+  `invalid`. 5.3: `fsui-otp-field`, `fsui-otp-field-complete`. 8: `experimental_webOTP`. 9.2:
+  the two subpaths.
+- `design/components/field-form.md` 7.2: an OTPField row. `docs/research/modern-platform-survey.md`:
+  scroll-driven animations are in Firefox 159 (the survey says Nightly only).
+- Docs pages: Avatar, OTP field, and "Scroll areas" (the recipe; verify it in three engines
+  first, it was written without a browser).
+
+Owed before implementation (expectations in the designs that no document settles):
+
+- Avatar, browser tests in three engines: a broken image with `alt=""` and CSS dimensions
+  paints nothing; `decode()` on a complete image separates a broken one from an SVG without
+  intrinsic size; react-dom's commit wait applies to `Avatar.Image` under a `<ViewTransition>`
+  and stops applying with a consumer `onLoad`.
+- OTPField, on devices: the six probes at the end of the notes (iOS selection highlight and
+  paste callout over a transparent input, Gboard composition with `alphanumeric`, autofill's
+  event sequence, caret restore after a controlled write, password-manager badges, forced
+  colours). The Input's inline style list and the composition rule are provisional until then.
+
+Test plan, Avatar (jsdom unless marked):
+
+- Server render: Root, `<img alt="">` and Fallback, all `data-status="idle"`; no `<img>`
+  without a source; hydration without mismatch.
+- `load` → `loaded`, Fallback unmounted; `error` → `error`, `<img>` unmounted.
+- Mount with a complete image (loaded, broken, zero natural size with `decode()` resolving /
+  rejecting): the first committed status.
+- A new `src`: back to `loading`; a late report for the old source is dropped; a new `src`
+  after an error mounts a new `<img>`.
+- `alt` non-empty: `role="img"`, `aria-label`; empty: `aria-hidden`, no role.
+- No `onLoad` prop on the rendered element (the React element's props, asserted through a
+  `render` function); a consumer `onLoad` / `onError` passes through.
+- Status writes are urgent: a status change commits while an unrelated async action is pending.
+- Two Images in one Root warn. Function props receive `{ status }`. `render`, `ref`.
+- Directive rows. Browser: the three rows under "Owed".
+
+Test plan, OTPField (jsdom unless marked):
+
+- The filter module, unit tests: every rule of otp-field.md 4.1, per charset; full-width
+  digits; a paste longer than `length`; a paste with spaces and hyphens.
+- Rendered attributes per `charset`; consumer `inputMode` / `autoComplete` override; no
+  `maxlength`.
+- Typing, overtyping, Backspace, paste: value, Slots (`data-filled`, characters), caret.
+- `data-active` for a collapsed caret, a range, the end of a complete code; none unfocused.
+- `onValueChange`: synchronous, outside a transition, reasons; controlled follows the DOM.
+- `completeAction`: sync and async, `data-pending` on Root and Input, input not disabled
+  while pending, a second completion while pending runs, a rejection reaches the boundary; not
+  at mount, on reset, on a controlled change, when disabled or read-only.
+- `submitOnComplete`: `requestSubmit()` once per completion; inside `Form.Root` the form's
+  pending and a returned field error on `Field.Error`.
+- Field: registration, `Field.Label for`, `required` and `pattern` validity, `validate` sees
+  the filtered value after a write-back (`useFieldValueChange`), server error dismissed by an
+  edit.
+- Reset; text present at mount is adopted with `"platform"` and runs no completion.
+- `experimental_webOTP`: with a stubbed `navigator.credentials`, a resolved code fills and
+  completes with `"platform"`; aborted at unmount, on submit and on manual completion; no call
+  with the flag off or the API absent.
+- Slot index warnings; unnamed Input warning; function props, `render`, `ref`; directive rows;
+  the `details` of both callbacks are serialisable.
+- Browser: click on a Slot places the caret; `selectionchange` drives `data-active`; a real
+  paste; the server render is interactive before hydration and adopted after.
