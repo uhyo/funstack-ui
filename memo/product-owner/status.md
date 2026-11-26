@@ -445,3 +445,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #165 MultiSelect design 8cbb1892: user took all 8 recommendations (dedicated MultiSelect, Value part, hidden validity select, pick order, full open API, no extras, multiple only). Implement after #164 merges.
 - To report upstream (human): MDN BCD ::interest-button listed as Chrome 149 but not shipped; Chromium rich interest card lacks aria-expanded/tooltip role (re-check after M160).
 - #164 MERGED cac4be52 (99c2f8f4 + reviews). Human check issue filed for SR/IME. Next: MultiSelect #165 developer.
+- #166 MERGED e551630c (cf276113 + review). Follow-ups #177 (Dialog Escape vs inner manual popover), #178 (Chromium 160 re-probe). Remaining wave 23: #165 MultiSelect (developer running).
