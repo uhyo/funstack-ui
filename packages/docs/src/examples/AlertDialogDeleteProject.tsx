@@ -17,7 +17,8 @@ export function AlertDialogDeleteProject() {
     return (
       <div className="demo-row">
         <output className="demo-readout">Project "Atlas" deleted.</output>
-        <button type="button" className="demo-button" onClick={() => setDeleted(false)}>
+        {/* The dialog and its Trigger are gone: put focus on the next thing to do. */}
+        <button type="button" className="demo-button" autoFocus onClick={() => setDeleted(false)}>
           Restore
         </button>
       </div>

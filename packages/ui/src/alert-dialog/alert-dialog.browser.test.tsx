@@ -3,10 +3,11 @@
 // listener), real Escape (a fact), the platform's dialog focusing steps on the Cancel's
 // `autofocus` (JS-free and library mode), and the two points the design entry left to verify:
 // a disabled element carrying `autofocus` is skipped by the focusing steps, and React's
-// `autoFocus` on a Cancel that mounts into an already open JS-free dialog takes focus. Chromium
+// `autoFocus` on a Cancel that mounts into an already open JS-free dialog takes focus (it did;
+// the Cancel now renders the prop only in the server and hydration render, so it does not). Chromium
 // also reads the role, name and description from its accessibility tree.
-import { render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { act, render, screen } from "@testing-library/react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { axNodeOf } from "../__tests__/ax-tree.js";
@@ -200,26 +201,32 @@ describe("AlertDialog (browser)", () => {
       }
     });
 
-    it("React's autoFocus on a Cancel mounting into an open JS-free dialog takes focus", async () => {
+    it("a Cancel mounting into an open JS-free dialog carries autofocus but takes no focus", async () => {
+      // React's `autoFocus` on a client-created element calls `.focus()` (it took focus in all
+      // three engines, 2026-11-26 #167 entry); the Cancel renders it only in the server and
+      // hydration render, so a client mount leaves focus where the user put it.
+      let mount = () => {};
       function App() {
-        const [failed, setFailed] = useState(false);
+        const [mounted, setMounted] = useState(false);
+        useEffect(() => {
+          mount = () => setMounted(true);
+        }, []);
         return (
           <Confirm>
             <input data-testid="field" />
-            <button type="button" data-testid="fail" onClick={() => setFailed(true)}>
-              Fail
-            </button>
-            {failed && <AlertDialog.Cancel data-testid="cancel">Close</AlertDialog.Cancel>}
+            {mounted && <AlertDialog.Cancel data-testid="cancel">Close</AlertDialog.Cancel>}
           </Confirm>
         );
       }
       render(<App />);
       await user.click(trigger());
       expect(popup().open).toBe(true);
-      await user.click(screen.getByTestId("fail"));
+      await user.click(screen.getByTestId("field"));
+      expect(screen.getByTestId("field")).toHaveFocus();
+      await act(async () => mount());
       await settle(() => expect(cancel()).toBeInTheDocument());
       expect(cancel()).toHaveAttribute("autofocus");
-      expect(cancel()).toHaveFocus();
+      expect(screen.getByTestId("field")).toHaveFocus();
     });
 
     it("a Cancel mounting into a closed JS-free dialog does not take focus from the page", async () => {

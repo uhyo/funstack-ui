@@ -13340,3 +13340,28 @@ Implementation notes (not rules):
   (`packages/ui/src/__tests__/alert-dialog-harness.tsx`), plus the AlertDialog rows;
   `alert-dialog-transition-types.test.tsx`; `alert-dialog.browser.test.tsx`. Notes in
   `memo/developer/issue-167.md`.
+## 2026-11-26, #167: `AlertDialog`, review amendments
+
+From the review of the implementation (`memo/reviewer/review-167.md` on `review/167`).
+Sections changed: alert-dialog.md 2.2, 3.4, 7 (walkthrough 4); the docs page.
+
+- **7, walkthrough 4: the held Cancel is stated as what the user sees.** In library mode a
+  Cancel click during a pending Action is held until the action settles, and nothing near the
+  Cancel shows it (the Trigger's `data-pending` is under the backdrop). The design and the docs
+  page now say so and point to the `useOptimistic` recipe (9.3) for slow work. Pending feedback
+  on the Cancel or the Popup while its close waits is left to a separate issue.
+- **3.4: React's `autoFocus` only in the server and hydration render.** On a client-created
+  element React calls `.focus()`: a Cancel mounting or remounting into an open JS-free dialog
+  took focus from the user, and of two Cancels the last one mounted won. The Cancel renders the
+  prop only under `useSyncExternalStore`'s server snapshot (`useHydratedMount`); its ref still
+  writes the attribute in every render.
+- **2.2: the Description warning is judged over the first showing.** It moved to
+  `useShownDescriptionWarning` next to `useShownNameWarning` (a no-op in production): checked
+  when the dialog opens, re-checked on changes inside it, logged at its first `close` if still
+  missing, so a Description behind a Suspense boundary pending at the open no longer warns.
+- `useDialogPopup`'s `role` option is typed `"alertdialog"`.
+- Tests added: the Description behind a pending boundary, two Cancels and a remounting Cancel
+  mounting into an open dialog, the hydration render, walkthrough 3's rejection after Escape
+  (the Action is gone: `reportError`, no boundary). Skill: AlertDialog's Cancel and Action in
+  the pure-trigger list and the Close-parts default. Docs example: focus goes to Restore after
+  a successful delete.

@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode, RefObject } from "react";
 import { useDialogContext } from "../dialog/dialog-context.js";
 import { useDialogPopup } from "../dialog/dialog-popup.js";
 import type { DialogPopupProps, DialogPopupState } from "../dialog/dialog-popup.js";
+import { useShownDescriptionWarning } from "../internal/use-name-warning.js";
 import { AlertDialogCancelContext, firstEnabledCancel } from "./alert-dialog-context.js";
 import type { AlertDialogCancelContextValue } from "./alert-dialog-context.js";
 
@@ -62,27 +63,16 @@ export function AlertDialogPopup(props: AlertDialogPopupProps) {
     [defaultFocus, cancels],
   );
 
-  // Development check (design 2.2): the APG asks for the alert message as the description. Once
-  // per instance, when the dialog is (or can be) shown: a mounted Description, or a consumer
-  // `aria-describedby` naming an element in the document.
-  const warned = useRef(false);
-  const shown = ctx.mode !== "library" || ctx.committed;
-  const { popupRef } = ctx;
-  useEffect(() => {
-    if (!isDev || !shown || warned.current) return;
-    const dialog = popupRef.current;
-    if (dialog === null) return;
-    const doc = dialog.ownerDocument;
-    const ids = (dialog.getAttribute("aria-describedby") ?? "").split(/\s+/);
-    if (ids.some((id) => id !== "" && doc.getElementById(id) !== null)) return;
-    warned.current = true;
-    console.error(
-      isDev &&
-        "AlertDialog.Popup: the alert dialog has no description. Render an " +
-          "AlertDialog.Description with the message (or give the Popup an `aria-describedby`): a " +
-          "screen reader announces an alert dialog by its name and description.",
-    );
-  }, [shown, popupRef]);
+  // Development check (design 2.2): the APG asks for the alert message as the description: a
+  // mounted Description, or a consumer `aria-describedby` naming an element, by the end of the
+  // dialog's first showing.
+  useShownDescriptionWarning(
+    ctx.popupRef,
+    isDev &&
+      "AlertDialog.Popup: the alert dialog has no description. Render an " +
+        "AlertDialog.Description with the message (or give the Popup an `aria-describedby`): a " +
+        "screen reader announces an alert dialog by its name and description.",
+  );
 
   return useDialogPopup(
     // An untyped `lightDismiss` / `experimental_closedBy` is overridden: no light dismiss, no

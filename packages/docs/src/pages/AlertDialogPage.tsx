@@ -61,8 +61,8 @@ export function AlertDialogPage() {
         <li>
           <strong>A Description is expected.</strong> A screen reader announces an alert dialog by
           its name and description, so a Popup without an <code>AlertDialog.Description</code> (or
-          an <code>aria-describedby</code> of yours) is a development warning, as a Popup without a
-          Title is.
+          an <code>aria-describedby</code> of yours) is a development warning (logged when its first
+          showing ends), as a Popup without a Title is.
         </li>
       </ul>
 
@@ -120,10 +120,11 @@ export function AlertDialogPage() {
       <Callout title="A pending confirmation can be dismissed">
         Dismissing a pending confirmation hides it; it does not abort it. Escape closes the dialog
         while the action runs, and the action finishes in the background. In library mode a Cancel
-        click meanwhile is a close request that React entangles with the running action: the Trigger
-        shows <code>data-pending</code> and the dialog closes when the action settles. To make
-        Cancel unavailable while the work runs, disable it with your own optimistic state (
-        <a href="#cancel-while-pending">recipe</a>).
+        click meanwhile is a close request that React entangles with the running action: it is held
+        until the action settles, and nothing near the Cancel shows it (the Trigger's{" "}
+        <code>data-pending</code> is under the backdrop), so the click looks ignored. When the work
+        can take more than a moment, disable Cancel while it runs with your own optimistic state:
+        see <a href="#cancel-while-pending">Cancel unavailable while the confirm runs</a>.
       </Callout>
 
       <h3 id="props">Props</h3>
@@ -261,7 +262,7 @@ export function AlertDialogPage() {
       <PartFacts
         state={"`AlertDialogCancelState` is `{ pending, disabled }`."}
         owned={
-          "`Dialog.Close`'s (`type`, `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` in library mode or with `action`, `data-pending`, `data-disabled`), and `autoFocus` while it is the focus target in JS-free mode."
+          "`Dialog.Close`'s (`type`, `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` in library mode or with `action`, `data-pending`, `data-disabled`), and `autoFocus` in the server and hydration render while it is the focus target in JS-free mode (a Cancel mounted on the client into an open dialog carries the attribute but takes no focus)."
         }
         note={
           'JS-free mode: `<button command="request-close" autofocus>`, in the server HTML too, so the focus is right before hydration. Library mode: no attribute; the Popup writes `autofocus` on the first enabled Cancel right before `showModal()` and removes it after.'
@@ -395,8 +396,8 @@ export function AlertDialogPage() {
         </li>
         <li>
           Development warnings, in addition to Dialog's: a Popup without a Description and without
-          an <code>aria-describedby</code> of yours that names an element, once, when it is first
-          shown.
+          an <code>aria-describedby</code> of yours that names an element, once, when its first
+          showing ends (a Description behind a Suspense boundary that resolves meanwhile counts).
         </li>
       </ul>
 

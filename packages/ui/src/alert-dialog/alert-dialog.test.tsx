@@ -11,7 +11,7 @@
 // platform's dialog focusing steps (`autofocus` on a disabled Cancel skipped, React's
 // `autoFocus` on a Cancel mounting into an open JS-free dialog) and the exposed role.
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { startTransition, useOptimistic, useRef, useState } from "react";
+import { Suspense, startTransition, useOptimistic, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -483,6 +483,81 @@ describe("AlertDialog", () => {
     });
   });
 
+  describe("JS-free Cancels mounting on the client (design 3.4)", () => {
+    it("two Cancels mounting into an open dialog take no focus; both carry autofocus", async () => {
+      const user = setupUser();
+      function App() {
+        const [more, setMore] = useState(false);
+        return (
+          <Confirm>
+            <input data-testid="field" />
+            <button type="button" data-testid="more" onClick={() => setMore(true)}>
+              More
+            </button>
+            {more && (
+              <>
+                <AlertDialog.Cancel data-testid="close">Cancel</AlertDialog.Cancel>
+                <AlertDialog.Cancel data-testid="later">Later</AlertDialog.Cancel>
+              </>
+            )}
+          </Confirm>
+        );
+      }
+      render(<App />);
+      await user.click(trigger());
+      expect(popup().open).toBe(true);
+      screen.getByTestId("field").focus();
+      fireEvent.click(screen.getByTestId("more"));
+      await flushTasks(1);
+      expect(cancel()).toHaveAttribute("autofocus");
+      expect(screen.getByTestId("later")).toHaveAttribute("autofocus");
+      expect(screen.getByTestId("field")).toHaveFocus();
+    });
+
+    it("a Cancel that remounts (key change) does not take focus", async () => {
+      const user = setupUser();
+      function App() {
+        const [key, setKey] = useState(0);
+        return (
+          <Confirm>
+            <input data-testid="field" />
+            <button type="button" data-testid="remount" onClick={() => setKey((k) => k + 1)}>
+              Remount
+            </button>
+            <AlertDialog.Cancel key={key} data-testid="close">
+              Cancel
+            </AlertDialog.Cancel>
+          </Confirm>
+        );
+      }
+      render(<App />);
+      await user.click(trigger());
+      expect(cancel()).toHaveFocus();
+      screen.getByTestId("field").focus();
+      fireEvent.click(screen.getByTestId("remount"));
+      await flushTasks(1);
+      expect(cancel()).toHaveAttribute("autofocus");
+      expect(screen.getByTestId("field")).toHaveFocus();
+    });
+
+    it("hydration renders React's autoFocus; the re-render after it keeps the attribute", async () => {
+      const container = document.createElement("div");
+      container.innerHTML = renderToString(
+        <Confirm>
+          <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+        </Confirm>,
+      );
+      expect(container.querySelector("[autofocus]")).not.toBeNull();
+      await hydrateFromServer(
+        <Confirm>
+          <AlertDialog.Cancel data-testid="close">Cancel</AlertDialog.Cancel>
+        </Confirm>,
+        { flush: () => flushTasks(2) },
+      );
+      expect(cancel()).toHaveAttribute("autofocus");
+    });
+  });
+
   describe("Action (design 3.2)", () => {
     it("with action: no commandfor / command, in JS-free and library mode; without: the native command", () => {
       const { unmount } = render(
@@ -759,6 +834,37 @@ describe("AlertDialog", () => {
       expect(popup().open).toBe(false);
     });
 
+    it("Escape while pending, then the action rejects: the Action is gone, the error goes to reportError (walkthrough 3)", async () => {
+      silenceErrors();
+      const user = setupUser();
+      const work = deferred();
+      const reported = vi.fn();
+      vi.stubGlobal("reportError", reported);
+      const boundary = vi.fn();
+      render(
+        <ErrorCatcher onError={boundary}>
+          <Confirm root={{ defaultOpen: false }}>
+            <AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+            <AlertDialog.Action data-testid="confirm" action={() => work.promise}>
+              Delete
+            </AlertDialog.Action>
+          </Confirm>
+        </ErrorCatcher>,
+      );
+      await openThroughTrigger(user);
+      await user.click(confirm());
+      await act(async () => popup().requestClose());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      expect(screen.queryByTestId("confirm")).toBeNull();
+      await act(async () => work.reject(new Error("too late")));
+      await flushTasks(2);
+      expect(boundary).not.toHaveBeenCalled();
+      expect(reported).toHaveBeenCalledTimes(1);
+      expect((reported.mock.calls[0]![0] as Error).message).toBe("too late");
+      expect(popup().open).toBe(false);
+    });
+
     it("optimistic: the consumer's useOptimistic disables the Cancel while deleting and reverts on settle (design 9.3)", async () => {
       const user = setupUser();
       const work = deferred();
@@ -891,30 +997,41 @@ describe("AlertDialog", () => {
   });
 
   describe("development warnings (design 2.2, 10)", () => {
-    it("warns once when there is no Description (JS-free mode: at mount)", () => {
+    const descriptionWarnings = (error: ReturnType<typeof silenceErrors>) =>
+      error.mock.calls.filter(([m]) => String(m).includes("no description"));
+
+    it("JS-free mode: warns once, at the end of the first showing, when there is no Description", async () => {
+      const user = setupUser();
       const error = silenceErrors();
-      const { rerender } = render(
+      render(
         <AlertDialog.Root>
-          <AlertDialog.Popup>
+          <AlertDialog.Trigger data-testid="trigger">Open</AlertDialog.Trigger>
+          <AlertDialog.Popup data-testid="popup">
             <AlertDialog.Title>Session expired</AlertDialog.Title>
-            <AlertDialog.Cancel>OK</AlertDialog.Cancel>
+            <AlertDialog.Cancel data-testid="close">OK</AlertDialog.Cancel>
           </AlertDialog.Popup>
         </AlertDialog.Root>,
       );
-      rerender(
-        <AlertDialog.Root>
-          <AlertDialog.Popup className="x">
-            <AlertDialog.Title>Session expired</AlertDialog.Title>
-            <AlertDialog.Cancel>OK</AlertDialog.Cancel>
-          </AlertDialog.Popup>
-        </AlertDialog.Root>,
-      );
-      const calls = error.mock.calls.filter(([m]) => String(m).includes("no description"));
+      await flushTasks(2);
+      expect(descriptionWarnings(error)).toHaveLength(0);
+      await user.click(trigger());
+      await flushTasks(2);
+      expect(popup().open).toBe(true);
+      await user.click(cancel());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      const calls = descriptionWarnings(error);
       expect(calls).toHaveLength(1);
       expect(String(calls[0]![0])).toContain("AlertDialog.Description");
+      // Once per instance.
+      await user.click(trigger());
+      await flushTasks(2);
+      await user.click(cancel());
+      await flushTasks(2);
+      expect(descriptionWarnings(error)).toHaveLength(1);
     });
 
-    it("library mode: warns when first shown, not before", async () => {
+    it("library mode: not before the first showing; logged when it ends", async () => {
       const user = setupUser();
       const error = silenceErrors();
       render(
@@ -922,15 +1039,52 @@ describe("AlertDialog", () => {
           <AlertDialog.Trigger data-testid="trigger">Open</AlertDialog.Trigger>
           <AlertDialog.Popup data-testid="popup">
             <AlertDialog.Title>Session expired</AlertDialog.Title>
-            <AlertDialog.Cancel>OK</AlertDialog.Cancel>
+            <AlertDialog.Cancel data-testid="close">OK</AlertDialog.Cancel>
           </AlertDialog.Popup>
         </AlertDialog.Root>,
       );
-      const count = () =>
-        error.mock.calls.filter(([m]) => String(m).includes("no description")).length;
-      expect(count()).toBe(0);
+      await flushTasks(2);
+      expect(descriptionWarnings(error)).toHaveLength(0);
       await openThroughTrigger(user);
-      expect(count()).toBe(1);
+      await user.click(cancel());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      expect(descriptionWarnings(error)).toHaveLength(1);
+    });
+
+    it("a Description behind a Suspense boundary pending at the open counts once it arrives", async () => {
+      const user = setupUser();
+      const error = silenceErrors();
+      const data = deferred();
+      let ready = false;
+      void data.promise.then(() => {
+        ready = true;
+      });
+      function SlowDescription() {
+        if (!ready) throw data.promise;
+        return <AlertDialog.Description>12 documents are removed.</AlertDialog.Description>;
+      }
+      render(
+        <AlertDialog.Root defaultOpen={false}>
+          <AlertDialog.Trigger data-testid="trigger">Open</AlertDialog.Trigger>
+          <AlertDialog.Popup data-testid="popup">
+            <AlertDialog.Title>Delete?</AlertDialog.Title>
+            <Suspense fallback={<p>Loading…</p>}>
+              <SlowDescription />
+            </Suspense>
+            <AlertDialog.Cancel data-testid="close">Cancel</AlertDialog.Cancel>
+          </AlertDialog.Popup>
+        </AlertDialog.Root>,
+      );
+      await openThroughTrigger(user);
+      expect(screen.getByText("Loading…")).toBeInTheDocument();
+      await act(async () => data.resolve());
+      await flushTasks(2);
+      expect(screen.getByText("12 documents are removed.")).toBeInTheDocument();
+      await user.click(cancel());
+      await flushTasks(2);
+      expect(popup().open).toBe(false);
+      expect(descriptionWarnings(error)).toHaveLength(0);
     });
 
     it("no warning with a Description, or with a consumer aria-describedby naming an element", () => {

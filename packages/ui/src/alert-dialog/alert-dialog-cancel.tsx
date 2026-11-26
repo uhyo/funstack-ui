@@ -7,6 +7,7 @@ import type {
   DialogCloseState,
 } from "../dialog/dialog-close.js";
 import { useDialogContext } from "../dialog/dialog-context.js";
+import { useHydratedMount } from "../internal/use-hydrated-mount.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { AlertDialogCancelContext } from "./alert-dialog-context.js";
 
@@ -28,11 +29,11 @@ export type AlertDialogCancelProps = DialogCloseProps;
  * The safe answer: `Dialog.Close` under another name (`<button type="button" commandfor
  * command="request-close">` in JS-free mode, a close through the Root in library mode), and the
  * default initial focus target (design 3.4): when the Popup has no `initialFocus`, the dialog
- * opens with focus on the first enabled Cancel. In JS-free mode it renders `autofocus`, in the
+ * opens with focus on the first enabled Cancel. In JS-free mode it carries `autofocus`, in the
  * server HTML too, so the focus is right before hydration.
  *
- * Owned keys (conventions 1.2): Dialog.Close's, and `autoFocus` while it is the default target in
- * JS-free mode.
+ * Owned keys (conventions 1.2): Dialog.Close's, and `autoFocus` in the server and hydration render
+ * while it is the default target in JS-free mode.
  *
  * @see https://ui.funstack.work/components/alert-dialog
  */
@@ -46,6 +47,11 @@ export function AlertDialogCancel({ disabled, ref, ...rest }: AlertDialogCancelP
   // enabled one.
   const autofocus =
     ctx.mode !== "library" && cancels !== null && cancels.defaultFocus && disabled !== true;
+  // React's `autoFocus` prop only where it writes the attribute: the server render and the
+  // render that hydrates it (no `.focus()` there). On a client-created mount React would call
+  // `.focus()` instead, so a Cancel mounting or remounting into an open dialog would take focus
+  // (and of two, the last would win); there the ref's attribute is enough.
+  const serverOrHydrating = useHydratedMount();
 
   const attach = useCallback(
     (element: HTMLElement | null) => {
@@ -65,7 +71,10 @@ export function AlertDialogCancel({ disabled, ref, ...rest }: AlertDialogCancelP
 
   return useDialogClose(
     { ...rest, disabled, ref: mergedRef },
-    { part: "AlertDialog.Cancel", ownProps: autofocus ? { autoFocus: true } : undefined },
+    {
+      part: "AlertDialog.Cancel",
+      ownProps: autofocus && serverOrHydrating ? { autoFocus: true } : undefined,
+    },
   );
 }
 

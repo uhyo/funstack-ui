@@ -132,8 +132,9 @@ browser's, from `showModal()`.
 
 The APG asks for `aria-labelledby` (or `aria-label`) and for `aria-describedby` naming the
 alert message. Both ids are wired as in Dialog. In development the Popup warns, once per
-instance and when first shown, if there is no mounted `AlertDialog.Description` and no consumer
-`aria-describedby`: a screen reader announces an alert dialog by its name and description, and
+instance, if by the end of its first showing (its first `close`) no `AlertDialog.Description`
+was mounted and no consumer `aria-describedby` named an element (a Description behind a
+Suspense boundary that resolves while the dialog is open counts): a screen reader announces an alert dialog by its name and description, and
 without the description the user hears a title and two buttons. (Dialog's warning for a missing
 name stays.)
 
@@ -281,14 +282,16 @@ dialog completes something that cannot be undone. That is the Cancel.
 - **JS-free mode.** The browser opens the dialog itself, so the attribute has to be there
   already. An enabled Cancel renders React's `autoFocus` when the Popup has no `initialFocus`
   (the Popup tells its descendants through context, so this is decided during the server
-  render): the attribute is in the server HTML and the focus is right before hydration. On a
-  client render React does not write the attribute; the Cancel's ref writes it, and removes it
-  when the Cancel becomes disabled or stops being the target. With several Cancels each enabled
+  render): the attribute is in the server HTML and the focus is right before hydration. The
+  prop is rendered only in the server render and the render that hydrates it (the server
+  snapshot of `useSyncExternalStore`): on a client-created element React does not write the
+  attribute but calls `.focus()`. The Cancel's ref writes the attribute in every render, and
+  removes it when the Cancel becomes disabled or stops being the target. With several Cancels each enabled
   one carries the attribute and the platform takes the first; the dialog focusing steps skip a
-  disabled element that carries it (verified in the three engines). React's `autoFocus` also
-  calls `.focus()` when a Cancel mounts into an already open JS-free dialog (an Error Boundary
-  fallback with its own Cancel): the Cancel takes focus, which is wanted there (verified in the
-  three engines); into a closed dialog it does nothing.
+  disabled element that carries it (verified in the three engines). A Cancel that mounts or
+  remounts on the client into an already open JS-free dialog (a key change, a Suspense reveal,
+  an Error Boundary fallback) therefore takes no focus: React's `.focus()` would move it away
+  from the user, and with two Cancels the last one mounted would win against the rule.
 - **Opting out.** `initialFocus` on the Popup wins (a ref or a selector), and then no Cancel
   renders `autoFocus`. The APG's other advice still applies to a long message: point
   `initialFocus` at the Title with `tabIndex={-1}` so the text is read from the top.
@@ -470,11 +473,15 @@ Library mode, uncontrolled, unless stated. `C` committed open, `O` optimistic op
    library mode the dialog stays open, the Trigger pending, until the **action** settles; then
    the close commits and the Action's own close is a no-op. A rejection still reaches the
    boundary above the Action, and the dialog closes. In JS-free mode the Cancel is the browser's
-   command and closes the dialog at once, as Escape does in both modes. The library
+   command and closes the dialog at once, as Escape does in both modes. **Nothing near the
+   Cancel shows that its click was taken**: the Cancel without an `action` has no pending state
+   of its own, and the Trigger's `data-pending` sits under the modal backdrop, so to the user
+   the click looks ignored for as long as the action runs. Pending feedback on the Cancel (or
+   the Popup) while its held close waits is a separate issue, not built. The library
    does not disable the Cancel while an Action is pending: Escape cannot be held either, so
    "the dialog can leave while the work runs" is true whatever the Cancel does, and one rule
-   covers both. A consumer who wants the Cancel unavailable meanwhile says so with their own
-   optimistic state (section 9.3).
+   covers both. A dialog whose work takes long should make the Cancel visibly unavailable
+   meanwhile with its own optimistic state (section 9.3); the docs page recommends it.
 5. **Two clicks on the confirm.** Default `"ignore"`: the second is cancelled, one run, one
    close. `whilePending="run"`: two runs, one close after the last.
 6. **Open with content that suspends.** `dialog.md` 11.1: the Trigger is pending, the dialog

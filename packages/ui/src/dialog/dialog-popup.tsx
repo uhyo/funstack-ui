@@ -162,8 +162,8 @@ DialogPopup.displayName = "DialogPopup";
 /** What a caller of `useDialogPopup` fixes (design/components/alert-dialog.md 8). */
 export interface DialogPopupOptions {
   readonly namespace: DialogNamespace;
-  /** An owned `role` (`"alertdialog"`); without it `role` passes through. */
-  readonly role?: string;
+  /** An owned `role` (AlertDialog's); without it `role` passes through. */
+  readonly role?: "alertdialog";
   /**
    * The initial focus target when `initialFocus` is not given (AlertDialog: the first enabled
    * Cancel), resolved right before a library open. `null` leaves the choice to the platform,

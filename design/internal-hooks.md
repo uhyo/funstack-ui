@@ -231,7 +231,7 @@ packages/ui/src/internal/
   use-latest.ts           # useLatest(value): a ref written in an insertion effect
   use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)
   use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
-  use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2)
+  use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2); useShownDescriptionWarning (AlertDialog's missing Description, judged over the first showing)
   dev-warn.ts             # warnOnce for directive-free parts
   use-item-order.ts       # section 3.8: the Items' document order in state (CheckboxGroup, ToggleGroup)
   value-set.ts            # set / order arithmetic of the set-valued components; directive-free
