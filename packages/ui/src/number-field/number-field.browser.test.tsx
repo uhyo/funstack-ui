@@ -512,6 +512,28 @@ describe("NumberField (browser)", () => {
     expect(window.getSelection()?.toString() ?? "").toBe("");
   });
 
+  it("inside <fieldset disabled> a press on the natively disabled button does not step (#180)", async () => {
+    const onChange = vi.fn<Fn>();
+    const onCommit = vi.fn<Fn>();
+    render(
+      <fieldset disabled>
+        <Fixture defaultValue={5} valueChangeAction={onChange} valueCommitAction={onCommit} />
+      </fieldset>,
+    );
+    // The platform disables the button and the input; the part's state does not see it.
+    expect(inc().matches(":disabled")).toBe(true);
+    expect(inc()).not.toHaveAttribute("data-disabled");
+    // `force`: Playwright otherwise waits for the button to become enabled. Chromium and Firefox
+    // still dispatch `pointerdown` to a disabled button (only `click` is withheld), which is what
+    // started the hold before the fix.
+    await user.click(inc(), { force: true, delay: 500 });
+    await user.click(screen.getByTestId("dec"), { force: true });
+    await flushMicrotasks();
+    expect(input().value).toBe("5");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
   it("announces once per key press and once per hold release", async () => {
     if (supportsAriaNotify) {
       const notify = vi.spyOn(

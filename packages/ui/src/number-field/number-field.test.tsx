@@ -674,6 +674,41 @@ describe("NumberField", () => {
       expect(onCommit).not.toHaveBeenCalled();
     });
 
+    it("inside <fieldset disabled> neither a host nor a span button steps (#180)", async () => {
+      const onChange = vi.fn<Fn>();
+      const ui = (disabled: boolean) => (
+        <fieldset disabled={disabled}>
+          <NumberField.Root defaultValue={5} locale="en-US" valueChangeAction={onChange}>
+            <NumberField.Label>Quantity</NumberField.Label>
+            <NumberField.Input data-testid="input" />
+            <NumberField.Increment data-testid="inc">+</NumberField.Increment>
+            <NumberField.Decrement data-testid="dec" render={<span />}>
+              −
+            </NumberField.Decrement>
+          </NumberField.Root>
+        </fieldset>
+      );
+      const { rerender } = render(ui(true));
+      // The platform's disabled state; the part's own does not see it (conventions 3.6).
+      expect(inc()).toBeDisabled();
+      expect(inc()).not.toHaveAttribute("data-disabled");
+      expect(dec()).not.toHaveAttribute("aria-disabled");
+      press(inc());
+      // The span is not disabled itself; the visible input is.
+      expect(pointer("pointerDown", dec())).toBe(false);
+      pointer("pointerUp", dec());
+      act(() => {
+        fireEvent.click(dec(), { detail: 0 });
+      });
+      await flushMicrotasks();
+      expect(input().value).toBe("5");
+      expect(onChange).not.toHaveBeenCalled();
+      rerender(ui(false));
+      press(inc());
+      await flushMicrotasks();
+      expect(input().value).toBe("6");
+    });
+
     // #83
     describe("disabled on component renders (design/components/button.md 17.3)", () => {
       const cases = [

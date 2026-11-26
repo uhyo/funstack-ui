@@ -1067,6 +1067,37 @@ describe("Slider", () => {
       expect(root()).not.toHaveAttribute("data-dragging");
     });
 
+    it("ignores the pointer inside <fieldset disabled>, which the state does not see (#180)", () => {
+      const onChange = vi.fn<ChangeFn>();
+      const onCommit = vi.fn<CommitFn>();
+      const ui = (disabled: boolean) => (
+        <fieldset disabled={disabled}>
+          <Slider.Root
+            data-testid="root"
+            defaultValue={40}
+            valueChangeAction={onChange}
+            valueCommitAction={onCommit}
+          >
+            <Parts count={1} />
+          </Slider.Root>
+        </fieldset>
+      );
+      const { rerender } = render(ui(true));
+      expect(thumbInput()).toBeDisabled();
+      expect(root()).not.toHaveAttribute("data-disabled");
+      // Not prevented: the press is not the slider's.
+      expect(pointer("pointerDown", mockTrack(), 70)).toBe(true);
+      expect(pointer("pointerDown", thumb(), 70)).toBe(true);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(root()).not.toHaveAttribute("data-dragging");
+      expect(thumbInput().value).toBe("40");
+      rerender(ui(false));
+      pointer("pointerDown", mockTrack(), 70);
+      pointer("pointerUp", mockTrack(), 70);
+      expect(thumbInput().value).toBe("70");
+    });
+
     it("warns once and stays keyboard-only without a Track", () => {
       const consoleError = silenceErrors();
       render(

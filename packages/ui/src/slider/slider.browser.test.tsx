@@ -258,6 +258,51 @@ describe("Slider (browser)", () => {
       expect(window.getSelection()?.toString() ?? "").toBe("");
     });
 
+    it("inside <fieldset disabled> a track press and a thumb drag do nothing (#180)", async () => {
+      const onChange = vi.fn<ChangeFn>();
+      const onCommit = vi.fn<CommitFn>();
+      render(
+        <fieldset disabled>
+          <Fixture defaultValue={20} valueChangeAction={onChange} valueCommitAction={onCommit} />
+        </fieldset>,
+      );
+      // The platform disables the range input; the library's own state does not see it
+      // (conventions 3.6), but the pointer surfaces read the input's `:disabled`.
+      expect(input().matches(":disabled")).toBe(true);
+      expect(screen.getByTestId("root")).not.toHaveAttribute("data-disabled");
+      const track = screen.getByTestId("track");
+      await user.click(track, { position: { x: 150, y: 10 } });
+      await user.dragAndDrop(thumb(), track, {
+        sourcePosition: { x: 10, y: 10 },
+        targetPosition: { x: 150, y: 10 },
+      });
+      await flushMicrotasks();
+      expect(input().value).toBe("20");
+      expect(thumb().style.getPropertyValue("--slider-value")).toBe("20%");
+      expect(onChange).not.toHaveBeenCalled();
+      expect(onCommit).not.toHaveBeenCalled();
+      expect(screen.getByTestId("root")).not.toHaveAttribute("data-dragging");
+      expect(document.activeElement).not.toBe(input());
+    });
+
+    it("a drag works again once the fieldset is enabled", async () => {
+      const onCommit = vi.fn<CommitFn>();
+      const { rerender } = render(
+        <fieldset disabled>
+          <Fixture defaultValue={20} valueCommitAction={onCommit} />
+        </fieldset>,
+      );
+      rerender(
+        <fieldset>
+          <Fixture defaultValue={20} valueCommitAction={onCommit} />
+        </fieldset>,
+      );
+      await user.click(screen.getByTestId("track"), { position: { x: 150, y: 10 } });
+      await flushMicrotasks();
+      expect(input().value).toBe("75");
+      expect(onCommit).toHaveBeenCalledTimes(1);
+    });
+
     it("mirrors the pointer under a dir=rtl container", async () => {
       render(<Fixture dir="rtl" defaultValue={50} />);
       const track = screen.getByTestId("track");
