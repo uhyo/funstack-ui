@@ -32,6 +32,14 @@ Branch `feat/168-drawer`, from `design/168-drawer` (837cff30) + master.
 - Playwright `mouse.move(x, y, { steps })` is paced at one step per frame (~16 ms). A flick test
   needs the release in the same command (`mouse.up(x, y, "left", steps)`), else the command
   round-trip before `up` eats the 100 ms window under load.
+- Under a full `pnpm test:run` (jsdom + browser in parallel) even one-command gestures were too
+  slow for 0.5 px/ms. The flick and reversal rows now record the events the engine delivered,
+  compute the tracker's decision from them with the pure arithmetic, assert the drawer agrees,
+  and retry (5 attempts) until an attempt was the gesture the row is about; with
+  `strictInputTiming` (vitest `provide`, true when `CI` is set) a row with no qualifying attempt
+  fails, locally it passes on the agreement alone. Commands:
+  `mouseFlick(from, to, steps)` (press, moves, release in one command) and `mouse.up(x, y,
+  button, steps)` (moves then release in one command).
 - Click after a mouse drag that started on a button lands on the `<dialog>` (Chromium, Firefox,
   WebKit via CI).
 - The release wait works in Firefox: `exitAnimations` lists the `translate` transition the

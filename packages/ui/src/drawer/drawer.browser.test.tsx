@@ -11,11 +11,13 @@
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, inject, it, vi } from "vitest";
 import { mouse } from "../__tests__/browser-commands.js";
 import { addStyle, flushFor, settle, sleep } from "../__tests__/browser-helpers.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
+import { classifyPress, releaseOutcome, releaseVelocity } from "../internal/swipe-arithmetic.js";
+import type { SwipeSample } from "../internal/swipe-arithmetic.js";
 import { Drawer } from "./index.js";
 import type { DrawerOpenChangeDetails, DrawerPopupProps, DrawerRootProps } from "./index.js";
 
@@ -111,20 +113,58 @@ async function moveBy(dx: number, dy: number, { count = 6 } = {}): Promise<void>
   at = to;
 }
 
-/** Moves by (dx, dy) in `steps` frame-paced moves and releases right after, in one command. */
-async function flickTo(dx: number, dy: number, steps: number): Promise<void> {
-  at = { x: at.x + dx, y: at.y + dy };
-  await act(async () => {
-    await mouse.up(at.x, at.y, "left", steps);
-  });
-}
-
 /** Releases where the pointer is, after holding still for `hold` ms (0: at once). */
 async function release(hold = 150): Promise<void> {
   if (hold > 0) await sleep(hold);
   await act(async () => {
     await mouse.up(at.x, at.y);
   });
+}
+
+/** The client point at the centre of `element`, rounded. */
+function pointIn(element: Element): { x: number; y: number } {
+  const r = element.getBoundingClientRect();
+  return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+}
+
+/**
+ * Records the pointer events the engine delivers (document, capture phase) until the next
+ * `pointerup`, and says what the tracker decides for them (design 4.1) on a bottom drawer of
+ * `extent` px: `"none"` when they never started a drag.
+ */
+function recordPointer(): { outcome: (extent: number) => "dismiss" | "return" | "none" } {
+  const events: PointerEvent[] = [];
+  const types = ["pointerdown", "pointermove", "pointerup"] as const;
+  const record = (event: PointerEvent) => {
+    events.push(event);
+    if (event.type === "pointerup")
+      for (const type of types) document.removeEventListener(type, record, true);
+  };
+  for (const type of types) document.addEventListener(type, record, true);
+  return {
+    outcome: (extent) => {
+      const down = events.find((event) => event.type === "pointerdown");
+      const up = events.find((event) => event.type === "pointerup");
+      if (down === undefined || up === undefined) throw new Error("no press and release recorded");
+      const samples: SwipeSample[] = [{ time: down.timeStamp, toward: 0 }];
+      let started = false;
+      for (const event of events) {
+        if (event.type === "pointerdown") continue;
+        const dx = event.clientX - down.clientX;
+        const dy = event.clientY - down.clientY;
+        if (!started) {
+          const verdict = classifyPress(dx, dy, "down");
+          if (verdict === "drop") return "none";
+          if (verdict === "wait") continue;
+          started = true;
+        }
+        samples.push({ time: event.timeStamp, toward: dy });
+      }
+      if (!started) return "none";
+      const offset = Math.max(0, up.clientY - down.clientY);
+      return releaseOutcome(offset, extent, releaseVelocity(samples));
+    },
+  };
 }
 
 const swipeY = () => popup().style.getPropertyValue("--drawer-swipe-y");
@@ -200,31 +240,73 @@ describe("Drawer (browser)", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
   });
 
+  // The two rows below depend on the speed of real input, which a loaded machine slows down:
+  // under a full local `pnpm test:run` the engine can take over 100 ms per input event. Each
+  // attempt records the events the engine delivered and asserts that the drawer did what the
+  // arithmetic (design 4.1) says for them; the row is done once an attempt was the gesture it is
+  // about. In CI (`strictInputTiming`, each engine alone) one must be; locally a row whose input
+  // was always too slow passes on the agreement alone (the decision itself is covered with a
+  // fake clock in drawer.test.tsx and internal/swipe.test.ts).
   it("a fast flick closes, however short", async () => {
     addStyle(CSS);
     const onOpenChange = vi.fn();
-    render(<Sheet root={{ defaultOpen: false, onOpenChange }} />);
-    await openSheet();
-    await press(handle());
-    // 60 px (short of the 75 px quarter) in three frame-paced moves and the release in one
-    // command: about 1 px/ms.
-    await flickTo(0, 60, 3);
-    await settle(() => expect(popup().open).toBe(false));
-    await settle(() => expect(onOpenChange).toHaveBeenCalledTimes(1));
+    // A taller sheet: 180 px is short of its 200 px quarter.
+    render(
+      <Sheet root={{ defaultOpen: false, onOpenChange }} popup={{ style: { blockSize: 800 } }} />,
+    );
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!popup().open) await openSheet();
+      const extent = innerHeight - popup().getBoundingClientRect().top;
+      const from = pointIn(handle());
+      const recording = recordPointer();
+      // Pressed, moved in two steps and released in one command.
+      await act(async () => {
+        await mouse.flick(from, { x: from.x, y: from.y + 180 }, 2);
+      });
+      const expected = recording.outcome(extent);
+      if (expected === "dismiss") {
+        await settle(() => expect(popup().open).toBe(false));
+        await settle(() => expect(onOpenChange).toHaveBeenCalledTimes(1));
+        return;
+      }
+      // Too slow on this machine: the drawer returned, as the arithmetic says.
+      expect(expected).toBe("return");
+      await flushFor(300);
+      expect(popup().open).toBe(true);
+    }
+    if (inject("strictInputTiming")) {
+      throw new Error("no attempt was a flick (0.5 px/ms): the engine's input was too slow");
+    }
   });
 
   it("moving back before the release returns, however far it went", async () => {
     addStyle(CSS);
     render(<Sheet root={{ defaultOpen: false }} />);
-    await openSheet();
-    await press(handle());
-    await moveBy(0, 220);
-    await sleep(150);
-    // Back to 100 px (past the quarter) at about 1 px/ms, released at once.
-    await flickTo(0, -120, 6);
-    await flushFor(300);
-    expect(popup().open).toBe(true);
-    expect(swipeY()).toBe("");
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (!popup().open) await openSheet();
+      const recording = recordPointer();
+      await press(handle());
+      await moveBy(0, 220);
+      await sleep(150);
+      // Back to 100 px (past the quarter) in six moves, released at once in the same command.
+      at = { x: at.x, y: at.y - 120 };
+      await act(async () => {
+        await mouse.up(at.x, at.y, "left", 6);
+      });
+      const expected = recording.outcome(300);
+      if (expected === "return") {
+        await flushFor(300);
+        expect(popup().open).toBe(true);
+        expect(swipeY()).toBe("");
+        return;
+      }
+      // The move back was too slow to count on this machine: past the quarter, it closed.
+      expect(expected).toBe("dismiss");
+      await settle(() => expect(popup().open).toBe(false));
+    }
+    if (inject("strictInputTiming")) {
+      throw new Error("no attempt moved back at 0.1 px/ms: the engine's input was too slow");
+    }
   });
 
   it("a drag inside the scrolling body moves nothing; the header still drags", async () => {

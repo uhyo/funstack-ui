@@ -2,6 +2,13 @@
 import { commands } from "vitest/browser";
 import { sleep } from "./browser-helpers.js";
 
+declare module "vitest" {
+  interface ProvidedContext {
+    /** CI: a row that needs fast real input fails when the engine never delivered it. */
+    strictInputTiming: boolean;
+  }
+}
+
 declare module "vitest/browser" {
   interface BrowserCommands {
     emulateReducedMotion: (reduce: boolean) => Promise<void>;
@@ -11,6 +18,13 @@ declare module "vitest/browser" {
       y: number,
       button?: "left" | "right" | "middle",
       steps?: number,
+    ) => Promise<void>;
+    mouseFlick: (
+      fromX: number,
+      fromY: number,
+      toX: number,
+      toY: number,
+      steps: number,
     ) => Promise<void>;
     wheel: (x: number, y: number, deltaX: number, deltaY: number) => Promise<void>;
   }
@@ -150,6 +164,17 @@ export const mouse = {
     await handled;
   },
   pressOn,
+  /**
+   * A press at `from`, `steps` moves to `to` and the release, in one command (no pause between
+   * them: a flick); resolves after the `pointerup` was handled.
+   */
+  flick: async (from: Point, to: Point, steps: number) => {
+    const a = toPagePoint(from.x, from.y);
+    const b = toPagePoint(to.x, to.y);
+    const handled = inputHandled("pointerup");
+    await commands.mouseFlick(a.x, a.y, b.x, b.y, steps);
+    await handled;
+  },
   /** Two presses and releases, the second with `detail === 2`; resolves after the `dblclick`. */
   dblclick: async (x: number, y: number, button: Button = "left") => {
     const p = toPagePoint(x, y);
