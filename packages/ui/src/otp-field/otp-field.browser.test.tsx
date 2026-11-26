@@ -182,6 +182,29 @@ describe("OTPField (browser)", () => {
       const field = input().getBoundingClientRect();
       expect([field.width, field.height]).toEqual([box.width, box.height]);
     });
+
+    it("a Slot that forms a stacking context (dimmed while pending, positioned) is not the target", async () => {
+      styled();
+      onCleanup(
+        addStyle(`
+          .otp[data-pending] .otp-slot { opacity: .6; }
+          .otp-slot { position: relative; }
+        `),
+      );
+      // Settled at the end: a pending async action holds every transition, later tests' too.
+      const d = deferred();
+      render(<Code length={4} defaultValue="12" completeAction={() => d.promise} />);
+      await focusInput();
+      await user.keyboard("{End}34");
+      expect(root()).toHaveAttribute("data-pending", "");
+      expect(getComputedStyle(slot(1)).opacity).toBe("0.6");
+      expect(getComputedStyle(slot(1)).pointerEvents).toBe("none");
+      const at = centre(slot(1));
+      expect(document.elementFromPoint(at.x, at.y)).toBe(input());
+      await mouse.click(at.x, at.y);
+      await eventually(() => expect(input().selectionStart).toBe(1));
+      await act(async () => d.resolve());
+    });
   });
 
   describe("paste", () => {
@@ -473,22 +496,36 @@ describe("OTPField (browser)", () => {
           el.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "aか" }));
         });
         expect(el.value).toBe("a");
+        // Firefox's order: the final input follows compositionend, no longer composing.
+        await act(async () => {
+          setValue.call(el, "aか");
+          el.dispatchEvent(
+            new InputEvent("input", {
+              bubbles: true,
+              isComposing: false,
+              inputType: "insertCompositionText",
+              data: "aか",
+            }),
+          );
+        });
+        expect(el.value).toBe("a");
+        expect(slotTexts(4)).toBe("a|||");
       }
       expect(onValueChange.mock.calls.every(([v]) => /^[A-Za-z0-9]*$/.test(v))).toBe(true);
     });
 
-    it.runIf(browserName === "chromium")(
-      "the accessibility tree: one named textbox, the Slots hidden (Chromium CDP)",
-      async () => {
-        render(<Code defaultValue="12" />);
-        const nodes = (await getAXNodes()).filter((n) => !n.ignored);
-        const textboxes = nodes.filter((n) => n.role?.value === "textbox");
-        expect(textboxes).toHaveLength(1);
-        expect(textboxes[0]?.name?.value).toBe("Verification code");
-        expect(nodes.some((n) => n.role?.value === "StaticText" && n.name?.value === "1")).toBe(
-          false,
-        );
-      },
-    );
+    it("the accessibility tree: one named textbox, the Slots hidden (tree through Chromium CDP)", async () => {
+      render(<Code defaultValue="12" />);
+      for (let i = 0; i < 6; i++) expect(slot(i)).toHaveAttribute("aria-hidden", "true");
+      // Other engines expose no accessibility tree to the test: the attributes above are the row.
+      if (browserName !== "chromium") return;
+      const nodes = (await getAXNodes()).filter((n) => !n.ignored);
+      const textboxes = nodes.filter((n) => n.role?.value === "textbox");
+      expect(textboxes).toHaveLength(1);
+      expect(textboxes[0]?.name?.value).toBe("Verification code");
+      expect(nodes.some((n) => n.role?.value === "StaticText" && n.name?.value === "1")).toBe(
+        false,
+      );
+    });
   });
 });

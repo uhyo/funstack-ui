@@ -44,6 +44,13 @@ export interface OTPFieldSlotProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"span">, OTPFieldSlotState>;
 }
 
+/**
+ * Never the pointer's target (design 1, 6): a Slot that forms a stacking context (`opacity`,
+ * `position`, `transform`, an animation of those) would otherwise paint over the Input and take
+ * the click. Owned; creates no stacking context of its own.
+ */
+const SLOT_STYLE: CSSProperties = { pointerEvents: "none" };
+
 function defaultChildren(state: OTPFieldSlotState): ReactNode {
   return state.char;
 }
@@ -53,7 +60,8 @@ function defaultChildren(state: OTPFieldSlotState): ReactNode {
  * the Input's text, `aria-hidden` (the input already says everything). Not focusable and never
  * the pointer's target: the Input lies over it.
  *
- * Owned keys (conventions 1.2): `aria-hidden`, `data-index`, `data-filled`, `data-active`. The
+ * Owned keys (conventions 1.2): `aria-hidden`, `data-index`, `data-filled`, `data-active`, and
+ * `pointer-events: none` in the inline style. The
  * Root's attributes (`data-pending`, `data-complete`, …) style the Slots from above.
  *
  * @see https://ui.funstack.work/components/otp-field
@@ -86,6 +94,7 @@ export function OTPFieldSlot({
     "data-index": String(index),
     "data-filled": dataAttr(char !== null),
     "data-active": dataAttr(isActive),
+    style: SLOT_STYLE,
   };
 
   return useRender<ComponentPropsWithRef<"span">, OTPFieldSlotState>({

@@ -196,7 +196,7 @@ import { Separator } from "@funstack/ui/separator";
             type: "boolean",
             default: "false",
             description:
-              "Submit the Input's form (`requestSubmit()`) when an edit leaves the code complete, right after dispatching `completeAction`. See [Auto-submit](#auto-submit) for the notice it needs.",
+              "Submit the Input's form (`requestSubmit()`) when an edit leaves the code complete, right after dispatching `completeAction`; inside a Field after re-validating the filtered text; during an IME composition at `compositionend`. See [Auto-submit](#auto-submit) for the notice it needs.",
           },
           {
             name: "name, form",
@@ -292,7 +292,9 @@ import { Separator } from "@funstack/ui/separator";
         state={
           "`OTPFieldSlotState` is `OTPFieldState` plus `{ index, char, filled, active }`: `char` is the character at `index` or `null`, `active` is the caret or part of the selection at this position while the input is focused."
         }
-        owned={"`aria-hidden`, `data-index`, `data-filled`, `data-active`."}
+        owned={
+          "`aria-hidden`, `data-index`, `data-filled`, `data-active`, and `pointer-events: none` in the inline style."
+        }
       />
 
       <h3 id="data-attributes">Data attributes</h3>
@@ -334,9 +336,8 @@ import { Separator } from "@funstack/ui/separator";
 @media (prefers-reduced-motion: reduce) { .otp-slot::after { animation: none; } }`}</CodeBlock>
       <ul>
         <li>
-          Keep the Slots unpositioned (no <code>position</code>), or give the Input a{" "}
-          <code>z-index</code>: the Input must stay on top to receive the pointer. The drawn caret
-          above is a grid item, not an absolutely positioned one, for that reason.
+          Style the Slots freely: they carry an owned inline <code>pointer-events: none</code>, so a
+          dimmed, positioned or animated Slot never takes the click from the Input.
         </li>
         <li>
           A design that moves the focus ring from the Input to the active Slot must keep one
@@ -502,8 +503,9 @@ import { Separator } from "@funstack/ui/separator";
           Anything else, a refusal, and an abort are ignored.
         </li>
         <li>
-          The request is aborted at unmount, when the Input's form is submitted and when the user
-          completes the code by hand.
+          One request for the life of the Input. It is aborted at unmount, when the Input's form is
+          submitted and when the user completes the code by hand; after a completion no new request
+          starts and a late code is ignored.
         </li>
       </ul>
       <CodeBlock>{`// A Server Function as the check, straight from a Server Component:

@@ -47,3 +47,12 @@ device checks; this memo is what I would want next time.
 - No completion for an input event that inserted nothing kept and changed nothing.
 - A dropped character over a selection keeps the selection (rule 3a).
 - Input omits `onChange` from its props type.
+
+## Review fixes (2026-11-26)
+
+- `useActionTrigger().run` is not stable: never put it in a deps list of something an effect
+  depends on. Read it through the latest ref.
+- A test whose action never settles poisons every later test in the same browser page
+  (entanglement): always resolve the deferred at the end of the row.
+- Field validates in a capture `input` listener before the filter's write-back: anything
+  synchronous after the write-back (requestSubmit) must refresh the Field first.

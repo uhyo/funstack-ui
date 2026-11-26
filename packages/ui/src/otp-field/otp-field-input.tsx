@@ -6,6 +6,7 @@ import { useFieldControl } from "../internal/form/use-field-control.js";
 import { useFormOwnerEvent } from "../internal/form/use-form-owner-event.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
+import { useLatest } from "../internal/use-latest.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -168,8 +169,12 @@ export function OTPFieldInput({ className, style, render, ...rest }: OTPFieldInp
 
   // --- WebOTP (design 8) ------------------------------------------------------------------------
 
+  // Keyed on the flag alone: the request lives as long as the Input (and the flag), and the code
+  // is handed over through the latest callback.
+  const webOTPCodeRef = useLatest(webOTPCode);
+  const { webOTPDone } = ctx;
   useEffect(() => {
-    if (!experimentalWebOTP || !("OTPCredential" in window)) return;
+    if (!experimentalWebOTP || !("OTPCredential" in window) || webOTPDone.current) return;
     const controller = new AbortController();
     webOTPAbort.current = controller;
     const request: OTPCredentialRequest = {
@@ -180,7 +185,7 @@ export function OTPFieldInput({ className, style, render, ...rest }: OTPFieldInp
       (credential) => {
         if (controller.signal.aborted) return;
         const code = (credential as { code?: unknown } | null)?.code;
-        if (typeof code === "string") webOTPCode(code);
+        if (typeof code === "string") webOTPCodeRef.current(code);
       },
       // Declined, no message, aborted: the normal outcomes.
       () => {},
@@ -189,7 +194,7 @@ export function OTPFieldInput({ className, style, render, ...rest }: OTPFieldInp
       controller.abort();
       if (webOTPAbort.current === controller) webOTPAbort.current = null;
     };
-  }, [experimentalWebOTP, webOTPAbort, webOTPCode]);
+  }, [experimentalWebOTP, webOTPAbort, webOTPDone, webOTPCodeRef]);
   useFormOwnerEvent(inputRef, "submit", () => {
     webOTPAbort.current?.abort();
     webOTPAbort.current = null;

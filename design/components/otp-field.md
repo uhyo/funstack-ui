@@ -248,7 +248,7 @@ the library's `onChange` (omitted from the props type, conventions 1.5) and its 
 listeners (`beforeinput`, `compositionstart` / `compositionend`, `selectionchange`, `select`,
 `focus`, `keyup`, `blur`, `click`, through `addEventListener`, so the consumer's `on*` props
 for those events pass through and run independently), the inline style of section 6, the
-Field's attributes, `data-*`. Slot: `aria-hidden`, `data-index`, `data-filled`, `data-active`
+Field's attributes, `data-*`. Slot: `aria-hidden`, `pointer-events: none` in `style` (section 6), `data-index`, `data-filled`, `data-active`
 (the Root's `data-pending`, `data-complete`, `data-invalid` style the Slots from above:
 `.otp[data-pending] .otp-slot`).
 
@@ -259,7 +259,7 @@ trigger, `<state>CommitAction` for the end of a gesture on a continuous control.
 a pure trigger: nothing changes that could be rolled back, the user's code is already in the
 input. The three candidate names:
 
-- **`completeAction`** (proposed). The vision's own form, "`action` or `fooAction`
+- **`completeAction`** (decided). The vision's own form, "`action` or `fooAction`
   (`clickAction`)": the action named after the event that triggers it. It reads correctly at
   the call site and leaves `action` free of doubt on a part that lives inside forms.
 - `action`. The existing name for a pure trigger, but `<OTPField.Root action={verify}>` reads
@@ -268,8 +268,8 @@ input. The three candidate names:
   NumberField commit **every** gesture's value, partial or not, and their commit decides the
   uncontrolled state. This one fires only for a complete code and decides nothing.
 
-It needs a row in conventions 2.1 ("a pure trigger that carries a value, named after its
-event: `<event>Action`, `(value, details)`"). Open decision 3 in the changelog.
+The name has its row in conventions 2.1: a pure trigger that carries a value, named after its
+event, `<event>Action`, `(value, details)`.
 
 The contract is conventions 2.3 with these particulars:
 
@@ -291,8 +291,12 @@ The contract is conventions 2.3 with these particulars:
 - **Errors.** A rejection reaches the nearest Error Boundary (conventions 2.4). A wrong code is
   not an error: the action resolves and the consumer shows the message.
 - **`submitOnComplete`** calls `requestSubmit()` on the Input's form right after dispatching
-  `completeAction` (which it does not await), in the same event. Constraint validation runs
-  as for any submission; the submission is the form's channel (conventions 2.7), with
+  `completeAction` (which it does not await), in the same event. Inside a Field it first asks
+  the Field to re-validate (`notifyChange(true)`): the Field's own `input` listener ran
+  `validate` on the browser's text before the filter's write-back, and the commit that
+  re-validates comes after the event. While a composition is open the submission is held and
+  made at `compositionend` (the IME has not committed the text; a cancelled composition then
+  submits nothing). Constraint validation runs as for any submission; the submission is the form's channel (conventions 2.7), with
   `Form.Root`'s pending, errors and reset. Nothing happens without a form or before hydration.
 
 ### 3.2 `value`, `defaultValue`, `onValueChange`
@@ -435,10 +439,15 @@ it. A second click of a double click (`detail > 1`) and a click that leaves a se
 
 ## 6. Styling
 
-The library ships no CSS. It sets two inline styles, both functional (the precedent is the
-visually hidden inputs of Slider and NumberField):
+The library ships no CSS. It sets three inline styles, all functional and owned (the precedent
+is the visually hidden inputs of Slider and NumberField):
 
 - Root: `position: relative`.
+- Slot: `pointer-events: none`. A Slot that forms a stacking context (`opacity` below 1, as a
+  pending style dims it, `position`, `transform`, an animation of those) paints over the
+  Input in tree order and would take the click; with `pointer-events: none` the Input stays
+  the target whatever the consumer's CSS, and no stacking context is created. Not a
+  `z-index` on the Input, which would lift it over the page's later positioned content.
 - Input: `position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0;
   padding: 0; border: 0; background: transparent; color: transparent; caret-color:
   transparent; forced-color-adjust: none`. The outline is left alone. The exact list is
@@ -576,8 +585,9 @@ Not in all three engines, so it is behind `experimental_webOTP` on the Root (con
 off by default. With the flag on and `"OTPCredential" in window`:
 
 - The Input's mount effect calls `navigator.credentials.get({ otp: { transport: ["sms"] },
-  signal })`. The request is aborted at unmount, when the Input's form is submitted, and when
-  the user completes the code by hand.
+  signal })`, once for the life of the Input (keyed on the flag, not on renders). The request
+  is aborted at unmount, when the Input's form is submitted, and when the user completes the
+  code by hand; after any completion no new request starts and a late code is ignored.
 - A resolved credential's `code` goes through the filter. If it yields exactly `length`
   characters it becomes the value (`onValueChange` with `"platform"`, `details.event`
   `undefined`), then completion runs as for an edit (`completeAction` with `"platform"`,

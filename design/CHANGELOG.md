@@ -13857,3 +13857,41 @@ Implementation notes (not rules):
 - Docs: `/components/otp-field` (a verify-code example with a failing check, an auto-submit
   example inside a Form with the WCAG 3.2.2 notice, the `scripting: none` recipe, WebOTP),
   roadmap entry, agent skill line, playground demo. Notes in `memo/developer/issue-171-otp.md`.
+
+## 2026-11-26, #171: `OTPField`, review amendments
+
+Review of `feat/171-otp-field` at 59995614 (`memo/reviewer/review-171-otp.md` on
+`review/171-otp`). otp-field.md edited to match; the earlier #171 entries stand.
+
+- **8: one WebOTP request for the life of the Input.** `useActionTrigger().run` is a new
+  function per render, so every Root callback built on it, and with them the Input's WebOTP
+  effect and native listeners, changed identity on each render: each keystroke aborted the
+  request and started another, and the render after a manual completion started a live one
+  again, so a late SMS could overwrite a typed code and complete it a second time. The Root now
+  reads `run` through its latest-props ref (every handler and the context are stable), the
+  WebOTP effect is keyed on the flag alone and reads the fill callback through a ref, and a
+  completion marks the field done: no new request starts and a late code is ignored.
+- **3.1: `submitOnComplete` inside a Field re-validates first.** The Field's capture `input`
+  listener runs `validate` on the browser's pre-filter text (`12 34`, or the 7 characters of a
+  rule-5 overtype) and the re-validation of the written text comes with the commit after the
+  event, so `requestSubmit()` saw a stale custom validity and the submission was blocked. The
+  Root calls the Field's `notifyChange(true)` right before `requestSubmit()`.
+- **3.1, 4.1: no submission while composing.** A completion derived from composing text still
+  runs `completeAction` (the Gboard case), but `submitOnComplete` is held and made at
+  `compositionend` when the committed text is still complete. The Escape-cancel case is added
+  to the device checks (#186).
+- **6: the Slot owns `pointer-events: none` in its inline style.** A Slot that forms a stacking
+  context paints over the positioned Input in tree order and takes the click; the docs' own
+  pending style (`opacity: .6`) did so in Chromium and Firefox. Not `z-index` on the Input,
+  which would lift it over the page's later positioned content. The docs caveat ("keep the
+  Slots unpositioned") is gone; a browser row clicks a dimmed, positioned Slot.
+- **3.2: the value ref follows the rendered value in controlled mode.** An edit no longer
+  writes it before the parent decides, so a parent that ignores edits gets each one reported
+  against what is on screen.
+- Wording: 3.1 no longer calls `completeAction` "proposed" or an open decision.
+- Tests: jsdom rows for one WebOTP request across typing and none after a completion, a Field
+  `validate` with a filtered paste and a rule-5 overtype under `submitOnComplete`, the held
+  submission during a composition, Firefox's order (`compositionend`, then a final non-composing
+  `input`; also scripted in the browser row for engines without an IME driver), a controlled
+  parent that ignores edits. The accessibility-tree row branches inside one test instead of
+  `it.runIf`. The Combobox reset defect found at implementation is #185.

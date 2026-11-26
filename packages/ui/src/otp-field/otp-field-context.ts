@@ -37,6 +37,8 @@ export interface OTPFieldContextValue {
   readonly webOTPCode: (code: string) => void;
   /** The pending WebOTP request, aborted when the code is completed by hand. */
   readonly webOTPAbort: RefObject<AbortController | null>;
+  /** A completion happened: no WebOTP request starts any more (design 8). */
+  readonly webOTPDone: RefObject<boolean>;
   /** Registers a Slot's element under its index; returns the cleanup. */
   readonly registerSlot: (index: number, element: HTMLElement) => () => void;
 }

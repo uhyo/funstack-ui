@@ -307,9 +307,17 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
   /** The value change the Field is told about next was an edit (design 7: `takeEdit`). */
   const editRef = useRef(false);
   const webOTPAbort = useRef<AbortController | null>(null);
+  /** A completion happened: no WebOTP request starts any more, and a late code is ignored. */
+  const webOTPDone = useRef(false);
+  /** `submitOnComplete` was held back by an open composition. */
+  const submitAfterComposition = useRef(false);
 
   const { pending, run } = useActionTrigger();
 
+  // The latest committed props and `run`, for the stable callbacks below. Named `*Ref` so that
+  // React Compiler's lint treats `.current` as a ref read, not a missing memo dependency.
+  // `run` is a new function on every render: reading it through the ref keeps every handler,
+  // the context and the Input's listeners and WebOTP request stable across renders.
   const propsRef = useLatest({
     charset,
     length,
@@ -319,6 +327,8 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     onValueChange,
     completeAction,
     submitOnComplete,
+    run,
+    notifyField: fieldContext?.notifyChange,
   });
 
   // --- Writes ---------------------------------------------------------------------------------
@@ -327,9 +337,12 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
   const commitValue = useCallback(
     (next: string, reason: ChangeReason, event: Event | undefined, edit: boolean) => {
       const props = propsRef.current;
-      valueRef.current = next;
       editRef.current = edit;
-      if (!props.controlled) setInternalValue(next);
+      // Controlled: the value is the parent's until it renders it (it may not adopt the edit).
+      if (!props.controlled) {
+        valueRef.current = next;
+        setInternalValue(next);
+      }
       callUrgentHandler(
         props.onValueChange,
         next,
@@ -340,28 +353,45 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
   );
 
   /** The code is complete after an edit or a WebOTP fill (design 3.1). */
+  /** Submits the Input's form, after the Field re-validated the text just written (design 3.1). */
+  const submit = useCallback(() => {
+    const form = inputRef.current?.form;
+    if (form == null) return;
+    // The Field validated the browser's pre-filter text in its `input` listener; the commit
+    // that re-validates the written text comes after this event. Refresh it now.
+    propsRef.current.notifyField?.(true);
+    form.requestSubmit();
+  }, [propsRef]);
+
+  /** The code is complete after an edit or a WebOTP fill (design 3.1). */
   const complete = useCallback(
-    (code: string, reason: ChangeReason, event: Event | undefined) => {
+    (code: string, reason: ChangeReason, event: Event | undefined, composing = false) => {
       const {
         disabled: off,
         readOnly: ro,
         completeAction: action,
-        submitOnComplete: submit,
+        submitOnComplete: submitting,
+        run: runAction,
       } = propsRef.current;
       if (off || ro) return;
-      // A code completed by hand makes a waiting WebOTP request moot (design 8).
+      // A code completed by hand makes a waiting WebOTP request moot (design 8), and no new one
+      // starts after it.
+      webOTPDone.current = true;
       webOTPAbort.current?.abort();
       webOTPAbort.current = null;
       if (action !== undefined) {
         const details = createActionDetails(event, { reason }) as OTPFieldCompleteDetails;
-        run(() => {
+        runAction(() => {
           for (const type of COMPLETE_TYPES) addTransitionType(type);
           return action(code, details);
         });
       }
-      if (submit) inputRef.current?.form?.requestSubmit();
+      if (!submitting) return;
+      // The IME has not committed the text yet: submit at `compositionend` (design 4.1).
+      if (composing) submitAfterComposition.current = true;
+      else submit();
     },
-    [propsRef, run],
+    [propsRef, submit],
   );
 
   const readSelection = useCallback(() => {
@@ -404,7 +434,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
         readSelection();
         if (next === valueRef.current) return;
         commitValue(next, "activate", native, true);
-        if (next.length === len) complete(next, "activate", native);
+        if (next.length === len) complete(next, "activate", native, true);
         return;
       }
 
@@ -451,11 +481,17 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
       );
       writeInput(input, next, caret);
       readSelection();
-      if (next === valueRef.current) return;
-      commitValue(next, "activate", event, true);
-      if (next.length === len) complete(next, "activate", event);
+      const held = submitAfterComposition.current;
+      submitAfterComposition.current = false;
+      if (next !== valueRef.current) {
+        commitValue(next, "activate", event, true);
+        if (next.length === len) complete(next, "activate", event);
+        return;
+      }
+      // The code was completed while composing: the submission held back then goes now.
+      if (held && next.length === len && propsRef.current.submitOnComplete) submit();
     },
-    [commitValue, complete, propsRef, readSelection],
+    [commitValue, complete, propsRef, readSelection, submit],
   );
 
   const blurred = useCallback(() => {
@@ -542,7 +578,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
   const webOTPCode = useCallback(
     (code: string) => {
       const { charset: cs, length: len, disabled: off, readOnly: ro } = propsRef.current;
-      if (off || ro) return;
+      if (off || ro || webOTPDone.current) return;
       const next = filterChars(code, cs);
       if (next.length !== len) return;
       // Written now, so that `submitOnComplete` posts it before React renders.
@@ -617,6 +653,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
       webOTPCode,
       registerSlot,
       webOTPAbort,
+      webOTPDone,
     }),
     [
       state,

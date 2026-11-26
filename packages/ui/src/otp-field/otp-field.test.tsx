@@ -453,6 +453,19 @@ renderBoth("onValueChange", (mode) => {
   });
 });
 
+describe("controlled value: a parent that ignores edits", () => {
+  it("reports every edit against the rendered value", async () => {
+    const onValueChange = vi.fn<Change>();
+    const user = setupUser();
+    render(<Code value="" onValueChange={onValueChange} />);
+    await user.click(input());
+    await user.keyboard("1");
+    await user.keyboard("1");
+    expect(input().value).toBe("");
+    expect(onValueChange.mock.calls.map(([v]) => v)).toEqual(["1", "1"]);
+  });
+});
+
 describe("controlled value", () => {
   it("the parent can clear the field (setCode('') after the check)", async () => {
     const user = setupUser();
@@ -670,6 +683,32 @@ describe("submitOnComplete", () => {
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(order).toEqual(["complete 1234", "submit 1234"]);
     await user.paste("5678");
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+  });
+
+  it("inside a Field: a validate result on the pre-filter text does not block the submit", async () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    const user = setupUser();
+    render(
+      <form onSubmit={onSubmit}>
+        <Field.Root name="code" validate={(v) => (/^\d{4}$/.test(String(v)) ? null : "4 digits")}>
+          <Field.Label>Code</Field.Label>
+          <OTPField.Root length={4} submitOnComplete data-testid="root">
+            <OTPField.Input data-testid="input" />
+            {[0, 1, 2, 3].map((i) => (
+              <OTPField.Slot key={i} index={i} />
+            ))}
+          </OTPField.Root>
+        </Field.Root>
+      </form>,
+    );
+    await user.click(input());
+    await user.paste("12 34");
+    expect(input().value).toBe("1234");
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    // Rule 5 at the end of a complete code: the DOM holds five characters when the Field validates.
+    await user.keyboard("{End}9");
+    expect(input().value).toBe("1239");
     expect(onSubmit).toHaveBeenCalledTimes(2);
   });
 
@@ -950,6 +989,49 @@ describe("composition", () => {
     expect(completeAction).not.toHaveBeenCalled();
   });
 
+  it("submitOnComplete waits for compositionend", async () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    const completeAction = vi.fn<Complete>();
+    render(
+      <form onSubmit={onSubmit}>
+        <Code length={2} charset="alphanumeric" submitOnComplete completeAction={completeAction} />
+      </form>,
+    );
+    act(() => input().focus());
+    fireEvent.compositionStart(input());
+    composeInput("ab", true);
+    expect(completeAction).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+    act(() => {
+      fireEvent.compositionEnd(input());
+    });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(completeAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("Firefox's order: compositionend, then the final input (isComposing false)", async () => {
+    const onValueChange = vi.fn<Change>();
+    render(<Code length={3} charset="alphanumeric" onValueChange={onValueChange} />);
+    act(() => input().focus());
+    fireEvent.compositionStart(input());
+    composeInput("aか", true);
+    act(() => {
+      fireEvent.compositionEnd(input());
+    });
+    expect(input().value).toBe("a");
+    // The final input carries the composed text again, now as an ordinary edit.
+    act(() => {
+      fireEvent.input(input(), {
+        target: { value: "aか" },
+        isComposing: false,
+        inputType: "insertCompositionText",
+      });
+    });
+    expect(input().value).toBe("a");
+    expect(slotTexts(3)).toBe("a||");
+    expect(onValueChange.mock.calls.every(([v]) => v === "a")).toBe(true);
+  });
+
   it("completion may fire from composed text", async () => {
     const completeAction = vi.fn<Complete>();
     render(<Code length={2} charset="alphanumeric" completeAction={completeAction} />);
@@ -1063,6 +1145,28 @@ describe("experimental_webOTP", () => {
     await act(async () => requests[0]!.resolve({ code: "1234" }));
     expect(input().value).toBe("");
     expect(completeAction).not.toHaveBeenCalled();
+  });
+
+  it("one request across typing; none live after a manual completion; a late code is ignored", async () => {
+    const { get, requests } = stubWebOTP();
+    const completeAction = vi.fn<Complete>();
+    render(<Code length={4} experimental_webOTP completeAction={completeAction} />);
+    await flushMicrotasks();
+    const user = setupUser();
+    await user.click(input());
+    await user.keyboard("12");
+    expect(get).toHaveBeenCalledTimes(1);
+    await user.keyboard("34");
+    await flushMicrotasks();
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(requests.every((r) => r.signal.aborted)).toBe(true);
+    expect(completeAction).toHaveBeenCalledTimes(1);
+    // An edit after the completion starts no new request.
+    await user.keyboard("{Backspace}5");
+    await flushMicrotasks();
+    expect(get).toHaveBeenCalledTimes(1);
+    await act(async () => requests[0]!.resolve({ code: "9999" }));
+    expect(input().value).toBe("1235");
   });
 
   it("aborted at unmount, on manual completion and when the form is submitted", async () => {
