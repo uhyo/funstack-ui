@@ -142,7 +142,7 @@ export function SelectPage() {
           "`value`, `disabled`, `onChange`, `data-pending`, `data-disabled`. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
         }
         note={
-          "`multiple` and `size` are not accepted: multi-select is not part of this version. `id`, `aria-*`, `onFocus` and other select props pass through."
+          "`multiple` and `size` are not accepted (a type error; `multiple` is dropped with a development warning): for several values see [Several values](#several-values). `id`, `aria-*`, `onFocus` and other select props pass through."
         }
       />
       <p>
@@ -499,6 +499,30 @@ export function SelectPage() {
         the browser. An action-less Select is a working native select before hydration, including
         the copy into the button.
       </p>
+
+      <h3 id="several-values">Several values</h3>
+      <p>
+        Select is the browser's control, and no stable engine has a styleable multi-select drop-down
+        yet (<code>{"<select multiple>"}</code> is still a list box). So a select for several values
+        is another component, <a href="/components/multi-select">MultiSelect</a>: the library's own
+        listbox on a popover, with the same action, pending and form conventions. It needs
+        JavaScript and does not open before hydration, which is why it is not a prop here:{" "}
+        <code>{"<Select.Root multiple>"}</code> is a type error and warns in development. When the
+        native multi drop-down ships everywhere, it is the name it will take.
+      </p>
+      <ul>
+        <li>
+          A few choices shown in the page: <a href="/components/checkbox-group">CheckboxGroup</a>.
+        </li>
+        <li>
+          A drop-down of choices, the selection summarised in the button:{" "}
+          <a href="/components/multi-select">MultiSelect</a>.
+        </li>
+        <li>
+          A searchable list with removable chips:{" "}
+          <a href="/components/combobox#multiple">Combobox multiple</a>.
+        </li>
+      </ul>
 
       <h3 id="styling">Styling</h3>
       <p>

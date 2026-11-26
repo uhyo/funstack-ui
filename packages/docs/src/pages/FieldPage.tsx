@@ -70,8 +70,8 @@ import { Form } from "@funstack/ui/form";
         </li>
         <li>
           <strong>Any FUNSTACK form control is a Field's control</strong> without a wrapper:
-          Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, Slider and NumberField (see{" "}
-          <a href="/components/slider#inside-a-field">Slider inside a Field</a> and{" "}
+          Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, MultiSelect, Slider and
+          NumberField (see <a href="/components/slider#inside-a-field">Slider inside a Field</a> and{" "}
           <a href="/components/number-field#inside-a-field">NumberField inside a Field</a>). A group
           (RadioGroup, CheckboxGroup, a Slider with several thumbs) is named by{" "}
           <code>Field.Label</code> through <code>aria-labelledby</code> instead of <code>for</code>.
@@ -592,6 +592,13 @@ form[data-pending]           { cursor: progress; }
           <code>Combobox.Label</code> is rendered. <code>validate</code> reads the selection (the
           hidden input), and picking an option counts as an edit: it re-runs <code>validate</code>{" "}
           and dismisses a server error, like typing.
+        </li>
+        <li>
+          MultiSelect: the Trigger (a <code>{"<button>"}</code>) is the control;{" "}
+          <code>Field.Label</code> focuses it instead of clicking it, as a label does for a{" "}
+          <code>{"<select>"}</code>. Its validity is a hidden <code>{"<select>"}</code>'s, which
+          shows no browser bubble, so <code>Field.Error</code> is where a <code>required</code>{" "}
+          message appears (<a href="/components/multi-select#forms">MultiSelect forms</a>).
         </li>
         <li>
           NumberField: the visible text input is the control (labelled, described, focused), while

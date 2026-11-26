@@ -75,6 +75,7 @@ export const routes = [
               page("/components/checkbox-group", "CheckboxGroupPage"),
               page("/components/select", "SelectPage"),
               page("/components/combobox", "ComboboxPage"),
+              page("/components/multi-select", "MultiSelectPage"),
               page("/components/toast", "ToastPage"),
               page("/components/slider", "SliderPage"),
               page("/components/number-field", "NumberFieldPage"),
