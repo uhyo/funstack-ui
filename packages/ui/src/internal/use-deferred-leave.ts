@@ -1,17 +1,18 @@
 "use client";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import { useLatest } from "../internal/use-latest.js";
+import { useLatest } from "./use-latest.js";
 
 export interface DeferredLeaveOptions {
-  readonly inputRef: RefObject<HTMLInputElement | null>;
+  /** The element that holds focus: the Combobox Input, the MultiSelect Trigger. */
+  readonly surfaceRef: RefObject<HTMLElement | null>;
   readonly popupRef: RefObject<HTMLElement | null>;
   /**
-   * `Combobox.Chips` (`multiple`, design 15.6): a third region inside the combobox. Focus moving
-   * between the input and a chip is not focus leaving.
+   * `Combobox.Chips` (`multiple`, combobox.md 15.6): a third region inside the combobox. Focus
+   * moving between the input and a chip is not focus leaving.
    */
-  readonly chipsRef: RefObject<HTMLElement | null>;
-  /** Focus has left the input, the popup and the chips (design 5.4, 15.6). */
+  readonly chipsRef?: RefObject<HTMLElement | null>;
+  /** Focus has left the surface, the popup and the chips (combobox.md 5.4, 15.6). */
   readonly leave: (event: Event) => void;
 }
 
@@ -21,7 +22,8 @@ export interface DeferredLeave {
 }
 
 /**
- * The Combobox Input's focus-leave decision (design 5.4), for `Combobox.Root`. A press blurs the
+ * The focus-leave decision of a listbox component's focus surface (design/components/combobox.md
+ * 5.4; the Combobox Input, the MultiSelect Trigger, multi-select.md B.4). A press blurs the
  * input at `mousedown`, but its outcome is known only at the `click`, which runs in the
  * `pointerup` task: a `<label for>` (Combobox.Label, Field.Label) refocuses the input there.
  * While the input is focused (and until a leave deferred to a release has been decided), the
@@ -35,7 +37,7 @@ export interface DeferredLeave {
  * decides one task after the press is released (or one task later) when it moved nowhere.
  */
 export function useDeferredLeave({
-  inputRef,
+  surfaceRef: inputRef,
   popupRef,
   chipsRef,
   leave,
@@ -46,7 +48,7 @@ export function useDeferredLeave({
     if (node === inputRef.current) return true;
     const popup = popupRef.current;
     if (popup !== null && popup.contains(node)) return true;
-    const chips = chipsRef.current;
+    const chips = chipsRef?.current ?? null;
     return chips !== null && chips.contains(node);
   };
 

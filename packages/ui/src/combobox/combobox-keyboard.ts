@@ -3,8 +3,8 @@ import { flushSync } from "react-dom";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { RefObject } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
-import type { ActiveOption } from "./use-active-option.js";
-import type { OptionRegistry } from "./use-option-registry.js";
+import type { ActiveOption } from "../internal/use-active-option.js";
+import type { OptionRegistry } from "../internal/use-option-registry.js";
 
 export interface ComboboxKeyboardOptions {
   /** The Root's `disabled`, `loop` and `allowCustomValue`. */

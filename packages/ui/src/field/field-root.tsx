@@ -357,13 +357,22 @@ export function FieldRoot({
     element.addEventListener("change", onEdit, true);
     element.addEventListener("focusout", onBlur, true);
     element.addEventListener("invalid", onInvalid, true);
+    // A control that cannot validate itself and keeps its validity on an element outside it
+    // (MultiSelect's Trigger and its hidden validity `<select>`, multi-select.md B.10): the
+    // `invalid` fires there. NumberField's surface validates itself (its hidden input's `invalid`
+    // is cancelled and the visible input reports), so it is not listened to twice.
+    const outside =
+      validityElementOf(element) === null ? (control?.validityElement?.() ?? null) : null;
+    const listenOutside = outside !== null && !element.contains(outside);
+    if (listenOutside) outside.addEventListener("invalid", onInvalid, true);
     return () => {
       element.removeEventListener("input", onEdit, true);
       element.removeEventListener("change", onEdit, true);
       element.removeEventListener("focusout", onBlur, true);
       element.removeEventListener("invalid", onInvalid, true);
+      if (listenOutside) outside.removeEventListener("invalid", onInvalid, true);
     };
-  }, [element, refresh, dismiss]);
+  }, [element, control, refresh, dismiss]);
 
   // The form owner's events: another field's edit re-runs `validate` (cross-field rules); a reset
   // clears the user-validity flag, re-read when the controls hold their reset values.
@@ -455,6 +464,7 @@ export function FieldRoot({
   );
 
   const labelable = control?.labelable ?? true;
+  const controlElement = useCallback(() => controlRef.current?.element ?? null, []);
   const context = useMemo<FieldContextValue>(
     () => ({
       ids,
@@ -463,6 +473,7 @@ export function FieldRoot({
       required,
       state: memoState,
       labelable,
+      controlElement,
       registerControl,
       registerError,
       notifyChange,
@@ -474,6 +485,7 @@ export function FieldRoot({
       required,
       memoState,
       labelable,
+      controlElement,
       registerControl,
       registerError,
       notifyChange,

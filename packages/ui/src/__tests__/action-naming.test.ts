@@ -149,6 +149,17 @@ type PublicProps = {
   MeterRootProps: UI.MeterRootProps;
   MeterTrackProps: UI.MeterTrackProps;
   MeterValueProps: UI.MeterValueProps;
+  MultiSelectEmptyProps: UI.MultiSelectEmptyProps;
+  MultiSelectGroupLabelProps: UI.MultiSelectGroupLabelProps;
+  MultiSelectGroupProps: UI.MultiSelectGroupProps;
+  MultiSelectLabelProps: UI.MultiSelectLabelProps;
+  MultiSelectListProps: UI.MultiSelectListProps;
+  MultiSelectOptionProps: UI.MultiSelectOptionProps;
+  MultiSelectPopupProps: UI.MultiSelectPopupProps;
+  MultiSelectRootProps: UI.MultiSelectRootProps;
+  MultiSelectStatusProps: UI.MultiSelectStatusProps;
+  MultiSelectTriggerProps: UI.MultiSelectTriggerProps;
+  MultiSelectValueProps: UI.MultiSelectValueProps;
   NumberFieldDecrementProps: UI.NumberFieldDecrementProps;
   NumberFieldIncrementProps: UI.NumberFieldIncrementProps;
   NumberFieldInputProps: UI.NumberFieldInputProps;
@@ -271,6 +282,17 @@ const listedKeys = {
   MeterRootProps: true,
   MeterTrackProps: true,
   MeterValueProps: true,
+  MultiSelectEmptyProps: true,
+  MultiSelectGroupLabelProps: true,
+  MultiSelectGroupProps: true,
+  MultiSelectLabelProps: true,
+  MultiSelectListProps: true,
+  MultiSelectOptionProps: true,
+  MultiSelectPopupProps: true,
+  MultiSelectRootProps: true,
+  MultiSelectStatusProps: true,
+  MultiSelectTriggerProps: true,
+  MultiSelectValueProps: true,
   NumberFieldDecrementProps: true,
   NumberFieldIncrementProps: true,
   NumberFieldInputProps: true,
@@ -372,7 +394,7 @@ describe("action naming (conventions 10.1)", () => {
     expectTypeOf<UI.ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<string, UI.ComboboxInputValueChangeDetails> | undefined
     >();
-    // Exactly the four overlay Roots, each with the details type of its `openChangeAction`.
+    // Exactly the five overlay Roots, each with the details type of its `openChangeAction`.
     type WithOpenChange = {
       [K in keyof PublicProps]: "onOpenChange" extends OwnHandlerKeys<PublicProps[K]> ? K : never;
     }[keyof PublicProps];
@@ -382,6 +404,7 @@ describe("action naming (conventions 10.1)", () => {
       | "ComboboxMultipleProps"
       | "DialogRootProps"
       | "MenuRootProps"
+      | "MultiSelectRootProps"
       | "PopoverRootProps"
     >();
     expectTypeOf<UI.PopoverRootProps["onOpenChange"]>().toEqualTypeOf<
@@ -395,6 +418,9 @@ describe("action naming (conventions 10.1)", () => {
     >();
     expectTypeOf<UI.DialogRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.DialogOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.MultiSelectRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.MultiSelectOpenChangeDetails> | undefined
     >();
   });
 

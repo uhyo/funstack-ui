@@ -18,12 +18,15 @@ import {
   useFieldValueChange,
 } from "../internal/form/use-field-control.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
+import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useNativeSelectValue } from "../internal/form/use-native-select-value.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
 import type { SelectContextValue } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 /** Details passed as the second argument of `valueChangeAction`. */
 export interface SelectValueChangeDetails extends ActionDetails {
@@ -130,8 +133,21 @@ export function SelectRoot({
   style,
   children,
   render,
-  ...rest
+  ...restWithMultiple
 }: SelectRootProps) {
+  // `multiple` is a type error and is not passed on: a list of values is MultiSelect
+  // (design/components/select.md 13, multi-select.md A.3). The name stays free for the native
+  // multi drop-down.
+  const { multiple, ...rest } = restWithMultiple as typeof restWithMultiple & {
+    multiple?: unknown;
+  };
+  useDevWarning(
+    multiple !== undefined && multiple !== false,
+    isDev &&
+      "Select.Root: `multiple` is not supported; it is ignored. Select is a native single " +
+        "<select>. For several values use MultiSelect (`@funstack/ui/multi-select`), or " +
+        "CheckboxGroup for a short list shown in the page.",
+  );
   const { ref: libraryRef, node: selectRef } = useSelectPartRef<HTMLSelectElement>(
     "Select.Root",
     "select",

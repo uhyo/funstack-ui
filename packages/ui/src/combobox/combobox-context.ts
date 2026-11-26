@@ -2,14 +2,12 @@
 import { createContext, use } from "react";
 import type { RefObject } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
+import type { ListboxOptionEntry } from "../internal/use-option-registry.js";
+
+export { optionId } from "../internal/use-option-registry.js";
 
 /** What a mounted `Combobox.Option` tells its Root (design 2, "mounted options, labels"). */
-export interface ComboboxOptionEntry {
-  readonly element: HTMLElement;
-  /** The `label` prop; `undefined`: the element's trimmed `textContent` at the moment of use. */
-  readonly label: string | undefined;
-  readonly disabled: boolean;
-}
+export type ComboboxOptionEntry = ListboxOptionEntry;
 
 /** One Combobox: what its Root provides to every part (design 14, `combobox-context.ts`). */
 export interface ComboboxContextValue {
@@ -136,8 +134,3 @@ export const ComboboxGroupContext = createContext<string | null>(null);
 
 /** `Combobox.Chip`: its value, for the `Combobox.ChipRemove` inside it. */
 export const ComboboxChipContext = createContext<string | null>(null);
-
-/** The id fragment of an option value: stable across result sets, no whitespace (design 3.5). */
-export function optionId(prefix: string, value: string): string {
-  return `${prefix}${encodeURIComponent(value)}`;
-}

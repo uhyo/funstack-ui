@@ -1,5 +1,5 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { fieldDataAttributes, useFieldContext } from "../internal/form/field-context.js";
 import type { FieldState } from "../internal/form/field-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -32,8 +32,12 @@ export interface FieldLabelProps extends Omit<
  * RadioGroup or CheckboxGroup `<fieldset>`) it renders no `for` once the group registered, and
  * the group names itself with `aria-labelledby` → this id (design 4.2).
  *
- * Owned keys (conventions 1.2): `id`, `htmlFor`, `data-invalid`, `data-disabled`,
- * `data-required`, `data-pending`.
+ * A `<label for>` on a `<button>` forwards a click to it. For a button control (MultiSelect's
+ * Trigger, multi-select.md B.10) the click is cancelled and the button is focused instead, as a
+ * label focuses a `<select>` without opening it.
+ *
+ * Owned keys (conventions 1.2): `id`, `htmlFor`, `onClick` (composed), `data-invalid`,
+ * `data-disabled`, `data-required`, `data-pending`.
  *
  * @see https://ui.funstack.work/components/field
  */
@@ -58,6 +62,12 @@ export function FieldLabel({ className, style, children, render, ...rest }: Fiel
     libraryProps: {
       id: ctx.ids.label,
       htmlFor: ctx.labelable ? ctx.ids.control : undefined,
+      onClick: (event: MouseEvent<HTMLLabelElement>) => {
+        const control = ctx.controlElement();
+        if (!(control instanceof HTMLButtonElement) || event.defaultPrevented) return;
+        event.preventDefault();
+        if (!control.disabled) control.focus();
+      },
       ...fieldDataAttributes(ctx.state),
     },
     ref,

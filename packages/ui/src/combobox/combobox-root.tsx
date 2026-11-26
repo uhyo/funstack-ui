@@ -31,19 +31,20 @@ import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-
 import { resolveStateValue } from "../internal/use-render.js";
 import { sortByDocumentOrder } from "../internal/dom-order.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
+import { HiddenValues } from "../internal/form/hidden-values.js";
 import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { toSet } from "../internal/value-set.js";
 import type { SetPatch } from "../internal/value-set.js";
 import { ComboboxContext } from "./combobox-context.js";
 import { chipText } from "./chip-text.js";
-import { useActiveOption } from "./use-active-option.js";
+import { useActiveOption } from "../internal/use-active-option.js";
 import { useComboboxForm } from "./use-combobox-form.js";
 import { createComboboxKeyDown } from "./combobox-keyboard.js";
 import type { ComboboxMultipleKeys } from "./combobox-keyboard.js";
 import { useComboboxText } from "./use-combobox-text.js";
-import { useDeferredLeave } from "./use-deferred-leave.js";
-import { useMultipleSelection } from "./use-multiple-selection.js";
-import { useOptionRegistry } from "./use-option-registry.js";
+import { useDeferredLeave } from "../internal/use-deferred-leave.js";
+import { useMultipleSelection } from "../internal/action/use-multiple-selection.js";
+import { useOptionRegistry } from "../internal/use-option-registry.js";
 import type {
   ComboboxChipEntry,
   ComboboxChipsValue,
@@ -574,7 +575,10 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
 
   // `multiple` (design 15.4): the set-valued selection. Idle in single mode, as the hook above is
   // with `multiple` (hooks are unconditional; the mode is fixed at mount).
-  const multi = useMultipleSelection({
+  const multi = useMultipleSelection<{ custom: boolean }>({
+    component: "combobox",
+    part: "Combobox.Root",
+    resetFields: { custom: false },
     enabled: multiple,
     value: multiple ? (valueProp as string[] | undefined) : undefined,
     defaultValue: multiple ? (defaultValueProp as string[] | undefined) : undefined,
@@ -630,7 +634,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     registerStatus,
     registerLabel,
     orderedOptions,
-  } = useOptionRegistry(labels, (optionValue, label) => {
+  } = useOptionRegistry("Combobox", labels, (optionValue, label) => {
     // A chip learns the text of an Option for its value as the Option mounts (design 15.1).
     if (multiple && selectedRef.current.has(optionValue)) {
       learnChipLabels([[optionValue, label]]);
@@ -1056,7 +1060,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     if (textRef.current !== label) writeText(label, "dismiss", event);
   };
   const { focusIn, focusOut } = useDeferredLeave({
-    inputRef,
+    surfaceRef: inputRef,
     popupRef: popover.popupRef,
     chipsRef,
     leave,
@@ -1221,19 +1225,8 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
           value={selection.optimistic ?? ""}
         />
       );
-    } else if (multi.values.length === 0) {
-      hidden = <input key="" ref={hiddenRef} type="hidden" form={form} value="" />;
     } else {
-      hidden = multi.values.map((v, i) => (
-        <input
-          key={`v:${v}`}
-          ref={i === 0 ? hiddenRef : undefined}
-          type="hidden"
-          name={name}
-          form={form}
-          value={v}
-        />
-      ));
+      hidden = <HiddenValues name={name} form={form} values={multi.values} inputRef={hiddenRef} />;
     }
   }
 
