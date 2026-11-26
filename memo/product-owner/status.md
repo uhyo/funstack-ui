@@ -436,3 +436,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 ## Wave 23+: #162 component gaps (user request 2026-11-26)
 - Sub-issues: #163 Collapsible, #164 Combobox multiple, #165 Select multiple (research first), #166 HoverCard, #167 AlertDialog, #168 Drawer, #169 Separator/Fieldset/Input, #170 Menubar/NavigationMenu, #171 Avatar/ScrollArea/OTP, #172 direction/locale decision. Wave plan commented on #162.
 - Wave 23 started: architect designs #163 and #164 (worktrees), platform-researcher on #166 + #165. Designs go to the user for decisions before implementation.
+- #163 design a7ebb08c (branch design/163-collapsible); user took all 4 recommendations (defaultOpen → library mode; openChangeAction only; <details> only; Accordion.Item standalone kept, docs point to Collapsible). → developer feat/163-collapsible.
