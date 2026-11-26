@@ -172,11 +172,25 @@ export interface DialogPopupOptions {
   readonly defaultInitialFocus?: (dialog: HTMLDialogElement) => HTMLElement | null;
   /** Wraps the rendered children (AlertDialog's Cancel context). */
   readonly wrapChildren?: (children: ReactNode) => ReactNode;
+  /** Extra owned keys on the `<dialog>` (Drawer's `data-side`, drawer.md 9). */
+  readonly ownProps?: ComponentPropsWithRef<"dialog"> & DataAttributes;
+  /**
+   * Installs a dismissal gesture on the dialog element after hydration, in both modes, next to
+   * the JS dismissals (Drawer's swipe, drawer.md 9), and returns its cleanup. `dismiss(event)`
+   * records the close intent (`"dismiss"`, `event`) and calls `requestClose()`: the browser
+   * closes the dialog, a fact reported to `onOpenChange` (conventions 3.9.2). Re-installed when
+   * the function changes.
+   */
+  readonly attachDismiss?: (
+    dialog: HTMLDialogElement,
+    dismiss: (event: Event) => void,
+  ) => () => void;
 }
 
 /**
  * The body of `Dialog.Popup`, also run by `AlertDialog.Popup` with `role`, no light dismiss and
- * a default initial focus target (alert-dialog.md 8).
+ * a default initial focus target (alert-dialog.md 8), and by `Drawer.Popup` with `data-side`
+ * and the swipe (drawer.md 9).
  */
 export function useDialogPopup(
   {
@@ -191,7 +205,14 @@ export function useDialogPopup(
     render,
     ...rest
   }: DialogPopupProps,
-  { namespace, role, defaultInitialFocus, wrapChildren }: DialogPopupOptions,
+  {
+    namespace,
+    role,
+    defaultInitialFocus,
+    wrapChildren,
+    ownProps,
+    attachDismiss,
+  }: DialogPopupOptions,
 ): ReactNode {
   const part = `${namespace}.Popup`;
   const ctx = useDialogContext(part);
@@ -473,6 +494,17 @@ export function useDialogPopup(
     };
   }, [dialog, modal, lightDismiss, experimental_closedBy]);
 
+  // A component's own dismissal gesture (Drawer's swipe): a fact, through `requestClose()`.
+  const { recordCloseIntent } = ctx;
+  useEffect(() => {
+    if (dialog === null || attachDismiss === undefined) return;
+    return attachDismiss(dialog, (event) => {
+      if (!dialog.open) return;
+      recordCloseIntent({ reason: "dismiss", event });
+      dialog.requestClose();
+    });
+  }, [dialog, attachDismiss, recordCloseIntent]);
+
   // Development check (design 9): the dialog has an accessible name when it is (or can be)
   // shown.
   useShownNameWarning(
@@ -504,6 +536,7 @@ export function useDialogPopup(
     "data-modal": dataAttr(modal),
     // Owned when fixed (AlertDialog's `alertdialog`): a consumer's `role` is dropped.
     ...(role !== undefined && { role }),
+    ...ownProps,
     // A pre-hydration open leaves an `open` attribute the server did not render (design 2.4).
     suppressHydrationWarning: true,
   };

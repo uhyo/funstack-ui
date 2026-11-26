@@ -1,4 +1,5 @@
 "use client";
+import { use, useCallback } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import type {
@@ -9,7 +10,8 @@ import type {
   WhilePending,
 } from "../internal/types.js";
 import { useOverlayClose } from "../internal/overlay/use-overlay-close.js";
-import { useDialogContext } from "./dialog-context.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { DialogCloseRegistry, useDialogContext } from "./dialog-context.js";
 import type { DialogNamespace } from "./dialog-context.js";
 
 /**
@@ -124,11 +126,21 @@ export function useDialogClose(
     style,
     children,
     render,
+    ref,
     ...rest
   }: DialogCloseProps,
   { part, ownProps }: DialogCloseOptions,
 ): ReactNode {
   const ctx = useDialogContext(part);
+  // A Drawer.Popup's development check that the drawer has a Close (drawer.md 7).
+  const registerClose = use(DialogCloseRegistry);
+  const reportClose = useCallback(
+    (element: HTMLElement | null) => {
+      if (element !== null) registerClose?.(element);
+    },
+    [registerClose],
+  );
+  const mergedRef = useMergedRefs<HTMLButtonElement | null>(ref, reportClose);
   const { popupRef, recordCloseIntent } = ctx;
   const isLibrary = ctx.mode === "library";
   return useOverlayClose({
@@ -161,6 +173,6 @@ export function useDialogClose(
     style,
     children,
     render,
-    rest,
+    rest: { ...rest, ref: mergedRef },
   });
 }

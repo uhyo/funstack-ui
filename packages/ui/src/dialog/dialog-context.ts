@@ -37,9 +37,17 @@ export const DialogContext = createContext<DialogContextValue | null>(null);
 
 /**
  * The namespace whose part names a shared part body uses in its messages: `Dialog`, or
- * `AlertDialog`, whose parts run the Dialog parts' code (design/components/alert-dialog.md 8).
+ * `AlertDialog` and `Drawer`, whose parts run the Dialog parts' code
+ * (design/components/alert-dialog.md 8, drawer.md 9).
  */
-export type DialogNamespace = "Dialog" | "AlertDialog";
+export type DialogNamespace = "Dialog" | "AlertDialog" | "Drawer";
+
+/**
+ * Development only: where a Close part inside a `Drawer.Popup` reports its element, for the
+ * Popup's "another way to close" warning (design/components/drawer.md 7). `null` outside a
+ * Drawer. The Close parts of every namespace report: a `Dialog.Close` closes a drawer too.
+ */
+export const DialogCloseRegistry = createContext<((element: Element) => void) | null>(null);
 
 /**
  * The parts of `Dialog` and `AlertDialog` (design/components/alert-dialog.md 8) share this

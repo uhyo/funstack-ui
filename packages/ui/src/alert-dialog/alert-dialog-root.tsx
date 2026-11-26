@@ -35,7 +35,7 @@ export type AlertDialogRootProps = Omit<DialogRootProps, "modal">;
 export function AlertDialogRoot(props: AlertDialogRootProps) {
   // `useDialogRoot` reads only the open-state props and `children`: an untyped `modal` is
   // dropped.
-  return useDialogRoot(props, { namespace: "AlertDialog", modal: true });
+  return useDialogRoot(props, { namespace: "AlertDialog", modal: true, component: "dialog" });
 }
 
 AlertDialogRoot.displayName = "AlertDialogRoot";

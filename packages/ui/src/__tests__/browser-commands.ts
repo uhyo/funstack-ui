@@ -10,6 +10,7 @@ declare module "vitest/browser" {
       x: number,
       y: number,
       button?: "left" | "right" | "middle",
+      steps?: number,
     ) => Promise<void>;
     wheel: (x: number, y: number, deltaX: number, deltaY: number) => Promise<void>;
   }
@@ -131,12 +132,15 @@ export const mouse = {
     await commands.mouse("down", p.x, p.y, button);
     await handled;
   },
-  /** Moves to (x, y) and releases `button`. */
-  up: async (x: number, y: number, button: Button = "left") => {
+  /**
+   * Moves to (x, y) and releases `button`; with `steps`, moves there through that many moves
+   * (about one per frame) and releases right after the last one, in one command (a flick).
+   */
+  up: async (x: number, y: number, button: Button = "left", steps?: number) => {
     const p = toPagePoint(x, y);
     const handled = inputHandled("pointerup");
     held.delete(button);
-    await commands.mouse("up", p.x, p.y, button);
+    await commands.mouse("up", p.x, p.y, button, steps);
     await handled;
   },
   click: async (x: number, y: number, button: Button = "left") => {

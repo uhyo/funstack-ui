@@ -42,6 +42,7 @@
     "./combobox": "./dist/combobox/index.mjs",
     "./csp": "./dist/csp/index.mjs",
     "./dialog": "./dist/dialog/index.mjs",
+    "./drawer": "./dist/drawer/index.mjs",
     "./field": "./dist/field/index.mjs",
     "./form": "./dist/form/index.mjs",
     "./hover-card": "./dist/hover-card/index.mjs",

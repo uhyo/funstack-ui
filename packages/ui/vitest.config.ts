@@ -56,8 +56,9 @@ const mouse: BrowserCommand<
     x: number,
     y: number,
     button?: MouseButton,
+    steps?: number,
   ]
-> = async (context, action, x, y, button = "left") => {
+> = async (context, action, x, y, button = "left", steps = 1) => {
   const { mouse } = context.page;
   if (action === "click") {
     await mouse.click(x, y, { button });
@@ -71,7 +72,10 @@ const mouse: BrowserCommand<
     await mouse.move(x, y);
     return;
   }
-  await mouse.move(x, y);
+  // An `up` with `steps` > 1 moves there in steps (about one per frame) and releases in the
+  // same command, with no pause between the last move and the release: a flick
+  // (design/components/drawer.md 4.1).
+  await mouse.move(x, y, { steps: action === "up" ? steps : 1 });
   if (action === "down") await mouse.down({ button });
   else await mouse.up({ button });
 };
