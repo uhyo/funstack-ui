@@ -1,7 +1,7 @@
 # Combobox
 
-Status: **accepted**, implemented, except section 15 (`multiple`, #164): **proposed**, not
-implemented. History (decisions, review revisions, amendments,
+Status: **accepted**, implemented, section 15 (`multiple`, #164) included. History (decisions,
+review revisions, amendments,
 implementation notes, the test plan): `design/CHANGELOG.md`, parts "combobox.md". Follows
 `design/conventions.md`
 (accepted); where this document and the conventions disagree, the conventions win. **Read
@@ -1335,7 +1335,8 @@ Moved to `design/CHANGELOG.md` (part "combobox.md"). Not part of the contract: t
 
 ## 15. Multiple selection (`multiple`)
 
-Status: **proposed** (#164), not implemented. `Combobox.Root multiple` turns the selection into
+Status: **decided** (#164; the user accepted the six recommendations on 2026-11-26, recorded in
+`design/CHANGELOG.md`), implemented. `Combobox.Root multiple` turns the selection into
 a list of values shown as chips. Everything in sections 1 to 11 holds unless this section says
 otherwise: the text stays one urgent string, results are still the consumer's render for the
 deferred `query`, the active option is still virtual focus, the popup is the same popover.
@@ -1416,7 +1417,7 @@ Rendered HTML (closed, the value is `["jp", "fr"]`, no text):
 
 | Part | Element | Role | Renders from | Notes |
 | --- | --- | --- | --- | --- |
-| `Chips` | `div` | `list` while there is at least one value, none while empty | optimistic value | The container of the chips, **not** of the Input (a list may own only list items). `aria-labelledby` → the Label while one is mounted (token-merged, as the List), `data-empty`, `data-pending`, `data-disabled`. Function `children` receive `{ value }`. Always rendered. |
+| `Chips` | `div` | `list` while there is at least one value, none while empty | optimistic value | The container of the chips, **not** of the Input (a list may own only list items). `aria-labelledby` → the Label while one is mounted and the list is not empty (token-merged, as the List; a role-less `div` may not be named), `onFocus` / `onBlur` owned (the leave rule of 15.6), `data-empty`, `data-pending`, `data-disabled`. Function `children` receive `{ value }`. Always rendered. |
 | `Chip` | `div` | `listitem` | optimistic value, committed value (for `pending`) | `value` required; `label` optional. `tabindex="-1"`: focusable by the keys of 15.6, never a Tab stop. `data-pending`, `data-disabled`. |
 | `ChipRemove` | `button` | button | | Inside a `Chip`. `type="button"`, `tabindex="-1"`, `pointerdown` and `mousedown` prevented (the input keeps focus, as `Clear`); click removes the chip's value and focuses the input. Needs an accessible name from the consumer (dev warning without one). `data-pending`, `data-disabled`. |
 | `Root` | one `input[type=hidden]` **per value** when `name` is given | | optimistic value | 15.8. The one place a part renders more than one element (conventions 1.1). |
@@ -1512,7 +1513,7 @@ export type ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps;
 
 export interface ComboboxChipsState { readonly value: readonly string[]; readonly pending: boolean; readonly disabled: boolean; }
 export interface ComboboxChipsProps
-  extends Omit<ComponentPropsWithRef<"div">, "role" | "onKeyDown" | "onPointerDown" | "onMouseDown" | "onClick" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "role" | "onKeyDown" | "onPointerDown" | "onMouseDown" | "onClick" | "onFocus" | "onBlur" | "className" | "style" | "children"> {
   className?: StateValue<string | undefined, ComboboxChipsState>;
   style?: StateValue<CSSProperties | undefined, ComboboxChipsState>;
   /** Usually a function of `{ value }` rendering one `Chip` per value, keyed by the value. */
@@ -1678,7 +1679,7 @@ On a focused chip (handled by `Chips`; "previous" and "next" follow the inline d
 | Next arrow | the next chip; on the last chip: the Input |
 | Home / End | the first / last chip |
 | Backspace, Delete | remove this chip; focus moves, before the dispatch, to the next chip, else the previous one, else the Input |
-| Escape | the Input |
+| Escape | the Input; the key is prevented, so an enclosing Dialog or Popover does not close |
 | A printable key | the Input is focused in the `keydown`, so the character is typed there |
 | Tab / Shift+Tab | the browser's: chips are `tabindex="-1"`, so Tab goes on from the chip's place in the document (the Input, in the usual layout) |
 | Enter, Space | nothing: a chip has no action of its own |

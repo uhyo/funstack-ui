@@ -202,8 +202,12 @@ export type {
 export { Combobox } from "./combobox/index.js";
 export type {
   ComboboxRootProps,
+  ComboboxSingleProps,
+  ComboboxMultipleProps,
   ComboboxRootState,
+  ComboboxMultipleRootState,
   ComboboxValueChangeDetails,
+  ComboboxMultipleValueChangeDetails,
   ComboboxInputValueChangeDetails,
   ComboboxOpenChangeDetails,
   ComboboxLabelProps,
@@ -228,6 +232,12 @@ export type {
   ComboboxEmptyState,
   ComboboxStatusProps,
   ComboboxStatusState,
+  ComboboxChipsProps,
+  ComboboxChipsState,
+  ComboboxChipProps,
+  ComboboxChipState,
+  ComboboxChipRemoveProps,
+  ComboboxChipRemoveState,
 } from "./combobox/index.js";
 
 export { Toast, toast, createToastManager } from "./toast/index.js";

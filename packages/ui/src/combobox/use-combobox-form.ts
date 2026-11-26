@@ -6,9 +6,7 @@ import type { FormAssociatedElement } from "../internal/form/use-form-owner-even
 import { useFormReset, useResetTarget } from "../internal/form/use-form-reset.js";
 
 export interface ComboboxFormOptions {
-  /** The Root's props, for the reset targets. */
-  readonly value: string | null | undefined;
-  readonly defaultValue: string | null | undefined;
+  /** The Root's text props, for the text's reset target. */
   readonly inputValue: string | undefined;
   readonly defaultInputValue: string | undefined;
   readonly inputRef: RefObject<HTMLInputElement | null>;
@@ -16,10 +14,11 @@ export interface ComboboxFormOptions {
   /** The latest text (the urgent lane). */
   readonly textRef: RefObject<string>;
   readonly writeText: (next: string, reason: ChangeReason, event: Event | undefined) => void;
-  /** The optimistic selection. */
-  readonly optimistic: string | null;
-  /** Dispatches the reset target as the value (`"platform"`). */
-  readonly resetValue: (next: string | null, event: Event) => void;
+  /**
+   * Dispatches the value's reset target (`"platform"`) unless there is nothing to change. The
+   * Root computes the target per mode (design 11.1, 15.8).
+   */
+  readonly resetValue: (event: Event) => void;
 }
 
 /**
@@ -28,13 +27,11 @@ export interface ComboboxFormOptions {
  * text, and the mount reconciliation of a text typed before hydration.
  */
 export function useComboboxForm(options: ComboboxFormOptions): void {
-  const { value, defaultValue, inputValue, defaultInputValue, inputRef, hiddenRef, textRef } =
-    options;
+  const { inputValue, defaultInputValue, inputRef, hiddenRef, textRef } = options;
   const { writeText } = options;
 
-  // Reset targets (conventions 3.8 rule 6): uncontrolled, the latest default props; controlled,
-  // the mount-time values.
-  const valueResetTarget = useResetTarget(value, defaultValue) ?? null;
+  // The text's reset target (conventions 3.8 rule 6): uncontrolled, the latest default prop;
+  // controlled, the mount-time value.
   const inputDefaultValue = useResetTarget(inputValue, defaultInputValue) ?? "";
   // After a form reset a controlled parent may not adopt the text: put React's value back into
   // the DOM (react-dom only does that after its own input events).
@@ -63,7 +60,7 @@ export function useComboboxForm(options: ComboboxFormOptions): void {
       if (domText !== textRef.current) writeText(domText, "platform", event);
       // A controlled parent that does not adopt the text gets the DOM re-synced.
       setResync((n) => n + 1);
-      if (valueResetTarget !== options.optimistic) options.resetValue(valueResetTarget, event);
+      options.resetValue(event);
     },
     () => {
       // react-dom writes `defaultValue = value` after every update of a controlled input, so the

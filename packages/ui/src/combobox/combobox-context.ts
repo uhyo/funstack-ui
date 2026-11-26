@@ -22,8 +22,20 @@ export interface ComboboxContextValue {
     /** `${root}-option-`: an Option's id is this plus `encodeURIComponent(value)`. */
     readonly optionPrefix: string;
   };
-  /** Optimistic selection. */
+  /** Optimistic selection; always `null` with `multiple` (design 15.2). */
   readonly value: string | null;
+  /** `multiple` at mount (design 15). */
+  readonly multiple: boolean;
+  /** Optimistic selection as a list: pick order with `multiple`, `[value]` or `[]` otherwise. */
+  readonly values: readonly string[];
+  /** `value` is in the optimistic selection (`aria-selected`, `data-selected`). */
+  readonly isSelected: (value: string) => boolean;
+  /**
+   * `data-pending` of an Option, Chip or ChipRemove: the value action is in flight and `value`
+   * is its optimistic target (single, design 5.2), or its optimistic and committed membership
+   * differ (`multiple`, design 15.5).
+   */
+  readonly isPending: (value: string) => boolean;
   /** The `valueChangeAction` transition is in flight. */
   readonly valuePending: boolean;
   /** `valuePending` or the open transition is in flight (the Root's `pending`). */
@@ -70,6 +82,35 @@ export interface ComboboxContextValue {
   readonly inputClick: (event: MouseEvent) => void;
   /** A press on the Input: captures the pointer to the shown Popup (design 5.4). */
   readonly inputPointerDown: (event: PointerEvent) => void;
+  /** The chips of `multiple` (design 15); inert without it. */
+  readonly chips: ComboboxChipsValue;
+}
+
+/** What a mounted `Combobox.Chip` tells its Root (design 15.6, 15.7). */
+export interface ComboboxChipEntry {
+  readonly element: HTMLElement;
+  /** The Chip's `label` prop. */
+  readonly label: string | undefined;
+}
+
+/** The chips half of the Root's context (design 15). */
+export interface ComboboxChipsValue {
+  /** The `Combobox.Chips` element: inside the combobox for the leave rule (design 15.6). */
+  readonly chipsRef: RefObject<HTMLElement | null>;
+  /** The label cache's entry for `value` (design 15.1), from render state. */
+  readonly labelOf: (value: string) => string | undefined;
+  /** Registers a mounted Chip; returns the unregistration. */
+  readonly registerChip: (value: string, entry: ComboboxChipEntry) => () => void;
+  /** `Combobox.ChipRemove`'s click: remove `value`, announce it, focus the Input. */
+  readonly removeChip: (value: string, event: Event) => void;
+  /** The keys of a focused chip (design 15.6), run by `Chips`' `onKeyDown`. */
+  readonly keyDown: (event: KeyboardEvent) => void;
+  /** Focus arrived in `Chips` (on a chip): the listbox closes (design 15.6). */
+  readonly focusIn: (event: FocusEvent) => void;
+  /** Focus left a chip. */
+  readonly focusOut: (event: FocusEvent) => void;
+  /** A click in `Chips`: the Input takes focus (design 15.6). */
+  readonly click: (event: MouseEvent) => void;
 }
 
 export const ComboboxContext = createContext<ComboboxContextValue | null>(null);
@@ -90,6 +131,9 @@ export const ComboboxListContext = createContext<boolean>(false);
 
 /** `Combobox.Group`: the id its `Combobox.GroupLabel` renders. */
 export const ComboboxGroupContext = createContext<string | null>(null);
+
+/** `Combobox.Chip`: its value, for the `Combobox.ChipRemove` inside it. */
+export const ComboboxChipContext = createContext<string | null>(null);
 
 /** The id fragment of an option value: stable across result sets, no whitespace (design 3.5). */
 export function optionId(prefix: string, value: string): string {

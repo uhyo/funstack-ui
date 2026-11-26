@@ -98,6 +98,9 @@ type PublicProps = {
   CheckboxGroupParentProps: UI.CheckboxGroupParentProps;
   CheckboxGroupRootProps: UI.CheckboxGroupRootProps;
   CheckboxProps: UI.CheckboxProps;
+  ComboboxChipProps: UI.ComboboxChipProps;
+  ComboboxChipRemoveProps: UI.ComboboxChipRemoveProps;
+  ComboboxChipsProps: UI.ComboboxChipsProps;
   ComboboxClearProps: UI.ComboboxClearProps;
   ComboboxEmptyProps: UI.ComboboxEmptyProps;
   ComboboxGroupLabelProps: UI.ComboboxGroupLabelProps;
@@ -105,9 +108,11 @@ type PublicProps = {
   ComboboxInputProps: UI.ComboboxInputProps;
   ComboboxLabelProps: UI.ComboboxLabelProps;
   ComboboxListProps: UI.ComboboxListProps;
+  ComboboxMultipleProps: UI.ComboboxMultipleProps;
   ComboboxOptionProps: UI.ComboboxOptionProps;
   ComboboxPopupProps: UI.ComboboxPopupProps;
   ComboboxRootProps: UI.ComboboxRootProps;
+  ComboboxSingleProps: UI.ComboboxSingleProps;
   ComboboxStatusProps: UI.ComboboxStatusProps;
   ComboboxTriggerProps: UI.ComboboxTriggerProps;
   DialogCloseProps: UI.DialogCloseProps;
@@ -212,6 +217,9 @@ const listedKeys = {
   CheckboxGroupParentProps: true,
   CheckboxGroupRootProps: true,
   CheckboxProps: true,
+  ComboboxChipProps: true,
+  ComboboxChipRemoveProps: true,
+  ComboboxChipsProps: true,
   ComboboxClearProps: true,
   ComboboxEmptyProps: true,
   ComboboxGroupLabelProps: true,
@@ -219,9 +227,11 @@ const listedKeys = {
   ComboboxInputProps: true,
   ComboboxLabelProps: true,
   ComboboxListProps: true,
+  ComboboxMultipleProps: true,
   ComboboxOptionProps: true,
   ComboboxPopupProps: true,
   ComboboxRootProps: true,
+  ComboboxSingleProps: true,
   ComboboxStatusProps: true,
   ComboboxTriggerProps: true,
   DialogCloseProps: true,
@@ -361,7 +371,12 @@ describe("action naming (conventions 10.1)", () => {
       [K in keyof PublicProps]: "onOpenChange" extends OwnHandlerKeys<PublicProps[K]> ? K : never;
     }[keyof PublicProps];
     expectTypeOf<WithOpenChange>().toEqualTypeOf<
-      "ComboboxRootProps" | "DialogRootProps" | "MenuRootProps" | "PopoverRootProps"
+      | "ComboboxRootProps"
+      | "ComboboxSingleProps"
+      | "ComboboxMultipleProps"
+      | "DialogRootProps"
+      | "MenuRootProps"
+      | "PopoverRootProps"
     >();
     expectTypeOf<UI.PopoverRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.PopoverOpenChangeDetails> | undefined

@@ -12589,3 +12589,65 @@ character to the Input in Chromium, Firefox and WebKit; screen readers announce 
 `aria-selected` change of the active option in a multiselectable listbox (NVDA, JAWS,
 VoiceOver), else the toggle needs an announcement too; a focusable `listitem` is read with its
 position.
+
+## 2026-11-26, #164: Combobox `multiple` decided and implemented
+
+The user accepted the six recommendations of the entry above (issue comment, 2026-11-26):
+
+1. The text is **cleared** after a pick.
+2. The listbox **stays open** after a pick.
+3. Chips take **real focus**, with one Tab stop (the Input).
+4. A chip whose removal is pending **disappears at once** and comes back on rejection.
+5. `allowCustomValue` text is **added as a value** when focus leaves.
+6. `announceRemoved` **ships** (default English `"Japan removed"`).
+
+combobox.md section 15 is now "decided"; the Status line no longer excludes it. No rule of
+section 15 changed with the decisions: the section was written with the recommendations.
+
+Amendments made at implementation (combobox.md 15.1, 15.2, 15.6):
+
+- `Combobox.Chips` owns `onFocus` / `onBlur` as well (added to the `Omit` of
+  `ComboboxChipsProps`): focus arriving on a chip closes the listbox and starts the press watch
+  of the leave rule, and focus leaving a chip for outside the combobox is focus leaving. The
+  Input owns the same pair for the same reason (3.2); `onFocusCapture` / `onBlurCapture` pass
+  through.
+- `Chips` renders `aria-labelledby` only while it has the `list` role (not empty): a role-less
+  `div` may not be named.
+- Escape on a chip is prevented as it moves focus to the Input, so the close request of an
+  enclosing Dialog or Popover does not run (verified in Chromium and Firefox, browser row
+  "Escape on a chip inside a modal Dialog").
+
+Implementation notes (not rules):
+
+- The Root keeps one component: both selection hooks are called on every render, the one for
+  the other mode idle (no props, no action). The multiple one is
+  `packages/ui/src/combobox/use-multiple-selection.ts` (the patch reducer, `change`, the whole
+  form reset with the #151 rule of CheckboxGroup); Option, Chip and ChipRemove read
+  `isSelected` / `isPending` from the context, so they do not branch on the mode.
+- Chip labels are render state: a snapshot map written in the pick's event (before the
+  dispatch, so the chip's first render has the label), when an Option for a selected value
+  registers, and in a layout effect when values arrive from outside. The cache itself stays a
+  ref map read by handlers only.
+- `useComboboxForm` takes `resetValue(event)`; the Root computes the reset target per mode.
+  `useDeferredLeave` takes `chipsRef` as a third inside region.
+- Tests: the shared value-action suite runs against `Combobox.Root multiple` (driver
+  `packages/ui/src/__tests__/drivers/combobox-multiple.tsx`, including the transition-type rows
+  in `packages/ui/src/combobox/combobox-multiple-transition-types.test.tsx`);
+  `packages/ui/src/combobox/combobox-multiple.test.tsx` (jsdom) and
+  `packages/ui/src/combobox/combobox-multiple.browser.test.tsx`.
+
+The points left to verify by the entry above:
+
+- **A printable key on a chip lands in the Input** (the Input focused in the chip's `keydown`):
+  verified with the real keyboard in Chromium 156 and Firefox 157 (a letter, a shifted letter,
+  a digit); WebKit through CI (`workflow_dispatch` on the work branch), WebKit cannot run on the
+  development machine.
+- **Screen readers and the `aria-selected` change** of the active option in a multiselectable
+  listbox: not verifiable in the automated suite. Chromium's accessibility tree (CDP) exposes
+  `multiselectable` on the listbox and `selected` on each option, toggled by a pick. The NVDA,
+  JAWS and VoiceOver pass is still to be done by hand; until it is, no extra announcement for a
+  toggle.
+- **A focusable `listitem` read with its position**: Chromium's tree exposes the chips as a
+  list named by the Label with `focusable` list items; CDP shows no `posinset` / `setsize` for
+  them (Chromium computes the position in the platform layer), so what a screen reader speaks
+  is part of the same manual pass.

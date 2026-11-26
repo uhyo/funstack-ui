@@ -20,8 +20,10 @@ const isDev = process.env.NODE_ENV !== "production";
  * `render`.
  */
 export interface ComboboxClearState {
-  /** Optimistic selection. */
+  /** Optimistic selection; always `null` with `multiple` (read `values`). */
   readonly value: string | null;
+  /** Optimistic selection as a list: pick order with `multiple`, `[value]` or `[]` otherwise. */
+  readonly values: readonly string[];
   /** The text in the input (urgent). */
   readonly inputValue: string;
   /** Disabled by its own prop or by the Root. */
@@ -63,7 +65,8 @@ export interface ComboboxClearProps extends Omit<
 
 /**
  * The optional button that clears the combobox: `<button type="button" tabindex="-1">`. A click
- * empties the text (urgent) and dispatches `valueChangeAction(null)` unless nothing is selected;
+ * empties the text (urgent) and dispatches `valueChangeAction(null)` (with `multiple`: one change
+ * that removes every value, announced) unless nothing is selected;
  * the input keeps focus. Always rendered: hide it with CSS (`:placeholder-shown`) or `state`.
  * A click while the listbox is open closes it (the platform's light dismiss: the button is
  * outside the popup).
@@ -87,7 +90,12 @@ export function ComboboxClear({
     isDev && "Combobox.Clear: the button has no accessible name. Give it an `aria-label`.",
     BUTTON_NAME,
   );
-  const state: ComboboxClearState = { value: ctx.value, inputValue: ctx.inputValue, disabled };
+  const state: ComboboxClearState = {
+    value: ctx.value,
+    values: ctx.values,
+    inputValue: ctx.inputValue,
+    disabled,
+  };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...(rendersButton(render) && { type: "button" as const }),

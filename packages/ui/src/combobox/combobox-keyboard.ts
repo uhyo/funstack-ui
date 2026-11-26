@@ -1,6 +1,7 @@
 "use client";
 import { flushSync } from "react-dom";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
+import type { RefObject } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 import type { ActiveOption } from "./use-active-option.js";
 import type { OptionRegistry } from "./use-option-registry.js";
@@ -17,6 +18,39 @@ export interface ComboboxKeyboardOptions {
   readonly accept: (optionValue: string, event: Event) => void;
   /** Free text as the value (design 5.3). Returns whether it dispatched. */
   readonly commitText: (event: Event, close: boolean) => boolean;
+  /** With `multiple` (design 15.6): the keys that differ, and the chips. */
+  readonly multiple: ComboboxMultipleKeys | undefined;
+}
+
+/** What the Input's keys need from a `multiple` Root (design 15.6, 15.9). */
+export interface ComboboxMultipleKeys {
+  /** The text (urgent). */
+  readonly textRef: RefObject<string>;
+  /** At least one value is selected (optimistic): there is a chip. */
+  readonly hasChips: () => boolean;
+  /** Backspace in the empty input: remove the last chip and announce it. */
+  readonly removeLast: (event: Event) => void;
+  /** The inline-start arrow at the caret's start: focus the last chip. `false`: none mounted. */
+  readonly focusLastChip: () => boolean;
+  /** `allowCustomValue`: add the text as a value (or nothing if it is one) and clear it. */
+  readonly addText: (event: Event) => void;
+  /** Clear unmatched text (`"dismiss"`). */
+  readonly clearText: (event: Event) => void;
+}
+
+/** The caret is at the start of the input with nothing selected. */
+function caretAtStart(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLInputElement)) return false;
+  return target.selectionStart === 0 && target.selectionEnd === 0;
+}
+
+/** ArrowLeft, or ArrowRight when the input's computed direction is `rtl` (design 15.6). */
+function isInlineStartArrow(event: KeyboardEvent): boolean {
+  const target = event.target;
+  const rtl =
+    target instanceof Element &&
+    target.ownerDocument.defaultView?.getComputedStyle(target).direction === "rtl";
+  return event.key === (rtl ? "ArrowRight" : "ArrowLeft");
 }
 
 /**
@@ -33,6 +67,7 @@ export function createComboboxKeyDown({
   active,
   accept,
   commitText,
+  multiple,
 }: ComboboxKeyboardOptions): (event: KeyboardEvent) => boolean {
   const { registry, orderedOptions } = options;
   const { activeRef, setActive, pendingEdgeRef } = active;
@@ -82,7 +117,10 @@ export function createComboboxKeyDown({
       case "ArrowUp":
         event.preventDefault();
         if (event.altKey) {
-          if (isOpen) {
+          if (isOpen && multiple !== undefined) {
+            // A pick toggles and does not close: Alt+ArrowUp only closes (design 15.6).
+            popover.requestClose(event, "activate");
+          } else if (isOpen) {
             const current = activeEnabled();
             if (current !== null) accept(current, event);
             else popover.requestClose(event, "activate");
@@ -95,6 +133,26 @@ export function createComboboxKeyDown({
         }
         return true;
       case "Enter": {
+        if (multiple !== undefined) {
+          if (isOpen) {
+            event.preventDefault();
+            const current = activeEnabled();
+            if (current !== null) accept(current, event);
+            else if (allowCustomValue && multiple.textRef.current !== "") multiple.addText(event);
+            return true;
+          }
+          if (multiple.textRef.current === "") return false;
+          if (allowCustomValue) {
+            // The user is adding an item, not submitting the form (design 15.9).
+            event.preventDefault();
+            multiple.addText(event);
+            return true;
+          }
+          // Unmatched text must not reach the submission (`required`, design 15.8): cleared in
+          // one flush, then the key's default runs.
+          flushSync(() => multiple.clearText(event));
+          return false;
+        }
         if (isOpen) {
           // An open listbox means the user is choosing: never submit from here.
           event.preventDefault();
@@ -111,10 +169,38 @@ export function createComboboxKeyDown({
         if (allowCustomValue) flushSync(() => commitText(event, false));
         return false;
       }
-      case "Home":
-      case "End":
+      case "Backspace":
+        // A held Backspace that emptied the text does not go on to eat chips (design 15.6).
+        if (
+          multiple !== undefined &&
+          !event.repeat &&
+          !event.altKey &&
+          multiple.textRef.current === "" &&
+          multiple.hasChips()
+        ) {
+          multiple.removeLast(event);
+          return true;
+        }
+        return false;
       case "ArrowLeft":
       case "ArrowRight":
+        if (
+          multiple !== undefined &&
+          !event.altKey &&
+          !event.shiftKey &&
+          isInlineStartArrow(event) &&
+          caretAtStart(event.target) &&
+          multiple.hasChips() &&
+          multiple.focusLastChip()
+        ) {
+          event.preventDefault();
+          if (activeRef.current !== null) setActive(null);
+          return true;
+        }
+        if (activeRef.current !== null) setActive(null);
+        return false;
+      case "Home":
+      case "End":
         // APG: the caret keys move visual focus to the input (not prevented: the caret moves).
         if (activeRef.current !== null) setActive(null);
         return false;

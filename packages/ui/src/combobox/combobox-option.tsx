@@ -23,11 +23,14 @@ const isDev = process.env.NODE_ENV !== "production";
 export interface ComboboxOptionState {
   /** The Option's `value` prop. */
   readonly value: string;
-  /** Optimistic: this option's value is the (optimistic) selection. */
+  /** Optimistic: this option's value is (in) the optimistic selection. */
   readonly selected: boolean;
   /** `aria-activedescendant` points here (urgent). */
   readonly active: boolean;
-  /** The selection is pending and this option is its optimistic target. */
+  /**
+   * The selection is pending and this option is its optimistic target; with `multiple`, the
+   * option is being added or removed (its optimistic and committed selection differ).
+   */
   readonly pending: boolean;
   /** The Option's `disabled` prop. */
   readonly disabled: boolean;
@@ -125,12 +128,12 @@ export function ComboboxOption({
     return registerOption(value, { element, label, disabled });
   }, [registerOption, value, label, disabled]);
 
-  const selected = ctx.value === value;
+  const selected = ctx.isSelected(value);
   const state: ComboboxOptionState = {
     value,
     selected,
     active: ctx.activeValue === value,
-    pending: ctx.valuePending && selected,
+    pending: ctx.isPending(value),
     disabled,
   };
 

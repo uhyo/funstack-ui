@@ -1,6 +1,7 @@
 // Ships the platform attribute typings with this subpath (conventions 7.4). Type-only: the built
 // JS has no import of it.
 import "../internal/platform-attributes.js";
+import { ComboboxChip, ComboboxChipRemove, ComboboxChips } from "./combobox-chips.js";
 import { ComboboxClear } from "./combobox-clear.js";
 import {
   ComboboxEmpty,
@@ -23,6 +24,8 @@ import { ComboboxTrigger } from "./combobox-trigger.js";
  * `GroupLabel`; `Empty` and `Status` in the Popup. Typing is urgent (the `onInputValueChange`
  * handler, the library's urgent lane); the results render from the deferred `query`; accepting an
  * option is a transition with `data-pending` on it, and the listbox closes when it settles.
+ * `Root multiple` selects a list of values shown as `Chips` > `Chip` > `ChipRemove`; a pick
+ * toggles the option, clears the text and leaves the listbox open.
  *
  * @see https://ui.funstack.work/components/combobox
  */
@@ -39,12 +42,19 @@ export const Combobox = {
   GroupLabel: ComboboxGroupLabel,
   Empty: ComboboxEmpty,
   Status: ComboboxStatus,
+  Chips: ComboboxChips,
+  Chip: ComboboxChip,
+  ChipRemove: ComboboxChipRemove,
 } as const;
 
 export type {
   ComboboxRootProps,
+  ComboboxSingleProps,
+  ComboboxMultipleProps,
   ComboboxRootState,
+  ComboboxMultipleRootState,
   ComboboxValueChangeDetails,
+  ComboboxMultipleValueChangeDetails,
   ComboboxInputValueChangeDetails,
   ComboboxOpenChangeDetails,
 } from "./combobox-root.js";
@@ -65,3 +75,11 @@ export type {
   ComboboxStatusProps,
   ComboboxStatusState,
 } from "./combobox-group.js";
+export type {
+  ComboboxChipsProps,
+  ComboboxChipsState,
+  ComboboxChipProps,
+  ComboboxChipState,
+  ComboboxChipRemoveProps,
+  ComboboxChipRemoveState,
+} from "./combobox-chips.js";
