@@ -149,13 +149,16 @@ export function validityElementOf(el: Element | null): ValidatableElement | null
 }
 
 /**
- * What the Field focuses (design 2.5): the control itself, or for a group the checked radio if
+ * What the Field focuses (design 2.5): the control itself (a form control or a button), or for a
+ * group the checked radio if
  * any, else the first enabled named member (a group's first item, not a CheckboxGroup Parent,
  * which has no name), else the first enabled member.
  */
 export function focusTargetOf(el: Element | null): HTMLElement | null {
   if (el === null) return null;
   if (isValidatable(el)) return el;
+  // A button control (MultiSelect's Trigger, whose validity lives on a hidden element).
+  if (el instanceof HTMLButtonElement) return el;
   const members = (
     el instanceof HTMLFieldSetElement
       ? [...el.elements]

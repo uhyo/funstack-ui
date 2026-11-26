@@ -29,6 +29,13 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/multi-select">MultiSelect</a> (
+          <a href={issue(165)}>#165</a>). <code>{"<Select.Root multiple>"}</code>, already a type
+          error, no longer reaches the <code>{"<select>"}</code>: the attribute is dropped with a
+          development warning that names MultiSelect. <code>Field.Label</code> focuses a button
+          control (MultiSelect's Trigger) instead of clicking it.
+        </li>
+        <li>
           A disabled <code>Button</code> whose click the browser acts on (<code>type="submit"</code>{" "}
           or <code>"reset"</code>, the <code>formAction</code> default, <code>commandfor</code> /{" "}
           <code>popoverTarget</code>, with or without <code>action</code>) keeps native{" "}

@@ -19,6 +19,7 @@ export default defineConfig({
     "src/menu/index.ts",
     "src/select/index.ts",
     "src/combobox/index.ts",
+    "src/multi-select/index.ts",
     "src/toast/index.ts",
     "src/slider/index.ts",
     "src/number-field/index.ts",

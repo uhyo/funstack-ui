@@ -55,6 +55,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/switch", label: "Switch", group: "Forms" },
   { path: "/components/select", label: "Select", group: "Forms" },
   { path: "/components/combobox", label: "Combobox", group: "Forms" },
+  { path: "/components/multi-select", label: "MultiSelect", group: "Forms" },
   { path: "/components/slider", label: "Slider", group: "Forms" },
   { path: "/components/number-field", label: "NumberField", group: "Forms" },
   { path: "/components/progress", label: "Progress", group: "Output" },

@@ -636,8 +636,12 @@ export interface FieldErrorProps
 ```
 
 Owned keys: `Label`: `id`, `htmlFor` (present while the registered control is labelable, which is
-the default before any control registers; removed when a group control registers), the four
-`data-*`. `Description`: `id`, the four `data-*`. `Error`: `id`, the four `data-*`. None of them
+the default before any control registers; removed when a group control registers), `onClick`
+(composed with the consumer's), the four `data-*`. **A `<button>` control** (MultiSelect's
+Trigger, `design/components/multi-select.md` B.8): a `<label for>` would forward its click to
+the button and activate it, so the Label's click is cancelled and the button is focused instead
+(unless it is disabled), as a label focuses a `<select>` without opening it. Every other control
+keeps the platform's label activation. `Description`: `id`, the four `data-*`. `Error`: `id`, the four `data-*`. None of them
 takes `role`-changing props from the library: `Field.Error` has no `role="alert"` and no
 `aria-live` (research §2: the focus move reads the description; a live region would read it twice
 and has broken `aria-describedby` in older VoiceOver), and a consumer who wants an announcement for
@@ -942,6 +946,14 @@ registered element's `setCustomValidity`, so its own `:user-invalid` read in the
 sees the new state. Controls that register no `validityElement` are unchanged. See the
 `design/components/number-field.md` 7.1 and conventions 3.6 / 3.8.
 
+**Amendment (#165, MultiSelect).** A registered element that cannot validate itself (its
+resolved validity element is `null`: a `<button>`) and whose `validityElement` lies outside it
+(MultiSelect's hidden validity `<select>`, a sibling of the Trigger) gets the Field's `invalid`
+listener on the `validityElement` too, since the event fires there and does not bubble.
+`:user-invalid` is then read on the `validityElement` (there is no surface to read it on) and no
+message is mirrored. The focus target of a `<button>` control is the button itself
+(`focusTargetOf`). NumberField's surface validates itself, so nothing changes for it.
+
 The hook returns **no `data-pending`**: a control inside a Field keeps its own `data-pending`
 for its own action and nothing else (conventions 2.7 and 7.3; `Field.Control`, which is a Field
 part, carries the form's). The first draft's signature comment said the part merges the form
@@ -977,6 +989,7 @@ Which controls pass what:
 | `Combobox.Root` | the optimistic selection | `true` for a change its own `dispatchValue` caused (a ref set when the dispatched value differs from the optimistic one), so a pick dismisses a server error like typing; `false` for a controlled change from outside |
 | `CheckboxGroup.Root` | the sorted optimistic set plus the derived "at least one" `required` | nothing (the Items' own `change` already dismisses); covers a Parent click and the attribute flip |
 | `Checkbox`, `Switch`, `RadioGroup.Root`, `Select.Root` | the optimistic value | nothing (their native `input` / `change` already dismiss); covers a controlled change from outside and a rollback |
+| `MultiSelect.Root` | the optimistic selection | `true` for a change its own pick dispatched, `false` for a controlled change, a reset or a rollback |
 | `Slider.Root` (#60, proposed: slider.md 9.4) | the optimistic values joined (`optimisticValues.join("\u0000")`): one notification per gesture commit (uncontrolled), per adopted step (a controlled adopt-steps parent), and on a rollback | `true` when the latest commit's `reason` was `"activate"` (a pointer gesture, a key press, a JS-normalised vertical / RTL arrow), which are the gestures that fire no native `input` / `change`; `false` for `"platform"` and a rollback |
 | `Field.Control` | nothing | a native control's value changes only through events the Field hears |
 
@@ -998,6 +1011,7 @@ hook is also what Slider needs (#60): a pointer gesture fires no native `input` 
 | `Select.Root` | the `<select>` | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. Nothing changes for `<selectedcontent>`. `useFieldValueChange(optimistic)`. |
 | `Combobox` | `Combobox.Input` registers the input (labelable); the Root reads `FieldContext` directly for the hidden input's `name` and `disabled`, the Input's id, and the List's `aria-labelledby` when no `Combobox.Label` is mounted (choice 7) | yes | `for` on the Input | the Input (`required` lands there) | `Combobox.Root name` defaults from the Field (hidden input). `validate`'s `value` is `formData.get(name)`, the hidden input: the **selection**, not the typed text. A pick is an edit: `useFieldValueChange(selection, takeEdit)` re-runs `validate` and dismisses a server error at once (H1). `Combobox.Label` stays for use outside a Field. |
 | `Slider` (#60, **proposed**: the design is slider.md 9.4, pending product-owner acceptance) | `Slider.Root` calls the hook (the thumb count is known there) with `labelable: count === 1`; the returned ref registers the only Thumb's `<input type="range">` (through context) or, with several thumbs, the Root's group `div` | per shape | `for` (the Root makes `thumbId(0)` the Field's control id) / `aria-labelledby` on the Root, token-merged with `Slider.Label`'s id | the first Thumb's input in DOM order (a range has no native constraints; the slot carries `validate` and server errors; `:user-invalid` matches it after a submit attempt) | `name` / `disabled` default from the Field (a Thumb's own `name` still wins; `errors` and `validate` key on the Field's name). `required` is not applicable (a range always has a value; `Field.Root required` warns). `aria-invalid` on every Thumb input (never on the group `div`, 5.1); `aria-describedby`: the input (one thumb) or the Root (several). `useFieldValueChange` keyed on the optimistic values, `edit = true` for `"activate"` commits (pointer and normalised keys fire no native event). `Slider.Label` stays for use outside a Field. |
+| `MultiSelect` | `MultiSelect.Trigger` registers the button (labelable) with the validity element as `validityElement` while `required` is set; the Root reads `FieldContext` for `name`, `disabled`, `required`, the Trigger's id and the List's `aria-labelledby` | yes | `for` on the Trigger; the Label's click focuses it (4.2) | the hidden one-option `<select>` (with `required`), else none | `validate`'s `value` is the first value (`formData.get(name)`); a rule over the selection reads `formData.getAll(name)`. The browser's bubble is never shown (multi-select.md B.10), so `Field.Error` is where the `required` message appears. `useFieldValueChange(selection, takeEdit)`. |
 | `Toggle`, `Menu`, `Tabs`, … | nothing | | | | not form controls; a Field around them is a dev warning (no registration). |
 
 Landing Field therefore touches each of these parts with one hook call and the owned-layer merge

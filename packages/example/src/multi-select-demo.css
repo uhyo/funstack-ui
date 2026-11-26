@@ -1,0 +1,151 @@
+.ms-demo {
+  --ms-accent: #2563eb;
+  --ms-accent-weak: #dbeafe;
+}
+
+.ms-label {
+  display: block;
+  margin-block-end: 0.25em;
+  font-weight: 600;
+}
+
+.ms-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6em;
+  min-inline-size: 16em;
+  max-inline-size: 24em;
+  padding: 0.35em 0.6em;
+  border: 1px solid GrayText;
+  border-radius: 6px;
+  background: Canvas;
+  color: CanvasText;
+  font: inherit;
+  text-align: start;
+}
+.ms-trigger > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ms-trigger [data-placeholder] {
+  color: GrayText;
+}
+.ms-trigger[data-open] {
+  outline: 2px solid var(--ms-accent);
+  outline-offset: 1px;
+}
+.ms-trigger[data-pending] {
+  cursor: progress;
+}
+.ms-trigger[data-invalid] {
+  border-color: #dc2626;
+}
+
+.ms-popup {
+  margin: 0;
+  margin-block-start: 4px;
+  inset: auto;
+  max-block-size: 16em;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid GrayText;
+  border-radius: 8px;
+  background: Canvas;
+  color: CanvasText;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.2);
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    display 120ms allow-discrete,
+    overlay 120ms allow-discrete;
+}
+.ms-popup:popover-open {
+  opacity: 1;
+}
+@starting-style {
+  .ms-popup:popover-open {
+    opacity: 0;
+  }
+}
+
+.ms-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.ms-option::before {
+  content: "";
+  inline-size: 0.9em;
+  block-size: 0.9em;
+  border: 1px solid GrayText;
+  border-radius: 3px;
+}
+.ms-option[data-selected]::before {
+  border-color: var(--ms-accent);
+  background: var(--ms-accent);
+  box-shadow: inset 0 0 0 2px Canvas;
+}
+.ms-option[data-active] {
+  background: var(--ms-accent-weak);
+}
+.ms-option[data-pending] {
+  cursor: progress;
+}
+.ms-option[aria-disabled="true"] {
+  color: GrayText;
+}
+.ms-group-label {
+  padding: 4px 8px 2px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: GrayText;
+}
+.ms-status {
+  padding: 4px 8px;
+  color: GrayText;
+}
+.ms-spinner {
+  inline-size: 0.8em;
+  block-size: 0.8em;
+  margin-inline-start: auto;
+  border: 2px solid currentColor;
+  border-inline-end-color: transparent;
+  border-radius: 50%;
+  animation: ms-spin 0.8s linear infinite;
+}
+@keyframes ms-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+.ms-error {
+  color: #dc2626;
+  font-size: 0.9em;
+}
+.ms-error-box {
+  color: #dc2626;
+}
+.ms-dialog {
+  padding: 1em 1.5em;
+}
+
+::view-transition-old(.ms-pop) {
+  animation: 120ms ease-in both ms-fade-out;
+}
+::view-transition-new(.ms-pop) {
+  animation: 120ms ease-out both ms-fade-in;
+}
+@keyframes ms-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes ms-fade-in {
+  from {
+    opacity: 0;
+  }
+}

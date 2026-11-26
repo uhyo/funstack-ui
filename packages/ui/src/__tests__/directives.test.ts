@@ -139,8 +139,24 @@ const clientFiles = [
   "combobox/combobox-option.mjs",
   "combobox/combobox-group.mjs",
   "combobox/use-combobox-text.mjs",
-  "combobox/use-active-option.mjs",
+  "internal/use-active-option.mjs",
   "combobox/combobox-keyboard.mjs",
+  // The listbox machinery Combobox and MultiSelect share (multi-select.md B.15).
+  "internal/use-option-registry.mjs",
+  "internal/use-deferred-leave.mjs",
+  "internal/action/use-multiple-selection.mjs",
+  // Every MultiSelect part and its context are client modules (design/components/multi-select.md
+  // B.13).
+  "multi-select/multi-select-context.mjs",
+  "multi-select/multi-select-root.mjs",
+  "multi-select/multi-select-label.mjs",
+  "multi-select/multi-select-trigger.mjs",
+  "multi-select/multi-select-value.mjs",
+  "multi-select/multi-select-popup.mjs",
+  "multi-select/multi-select-list.mjs",
+  "multi-select/multi-select-option.mjs",
+  "multi-select/multi-select-group.mjs",
+  "multi-select/multi-select-keyboard.mjs",
   // Every Toast part and its context are client modules; the manager is not
   // (design/components/toast.md 13 and 17).
   "toast/toast-context.mjs",
@@ -246,6 +262,10 @@ const directiveFreeFiles = [
   "menu/index.mjs",
   "select/index.mjs",
   "combobox/index.mjs",
+  "multi-select/index.mjs",
+  // Typeahead of Menu and MultiSelect, and the hidden form values of the set-valued Roots.
+  "internal/typeahead.mjs",
+  "internal/form/hidden-values.mjs",
   "internal/overlay/anchor-position.mjs",
   "toast/index.mjs",
   "toast/toast.mjs",

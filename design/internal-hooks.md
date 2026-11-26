@@ -253,6 +253,10 @@ packages/ui/src/internal/
   decimal.ts              # decimal helpers of Slider and NumberField; directive-free
   range-value.ts          # clamp, percentage and formatting of Progress and Meter; directive-free
   csp-context.ts          # what <CSPProvider> gives the parts that render a hoisted <style> (section 12)
+  use-option-registry.ts  # the mounted Options, Statuses and Labels of a listbox, the label cache, optionId, optionLabel (Combobox, MultiSelect; combobox.md 2, multi-select.md B.15)
+  use-active-option.ts    # the active option (urgent virtual focus) and its revalidation; the pending edge, a resolver, the `loading` hold (combobox.md 6.5, multi-select.md B.8)
+  use-deferred-leave.ts   # the focus-leave decision of a listbox's focus surface, deferred past a press (combobox.md 5.4)
+  typeahead.ts            # the 500 ms typeahead buffer and its prefix match (Menu, MultiSelect; menu.md 5.1); directive-free
   action/                 # actions and triggers (section 3.4, conventions 2); imports flat modules only
     action-details.ts     # createActionDetails (section 2.2); directive-free
     use-controllable-action.ts # section 3.4; also intendedValue (3.8 rule 1)
@@ -262,6 +266,7 @@ packages/ui/src/internal/
     report-dropped.ts     # section 2.4: reportDropped(error) -> global reportError, console.error fallback; directive-free (callUrgentHandler imports it)
     use-connected.ts      # section 2.4: useConnected(), whether the owner's effects are connected; both hooks and Form.Root call it
     call-urgent-handler.ts # callUrgentHandler: the one rule of every `on*` handler (2.1); directive-free
+    use-multiple-selection.ts # the set-valued selection of a listbox (Combobox `multiple`, MultiSelect): patch reducer, replay, absolute reset (combobox.md 15.4)
   form/                   # native form controls and Field (section 3.8); imports action/ and flat modules
     use-form-reset.ts     # section 3.8; also useResetTarget(value, defaultValue), the reset target by mode (rule 6)
     use-form-owner-event.ts # section 3.8; declares FormAssociatedElement
@@ -276,6 +281,7 @@ packages/ui/src/internal/
     use-field-control.ts  # useFieldControl, useFieldValueChange, fieldInputProps, resolveFieldDefaults (3.8)
     validity.ts, focus-first-invalid.ts # Field helpers; directive-free
     form-status-watcher.tsx # the useFormStatus edge watcher of Form.Root and Dialog.Form
+    hidden-values.tsx     # HiddenValues: one hidden input per value of a set-valued Root (Combobox `multiple`, MultiSelect); directive-free
   overlay/                # open state, popups, placement, the modal stack (3.9, 13); imports action/ and flat modules
     use-overlay-root.ts   # useOverlayRoot, OverlayRootValue (section 3.9; Dialog), usePopoverRoot, PopoverRootValue (plus the `shown` mirror; Popover, Menu, Combobox, HoverCard), popoverDetails
     use-popover-popup.ts, use-popover-trigger.ts # the shared Popup and Trigger of Popover, Menu, Combobox; toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger. HoverCard uses the Popup hook only, with `quietShow` (every show a no-focus show), `allowOpen` (its "no open until fresh interest" at the `beforetoggle` interception), `elements` (a `<span>` card), `beforeInterestHide` (passed on to `useInterestDismiss`: blur before the lost-interest hide) and `onRoutedOpen`; hover-card.md 12

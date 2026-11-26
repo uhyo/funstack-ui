@@ -46,6 +46,7 @@
     "./hover-card": "./dist/hover-card/index.mjs",
     "./menu": "./dist/menu/index.mjs",
     "./meter": "./dist/meter/index.mjs",
+    "./multi-select": "./dist/multi-select/index.mjs",
     "./number-field": "./dist/number-field/index.mjs",
     "./popover": "./dist/popover/index.mjs",
     "./progress": "./dist/progress/index.mjs",

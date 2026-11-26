@@ -1,16 +1,30 @@
 "use client";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
-import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
-import type { OptionRegistry } from "./use-option-registry.js";
+import type { OptionRegistry, OrderedOption } from "./use-option-registry.js";
+
+/**
+ * Where the active option goes once an open has options: the first or last enabled one
+ * (ArrowDown / ArrowUp while closed), or what a resolver picks from the enabled options in
+ * document order (MultiSelect: the first selected one, a typeahead match; `null`: none).
+ */
+export type PendingEdge = "first" | "last" | ((enabled: readonly OrderedOption[]) => string | null);
 
 export interface ActiveOptionOptions {
-  readonly popover: Pick<PopoverRootValue, "committed" | "intended">;
+  /** The Root's popover (`PopoverRootValue`): its committed open state and the intent. */
+  readonly popover: { readonly committed: boolean; readonly intended: () => boolean };
   readonly orderedOptions: OptionRegistry["orderedOptions"];
   /** The Root's `autoHighlight`. */
   readonly autoHighlight: boolean;
   /** The results shown are for an older text: never auto-highlighted. */
   readonly stale: boolean;
+  /**
+   * Whether the List is loading (a `Status` is mounted inside it): the pending edge waits until
+   * it settles (MultiSelect, multi-select.md B.8). Read in the layout effect, so it must see a
+   * Status that registered in the same commit (a ref count, not render state). Default: never
+   * loading, the edge is taken as soon as an enabled option is mounted (Combobox).
+   */
+  readonly loading?: () => boolean;
 }
 
 export interface ActiveOption {
@@ -20,7 +34,7 @@ export interface ActiveOption {
   readonly activeRef: RefObject<string | null>;
   readonly setActive: (next: string | null) => void;
   /** The edge to activate once the open has options (ArrowDown / ArrowUp while closed). */
-  readonly pendingEdgeRef: RefObject<"first" | "last" | null>;
+  readonly pendingEdgeRef: RefObject<PendingEdge | null>;
   /**
    * `autoHighlight` (APG automatic selection) highlights once per open and once per edit, when
    * the results for it settle. Home / End / Left / Right clear the active option without
@@ -30,14 +44,16 @@ export interface ActiveOption {
 }
 
 /**
- * The active option of a combobox (design/components/combobox.md 2 and 6.5): urgent virtual
- * focus, revalidated against the mounted options in a layout effect after every commit.
+ * The active option of a listbox with virtual focus, Combobox or MultiSelect
+ * (design/components/combobox.md 2 and 6.5; multi-select.md B.8): urgent virtual focus,
+ * revalidated against the mounted options in a layout effect after every commit.
  */
 export function useActiveOption({
   popover,
   orderedOptions,
   autoHighlight,
   stale,
+  loading,
 }: ActiveOptionOptions): ActiveOption {
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
@@ -45,7 +61,7 @@ export function useActiveOption({
     activeRef.current = next;
     setActiveValue(next);
   }, []);
-  const pendingEdgeRef = useRef<"first" | "last" | null>(null);
+  const pendingEdgeRef = useRef<PendingEdge | null>(null);
   const autoArmedRef = useRef(true);
 
   // Revalidation (design 6.5): urgent, in a layout effect after every commit; never dispatches.
@@ -60,8 +76,12 @@ export function useActiveOption({
     }
     const enabled = orderedOptions().filter((option) => !option.disabled);
     let next = current;
-    if (pendingEdgeRef.current !== null && enabled.length > 0) {
-      next = (pendingEdgeRef.current === "first" ? enabled[0] : enabled.at(-1))!.value;
+    const edge = pendingEdgeRef.current;
+    if (edge !== null && enabled.length > 0 && loading?.() !== true) {
+      next =
+        typeof edge === "function"
+          ? edge(enabled)
+          : (edge === "first" ? enabled[0] : enabled.at(-1))!.value;
       pendingEdgeRef.current = null;
     } else if (next !== null && !enabled.some((option) => option.value === next)) {
       next = null;

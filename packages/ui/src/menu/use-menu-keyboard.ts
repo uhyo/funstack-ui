@@ -3,9 +3,7 @@ import { useCallback, useRef } from "react";
 import type { KeyboardEvent } from "react";
 import type { MenuContextValue } from "./menu-context.js";
 import { focusItem, hasModifier, isMenuItem, isRtl, menuItems, typeaheadText } from "./menu-dom.js";
-
-/** Typeahead buffer lifetime after the last keystroke (design 5.1). */
-const TYPEAHEAD_RESET_MS = 500;
+import { createTypeaheadBuffer, isTypingAhead, typeaheadMatch } from "../internal/typeahead.js";
 
 export interface MenuKeyboard {
   /** Menu.Popup's `onKeyDown`. */
@@ -21,34 +19,18 @@ export interface MenuKeyboard {
  */
 export function useMenuKeyboard(menu: MenuContextValue, nativeFocusgroup: boolean): MenuKeyboard {
   const { popover, submenu, loop } = menu;
-  const typeahead = useRef({ text: "", at: 0 });
-  const typingAhead = useCallback(() => {
-    const { text, at } = typeahead.current;
-    return text !== "" && Date.now() - at <= TYPEAHEAD_RESET_MS;
-  }, []);
+  const typeahead = useRef(createTypeaheadBuffer());
+  const typingAhead = useCallback(() => isTypingAhead(typeahead.current), []);
 
+  // Typeahead (design 5.1, `internal/typeahead.ts`): a repeated single character cycles through
+  // the items starting with it; a longer buffer keeps the current item while it still matches.
   const runTypeahead = (popup: HTMLElement, current: HTMLElement | null, key: string): boolean => {
-    const now = Date.now();
-    const buffer = typeahead.current;
-    if (buffer.text === "" || now - buffer.at > TYPEAHEAD_RESET_MS) buffer.text = "";
-    if (key === " " && buffer.text === "") return false;
-    buffer.text += key.toLowerCase();
-    buffer.at = now;
     const items = menuItems(popup);
-    if (items.length === 0) return true;
-    // A repeated single character cycles through the items starting with it; a longer buffer
-    // keeps the current item while it still matches (design 5.1).
-    const repeated = [...buffer.text].every((c) => c === buffer.text[0]);
-    const search = repeated ? buffer.text[0]! : buffer.text;
     const index = current === null ? -1 : items.indexOf(current);
-    const start = repeated || index < 0 ? index + 1 : index;
-    for (let i = 0; i < items.length; i++) {
-      const item = items[(start + i) % items.length]!;
-      if (typeaheadText(item).startsWith(search)) {
-        if (item !== current) focusItem(item);
-        break;
-      }
-    }
+    const match = typeaheadMatch(typeahead.current, key, items.map(typeaheadText), index);
+    if (match === null) return false;
+    const item = items[match];
+    if (item !== undefined && item !== current) focusItem(item);
     return true;
   };
 

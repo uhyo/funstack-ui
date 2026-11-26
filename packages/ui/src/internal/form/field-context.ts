@@ -55,6 +55,11 @@ export interface FieldContextValue {
   readonly state: FieldState;
   /** The registered control is labelable (default `true`, also before any registration). */
   readonly labelable: boolean;
+  /**
+   * The registered control's element, or `null` (handlers only): `Field.Label` focuses a
+   * `<button>` control instead of activating it (MultiSelect, multi-select.md B.10).
+   */
+  readonly controlElement: () => HTMLElement | null;
   /** Registers the Field's control; returns the unregister function. The first one wins. */
   readonly registerControl: (registration: FieldControlRegistration) => () => void;
   /** A `Field.Error` is mounted (the Field may cancel the platform bubble). */

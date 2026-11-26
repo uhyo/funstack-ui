@@ -224,6 +224,34 @@ export type {
 } from "./select/index.js";
 
 export { Combobox } from "./combobox/index.js";
+
+export { MultiSelect } from "./multi-select/index.js";
+export type {
+  MultiSelectRootProps,
+  MultiSelectRootState,
+  MultiSelectValueChangeDetails,
+  MultiSelectOpenChangeDetails,
+  MultiSelectLabelProps,
+  MultiSelectLabelState,
+  MultiSelectTriggerProps,
+  MultiSelectTriggerState,
+  MultiSelectValueProps,
+  MultiSelectValueState,
+  MultiSelectPopupProps,
+  MultiSelectPopupState,
+  MultiSelectListProps,
+  MultiSelectListState,
+  MultiSelectOptionProps,
+  MultiSelectOptionState,
+  MultiSelectGroupProps,
+  MultiSelectGroupState,
+  MultiSelectGroupLabelProps,
+  MultiSelectGroupLabelState,
+  MultiSelectEmptyProps,
+  MultiSelectEmptyState,
+  MultiSelectStatusProps,
+  MultiSelectStatusState,
+} from "./multi-select/index.js";
 export type {
   ComboboxRootProps,
   ComboboxSingleProps,
