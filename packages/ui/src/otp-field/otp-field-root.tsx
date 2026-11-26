@@ -352,7 +352,6 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     [propsRef],
   );
 
-  /** The code is complete after an edit or a WebOTP fill (design 3.1). */
   /** Submits the Input's form, after the Field re-validated the text just written (design 3.1). */
   const submit = useCallback(() => {
     const form = inputRef.current?.form;
