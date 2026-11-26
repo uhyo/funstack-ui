@@ -91,3 +91,40 @@ WebKit not installed here, branch CI green), `pnpm lint`, `typecheck`. Three thr
 - Developer deviations (Input calls `useFieldControl`, `onChange` omitted, run found by diffing,
   raw text while composing, selection read on focus/select/keyup): all sound.
 - Docs props tables match the types; skill line accurate; exports and action-naming list updated.
+
+## Follow-up: fixes in 4852e40f
+
+Verdict: **merge.** All seven findings addressed; no regression found.
+
+Ran at 4852e40f: build, jsdom + jsdom-isolated (4617 pass), browser `src/otp-field` on Chromium
+and Firefox (36 pass, none skipped), lint clean.
+
+1. Fixed. `run` and `notifyField` are read through `propsRef` (`useLatest`, written in an
+   insertion effect, so an event or promise callback sees the last committed `run`; correct,
+   since `run` only closes over refs and the stable `startTransition`). `complete`, `change`,
+   `compositionEnd` and `webOTPCode` are now stable. The WebOTP effect is keyed on the flag plus
+   refs and reads the callback through `webOTPCodeRef`. `webOTPDone` stops a new request after
+   any completion and guards `webOTPCode`. New jsdom row: one `get` across typing, all aborted
+   after completion, no request after a later edit. Its "late code is ignored" step resolves an
+   already-aborted request, so it exercises the `signal.aborted` guard rather than `webOTPDone`
+   (nit; that guard is trivially correct by reading). `webOTPDone` is never reset, so clearing
+   after a wrong code does not re-request: matches design 8 as amended.
+2. Fixed. `submit()` calls the Field's `notifyChange(true)` (sync refresh on the written DOM)
+   before `requestSubmit()`. The later `useFieldValueChange` notify is a harmless second refresh.
+   Test covers paste `12 34` and rule-5 overtype.
+3. Fixed as recommended: owned `pointer-events: none` on the Slot, docs caveat replaced, design 6
+   amended, browser row with a dimmed and positioned Slot during pending, clicked through.
+4. Fixed. A completion during composition holds the submit in `submitAfterComposition`;
+   `compositionend` submits it only if the value is unchanged and complete, so a cancelled
+   composition submits nothing. If the value changed at `compositionend` and is complete,
+   `complete()` runs again (second `completeAction` plus submit), consistent with "every
+   completion with a changed value runs". Firefox order is now scripted (jsdom and the
+   non-Chromium browser branch): the final input falls back with no change. `completeAction`
+   still runs on uncommitted text, by design.
+5. Fixed. `valueRef` is written only when uncontrolled; the controlled parent's render updates
+   it (discrete events flush synchronously). Test added.
+6. Fixed (design 3.1 wording).
+7. Fixed: comment on `propsRef`; AX row branches instead of `it.runIf`.
+
+New nit: otp-field-root.tsx:355 is a stray duplicate of the JSDoc line at :366 ("The code is
+complete after an edit or a WebOTP fill"), left above `submit`. Delete it.
