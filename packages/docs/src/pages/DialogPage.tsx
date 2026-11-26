@@ -28,6 +28,11 @@ export function DialogPage() {
         <DialogConfirm />
       </Example>
       <p>
+        For confirmations, <a href="/components/alert-dialog">AlertDialog</a> is this pattern with
+        the defaults built in: <code>role="alertdialog"</code>, no light dismiss, focus on Cancel,
+        and a confirm button that runs an async action.
+      </p>
+      <p>
         This confirmation is a Server Component in JS-free mode. Every button is a native invoker or
         a <code>method="dialog"</code> submit, so it works before hydration and with JavaScript
         disabled.
@@ -314,7 +319,9 @@ export function DialogPage() {
         owned={
           "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` are merged with yours. `onToggle` and `onBeforeToggle` are not accepted: use a `ref` for the platform events."
         }
-        note={'Other props, such as `role="alertdialog"` or `onCancel`, pass through.'}
+        note={
+          'Other props, such as `role` or `onCancel`, pass through. For a confirmation, use [AlertDialog](/components/alert-dialog): `role="alertdialog"`, no light dismiss and focus on Cancel are its defaults.'
+        }
       />
 
       <h4>
@@ -549,7 +556,9 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
         <li>
           The Popup's role is the native <code>dialog</code>; <code>aria-modal</code> is exposed by
           the browser after <code>showModal()</code>, never set by hand.{" "}
-          <code>role="alertdialog"</code> passes through. <code>aria-labelledby</code> and{" "}
+          <code>role="alertdialog"</code> passes through; for a confirmation that needs an answer,{" "}
+          <a href="/components/alert-dialog">AlertDialog</a> renders it for you, with no light
+          dismiss and focus on Cancel. <code>aria-labelledby</code> and{" "}
           <code>aria-describedby</code> point at Title and Description. A Popup with neither a Title
           nor an <code>aria-label</code> is a development warning.
         </li>

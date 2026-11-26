@@ -45,6 +45,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/hover-card", label: "HoverCard", group: "Overlays" },
   { path: "/components/popover", label: "Popover", group: "Overlays" },
   { path: "/components/dialog", label: "Dialog", group: "Overlays" },
+  { path: "/components/alert-dialog", label: "AlertDialog", group: "Overlays" },
   { path: "/components/menu", label: "Menu", group: "Overlays" },
   { path: "/components/context-menu", label: "Context menu (Menu)", group: "Overlays" },
   { path: "/components/toast", label: "Toast", group: "Overlays" },

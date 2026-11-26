@@ -29,6 +29,13 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/alert-dialog">AlertDialog</a> (
+          <a href={issue(167)}>#167</a>): a Dialog with <code>role="alertdialog"</code>, no light
+          dismiss and focus on Cancel, whose <code>Action</code> runs an async action and closes
+          when it resolves. Development messages of a Dialog part outside its Root now name the Root
+          of its own namespace.
+        </li>
+        <li>
           New component <a href="/components/multi-select">MultiSelect</a> (
           <a href={issue(165)}>#165</a>). <code>{"<Select.Root multiple>"}</code>, already a type
           error, no longer reaches the <code>{"<select>"}</code>: the attribute is dropped with a
