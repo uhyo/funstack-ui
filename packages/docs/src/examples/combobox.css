@@ -124,3 +124,53 @@
     transition: none;
   }
 }
+
+/* Combobox `multiple`: the field box holds the chips and the input; Chips is the list of selected
+   values, each Chip a focusable list item (the inline-start arrow at the input's start moves into
+   them). A chip whose addition is still being saved carries `data-pending`. The box is named as
+   an anchor so the listbox can be as wide as it (the Popup's `style` in the example). */
+.demo-combobox-tags {
+  display: flex;
+  flex-wrap: wrap;
+  max-inline-size: 30rem;
+  padding: 2px 4px;
+  anchor-name: --demo-tags;
+}
+.demo-combobox-tags .demo-combobox-input {
+  flex: 1;
+  min-inline-size: 8rem;
+}
+.demo-combobox-chips {
+  display: flex;
+  flex-wrap: wrap;
+}
+.demo-combobox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 2px;
+  padding: 0.1em 0.2em 0.1em 0.55em;
+  border-radius: 999px;
+  background: var(--color-bg-secondary);
+  font-size: 0.9em;
+}
+.demo-combobox-chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.demo-combobox-chip[data-pending] {
+  opacity: 0.6;
+  cursor: progress;
+}
+.demo-combobox-chip-remove {
+  padding: 0 0.35em;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--color-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.demo-combobox-chip-remove:hover {
+  color: var(--color-text);
+}
