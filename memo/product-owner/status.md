@@ -448,3 +448,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #166 MERGED e551630c (cf276113 + review). Follow-ups #177 (Dialog Escape vs inner manual popover), #178 (Chromium 160 re-probe). Remaining wave 23: #165 MultiSelect (developer running).
 - #179 flake fixed + merged (test race, poll). #165 impl c23b3ce9 in review (review/165). User accepted required fallback (no bubble; message only via Field.Error).
 - #165 MERGED 308d3965 (7ad563c2 + review). WAVE 23 (P1) DONE: Collapsible, Combobox multiple, HoverCard, MultiSelect. Open follow-ups: #175, #177, #178; human #176. Next: wave 24 (#167 AlertDialog, #169 small parts) — confirm with user / consider alpha.20.
+
+## Wave 24 (#167 AlertDialog, #169 small parts), 2026-11-26
+- Designs: 167 2f9ec4a0 (design/167-alert-dialog), 169 d8853cba (design/169-small-parts). User took all recommendations (see issue comments). Fieldset: not built (PO, per recommendation).
+- New issues: https://github.com/uhyo/funstack-ui/issues/180 Slider fieldset-disabled (in wave 24 small-parts dev), https://github.com/uhyo/funstack-ui/issues/181 commit-action text field research (later), https://github.com/uhyo/funstack-ui/issues/182 Dialog/Popover.Close pre-hydration command (user decision later).
+- Asked user about alpha.20 release; no answer yet.
