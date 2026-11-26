@@ -12919,3 +12919,86 @@ Open decisions for the user (recommendation first):
 8. Single selection in this component: no / yes.
 
 To verify in a browser at implementation: multi-select.md B.16.
+## 2026-11-26, #165: `MultiSelect` decided and implemented
+
+The user accepted the eight recommendations of the entry above (issue comment, 2026-11-26):
+
+1. A dedicated component, `MultiSelect` (`@funstack/ui/multi-select`).
+2. The name `MultiSelect`.
+3. A `Value` part with function `children`, no chips.
+4. `required` through a hidden validity `<select>`.
+5. The value in pick order.
+6. The full open-state API.
+7. No `Clear`, no range selection, no select-all in v1.
+8. Multiple selection only.
+
+multi-select.md is now "decided": the neutral part names of Part B are the parts of
+`MultiSelect` (`Root`, `Label`, `Trigger`, `Value`, `Popup`, `List`, `Option`, `Group`,
+`GroupLabel`, `Status`, `Empty`); Part A stays as the reasoning, A.5 records the decisions.
+
+The conventions edits the entry above left for acceptance:
+
+- conventions 1.1: the part vocabulary rows `Root` (one hidden input per value for a set:
+  Combobox `multiple`, MultiSelect), `List`, `Trigger` (MultiSelect's is the combobox,
+  `button[role=combobox]`), `Label` (a button surface whose forwarded click it turns into
+  focus), `Option`, `Empty`, `Status`, `Value` (MultiSelect's `span` with function `children`);
+  the validity element as a use of the NumberField exception; MultiSelect's Root under the
+  Combobox hidden-input exception.
+- conventions 2.5: MultiSelect in the list of set-valued owners.
+- conventions 5.3: the MultiSelect row (`fsui-multi-select`, `-open`, `-close`, `-select`,
+  `-deselect`).
+- Also: conventions 3.2 (the `shown` row: MultiSelect's Trigger renders `aria-expanded`), 3.6
+  (a surface that cannot hold validity at all: no mirror, the `invalid` cancelled), 7.4 (the
+  "written after hydration" row names MultiSelect's `popovertarget`).
+
+Amendments made at implementation:
+
+- **B.10, B.16: the browser's bubble is not shown.** The B.16 check failed in Firefox: the
+  bubble of the hidden element stays after the focus hand-over, over the place where the
+  listbox opens, and takes the clicks there (the first options could not be clicked). A probe
+  with a plain visible `<select required>` showed Firefox's bubble swallowing the clicks below it
+  as well, so it is the platform's; script can neither move nor dismiss it. The fallback of
+  `memo/architect/select-multiple-notes.md` is taken: the validity element's `invalid` is
+  cancelled, a submission attempt (`:user-invalid`) focuses the Trigger through the Field's
+  first-invalid collector, and the message is `Field.Error`'s. Outside a Field a blocked submit
+  only moves focus. The validity element is `autocomplete="off"` and disabled with the Trigger;
+  the Trigger carries an inline `anchor-name` while `required` is set.
+- **field-form.md 4.2, 7.1, 7.2**: `Field.Label` cancels its click and focuses a `<button>`
+  control (owned `onClick`, composed); a Field listens for `invalid` on a `validityElement`
+  outside a registered element that cannot validate itself; `focusTargetOf` returns a button
+  control itself; a MultiSelect row in the 7.2 table and in the `useFieldValueChange` table.
+- **B.7, B.1**: `data-placeholder` is on `Value` whenever the selection is empty, also with
+  function `children`.
+- **select.md 13**: `multiple` on `Select.Root` is dropped (not passed to the `<select>`) as
+  well as warned about: a `<select multiple>` under `value={string}` is a broken state.
+- **B.15**: the shared files are named as they landed (below).
+- `MultiSelectTriggerProps` also omits `onKeyUp` (owned: Space is prevented on `keyup` too).
+
+Implementation notes (not rules):
+
+- The listbox hooks moved from `combobox/` to `internal/` once: `use-option-registry.ts`,
+  `use-active-option.ts`, `use-deferred-leave.ts` (flat), `action/use-multiple-selection.ts`
+  (generic over the component's extra detail fields), and the new `form/hidden-values.tsx`.
+  `use-active-option.ts` gained a resolver form of the pending edge and a `loading` hold, both
+  unused by Combobox. Menu's typeahead moved to `internal/typeahead.ts`. Combobox's tests pass
+  unchanged; `design/internal-hooks.md` lists the files.
+- Tests: the shared value-action suite runs against MultiSelect (driver
+  `packages/ui/src/__tests__/drivers/multi-select.tsx`, transition types in
+  `packages/ui/src/multi-select/multi-select-transition-types.test.tsx`);
+  `packages/ui/src/multi-select/multi-select.test.tsx` (jsdom) and
+  `packages/ui/src/multi-select/multi-select.browser.test.tsx` (Chromium, Firefox, WebKit
+  through branch CI). Notes in `memo/developer/issue-165.md`.
+
+The points left to verify by the entry above (B.16), as found:
+
+- Chromium's accessibility tree exposes the Trigger as a `combobox` whose `expanded` follows
+  the shown listbox with `popovertarget` and the explicit `aria-expanded`. Firefox and WebKit
+  have no automated probe.
+- The validity element: see the amendment above. `reportValidity()` on it returns `false` (a
+  candidate for constraint validation, not "not focusable"); form-state restoration is ruled
+  out with `autocomplete="off"`, not probed across a reload.
+- A `<label for>` press held 150 ms on an open listbox: light dismiss, then focus on the
+  Trigger, no re-open (all three engines).
+- WebKit: focus is on the Trigger after a mouse press.
+- Still manual: the screen-reader pass (the toggle under `aria-activedescendant`, the
+  Trigger's text as the value); WebKit's `flip-block` nested in a Popover (302008).

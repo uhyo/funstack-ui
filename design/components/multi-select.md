@@ -1,13 +1,13 @@
 # MultiSelect (Select multiple)
 
-Status: **proposed** (#165), not implemented. Two things are proposed separately:
+Status: **decided** (#165; the user accepted the eight recommendations of A.5 on 2026-11-26,
+recorded in `design/CHANGELOG.md`), implemented. The component is **`MultiSelect`**
+(`@funstack/ui/multi-select`), and the part names of Part B are its parts: `MultiSelect.Root`,
+`Label`, `Trigger`, `Value`, `Popup`, `List`, `Option`, `Group`, `GroupLabel`, `Status`, `Empty`.
 
-- **Part A, the home**: where the API lives. The user decides; this document recommends a
-  dedicated `MultiSelect` component and says what changes under the other two homes.
-- **Part B, the behaviour**: what the component does. It is written against neutral part names
-  (`Root`, `Trigger`, `Value`, `Popup`, `List`, `Option`, ...) and does not depend on the home.
-  The code samples spell the namespace `MultiSelect`; under another home only the names of A.4
-  and the types of B.3 change.
+- **Part A, the home**: where the API lives, the comparison that led to the dedicated
+  component, and what would have changed under the other two homes (kept as the reasoning).
+- **Part B, the behaviour**: what the component does.
 
 Follows `design/conventions.md`; where this document and the conventions disagree, the
 conventions win. **Read `design/components/combobox.md` first**, with its section 15
@@ -137,7 +137,9 @@ Part B holds under all three homes. What differs:
 | Open-state API (B.4) | as written | **removed** if a later swap to the native element is wanted (research option D) | as written |
 | Document | this file | a section of select.md; select.md decisions 1, 2, 12, 15 and section 13 are rewritten | combobox.md section 16; `required` moves to the Root for this mode |
 
-## A.5 Open decisions for the user
+## A.5 The decisions
+
+Accepted by the user on 2026-11-26: the recommended option of each.
 
 1. **Home**: (c) `MultiSelect` (recommended) / (a) `Select.Root multiple` / (b) input-less
    Combobox.
@@ -217,7 +219,7 @@ Rendered HTML (closed, the value is `["ham", "olive"]`; ids come from one `useId
 | `Root` | none; one `input[type=hidden]` per value when `name` is given | | optimistic value | Owns `useId`, the value (set-valued `useControllableAction`), the open state (`usePopoverRoot`, library mode), the active option, the Option and Status registries, the label cache, the form-reset listener. No `ref`, `className`, `style`. Hidden inputs as combobox.md 15.8. |
 | `Label` | `label` | | | `for` → the Trigger's id; `id` → the List's `aria-labelledby`. Its click focuses the Trigger and does **not** open the listbox (B.8). |
 | `Trigger` | `button` | `combobox` | optimistic value and open; shown open for `aria-expanded` | The one Tab stop and the owner surface. `type="button"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `aria-required`, `popovertarget` after hydration, `data-open`, `data-pending`, `data-disabled`. Content must not be interactive. With `required` it renders the validity element right after itself (B.10). |
-| `Value` | `span` | none | optimistic value, label cache | Inside `Trigger`. Shows the selection, or `placeholder` while it is empty (`data-placeholder`). Optional: any Trigger content rendered from state works. |
+| `Value` | `span` | none | optimistic value, label cache | Inside `Trigger`. Shows the selection, or `placeholder` while it is empty; `data-placeholder` while the selection is empty, with or without `children`. Optional: any Trigger content rendered from state works. |
 | `Popup` | `div` | none | committed open | `popover="auto"`, inline placement; the content region; `keepMounted`, `transition`. As `Combobox.Popup`. |
 | `List` | `div` | `listbox` | registries | `aria-multiselectable="true"`, `aria-labelledby`, `aria-busy="true"` while loading, `data-empty`. Owns only `Option`s and `Group`s. |
 | `Option` | `div` | `option` | optimistic and committed value, urgent active | `value` required; `label` optional (typeahead text and the label cache; default the trimmed `textContent`); `disabled` → `aria-disabled`. `aria-selected` on every option, `data-selected`, `data-active`, `data-pending`, `data-disabled`. Never focused. |
@@ -480,8 +482,9 @@ function, where it has its own list. Every comparison the library makes is set e
 <MultiSelect.Value placeholder="Choose toppings" />
 ```
 
-- **Default content**: `placeholder` while the selection is empty (the span then carries
-  `data-placeholder`), else each value's label joined with `", "`. The separator is
+- **Default content**: `placeholder` while the selection is empty, else each value's label
+  joined with `", "`. The span carries `data-placeholder` whenever the selection is empty, also
+  with function `children` (a styling hook for "nothing chosen"). The separator is
   punctuation, not a word, and is replaced by passing `children`; it is not a built-in string
   under conventions 11.
 - **Labels come from the label cache** (combobox.md 2.3): the text of every Option the Root
@@ -592,28 +595,40 @@ No announcement is built in. Toggling changes `aria-selected` on the element
   item in the list"). It has one empty option, no `name` (it posts nothing) and never changes
   its value; **`required` is rendered only while the optimistic value is empty** (a computed
   native validity attribute, conventions 3.6, as CheckboxGroup's and combobox.md 15.8's). So a
-  submit with nothing selected is blocked natively with the localised message; removing the
-  last value marks it required at once, a rollback un-marks it. It is visually hidden by
-  inline styles (not `display: none`, which would make it unreportable) and laid over the
-  Trigger's box with CSS anchor positioning, so that the browser's bubble points at the
-  Trigger; when it receives focus (the browser focuses the first invalid control) it passes
-  focus to the Trigger. The Trigger carries `aria-required="true"` whenever the prop is set.
-  `ref` goes to the button; the validity element takes no props.
+  submit with nothing selected is blocked natively; removing the last value marks it required
+  at once, a rollback un-marks it. It is visually hidden by inline styles (not
+  `display: none`, which would make it unreportable), `autocomplete="off"` (no form-state
+  restoration) and laid over the Trigger's box with CSS anchor positioning: the Trigger gets
+  an inline `anchor-name` (under the consumer's `style`) while `required` is set. The Trigger
+  carries `aria-required="true"` whenever the prop is set. `ref` goes to the button; the
+  validity element takes no props.
 
-  Trade-off: NumberField cancels its hidden input's `invalid` event and reports on the visible
-  input instead, so the browser never reports on an `aria-hidden` element. That is not
-  possible here, because no visible element of this component can hold validity. Outside a
-  Field the bubble is therefore the hidden element's own, with focus handed to the Trigger;
-  inside a Field with a `Field.Error` the Field cancels the bubble and shows the message
-  itself (field-form.md decision 6).
+  **The browser's bubble is not shown** (the fallback of the B.16 check). The validity
+  element's `invalid` event is cancelled, and on a submission attempt (the element matches
+  `:user-invalid`; `checkValidity()` and `reportValidity()` move nothing) the Trigger is
+  focused through the Field's first-invalid collector (`focus-first-invalid.ts`), so with
+  several invalid controls the first in document order still takes focus. The message is
+  `Field.Error`'s: **`required` shows its message only inside a `Field.Root` with a
+  `Field.Error`**; outside one, a submit with nothing selected is blocked and focus lands on
+  the Trigger (`aria-required`), with no text. Why: in Firefox the bubble of the hidden
+  element outlives the focus hand-over and stays over the place where the listbox opens, and
+  it takes the pointer input there, so the first options cannot be clicked until it goes;
+  the bubble cannot be moved or hidden from script. Focus the validity element receives
+  anyway passes to the Trigger.
 - **Inside a `Field.Root`** the Trigger is the control (labelable, `aria-describedby`,
   `aria-invalid`, `data-invalid`) and the validity element is the Field's validity element
   (conventions 3.6, the NumberField case, without the message mirror: a button has no
-  custom-validity slot). `Field.Error` then shows the message in the page, which is the robust
-  path. A `Field.Label` must focus the Trigger without activating it, as `Label` does.
+  custom-validity slot). The Field hears the validity element's `invalid` there, since it is
+  outside the registered element (field-form.md 7.1), and `Field.Error` shows the message in
+  the page. `Field.Label` focuses a `<button>` control without activating it, as `Label`
+  does (field-form.md 4.2). `name`, `disabled` and `required` default from the Field.
 - **`disabled`** on the Root disables the Trigger natively; nothing opens or dispatches. The
   hidden inputs still post, as Combobox's (combobox.md 11.1). Trade-off: a disabled native
   select posts nothing; a consumer who wants that wraps the component in `<fieldset disabled>`.
+  The validity element is disabled with the Trigger, so a disabled MultiSelect is never
+  `valueMissing`.
+- **Without `name`** the form reset still reaches the Root: the reset listener follows the
+  form owner of the first hidden input, else the validity element, else the Trigger.
 - `useFormStatus` is not folded into `pending` (conventions 2.7).
 
 ## B.11 Async walkthroughs
@@ -639,8 +654,8 @@ No announcement is built in. Toggling changes `aria-selected` on the element
    value action is another state and still commits or rolls back.
 5. **Required, last value removed, submit.** One value, `required`. Space on it: `O=[]`, the
    validity element gets `required` in the same render. Submit while the removal is pending:
-   blocked, focus arrives on the Trigger. The removal rejects: the value returns and `required`
-   leaves.
+   blocked, focus arrives on the Trigger, no bubble (B.10). The removal rejects: the value
+   returns and `required` leaves.
 6. **Form reset during a save.** `defaultValue={["ham"]}`, Olive added and pending. Reset: an
    absolute dispatch of `["ham"]` (`removed: ["olive"]`, `"platform"`); if Olive's save
    resolves later, the replay applies it first and the reset after it, so `V=["ham"]`.
@@ -696,11 +711,34 @@ the docs page states first.
 
 ## B.15 What is shared with Combobox
 
-| Shared (moves to `internal/` at implementation) | Combobox only | This component only |
+| Shared (in `internal/`) | Combobox only | This component only |
 | --- | --- | --- |
-| The option registry and label cache (`use-option-registry.ts`), the active option and its revalidation (`use-active-option.ts`), the leave rule (`use-deferred-leave.ts`), the set selection, hidden inputs and JS reset of #164 (`use-combobox-form.ts`), the Popup's press prevention, the `Status` / `Empty` rules, option ids | The text (`use-combobox-text.ts`), the deferred query and `stale`, `allowCustomValue`, the chips, the Input's pointer capture, the result-count announcement, the computed `required` on the Input | The Trigger as the combobox, typeahead (shared with Menu, `use-menu-keyboard.ts`), Space and Home / End as listbox keys, the `Value` part, the validity element, the Label's click rule |
+| The option registry, label cache and option ids (`internal/use-option-registry.ts`), the active option and its revalidation (`internal/use-active-option.ts`; a resolver for the pending edge and a `loading` flag that holds it back, both unused by Combobox), the leave rule (`internal/use-deferred-leave.ts`), the set selection of #164 (`internal/action/use-multiple-selection.ts`), the hidden inputs (`internal/form/hidden-values.tsx`), the Popup's press prevention, the `Status` / `Empty` rules | The text (`use-combobox-text.ts`), the deferred query and `stale`, `allowCustomValue`, the chips, the Input's pointer capture, the result-count announcement, the computed `required` on the Input, the text half of the reset (`use-combobox-form.ts`) | The Trigger as the combobox, typeahead (shared with Menu: `internal/typeahead.ts`), Space, Home / End and PageUp / PageDown as listbox keys, the `Value` part, the validity element, the Label's click rule |
 
 ## B.16 To verify in a browser at implementation
+
+Results (#165 implementation, `multi-select.browser.test.tsx`, Chromium, Firefox and WebKit;
+`memo/developer/issue-165.md`):
+
+- `button[role=combobox]` with `popovertarget` and an explicit `aria-expanded`: Chromium's
+  accessibility tree exposes `expanded` false / true / false with the listbox hidden, shown and
+  hidden again. Firefox and WebKit have no automated accessibility-tree probe here.
+- The validity element: **the bubble does not survive in a usable way**. In Firefox the
+  bubble stays after the focus hand-over and takes the clicks under it (the first options of
+  the listbox, which opens there); the same probe with a plain visible `<select required>`
+  shows the bubble swallowing clicks below it too, so it is the platform's, and it cannot be
+  moved or dismissed from script. The fallback of B.10 is taken: the `invalid` is cancelled
+  and the Trigger is focused. With it, every engine blocks the submit, focuses the Trigger and
+  takes clicks on the options right after. `reportValidity()` on the element returns `false`
+  (it is a candidate for constraint validation, not "not focusable"). Firefox's form-state
+  restoration is ruled out with `autocomplete="off"` (not probed across a reload).
+- A `<label for>` press on the Trigger with the listbox open, held 150 ms: light dismiss
+  (`"dismiss"`), then focus on the Trigger, no re-open.
+- WebKit: focus is on the Trigger after a mouse press (the click handler focuses it).
+- Not automated: screen readers (the toggle under `aria-activedescendant`, the Trigger's text
+  as the value), and the `flip-block` fallback nested in a Popover in WebKit.
+
+The checks as they were proposed:
 
 - `button[role=combobox]` with `popovertarget` and an explicit `aria-expanded`: the exposed
   state in Chromium, Firefox and WebKit, shown and hidden.

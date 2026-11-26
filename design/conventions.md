@@ -81,22 +81,22 @@ anatomy section says what the part renders there; this table fixes what the name
 
 | Part | Meaning | Default element |
 | --- | --- | --- |
-| `Root` | Owns state, context and the transition. May render no DOM (overlays), a wrapper, the `<form>` itself (Form), the `<details>` itself (Collapsible) or a `div[role=group]` (NumberField); a Root that owns a form value but no visible form element renders exactly one `<input type="hidden">` when `name` is given (Combobox). | `div` / `form` or none |
-| `List` | Groups triggers and owns keyboard navigation between them. In Combobox it is the ARIA `listbox` inside the `Popup` (a listbox may contain only options and groups, so the Popup is the container). | `div` |
+| `Root` | Owns state, context and the transition. May render no DOM (overlays), a wrapper, the `<form>` itself (Form), the `<details>` itself (Collapsible) or a `div[role=group]` (NumberField); a Root that owns a form value but no visible form element renders exactly one `<input type="hidden">` when `name` is given (Combobox; one per value for a set: Combobox `multiple`, MultiSelect). | `div` / `form` or none |
+| `List` | Groups triggers and owns keyboard navigation between them. In Combobox and MultiSelect it is the ARIA `listbox` inside the `Popup` (a listbox may contain only options and groups, so the Popup is the container; MultiSelect's is `aria-multiselectable`). | `div` |
 | `Item` | One entry in a multi-item component: Accordion's `details`, Menu's `button[role=menuitem]` with an `action`, ToggleGroup's `button[aria-pressed]` whose pressed state is the Root's. | `div` / `details` / `button` |
-| `Trigger` / `Tab` | The interactive element the user acts on. | `button` |
+| `Trigger` / `Tab` | The interactive element the user acts on. MultiSelect's is the combobox itself, `button[role=combobox]`: the one Tab stop, the owner surface for `data-pending`, DOM focus with `aria-activedescendant` while the listbox is open. | `button` |
 | `ContextTrigger` | A region whose `contextmenu` (right-click, the keyboard's context-menu keys, a library long-press for touch) opens the owner's `Popup` at the pointer (Menu). A plain element with **no role and no ARIA**; may share a Root with a `Trigger`. | `div` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion, Collapsible). | `div` |
 | `Popup` | Content that lives in the top layer. | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
 | `Indicator` | Purely visual element that tracks state: the active tab marker; the fill of a Slider, Progress or Meter, sized by the consumer's CSS from the Root's custom properties. | `span` |
-| `Label` | Names the owner, in the form the owner's element needs: `<legend>` as the first child of a `<fieldset>` Root (RadioGroup, CheckboxGroup); `label[for]` for an input surface (Combobox, NumberField, a one-thumb Slider, Field's control); `label[id]` or `span[id]` referenced through `aria-labelledby` where the owner is a group or is not labelable (a multi-thumb Slider, a Field's group control, Progress, Meter). | `label` / `legend` / `span` |
+| `Label` | Names the owner, in the form the owner's element needs: `<legend>` as the first child of a `<fieldset>` Root (RadioGroup, CheckboxGroup); `label[for]` for an input surface (Combobox, NumberField, a one-thumb Slider, Field's control) or a button surface whose forwarded click it turns into focus (MultiSelect's Trigger, as a label on a `<select>` focuses it); `label[id]` or `span[id]` referenced through `aria-labelledby` where the owner is a group or is not labelable (a multi-thumb Slider, a Field's group control, Progress, Meter). | `label` / `legend` / `span` |
 | `Input` | A text field that is the owner's surface for `data-pending` and holds an urgent state (2.6): Combobox's `input[role=combobox]` (`inputValue`), NumberField's visible `input[type=text][inputmode]` (the draft text), which renders the hidden native number input right after it. | `input` |
 | `Parent` | A mixed-state checkbox that controls a subset of a CheckboxGroup (`values`): its state is derived from the group's optimistic set and its click dispatches for the whole subset. Never submitted (no `name`). | `input[type=checkbox]` |
-| `Option` | One choice: in a native `<select>` (optimistic `data-selected`, equal to the platform's `:checked`) or in a listbox (Combobox: `div[role=option]`, never focused, `data-active` for virtual focus). | `option` / `div` |
+| `Option` | One choice: in a native `<select>` (optimistic `data-selected`, equal to the platform's `:checked`) or in a listbox (Combobox, MultiSelect: `div[role=option]`, never focused, `data-active` for virtual focus). | `option` / `div` |
 | `Clear` | A `tabindex="-1"` button that empties a text field and dispatches the empty selection (Combobox). | `button` |
-| `Empty` | Content the **library** shows only when a list has no mounted options and its results are neither stale nor loading (Combobox). | `div` |
-| `Status` | A loading fallback or hint inside a popup (Combobox). Outside the `List` it is `role="status"`; **inside** the `List` it is the Suspense fallback, renders `role="none"` and marks the list as loading (`aria-busy="true"`, `Empty` hidden, nothing announced). | `div` |
-| `Value` | The element that shows the current value. Select: the `<selectedcontent>` the browser fills, with **no `children` prop** (7.4). Slider, Progress, Meter: a `span` (Progress / Meter: `aria-hidden` by default, the same text is in `aria-valuetext`). | `selectedcontent` / `span` |
+| `Empty` | Content the **library** shows only when a list has no mounted options and its results are neither stale nor loading (Combobox, MultiSelect). | `div` |
+| `Status` | A loading fallback or hint inside a popup (Combobox, MultiSelect). Outside the `List` it is `role="status"`; **inside** the `List` it is the Suspense fallback, renders `role="none"` and marks the list as loading (`aria-busy="true"`, `Empty` hidden, nothing announced). | `div` |
+| `Value` | The element that shows the current value. Select: the `<selectedcontent>` the browser fills, with **no `children` prop** (7.4). MultiSelect: a `span` inside the Trigger that renders the selection from function `children` (the consumer's names; the library knows only the labels of options it has seen) or a `placeholder`. Slider, Progress, Meter: a `span` (Progress / Meter: `aria-hidden` by default, the same text is in `aria-valuetext`). | `selectedcontent` / `span` |
 | `Track` | The rail of a Slider (owns pointer interaction and is the geometry reference for pointer math) or of a Progress / Meter bar (no interaction). | `div` |
 | `Thumb` | A draggable value handle (Slider, one per value, explicit `index`): a styled element **containing** a visually hidden native `<input type="range">`, which is the focusable, labelled, form-participating `slider`. | `span` + `input[type=range]` |
 | `Increment` / `Decrement` | `button[type=button][tabindex=-1]` that steps a numeric value, with press-and-hold (NumberField); natively `disabled` when the next step would change nothing. | `button` |
@@ -125,10 +125,16 @@ whose form control must be a different element renders the control as a **visual
 sibling immediately after it** (`NumberField.Input`): `ref` goes to the visible input, a
 documented `hiddenInputRef` to the control, and the props the control needs (`name`, `form`,
 `min`, `max`, `step`, `required`) are listed as forwarded to it.
+MultiSelect uses the same exception for constraint validation only: `MultiSelect.Trigger`
+renders a visually hidden one-option `<select>` immediately after its button while `required`
+is set (the **validity element**, `design/components/multi-select.md` B.10), with no `name`,
+no props and no `ref` of its own, because neither a button nor a hidden input can hold
+validity.
 A third exception (Combobox): a `Root` that has no element of its own renders the form
 value as hidden inputs, one for a single selection and **one per value** with `multiple`
 (`design/components/combobox.md` 15.8); they are form plumbing, take no `ref`, `className` or
-`render`, and sit before the children, outside every `<ViewTransition>`.
+`render`, and sit before the children, outside every `<ViewTransition>`. MultiSelect's Root
+does the same, one per value (`design/components/multi-select.md` B.10).
 
 ### 1.2 Element polymorphism: `render`
 
@@ -671,7 +677,7 @@ React neither cancels nor orders overlapping actions. The library's stance:
   slowest promise wins.) An earlier action's *rejection* changes nothing on screen; it is
   reported through `reportError` (section 2.4).
 - **Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`; Combobox
-  with `multiple`): every resolved change is kept**. Each dispatch is one change to the set (a patch: `added` /
+  with `multiple`; MultiSelect): every resolved change is kept**. Each dispatch is one change to the set (a patch: `added` /
   `removed`, or one item opened or closed), and the changes are independent intents, so "latest
   wins" would be wrong in both directions: the latest `next` is computed from the intended set
   and so contains earlier in-flight changes, including one whose action later rejects. The
@@ -1001,7 +1007,7 @@ The state owner (`Root` or the single component) holds:
 | `pending` | `useTransition()` | sync | `data-pending` on the owner and on the trigger that initiated the change |
 | urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event; reported through an `on<State>Change` handler, not an action (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
 | urgent, internal (the value a slider gesture has reached, `live`; NumberField's draft text and the value under its held button) | `useState`, written from the pointer or `input` event; no consumer-facing urgent action | sync, urgent | the thumbs, while a pointer is captured or a step or commit is in flight (`held`); otherwise they render `optimistic` (Slider 2.2) |
-| urgent, internal (`shown`: the popup is in the top layer) | `useState` in `usePopoverRoot` (Popover, Menu, Combobox; Dialog has none), written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on a non-button overlay Trigger render and on the Combobox Input (library mode; a `<button>` Trigger is a `popovertarget` invoker and renders none); `false` on the server and at hydration |
+| urgent, internal (`shown`: the popup is in the top layer) | `useState` in `usePopoverRoot` (Popover, Menu, Combobox, MultiSelect; Dialog has none), written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on a non-button overlay Trigger render, on the Combobox Input and on MultiSelect's `button[role=combobox]` Trigger (library mode; any other `<button>` Trigger is a `popovertarget` invoker and renders none; MultiSelect's renders it because the `combobox` role requires the state and the button is no invoker before hydration, multi-select.md B.9); `false` on the server and at hydration |
 
 **Virtual focus is urgent library state.** Where a pattern keeps DOM focus on one element and
 moves focus virtually with `aria-activedescendant` (Combobox), the active item is a plain
@@ -1310,7 +1316,11 @@ input) keeps the Field's slot on the validity element, and both the Field (after
 and the control (after each value write) mirror `validityElement.validationMessage` into the
 surface's own slot (`setCustomValidity`), so the surface is invalid exactly when the control is,
 with the platform's message, and the platform's report UI, `:user-invalid` and the Field's focus
-land on the surface. The surface carries no native constraint of its own.
+land on the surface. The surface carries no native constraint of its own. A surface that
+cannot hold validity at all (MultiSelect's `button[role=combobox]`) has no mirror: its validity
+element is a hidden one-option `<select>` with a computed `required`, whose `invalid` is
+cancelled; a submission attempt focuses the surface through the Field's first-invalid
+collector, and the message is `Field.Error`'s (`design/components/multi-select.md` B.10).
 
 ### 3.7 `keepMounted` on content regions
 
@@ -1624,6 +1634,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
 | Select | `fsui-select` (no direction variants) |
 | Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch; with `multiple` only when `details.added` is non-empty) and, with `multiple`, `fsui-combobox-deselect` (when `details.removed` is non-empty) |
+| MultiSelect | `fsui-multi-select`, `fsui-multi-select-open`, `fsui-multi-select-close` (Root open state); `fsui-multi-select-select` (a value dispatch whose `details.added` is non-empty), `fsui-multi-select-deselect` (`details.removed` non-empty; a reset may carry both) |
 | Toast | none (no `transition` prop; every commit is urgent, section 5.1) |
 | Field, Form | none (no `transition` prop: an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
 | Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
@@ -1895,7 +1906,7 @@ notes"):
 | Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). `popovertarget` / `popovertargetaction` are **not** in this row: react-dom 19.3 knows them as `popoverTarget` / `popoverTargetAction` (the lowercase spelling warns "Invalid DOM property"), serialises them camelCase in server HTML (HTML parses attribute names case-insensitively) and lowercases them through `setAttribute` on the client; write the camelCase prop. |
 | Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. `popoverTarget` / `popoverTargetAction` are typed upstream, so the overlay Triggers are not in this row; `command` / `commandfor` are in it for `Popover.Close`, the Dialog parts and consumers' `Button`s. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
-| Attribute that must act on the client but must not be in the server HTML (Combobox Trigger's `popovertarget`: the invoker relationship exempts its press from light dismiss, but a pre-hydration activation would open an empty, button-anchored popup) | Not rendered; written with `setAttribute` from the part's ref callback once the element is known to be a `<button>` (removed in the cleanup), so hydration never sees it and the click handler that cancels the activation is installed before the attribute exists. The key is still owned (omitted from the props type). Named in the component design (section 3.5 lists the parts that use it). |
+| Attribute that must act on the client but must not be in the server HTML (Combobox Trigger's and MultiSelect Trigger's `popovertarget`: the invoker relationship exempts its press from light dismiss, but a pre-hydration activation would open an empty, button-anchored popup) | Not rendered; written with `setAttribute` from the part's ref callback once the element is known to be a `<button>` (removed in the cleanup), so hydration never sees it and the click handler that cancels the activation is installed before the attribute exists. The key is still owned (omitted from the props type). Named in the component design (section 3.5 lists the parts that use it). |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6: `on*` is reserved for the urgent lane, and these are interactions, not an urgent state). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
 | Element whose children the **parser writes before hydration** (`<selectedcontent>`: Chromium and Safari clone the selected option's children into it at parse time, so a plain element fails hydration and client-renders the whole root) | Render it with `suppressHydrationWarning` and `dangerouslySetInnerHTML={{ __html: "" }}`, so React treats the children as opaque and the attribute mismatch is silenced (verified in `docs/research/select-combobox.md` §4: hydrates with no recoverable error, later browser writes keep working); the part has no `children` prop. One such element per component at most, named in its design doc (`Select.Value`). |

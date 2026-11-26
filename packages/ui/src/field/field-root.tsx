@@ -440,8 +440,8 @@ export function FieldRoot({
     if (!isDev || controlRef.current !== null) return;
     console.error(
       "Field.Root: no form control registered. Render a Field.Control or a FUNSTACK form " +
-        "control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, Slider, " +
-        "NumberField) inside it.",
+        "control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, MultiSelect, " +
+        "Slider, NumberField) inside it.",
     );
   }, []);
 
