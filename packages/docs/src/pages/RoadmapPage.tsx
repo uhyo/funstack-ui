@@ -29,6 +29,12 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/otp-field">OTPField</a> (<a href={issue(171)}>#171</a>
+          ): a one-time-code field that is one <code>autocomplete="one-time-code"</code> input drawn
+          as a row of boxes, with <code>completeAction</code> for the complete code,{" "}
+          <code>submitOnComplete</code> and <code>experimental_webOTP</code>.
+        </li>
+        <li>
           New component <a href="/components/avatar">Avatar</a> (<a href={issue(171)}>#171</a>), and
           a <a href="/components/scroll-area">Scroll areas</a> recipe page instead of a ScrollArea
           part.

@@ -1,11 +1,10 @@
 # OTPField
 
-Status: **proposed** (#171, part of #162). Not accepted, not implemented. History, the open
-decisions, the device probes still owed and the test plan: `design/CHANGELOG.md`. Follows
-`design/conventions.md`; where this document and the conventions disagree, the conventions win.
-The conventions rows this design would add (a part name, an action name, a handler, data
-attributes, an experimental flag) are listed in the changelog entry and are not edited in until
-the design is accepted.
+Status: **decided and implemented** (#171, part of #162). The decisions, the implementation
+amendments, the probe results and the device checks still owed are in the 2026-11-26 #171
+entries of `design/CHANGELOG.md`. Follows `design/conventions.md`; where this document and the
+conventions disagree, the conventions win. **Provisional until the device checks are done**: the
+Input's inline style list (section 6) and the composition rule (section 4.1).
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.6, 3.6, 4.1,
 5, 8, 11), `design/components/field-form.md` (4.3: text is a fact; 7.1: `useFieldControl`,
@@ -199,7 +198,7 @@ export interface OTPFieldInputProps
   extends Omit<
     ComponentPropsWithRef<"input">,
     | "type" | "value" | "defaultValue" | "maxLength" | "minLength" | "pattern"
-    | "name" | "form" | "required" | "disabled" | "readOnly"
+    | "name" | "form" | "required" | "disabled" | "readOnly" | "onChange"
     | "className" | "style" | "children"
   > {
   className?: StateValue<string | undefined, OTPFieldState>;
@@ -245,8 +244,13 @@ state the Slots read, and the Field registration), everything that is about the 
 
 Owned keys (conventions 1.2). Root: `data-*` above; `position` in `style` unless the consumer
 sets it. Input: `type`, `value`, `pattern`, `name`, `form`, `required`, `disabled`, `readOnly`,
-the library's `onChange` and its native listeners, the inline style of section 6, the Field's
-attributes, `data-*`. Slot: `aria-hidden`, `data-*`.
+the library's `onChange` (omitted from the props type, conventions 1.5) and its native
+listeners (`beforeinput`, `compositionstart` / `compositionend`, `selectionchange`, `select`,
+`focus`, `keyup`, `blur`, `click`, through `addEventListener`, so the consumer's `on*` props
+for those events pass through and run independently), the inline style of section 6, the
+Field's attributes, `data-*`. Slot: `aria-hidden`, `pointer-events: none` in `style` (section 6), `data-index`, `data-filled`, `data-active`
+(the Root's `data-pending`, `data-complete`, `data-invalid` style the Slots from above:
+`.otp[data-pending] .otp-slot`).
 
 ### 3.1 `completeAction`, and why it is named so
 
@@ -255,7 +259,7 @@ trigger, `<state>CommitAction` for the end of a gesture on a continuous control.
 a pure trigger: nothing changes that could be rolled back, the user's code is already in the
 input. The three candidate names:
 
-- **`completeAction`** (proposed). The vision's own form, "`action` or `fooAction`
+- **`completeAction`** (decided). The vision's own form, "`action` or `fooAction`
   (`clickAction`)": the action named after the event that triggers it. It reads correctly at
   the call site and leaves `action` free of doubt on a part that lives inside forms.
 - `action`. The existing name for a pure trigger, but `<OTPField.Root action={verify}>` reads
@@ -264,15 +268,18 @@ input. The three candidate names:
   NumberField commit **every** gesture's value, partial or not, and their commit decides the
   uncontrolled state. This one fires only for a complete code and decides nothing.
 
-It needs a row in conventions 2.1 ("a pure trigger that carries a value, named after its
-event: `<event>Action`, `(value, details)`"). Open decision 3 in the changelog.
+The name has its row in conventions 2.1: a pure trigger that carries a value, named after its
+event, `<event>Action`, `(value, details)`.
 
 The contract is conventions 2.3 with these particulars:
 
 - **When.** After each `input` event (and each WebOTP fill) that leaves `value.length ===
-  length`, including an edit that replaces one character of a complete code and a paste of the
-  same code again (the way to retry). Not at mount, not for text adopted at hydration, not for
-  a controlled `value` the parent changed, not for a reset, not while `disabled` or `readOnly`.
+  length` **and** either changed the value or inserted at least one character the filter kept:
+  an edit that replaces one character of a complete code (with the same character too) and a
+  paste of the same code again (the way to retry) run it; a character the filter drops (a
+  letter typed into a complete numeric code) does not. Not at mount, not for text adopted at
+  hydration, not for a controlled `value` the parent changed, not for a reset, not while
+  `disabled` or `readOnly`. Without a `completeAction` nothing is run (no empty transition).
 - **Sync prefix.** Runs during the `input` event dispatch, in the transition; a `setState`
   there is a transition update.
 - **Pending.** `data-pending` on Root and Input until every run has settled and its render has
@@ -284,8 +291,12 @@ The contract is conventions 2.3 with these particulars:
 - **Errors.** A rejection reaches the nearest Error Boundary (conventions 2.4). A wrong code is
   not an error: the action resolves and the consumer shows the message.
 - **`submitOnComplete`** calls `requestSubmit()` on the Input's form right after dispatching
-  `completeAction` (which it does not await), in the same event. Constraint validation runs
-  as for any submission; the submission is the form's channel (conventions 2.7), with
+  `completeAction` (which it does not await), in the same event. Inside a Field it first asks
+  the Field to re-validate (`notifyChange(true)`): the Field's own `input` listener ran
+  `validate` on the browser's text before the filter's write-back, and the commit that
+  re-validates comes after the event. While a composition is open the submission is held and
+  made at `compositionend` (the IME has not committed the text; a cancelled composition then
+  submits nothing). Constraint validation runs as for any submission; the submission is the form's channel (conventions 2.7), with
   `Form.Root`'s pending, errors and reset. Nothing happens without a form or before hydration.
 
 ### 3.2 `value`, `defaultValue`, `onValueChange`
@@ -317,12 +328,18 @@ events.
 The Input records `{ text, selectionStart, selectionEnd }` in `beforeinput`. In `input`, with
 `dom` the input's text and `caret` its `selectionStart`:
 
-1. **Inserted run.** For an insertion, `run = dom.slice(start, caret)`, filtered by `charset`
-   to `kept`.
+1. **Inserted run.** For an insertion (`inputType` starting with `insert`), `run` is what the
+   browser put between the text before the selection and the text after it: `dom` must start
+   with `before[0, start)` and end with `before[end, …)`, and `run` is what lies between
+   (independent of where the engine left the caret). Filtered by `charset` to `kept`. When
+   `dom` does not have that shape, rule 6 applies.
 2. **A full code replaces everything.** `kept.length >= length`: `next = kept.slice(0,
    length)`. Pasting a code into a half-typed field does not append to the half.
 3. **A selected range is replaced** (the browser already did it): `next = before[0, start) +
    kept + before[end, …)`.
+3a. **An insertion the filter drops entirely** (`kept` is empty: a letter in a numeric field,
+   over a caret or a selection) leaves the text as it was before the edit and restores the
+   selection: "no feedback beyond the text not changing" (4.2).
 4. **A collapsed caret overtypes**: `next = before[0, start) + kept + before[start +
    kept.length, …)`. Typing on a filled position replaces it and moves on, which is what a row
    of boxes suggests; at the end of the text it appends.
@@ -330,14 +347,22 @@ The Input records `{ text, selectionStart, selectionEnd }` in `beforeinput`. In 
    typing replaces the last character.
 6. **A deletion, and an `input` with no `beforeinput` before it** (autofill in some engines):
    `next = filter(dom)`.
-7. `next` is cut to `length`. The caret goes to `min(start + kept.length, length)`.
+7. `next` is cut to `length`. The caret goes to `min(start + kept.length, length)`; for rule 6
+   it keeps its place among the characters the filter kept before it.
+
+The write-back happens in the `input` event, before React's re-render: the library assigns
+`input.value` and calls `setSelectionRange()` only where the result differs from what the
+browser left, then sets its state; the re-render finds the DOM already equal and writes
+nothing, so the caret stays where the library put it (verified in three engines).
 
 The filter is a pure function of `(before, dom, caret, inputType, charset, length)` in a
 directive-free module with its own unit tests.
 
-**Composition.** While `isComposing`, the library does not write to the input (it would end
-the composition). The value is still derived from each `input` event (`filter(dom)`), so the
-Slots follow and completion can fire; the write-back happens at `compositionend`. Overtyping is
+**Composition.** While composing (between `compositionstart` and `compositionend`, or an
+`input` with `isComposing`), the library does not write to the input (it would end the
+composition): the Input renders the raw text it holds, not the value. The value is still
+derived from each `input` event (`filter(dom)`), so the Slots follow and completion can fire;
+the write-back happens at `compositionend` (reported with that event). Overtyping is
 not applied to composed text. Numeric keyboards do not compose; Android keyboards do for
 `"alphanumeric"`, which is why the rule is "derive always, write when allowed".
 
@@ -365,7 +390,8 @@ All native text editing; the library handles no `keydown`.
 
 The text is transparent, so the Slots show where the caret is. The Root tracks the Input's
 `selectionStart` / `selectionEnd` (the input's `selectionchange` event: Chrome 127, Firefox
-92, Safari 18) and its focus, as urgent state.
+92, Safari 18; also read on `focus`, `select`, `keyup` and after the library's own writes, which
+covers an engine that batches `selectionchange` late) and its focus, as urgent state.
 
 - Not focused: no Slot is `active`.
 - Collapsed caret at `p`: the Slot `min(p, length - 1)` is `active`. It is the position the
@@ -378,8 +404,10 @@ A consumer draws a caret in an `active` empty Slot and a ring around an `active`
 **Pointer.** The Input covers the Root, so a click focuses it and long-press, the paste
 callout and a password manager's menu are the browser's own. The native caret position under
 a click is meaningless for transparent text, so after a `click` the library sets the caret to
-the Slot under the pointer (from the registered Slot elements' boxes), clamped to
-`value.length`. Clicking a filled box and typing replaces it.
+the Slot under the pointer (from the registered Slot elements' boxes: the one containing the
+point, else the nearest), clamped to `value.length`. Clicking a filled box and typing replaces
+it. A second click of a double click (`detail > 1`) and a click that leaves a selected range
+(a drag) keep the browser's selection.
 
 ## 5. Accessibility
 
@@ -411,10 +439,15 @@ the Slot under the pointer (from the registered Slot elements' boxes), clamped t
 
 ## 6. Styling
 
-The library ships no CSS. It sets two inline styles, both functional (the precedent is the
-visually hidden inputs of Slider and NumberField):
+The library ships no CSS. It sets three inline styles, all functional and owned (the precedent
+is the visually hidden inputs of Slider and NumberField):
 
 - Root: `position: relative`.
+- Slot: `pointer-events: none`. A Slot that forms a stacking context (`opacity` below 1, as a
+  pending style dims it, `position`, `transform`, an animation of those) paints over the
+  Input in tree order and would take the click; with `pointer-events: none` the Input stays
+  the target whatever the consumer's CSS, and no stacking context is created. Not a
+  `z-index` on the Input, which would lift it over the page's later positioned content.
 - Input: `position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0;
   padding: 0; border: 0; background: transparent; color: transparent; caret-color:
   transparent; forced-color-adjust: none`. The outline is left alone. The exact list is
@@ -461,11 +494,17 @@ The Input is an ordinary text control:
   used: `tooShort` applies only to a value last changed by the user, and the library's
   write-back is a script change.
 - **Reset**: the browser resets the input to its default; the Root follows through
-  `useFormReset` and reports `onValueChange` with `"platform"`. No completion.
+  `useFormReset` and reports `onValueChange` with `"platform"`. No completion. The value
+  adopted is the **computed** reset target (the latest `defaultValue`, or the mount-time
+  `value` when controlled, filtered), not the input's text: after a click on a reset button
+  `useFormReset`'s microtask runs before the browser's reset algorithm (there is a microtask
+  checkpoint after each `reset` listener), when the input still holds the old text.
 - **Implicit submission**: Enter, native.
 
-Inside a `Field.Root` the Root calls `useFieldControl({ labelable: true, … })` and the Input
-merges the returned ref and attributes, which is `Field.Control`'s registration:
+Inside a `Field.Root` the Input calls `useFieldControl({ labelable: true, … })` and merges
+the returned ref and attributes, which is `Field.Control`'s registration; the Root resolves
+"own or the Field's" `name` / `disabled` / `required` itself (`resolveFieldDefaults`) and reads
+the Field's `invalid` for its `data-invalid`, as NumberField's Root does:
 
 | Field contract | OTPField |
 | --- | --- |
@@ -546,8 +585,9 @@ Not in all three engines, so it is behind `experimental_webOTP` on the Root (con
 off by default. With the flag on and `"OTPCredential" in window`:
 
 - The Input's mount effect calls `navigator.credentials.get({ otp: { transport: ["sms"] },
-  signal })`. The request is aborted at unmount, when the Input's form is submitted, and when
-  the user completes the code by hand.
+  signal })`, once for the life of the Input (keyed on the flag, not on renders). The request
+  is aborted at unmount, when the Input's form is submitted, and when the user completes the
+  code by hand; after any completion no new request starts and a late code is ignored.
 - A resolved credential's `code` goes through the filter. If it yields exactly `length`
   characters it becomes the value (`onValueChange` with `"platform"`, `details.event`
   `undefined`), then completion runs as for an edit (`completeAction` with `"platform"`,
@@ -565,9 +605,10 @@ off by default. With the flag on and `"OTPCredential" in window`:
   hydration. This window is the cost of decision 1 with inline styles in the server HTML; the
   alternative (styles applied after mount) shows a plain input shifting into boxes on every
   load. A submission in that window posts the text, validated by `pattern`.
-- **At mount** the Root reads the input's text (typed, autofilled or restored by the browser
-  before hydration), filters it and adopts it as the value, with `onValueChange` (`"platform"`)
-  if it differs from the default. **It does not run `completeAction`**: a code the browser
+- **At mount** (the Input's first layout effect, so an Input that mounts late is covered) the
+  Root reads the input's text (typed, autofilled or restored by the browser before hydration),
+  filters it, writes the filtered text back when they differ, and adopts it as the value, with
+  `onValueChange` (`"platform"`, `details.event` `undefined`) if it differs from the default. **It does not run `completeAction`**: a code the browser
   restored on reload is indistinguishable from one just typed, and verifying a stale code at
   page load is the worse mistake. The user submits with Enter or the button.
 - Without JavaScript: the `scripting: none` recipe of section 6.

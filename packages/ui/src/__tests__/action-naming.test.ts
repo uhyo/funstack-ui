@@ -15,8 +15,8 @@ import type * as UI from "../index.js";
  * `*Props` type, a key named `action` or `…Action` is a transition action (every function member
  * of its type returns `unknown`, as `Action` / `ChangeAction` do; `UrgentChangeHandler` returns
  * `void` and fails), and the library's own `on*` keys are exactly the handlers of conventions 2.1
- * (#148): `Combobox.Root`'s `onInputValueChange` and the overlay Roots' `onOpenChange`, each typed
- * `UrgentChangeHandler`. DOM pass-through props (`onClick`, `onClose`, `formAction`, …) are
+ * (#148): `Combobox.Root`'s `onInputValueChange`, `OTPField.Root`'s `onValueChange` (#171) and
+ * the overlay Roots' `onOpenChange`, each typed `UrgentChangeHandler`. DOM pass-through props (`onClick`, `onClose`, `formAction`, …) are
  * excluded when their type is React's. `Form.Root`'s `action` is React's form channel (a URL
  * string or `(formData) => unknown`): its function part returns `unknown` and passes, as it
  * should.
@@ -179,6 +179,9 @@ type PublicProps = {
   NumberFieldInputProps: UI.NumberFieldInputProps;
   NumberFieldLabelProps: UI.NumberFieldLabelProps;
   NumberFieldRootProps: UI.NumberFieldRootProps;
+  OTPFieldInputProps: UI.OTPFieldInputProps;
+  OTPFieldRootProps: UI.OTPFieldRootProps;
+  OTPFieldSlotProps: UI.OTPFieldSlotProps;
   PopoverCloseProps: UI.PopoverCloseProps;
   PopoverDescriptionProps: UI.PopoverDescriptionProps;
   PopoverPopupProps: UI.PopoverPopupProps;
@@ -327,6 +330,9 @@ const listedKeys = {
   NumberFieldInputProps: true,
   NumberFieldLabelProps: true,
   NumberFieldRootProps: true,
+  OTPFieldInputProps: true,
+  OTPFieldRootProps: true,
+  OTPFieldSlotProps: true,
   PopoverCloseProps: true,
   PopoverDescriptionProps: true,
   PopoverPopupProps: true,
@@ -420,9 +426,19 @@ describe("action naming (conventions 10.1)", () => {
   });
 
   it("the library's own `on*` props are the handlers of conventions 2.1 (#148)", () => {
-    expectTypeOf<OwnHandlers>().toEqualTypeOf<"onInputValueChange" | "onOpenChange">();
+    expectTypeOf<OwnHandlers>().toEqualTypeOf<
+      "onInputValueChange" | "onOpenChange" | "onValueChange"
+    >();
     expectTypeOf<UI.ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<string, UI.ComboboxInputValueChangeDetails> | undefined
+    >();
+    // The text of an OTPField (#171): only its Root has `onValueChange`.
+    type WithValueChange = {
+      [K in keyof PublicProps]: "onValueChange" extends OwnHandlerKeys<PublicProps[K]> ? K : never;
+    }[keyof PublicProps];
+    expectTypeOf<WithValueChange>().toEqualTypeOf<"OTPFieldRootProps">();
+    expectTypeOf<UI.OTPFieldRootProps["onValueChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<string, UI.OTPFieldValueChangeDetails> | undefined
     >();
     // Exactly the overlay Roots, each with the details type of its `openChangeAction`.
     type WithOpenChange = {
