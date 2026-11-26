@@ -1,0 +1,74 @@
+/* Collapsible demo: the Root is the <details>. `:open` is committed, [data-open] optimistic. */
+
+.col {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-block: 0.5em;
+}
+
+.col-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.6em 0.9em;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+  user-select: none;
+}
+.col-trigger::-webkit-details-marker {
+  display: none;
+}
+.col-trigger:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+.col-trigger[data-pending] {
+  cursor: progress;
+}
+
+.col-trigger::before {
+  content: "";
+  inline-size: 0.45em;
+  block-size: 0.45em;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  rotate: -45deg;
+  transition: rotate 150ms;
+}
+.col:open > .col-trigger:not([data-pending])::before,
+.col-trigger[data-open]::before {
+  rotate: 45deg;
+}
+
+.col::details-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 200ms ease,
+    content-visibility 200ms allow-discrete;
+}
+.col:open::details-content {
+  grid-template-rows: 1fr;
+}
+.col-panel {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 0.9em;
+}
+
+/* The `transition="col-grow"` demo animates through ViewTransition instead. */
+.col-vt::details-content {
+  transition-duration: 0s;
+}
+::view-transition-group(*.col-grow) {
+  animation-duration: 250ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .col::details-content,
+  .col-trigger::before {
+    transition: none;
+  }
+}
