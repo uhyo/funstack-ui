@@ -1,7 +1,7 @@
 # Drawer
 
-Status: **proposed** (#168, part of #162). Not implemented. The proposal's history and the open
-decisions are in the 2026-11-26 #168 entry of `design/CHANGELOG.md`. Follows
+Status: **decided and implemented** (#168, part of #162). The decisions and the implementation
+notes are in the 2026-11-26 #168 entries of `design/CHANGELOG.md`. Follows
 `design/conventions.md`; where this document and the conventions disagree, the conventions win.
 **Read `design/components/dialog.md` first**: a Drawer is a Dialog, and every rule of that
 document applies unless this one says otherwise. This document states only what differs.
@@ -179,8 +179,8 @@ is `true`. Pointer Events only.
 | Not a candidate | The press is on the `::backdrop`; inside a nested `<dialog>` or an open popover; on a text-entry or range control (`input`, `textarea`, `select`, `[contenteditable]`); inside a scroll container along the drawer's axis (section 5); or the drawer is closing. |
 | Start | The pointer has moved 6 px, more along the drawer's axis than across it, and toward the edge. The library then takes pointer capture on the dialog (`internal/pointer-capture.ts`) and sets `data-swiping`. A first move in another direction drops the press for good. |
 | Not a start | At that moment the press's `pointerdown` was `defaultPrevented` (a consumer's opt-out, read late so a React handler has run); another element holds the pointer's capture (a Slider thumb, a map); or a mouse press has produced a text selection (dragging over text selects, dragging from an empty area moves). |
-| Move | offset = the distance moved toward the edge, never below 0 (no overdrag in v1). Written to the custom properties (4.3) on every `pointermove`. No React render. |
-| Release | `pointerup`. **Dismiss** when the offset is at least 25% of the extent, or the velocity toward the edge over the last 100 ms is at least 0.5 px/ms; **but return** when the pointer was moving back (more than 0.1 px/ms away from the edge). Otherwise return. |
+| Move | offset = the distance moved toward the edge, never below 0 (no overdrag in v1). Written to the custom properties (4.3) on every `pointermove`. No React render. A text selection a mouse press has made since it went down is removed on each move: Firefox keeps extending it under pointer capture, and a drag moves, it does not select. |
+| Release | `pointerup`. **Dismiss** when the offset is at least 25% of the extent, or the velocity toward the edge over the last 100 ms is at least 0.5 px/ms; **but return** when the pointer was moving back (more than 0.1 px/ms away from the edge). Otherwise return. The press is the gesture's first sample (offset 0 at its time): an engine may coalesce a flick's moves into the one `pointermove` that starts the drag. |
 | Abort | `pointercancel`, a lost capture, a second primary press, the dialog closing for any other reason, the Popup unmounting: return (or just clean up when the dialog is gone). |
 
 The extent is the distance that takes the drawer fully off its edge, measured once at the
@@ -249,9 +249,10 @@ The starter stylesheet (docs, not shipped):
   transition: translate 300ms cubic-bezier(.32, .72, 0, 1),
               display 300ms allow-discrete, overlay 300ms allow-discrete;
 }
-.drawer[data-side="bottom"] { translate: 0 100%; }
-.drawer[data-side="inline-end"]:dir(ltr) { translate: 100% 0; }
-.drawer[data-side="inline-end"]:dir(rtl) { translate: -100% 0; }
+/* `:where()` keeps the closed positions at the specificity of `.drawer`, below `.drawer:open` */
+.drawer:where([data-side="bottom"]) { translate: 0 100%; }
+.drawer:where([data-side="inline-end"]:dir(ltr)) { translate: 100% 0; }
+.drawer:where([data-side="inline-end"]:dir(rtl)) { translate: -100% 0; }
 
 .drawer:open { translate: var(--drawer-swipe-x, 0px) var(--drawer-swipe-y, 0px); }
 @starting-style {
@@ -350,6 +351,13 @@ What follows:
   `overflow-y` and content taller than its box.
 - The rule ignores the amount of overflow so that touch and mouse agree: the browser claims a
   touch pan inside a scroll container even when nothing overflows.
+- **Computed `overflow` pairs the axes.** `overflow-y: auto` alone computes `overflow-x` to
+  `auto` too (CSS Overflow: `visible` becomes `auto` next to a non-`visible` value), so a
+  vertical list inside a side drawer is also a horizontal scroll container and its presses do
+  not drag, by mouse or by touch (the touch-action chain ends at that list, whose own
+  `touch-action` is `auto`). A side drawer that should drag from its list gives the list
+  `overflow-x: hidden` and `touch-action: pan-y`; one that scrolls in the Popup itself needs
+  nothing.
 
 Documented with the rule: `overscroll-behavior: contain` on the scrolling child, so a scroll
 that reaches its end does not chain to the page (Safari applies it only to a container that
@@ -530,10 +538,18 @@ New code, in two layers (conventions 9.1):
 - **In the drawer folder: the glue.** The candidate predicates of 4.1 and 5.1, the extent, the
   custom-property writes, the release of 4.2, the development warnings.
 
-`useDialogPopup` gains one option: a function called with the dialog element where the JS
-dismissals are installed (`dialog-dismiss.ts`), given a `dismiss(event)` that records the close
-intent and calls `requestClose()`, and returning a cleanup. Light dismiss could be expressed
-through the same option; that refactor is not required.
+`useDialogPopup` gains one option, `attachDismiss`: a function called with the dialog element
+where the JS dismissals are installed (`dialog-dismiss.ts`), given a `dismiss(event)` that
+records the close intent and calls `requestClose()`, and returning a cleanup. Light dismiss
+could be expressed through the same option; that refactor is not required. Also `ownProps`
+(the extra owned keys) on `useDialogPopup`, and `component` (`"dialog"` or `"drawer"`) on
+`useDialogRoot`. The Close-part warning of section 7 learns of the Close parts through a
+development-only context, `DialogCloseRegistry`, that the Drawer Popup provides and every
+Dialog-family Close part reports its element to (a `Dialog.Close` closes a drawer too).
+
+Files: `internal/swipe-arithmetic.ts` (the numbers and the pure functions),
+`internal/swipe.ts` (the tracker), `drawer/drawer-swipe.ts` (the glue), the part files in
+`drawer/`.
 
 Shared without change: `useOverlayRoot` and the fact path, the apply effect, `held` and the
 exit read, the CSS transition cut, initial focus, the modal registry Toast's Viewport uses (a

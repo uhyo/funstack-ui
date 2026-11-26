@@ -13661,3 +13661,80 @@ Not verified; to check at implementation:
 - A view transition that starts during a drag: which engines cancel the pointer.
 - Playwright mouse drags with pointer capture on a top-layer dialog in Firefox and WebKit.
 - Logical insets on a top-layer dialog follow the dialog's own `direction` (section 2).
+
+## 2026-11-26, #168: `Drawer` decided and implemented
+
+The user accepted the ten recommendations of the entry above (issue comment, 2026-11-26):
+
+1. A separate namespace, `Drawer` (`@funstack/ui/drawer`).
+2. On release the library finishes the slide, then calls `requestClose()`; the close is a fact.
+3. Swipe and scroll are separated by `touch-action` regions only; no pull from a scrolled-to-top
+   body.
+4. Own transition types, `fsui-drawer*`.
+5. No snap points.
+6. `lightDismiss` defaults to `modal`.
+7. Physical sides plus `inline-start` and `inline-end`.
+8. Mouse, pen and touch all swipe.
+9. No parent or background scaling; CSS recipes.
+10. Fixed thresholds.
+
+drawer.md is now "decided and implemented". Conventions registry rows added (no rule changes):
+conventions 2.1 and the handler table list `Drawer.Root`'s `onOpenChange`; 4.1 gains `swiping`
+(`Drawer.Popup`, attribute only) and a `side` row for `Drawer.Popup` (a prop echo, not a
+resolved side), and the `modal` row names the parts that run Dialog.Popup's code; 5.3 gains the
+Drawer row. overlay-open-state.md 3.9 says `Drawer.Root` is `Dialog.Root`, and 3.9.2 lists the
+swipe among the hides the library triggers but cannot hold.
+
+Amendments made at implementation (drawer.md):
+
+- **4.1 Move: a mouse drag removes the selection the press made.** Firefox keeps extending the
+  text selection of the press under pointer capture, also from padding (it starts a selection
+  at the nearest caret), so a drag selected the drawer's text as it moved. Chromium selects
+  nothing once the pointer is captured. The "Not a start" rule for a selection the press made
+  stays, but with real (Playwright) input the selection is still collapsed when the 6 px slop
+  is crossed, in both engines, so it rarely refuses anything.
+- **4.1 Release: the press is the first velocity sample.** Chromium coalesces a flick's moves
+  into one `pointermove` per frame, so the move that starts the drag can already be the end of
+  the flick; without the press as a sample the release velocity was 0.
+- **4.3 starter stylesheet: closed positions in `:where()`.** As written,
+  `.drawer[data-side="inline-end"]:dir(rtl)` (0,3,0) outranked `.drawer:open` (0,2,0), so a
+  right-to-left inline drawer stayed off screen when open. Every closed position now has the
+  specificity of `.drawer`.
+- **5.1: computed `overflow` pairs the axes.** `overflow-y: auto` alone computes `overflow-x`
+  to `auto`, so a vertically scrolling child of a side drawer is a horizontal scroll container
+  by the rule, and its presses do not drag (by touch too: the touch-action chain ends at that
+  child). Stated as a consequence with the recipe (`overflow-x: hidden; touch-action: pan-y` on
+  the child); the rule is unchanged. This contradicts the design's "a side drawer has no
+  conflict" only for content that scrolls in a child.
+- **9: the options as built.** `useDialogPopup` gained `attachDismiss` (as designed) and
+  `ownProps`; `useDialogRoot` gained `component`. The "no Close part" warning learns of the
+  Close parts through a development-only context, `DialogCloseRegistry`, which the Drawer
+  Popup provides and every Dialog-family Close part reports to; it is logged at the `close` of
+  a showing during which none was mounted. The Popup's `side` is added to the state by
+  wrapping the function props, not by a generic state option.
+
+The points left to verify by the entry above, as found (`drawer.browser.test.tsx`; Chromium and
+Firefox locally, WebKit in branch CI):
+
+- `exitAnimations` lists the `translate` transition a custom-property write starts: the dialog
+  is still open right after the release and closes when the slide ends, Firefox included.
+- After the slide, the CSS exit (Chromium, WebKit) starts off screen: no jump.
+- Playwright mouse drags with pointer capture on a top-layer dialog work in the three engines.
+- The `click` after a mouse drag that started on a button lands on the dialog; the button is
+  not activated.
+- Logical insets on a top-layer dialog follow the dialog's inherited `direction`: an
+  `inline-end` drawer in a `dir="rtl"` subtree sits at the left and swipes left.
+- Not verifiable here (no touch hardware; Playwright has touch drags in Chromium only): the
+  `touch-action` chain with an inner scroller, the absence of a synthesised click after a touch
+  drag, pinch zoom, iOS edge-swipe back. Listed for a device check in
+  `memo/developer/issue-168.md`. Not probed: a view transition starting during a drag; the
+  parent-scaling recipe of 8.2.
+
+Implementation notes (not rules):
+
+- Tests: `packages/ui/src/internal/swipe-arithmetic.test.ts` and `swipe.test.ts` (the tracker
+  on a plain element), `packages/ui/src/drawer/drawer.test.tsx` (the shared open-state and
+  Close-part suites against a Drawer harness, `__tests__/drawer-harness.tsx`, plus the swipe
+  rows with synthetic pointer events and a fake `Date`), `drawer-transition-types.test.tsx`,
+  `drawer.browser.test.tsx`. The browser `mouse` command's `up` takes `steps` so a flick's last
+  move and its release are one command. Notes in `memo/developer/issue-168.md`.
