@@ -12698,3 +12698,25 @@ product-owner decision. Sections changed: combobox.md 15.6, 15.7; conventions 1.
 - Tests (jsdom, `combobox-multiple.test.tsx`, "review fixes"): one row per finding, plus a
   Combobox row for the #151 rule (a reset equal to the intended value dispatched while changes
   are in flight, the final value the reset target).
+
+## 2026-11-26, #164: Combobox `multiple`, re-review follow-ups
+
+From the follow-up section of `memo/reviewer/review-164.md` (re-review of 33fdcb17). F2 is a
+product-owner decision. Sections changed: combobox.md 3.1 (the `openChangeAction` comment),
+5.6 (the requests table), 15.6.
+
+- **F1 (implementation only, no rule changed).** The record of a focused chip whose
+  registration ended (M2 of the entry above) is good for its own commit only: it is dropped in
+  a microtask. A chip cleanup in a commit the Root is not part of (a `label` from state below
+  the Root, a boundary inside it toggled from below) left a record behind, and a later Root
+  commit that removed that chip pulled focus back into the combobox from wherever it had gone.
+  The Root's layout effect runs before microtasks when the Root commits in the same commit, so
+  the M2 cases are unchanged. jsdom row "F1".
+- **F2 (15.6, 5.6, 3.1).** The cancel of an open still on its way when a chip takes focus (m2 of
+  the entry above) was `requestClose` with `reason: "dismiss"`, so `openChangeAction(false)` ran
+  with a dismissal reason, against "never called for a dismissal". It is a **request**, as
+  Alt+ArrowUp is: `openChangeAction(false, { reason: "activate" })`, `details.event` the
+  `focusin`, and `onOpenChange` is not called (nothing was shown). Listed among the requests in
+  the 5.6 table, the `openChangeAction` comment of 3.1, the JSDoc of `openChangeAction` and
+  `ComboboxOpenChangeDetails.reason`, and the docs row. The jsdom row "m2" asserts the reason
+  and that `onOpenChange` is not called.

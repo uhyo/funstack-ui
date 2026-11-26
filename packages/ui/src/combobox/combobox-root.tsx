@@ -80,7 +80,8 @@ export interface ComboboxInputValueChangeDetails extends ActionDetails {
 export interface ComboboxOpenChangeDetails extends ActionDetails {
   /**
    * `"activate"`: typing, ArrowDown / ArrowUp / Alt+ArrowDown, the Trigger, a click on the input
-   * with `openOnClick`, an accepted option (the close after it), a foreign `showPopover()`.
+   * with `openOnClick`, an accepted option (the close after it), Alt+ArrowUp, a foreign
+   * `showPopover()`; with `multiple`, a chip taking focus while an open is on its way (the cancel).
    * `"dismiss"`: Escape, light dismiss, focus leaving the combobox, another top-layer element.
    * `"platform"`: the popup was found open on mount (only script can cause it).
    */
@@ -163,7 +164,8 @@ export interface ComboboxRootBaseProps {
   defaultOpen?: boolean;
   /**
    * Requests only: awaited for opens and for the close after an accepted option (or the
-   * Trigger, or Alt+ArrowUp). Never called for a dismissal: that goes to `onOpenChange`.
+   * Trigger, or Alt+ArrowUp; with `multiple`, the cancel of an open still on its way when a
+   * chip takes focus). Never called for a dismissal: that goes to `onOpenChange`.
    */
   openChangeAction?: ChangeAction<boolean, ComboboxOpenChangeDetails>;
   /**
@@ -804,12 +806,20 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
           const chips = orderedChips();
           const index = chips.findIndex((chip) => chip.element === element);
           if (index >= 0) {
-            focusedChipGone.current = {
+            const record = {
               element,
               candidates: [...chips.slice(index + 1), ...chips.slice(0, index).reverse()].map(
                 (chip) => chip.value,
               ),
             };
+            focusedChipGone.current = record;
+            // Good for this commit only: the Root's layout effect below runs before microtasks
+            // when the Root commits too. A cleanup in a commit without the Root (a `label` from
+            // state below it, a boundary inside it toggled from below) must not leave a record
+            // that a later Root commit acts on, pulling focus back from wherever it went.
+            queueMicrotask(() => {
+              if (focusedChipGone.current === record) focusedChipGone.current = null;
+            });
           }
         }
         if (chipRegistry.get(chipValue) === entry) chipRegistry.delete(chipValue);
@@ -1128,11 +1138,13 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     focusIn: (event) => {
       // With focus on a chip the listbox has no active descendant and cannot be operated: a shown
       // one hides at once, an open still on its way (a slow `openChangeAction`, a commit not
-      // landed yet) is cancelled by a close request, so it never shows under the chip.
+      // landed yet) is cancelled by a close request, so it never shows under the chip. A
+      // request, not a dismissal (nothing was shown): `openChangeAction(false)` with
+      // `"activate"`, as Alt+ArrowUp (design 15.6).
       const popup = popover.popupRef.current;
       const shown = popup !== null && isPopoverOpen(popup);
       hideListbox(event);
-      if (!shown && popover.intended()) popover.requestClose(event, "dismiss");
+      if (!shown && popover.intended()) popover.requestClose(event, "activate");
       focusIn(event);
     },
     focusOut,

@@ -310,7 +310,7 @@ export function ComboboxPage() {
             name: "openChangeAction",
             type: "ChangeAction<boolean, ComboboxOpenChangeDetails>",
             description:
-              'Requests only: awaited for opens and for the closes a part asks for (an accepted option, the Trigger, Alt+ArrowUp). Never called for a dismissal (`onOpenChange`). Runs in the Root\'s transition; may be a Server Function. `details.reason`: `"activate"` (typing, ArrowDown / ArrowUp / Alt+ArrowDown, the Trigger, a click on the input with `openOnClick`, an accepted option, Alt+ArrowUp, a foreign `showPopover()`) or `"platform"` (found open on mount, which only script can cause; `event` is `undefined`).',
+              'Requests only: awaited for opens and for the closes a part asks for (an accepted option, the Trigger, Alt+ArrowUp; with `multiple`, a chip taking focus while an open is still on its way cancels it). Never called for a dismissal (`onOpenChange`). Runs in the Root\'s transition; may be a Server Function. `details.reason`: `"activate"` (typing, ArrowDown / ArrowUp / Alt+ArrowDown, the Trigger, a click on the input with `openOnClick`, an accepted option, Alt+ArrowUp, the cancel by a focused chip, a foreign `showPopover()`) or `"platform"` (found open on mount, which only script can cause; `event` is `undefined`).',
           },
           {
             name: "onOpenChange",

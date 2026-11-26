@@ -338,7 +338,7 @@ export interface ComboboxRootProps {
 
   open?: boolean;
   defaultOpen?: boolean;
-  /** As Popover, requests only: awaited for opens and for the close after an accepted option. Never called for a dismissal. */
+  /** As Popover, requests only: awaited for opens and for the closes a part asks for (an accepted option, the Trigger, Alt+ArrowUp; with `multiple`, the cancel when a chip takes focus during an open, 15.6). Never called for a dismissal. */
   openChangeAction?: ChangeAction<boolean, ComboboxOpenChangeDetails>;
   /** As Popover, facts only: a dismissal (Escape, focus leaving, light dismiss, a foreign invoker). Always `false`; synchronous, not awaited (5.6). */
   onOpenChange?: UrgentChangeHandler<boolean, ComboboxOpenChangeDetails>;
@@ -791,7 +791,7 @@ dismisses; conventions 3.9).
 | --- | --- | --- | --- |
 | Typing; ArrowDown / ArrowUp / Alt+ArrowDown while closed; Trigger click while closed; a pointer click in the input with `openOnClick`; a foreign open | `openChangeAction` | `true` | `"activate"` |
 | Found open at mount (only script can cause it here) | `openChangeAction` | `true` | `"platform"` |
-| The close after an accepted option (after `valueChangeAction` settled); re-accepting the selected option; Trigger click while open; Alt+ArrowUp | `openChangeAction` | `false` | `"activate"` |
+| The close after an accepted option (after `valueChangeAction` settled); re-accepting the selected option; Trigger click while open; Alt+ArrowUp; with `multiple`, a chip taking focus while an open is requested but not shown (the cancel of 15.6) | `openChangeAction` | `false` | `"activate"` |
 | Escape while open | **`onOpenChange`** | `false` | `"dismiss"` |
 | Focus leaving the input to outside the popup (the library's immediate `hidePopover()`) | **`onOpenChange`** | `false` | `"dismiss"` |
 | Light dismiss; another `auto` popover or modal dialog opening outside; a `Clear` click while open (the button is outside the popup) | **`onOpenChange`** | `false` | `"dismiss"` |
@@ -1698,7 +1698,9 @@ Focus rules:
   value. It does **close the listbox** (the library's immediate `hidePopover()`, a `"dismiss"`
   fact): with focus on a chip the listbox has no `aria-activedescendant` and cannot be
   operated. An open still on its way when a chip takes focus (requested, not shown yet) is
-  cancelled with a close request, so it never shows under the chip. Focus leaving a chip for
+  cancelled with a close request, so it never shows under the chip: a **request**, not a
+  dismissal (nothing was shown), so `openChangeAction(false)` runs with `reason: "activate"`, as
+  for Alt+ArrowUp, and `onOpenChange` is not called. Focus leaving a chip for
   anything outside the region is focus leaving the combobox.
 - **A focused chip that unmounts for any other reason** (a rolled-back addition, a controlled
   parent dropping the value, a form reset) passes focus on as Backspace and Delete do: the next

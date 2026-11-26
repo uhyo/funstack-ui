@@ -31,6 +31,7 @@ import type {
   ComboboxMultipleProps,
   ComboboxMultipleRootState,
   ComboboxMultipleValueChangeDetails,
+  ComboboxOpenChangeDetails,
 } from "./index.js";
 
 describeValueAction(comboboxMultipleDriver);
@@ -978,6 +979,39 @@ describe("Combobox multiple (jsdom)", () => {
       vi.unstubAllGlobals();
     });
 
+    it("F1: a chip re-registering in a commit without the Root leaves no record for a later one", async () => {
+      const setLabels: ((label: string) => void)[] = [];
+      function OwnLabelChip({ value }: { value: string }) {
+        const [label, setLabel] = useState(value);
+        setLabels.push(setLabel);
+        return (
+          <Combobox.Chip value={value} label={label} data-testid={`chip-${value}`}>
+            {value}
+          </Combobox.Chip>
+        );
+      }
+      const ui = (value: string[]) => (
+        <Harness
+          root={{ value, valueChangeAction: () => {} }}
+          chip={(v) => <OwnLabelChip key={v} value={v} />}
+        />
+      );
+      const { rerender } = render(ui(["jp", "fr"]));
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("{ArrowLeft}");
+      expect(document.activeElement).toBe(chip("fr"));
+      // The chip's own state changes its `label`: a commit the Root is not part of; the chip's
+      // registration is cleaned up (and redone) while it has focus.
+      await act(async () => setLabels.at(-1)!("France"));
+      expect(document.activeElement).toBe(chip("fr"));
+      act(() => (document.activeElement as HTMLElement).blur());
+      expect(document.activeElement).toBe(document.body);
+      rerender(ui(["jp"]));
+      // Focus was not on the chip when it went: nothing pulls it back into the combobox.
+      expect(document.activeElement).toBe(document.body);
+    });
+
     it("M2: a controlled parent dropping the focused chip: the previous chip, then the Input", async () => {
       const ui = (value: string[]) => <Harness root={{ value, valueChangeAction: () => {} }} />;
       const { rerender } = render(ui(["jp", "fr"]));
@@ -1019,19 +1053,27 @@ describe("Combobox multiple (jsdom)", () => {
       expect(action).not.toHaveBeenCalled();
     });
 
-    it("m2: a chip focused while an open is on its way cancels it", async () => {
+    it("m2: a chip focused while an open is on its way cancels it: a request ('activate'), no fact", async () => {
       const opens: ReturnType<typeof deferred<void>>[] = [];
-      const openAction = vi.fn((_next: boolean) => {
+      const openAction = vi.fn((_next: boolean, _details: ComboboxOpenChangeDetails) => {
         const d = deferred();
         opens.push(d);
         return d.promise;
       });
+      const onOpenChange = vi.fn();
       const user = setupUser();
-      render(<Harness root={{ defaultValue: ["jp"], openChangeAction: openAction }} />);
+      render(
+        <Harness root={{ defaultValue: ["jp"], openChangeAction: openAction, onOpenChange }} />,
+      );
       await typeText(user, "j");
       await user.keyboard("{Home}{ArrowLeft}");
       expect(document.activeElement).toBe(chip("jp"));
-      expect(openAction.mock.calls.map(([next]) => next)).toEqual([true, false]);
+      expect(openAction.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+        [true, "activate"],
+        [false, "activate"],
+      ]);
+      expect(openAction.mock.calls[1]![1].event?.type).toBe("focusin");
+      expect(onOpenChange).not.toHaveBeenCalled();
       await act(async () => {
         for (const d of opens) d.resolve();
       });
