@@ -57,18 +57,28 @@ export interface FieldControlProps extends Omit<
 const CONTROL_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 
 /**
- * The state the function props receive outside a `Field.Root`: valid, nothing disabled, required
- * or pending (design/components/field-form.md 4.3). Constant: the plain control has no library
- * state, and its own `disabled` / `required` are selected with `:disabled` / `:required`.
+ * The states the function props receive outside a `Field.Root` (design/components/field-form.md
+ * 4.3): never invalid or pending (no validation without a Field), with `disabled` / `required`
+ * from the control's own props, as inside a Field and as a standalone Checkbox reports them.
+ * One frozen object per combination, indexed `disabled * 2 + required`.
  */
-const STANDALONE_STATE: FieldState = Object.freeze({
-  invalid: false,
-  messages: Object.freeze([]) as readonly string[],
-  validity: VALID,
-  disabled: false,
-  required: false,
-  pending: false,
-});
+const NO_MESSAGES: readonly string[] = Object.freeze([]);
+const STANDALONE_STATES: readonly FieldState[] = [false, true].flatMap((disabled) =>
+  [false, true].map((required) =>
+    Object.freeze({
+      invalid: false,
+      messages: NO_MESSAGES,
+      validity: VALID,
+      disabled,
+      required,
+      pending: false,
+    }),
+  ),
+);
+
+function standaloneState(disabled: boolean | undefined, required: boolean | undefined) {
+  return STANDALONE_STATES[(disabled === true ? 2 : 0) + (required === true ? 1 : 0)]!;
+}
 
 /**
  * The field's native control: an `<input>` (or a `<textarea>` / `<select>` through `render`)
@@ -82,8 +92,8 @@ const STANDALONE_STATE: FieldState = Object.freeze({
  * `data-required`, `data-pending`.
  *
  * Outside a `Field.Root` it is the plain native control: every prop passes through (`id`
- * included), the library adds no attribute, and the function props receive a constant valid,
- * all-`false` state.
+ * included), the library adds no attribute, and the function props receive a state that is
+ * never invalid or pending, with `disabled` / `required` from the own props.
  *
  * @see https://ui.funstack.work/components/field
  */
@@ -120,7 +130,7 @@ export function FieldControl({
   return useRender<ComponentPropsWithRef<"input">, FieldState>({
     defaultElement: "input",
     render,
-    state: ctx === null ? STANDALONE_STATE : ctx.state,
+    state: ctx === null ? standaloneState(disabled, required) : ctx.state,
     className,
     style,
     children: undefined,

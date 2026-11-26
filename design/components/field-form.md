@@ -712,9 +712,12 @@ returns nothing to merge outside, 7.1), and a consumer's own styled input built 
 `Field.Control` must work for a search box or a table cell without a wrapping `Field.Root`.
 Outside a Field the library adds nothing: no `aria-invalid`, `aria-describedby` or `data-*`;
 `id`, `name`, `disabled` and `required` are ordinary pass-through (a `render` element's own win,
-as for any pass-through prop); the function props receive a constant `FieldState` that is valid
-and all-`false` (`messages` empty), since the plain control's own `disabled` / `required` are
-selected with `:disabled` / `:required`. `id` is in the props type; inside a Field it stays
+as for any pass-through prop); the function props receive a `FieldState` whose `disabled` and
+`required` are the control's own props (as inside a Field, where they are "own or the Field's",
+and as a standalone Checkbox or Switch reports its own), while `invalid` (`false`), `messages`
+(empty), `validity` (valid) and `pending` (`false`) are constant: there is no validation without
+a Field. Still no `data-*` attribute outside a Field; a `render` element's own `disabled` is not
+seen by the state, as inside a Field. `id` is in the props type; inside a Field it stays
 owned (ignored with the existing development warning). The other Field parts keep throwing: a
 Label, Description or Error outside a Field is a mistake, a control is not. The docs keep
 recommending the native element for a direct call site.

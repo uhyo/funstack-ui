@@ -366,7 +366,7 @@ import { Form } from "@funstack/ui/form";
           'Inside a Field: `id`, `name`, `required`, `disabled`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description, then the error while shown), and the Field\'s four `data-*` attributes.'
         }
         note={
-          "Outside a `Field.Root` it is the plain native control: every prop passes through (`id` included), the library adds no attribute, and the function props receive a constant valid, all-`false` `FieldState`. The other Field parts still throw outside a Field. See [Field.Control on its own](#field-control-alone)."
+          "Outside a `Field.Root` it is the plain native control: every prop passes through (`id` included), the library adds no attribute, and the function props receive a `FieldState` with the control's own `disabled` / `required` and a constant valid, not-pending rest. The other Field parts still throw outside a Field. See [Field.Control on its own](#field-control-alone)."
         }
       />
 
@@ -707,11 +707,14 @@ form[data-pending]           { cursor: progress; }
 </Field.Root>
 
 <label htmlFor="q">Search</label>
-<TextInput id="q" type="search" />               {/* the plain <input>, state always valid */}`}</CodeBlock>
+<TextInput id="q" type="search" />               {/* the plain <input>, state never invalid */}`}</CodeBlock>
       <p>
-        Outside a Field the function props receive a constant <code>FieldState</code> (valid, not
-        disabled, not required, not pending): select a plain control's own state with{" "}
-        <code>:disabled</code>, <code>:required</code> and <code>:user-invalid</code>. A search box
+        Outside a Field the function props receive a <code>FieldState</code> whose{" "}
+        <code>disabled</code> and <code>required</code> are the control's own props (as inside a
+        Field), so <code>{"className={(s) => s.disabled ? …}"}</code> works in both places;{" "}
+        <code>invalid</code>, <code>validity</code> and <code>pending</code> are constant (valid,
+        not pending: there is no validation without a Field), and no <code>data-*</code> attribute
+        is rendered. Select a plain control's validity with <code>:user-invalid</code>. A search box
         has no Field to wire; let the query leave the urgent lane with <code>useDeferredValue</code>
         , or use a <a href="/components/combobox">Combobox</a> when the result is a list of options.
         The text of an input is a fact, not a request, so there is no <code>valueChangeAction</code>{" "}

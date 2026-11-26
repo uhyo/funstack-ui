@@ -6,6 +6,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { createRef } from "react";
 import { hydrateRoot } from "react-dom/client";
+import type { Root } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { Separator } from "./index.js";
@@ -159,10 +160,13 @@ describe("Separator", () => {
       host.innerHTML = renderToString(ui);
       document.body.append(host);
       const recoverable = vi.fn();
+      let root: Root | undefined;
       await act(async () => {
-        hydrateRoot(host, ui, { onRecoverableError: recoverable });
+        root = hydrateRoot(host, ui, { onRecoverableError: recoverable });
       });
       expect(recoverable).not.toHaveBeenCalled();
+      // The jsdom project shares one window between files: leave no root behind.
+      act(() => root?.unmount());
       host.remove();
     });
   });

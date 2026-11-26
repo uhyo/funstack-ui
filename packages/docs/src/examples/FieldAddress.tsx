@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Field } from "@funstack/ui/field";
 import { Form } from "@funstack/ui/form";
 import { NumberField } from "@funstack/ui/number-field";
@@ -9,11 +9,13 @@ import { fakeSave } from "./fake-api.js";
 // has a native element, so `disabled` on the fieldset reaches each one (and the NumberField's
 // buttons ignore the pointer too). The library's `data-disabled` does not see an inherited
 // `disabled`, so the CSS selects `:disabled` instead. The fieldset is never disabled because a
-// submission is pending: that would drop focus. The notes are a textarea that grows with its
+// submission is pending: that would drop focus; after a save, focus moves to the checkbox before
+// the fieldset is disabled, for the same reason. The notes are a textarea that grows with its
 // content (`field-sizing: content`).
 export function FieldAddress() {
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
+  const editRef = useRef<HTMLInputElement>(null);
   return (
     <Form.Root
       className="demo-form"
@@ -21,11 +23,19 @@ export function FieldAddress() {
       action={async (formData) => {
         await fakeSave("the address");
         setSaved(`${String(formData.get("street"))}, ${String(formData.get("city"))}`);
+        // Disabling the fieldset would drop focus from the Save button inside it: move focus to
+        // the checkbox (outside the fieldset) first.
+        editRef.current?.focus();
         setEditing(false);
       }}
     >
       <label className="demo-field">
-        <input type="checkbox" checked={editing} onChange={(e) => setEditing(e.target.checked)} />{" "}
+        <input
+          ref={editRef}
+          type="checkbox"
+          checked={editing}
+          onChange={(e) => setEditing(e.target.checked)}
+        />{" "}
         Edit the address
       </label>
       <fieldset className="demo-address" disabled={!editing} aria-describedby="address-hint">

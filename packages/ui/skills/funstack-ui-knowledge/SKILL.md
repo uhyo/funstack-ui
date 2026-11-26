@@ -63,7 +63,7 @@ Each line: import path, parts, main state props.
 - `Slider` (`@funstack/ui/slider`): `Root`, `Label`, `Track`, `Indicator`, `Thumb`, `Value`. `valueChangeAction` per step, `valueCommitAction` once per gesture; `value` is a number or `number[]`.
 - `NumberField` (`@funstack/ui/number-field`): `Root`, `Label`, `Input`, `Increment`, `Decrement`. Locale-formatted; `valueChangeAction`, `valueCommitAction`.
 - `Progress` (`@funstack/ui/progress`) and `Meter` (`@funstack/ui/meter`): `Root`, `Track`, `Indicator`, `Label`, `Value`. Output only, no actions; the Root renders in a Server Component.
-- `Separator` (`@funstack/ui/separator`): a single `<hr>`; `orientation` (`"horizontal"` default, `"vertical"`), `decorative` (`role="none"`, no `aria-orientation`: for a purely visual line, and the only valid line inside a Combobox or MultiSelect listbox). `data-orientation` always; reset the `<hr>`'s margin and border in CSS. No `"use client"`: a Server Component may render it. Inside a Toolbar, Menu or Select use their own `Separator` part.
+- `Separator` (`@funstack/ui/separator`): a single `<hr>`; `orientation` (`"horizontal"` default, `"vertical"`), `decorative` (`role="none"`, no `aria-orientation`: for a purely visual line; it is also the separator element that is valid inside a Combobox or MultiSelect listbox, where a Group boundary styled in CSS is the other option). `data-orientation` always; reset the `<hr>`'s margin and border in CSS. No `"use client"`: a Server Component may render it. Inside a Toolbar, Menu or Select use their own `Separator` part.
 - `CSPProvider`, `STYLE_SHA256` (`@funstack/ui/csp`): for a strict `style-src` Content Security Policy.
 
 ## Full documentation

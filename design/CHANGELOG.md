@@ -13206,6 +13206,7 @@ Implementation notes (not rules):
   function read in the layout effect (the Status's ref count): render state missed a Status
   that registered in the open commit itself.
 - `use-multiple-selection.ts` casts the component's extra fields, not the whole details.
+
 ## 2026-11-26, #169: small parts, Separator / Fieldset / Input / Textarea (proposed)
 
 Architect, wave 24 (#162). Nothing here is accepted by the user or implemented. New document
@@ -13350,3 +13351,33 @@ fieldset" (a live example with a NumberField inside the fieldset), "A textarea t
 "Field.Control on its own"; the Slider and NumberField `disabled` rows mention an ancestor
 fieldset. Agent skill: Separator, and the Field line (textarea, standalone `Field.Control`,
 the fieldset pattern). Playground: `separator-demo.tsx`.
+
+## 2026-11-26, #169: review amendments
+
+Review of `feat/169-small-parts` (`memo/reviewer/review-169.md`, M1, L1 to L3, N1 to N3).
+
+- **M1, `Field.Control` state outside a `Field.Root`** (product-owner decision, amends
+  field-form 4.3 and the decision 2 notes of the entry above). The function props no longer
+  receive an all-`false` constant: `disabled` and `required` are the control's own props, as
+  inside a Field (where they are "own or the Field's") and as a standalone Checkbox or Switch
+  reports its own, so a styled input built on `Field.Control` reads the same state in both
+  places. `invalid` (`false`), `messages` (empty), `validity` (valid) and `pending` (`false`) stay
+  constant: there is no validation without a Field. Still no `data-*` attribute outside a Field;
+  a `render` element's own `disabled` is not seen by the state, as inside a Field. Implemented as
+  four frozen states, one per `disabled` / `required` combination, so identity is stable. Test
+  row: own `disabled` / `required` reach the state (and flip back), the same object for the same
+  combination, no `data-*`, and the same props inside a Field give the same two fields. The Field
+  page note and "Field.Control on its own" say so.
+- **L1:** the docs roadmap's "Behaviour changes" lists #169 and #180.
+- **L2:** the Server Components docs page names Separator among the directive-free components.
+- **L3:** the `FieldAddress` docs example moves focus to its "Edit the address" checkbox
+  (outside the fieldset) before disabling the fieldset after a save. The review's other option,
+  the Submit outside the fieldset with `disabled={!editing}`, would disable the focused button
+  itself and drop focus the same way.
+- **N1:** a blank line before the heading of the #169 design entry (whitespace only).
+- **N2:** the agent skill's Separator line no longer calls `decorative` the only valid line in a
+  listbox; a Group boundary styled in CSS is the other option (separator.md 4).
+- **N3:** the Separator hydration test row unmounts its root inside `act`.
+
+The Combobox / MultiSelect edge (an option in a popup that is already open when its fieldset
+becomes disabled) is filed as its own issue by the coordinator and is not changed here.

@@ -29,6 +29,14 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/separator">Separator</a> (<a href={issue(169)}>#169</a>
+          ). <code>Field.Control</code> no longer throws outside a <code>Field.Root</code>: it
+          renders the plain control and accepts <code>id</code>. A Slider's Track and Thumb and
+          NumberField's Increment / Decrement no longer move or dispatch inside a{" "}
+          <code>{"<fieldset disabled>"}</code> (<a href={issue(180)}>#180</a>); before, a drag or a
+          press still changed the value although the browser had disabled the inputs.
+        </li>
+        <li>
           New component <a href="/components/multi-select">MultiSelect</a> (
           <a href={issue(165)}>#165</a>). <code>{"<Select.Root multiple>"}</code>, already a type
           error, no longer reaches the <code>{"<select>"}</code>: the attribute is dropped with a

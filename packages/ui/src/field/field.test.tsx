@@ -754,31 +754,51 @@ describe("Field.Control outside a Field.Root (design 4.3)", () => {
     expect(error.mock.calls.some((c) => String(c[0]).includes("`id` prop is ignored"))).toBe(false);
   });
 
-  it("function props receive the constant valid, all-false state", () => {
+  it("function props receive own disabled / required; never invalid or pending; no data-*", () => {
     const seen: FieldState[] = [];
-    render(
+    const className = (s: FieldState) => {
+      seen.push(s);
+      return s.disabled ? "off" : "on";
+    };
+    const { rerender } = render(
       <Field.Control
         aria-label="q"
         required
         disabled
-        className={(s) => {
-          seen.push(s);
-          return "c";
-        }}
+        className={className}
         style={(s) => (s.invalid ? { color: "red" } : { color: "blue" })}
         data-testid="c"
       />,
     );
-    expect(screen.getByTestId("c")).toHaveClass("c");
-    expect(screen.getByTestId("c").style.color).toBe("blue");
+    const control = screen.getByTestId("c");
+    // The same styled input reads the same state inside a Field and alone.
+    expect(control).toHaveClass("off");
+    expect(control.style.color).toBe("blue");
     expect(seen.at(-1)).toEqual({
       invalid: false,
       messages: [],
       validity: expect.objectContaining({ valid: true, valueMissing: false }),
-      disabled: false,
-      required: false,
+      disabled: true,
+      required: true,
       pending: false,
     });
+    expect(control).not.toHaveAttribute("data-disabled");
+    expect(control).not.toHaveAttribute("data-required");
+    rerender(<Field.Control aria-label="q" className={className} data-testid="c" />);
+    expect(control).toHaveClass("on");
+    expect(seen.at(-1)).toMatchObject({ disabled: false, required: false });
+    // Frozen constants: the same object for the same combination.
+    rerender(
+      <Field.Control aria-label="q" disabled={false} className={className} data-testid="c" />,
+    );
+    expect(seen.at(-1)).toBe(seen.at(-2));
+    // Inside a Field the same props give the same `disabled` / `required`.
+    rerender(
+      <Field.Root name="q">
+        <Field.Control required disabled className={className} data-testid="c" />
+      </Field.Root>,
+    );
+    expect(seen.at(-1)).toMatchObject({ disabled: true, required: true });
   });
 
   it("render={<textarea />}: a textarea with its own props; a ref reaches the element", () => {
