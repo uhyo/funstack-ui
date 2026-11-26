@@ -359,6 +359,18 @@ export type {
 } from "./slider/index.js";
 
 export { NumberField } from "./number-field/index.js";
+
+export { OTPField } from "./otp-field/index.js";
+export type {
+  OTPFieldRootProps,
+  OTPFieldState,
+  OTPFieldValueChangeDetails,
+  OTPFieldCompleteDetails,
+  OTPFieldInputProps,
+  OTPFieldSlotProps,
+  OTPFieldSlotState,
+  OTPFieldCharset,
+} from "./otp-field/index.js";
 export type {
   NumberFieldRootProps,
   NumberFieldState,

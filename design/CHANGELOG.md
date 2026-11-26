@@ -13715,3 +13715,145 @@ Test plan, OTPField (jsdom unless marked):
   the `details` of both callbacks are serialisable.
 - Browser: click on a Slot places the caret; `selectionchange` drives `data-active`; a real
   paste; the server render is interactive before hydration and adopted after.
+## 2026-11-26, #171: `OTPField` decided and implemented
+
+The user accepted the OTPField recommendations of the entry above (issue comment, 2026-11-26):
+
+- Decision 6 (a): the name `OTPField`, at `@funstack/ui/otp-field`.
+- Decision 3 (a): `completeAction(value, details)`, with a new conventions 2.1 row for a pure
+  trigger that carries a value and is named after its event.
+- Decision 4 (a): `submitOnComplete`, default `false`, with the WCAG 3.2.2 notice in the docs.
+- Decision 5 (a): text typed before hydration is not visible until hydration; the docs give the
+  `@media (scripting: none)` recipe.
+- Decision 7 (a): `experimental_webOTP`, off by default.
+
+Avatar (decisions 1, 2) and ScrollArea (decision 8) are recorded with their own implementation
+entries; nothing here touches them.
+
+otp-field.md is now "decided and implemented"; the Input's inline style list (section 6) and the
+composition rule (4.1) stay provisional until the device checks below are done. Conventions
+registry rows added (the OTPField half of the "To do when decided" list above): 1.1 the `Slot`
+part and OTPField in the `Input` row; 2.1 the `<event>Action` row (`completeAction`) and
+`OTPField.Root`'s `onValueChange` in the handler table, the Decisions row 11 list and the
+`on<State>Change` examples; 2.5.1 a sentence and a table row: a pure trigger that carries a
+value and is no part the user presses has no `whilePending` and always runs ("every pure trigger
+accepts both" now reads "every pure trigger part"); 2.6 the urgent lane has four users; 4.1
+`filled` (new), OTPField added to `pending`, `active`, `index`, `invalid`, `complete`; 5.3 an
+OTPField row; 8 a WebOTP row in the flag table; 9.2 the kebab-case subpath of a multi-part
+component. testing.md 10.1: the urgent-handler row and the action-naming allow-list name
+`OTPFieldRootProps.onValueChange`. field-form.md 7.2: an OTPField row. internal-hooks.md:
+OTPField in the `useFormReset`, `useFieldControl` and `useFieldValueChange` rows.
+`docs/research/modern-platform-survey.md` (scroll-driven animations in Firefox 159) is left to
+whoever implements the ScrollArea recipe page.
+
+Amendments made at implementation (otp-field.md edited to match):
+
+- **3: `OTPFieldInputProps` omits `onChange`.** The design's Omit list kept it; the library's
+  own prop-form handler is omitted from the type (conventions 1.5), as NumberField.Input does.
+  The other listeners are native (`addEventListener`), so the consumer's `onBeforeInput`,
+  `onSelect`, `onKeyUp`, `onFocus`, `onBlur`, `onClick`, `onCompositionStart` / `End` pass
+  through and run independently.
+- **3: Slot data attributes.** Only `data-index`, `data-filled` and `data-active` (as decision
+  9 says); the Root's `data-pending` / `data-complete` / `data-invalid` style the Slots from
+  above.
+- **3.1 "When": an insertion the filter drops entirely does not complete.** The design said
+  "each `input` event that leaves the code complete"; read literally, a letter typed into a
+  complete numeric code would re-run the check. Completion now needs the edit to change the
+  value or to insert at least one kept character (so the same code pasted again, the retry,
+  and the same digit typed over itself still run). No `completeAction`, no transition.
+- **4.1 rule 1: the inserted run is found by the text around it**, not from the caret: `dom`
+  must start with the text before the selection and end with the text after it, and the run is
+  what lies between. Same result for typing and paste, independent of where an engine leaves
+  the caret after `insertReplacementText`; any other shape falls back to rule 6.
+- **4.1 rule 3a (new): an insertion whose run the filter drops entirely** leaves the text and
+  restores the selection, over a range too. Rule 3 literally would have deleted the selected
+  range, against 4.2's "no feedback beyond the text not changing".
+- **4.1: the write-back is synchronous, in the `input` event**, not in a layout effect: the
+  library assigns `input.value` and calls `setSelectionRange()` where the result differs, then
+  sets state; React's re-render and its controlled-input restore find the DOM equal and write
+  nothing. This is the answer to device probe 4 (below). An input event that changes nothing
+  (a dropped character) restores the DOM the same way, where no re-render would run a layout
+  effect.
+- **4.1 Composition: the Input renders the raw text while composing.** "The library does not
+  write" is not enough with a controlled `value`: React would write the filtered value at the
+  next render and end the composition. The Root keeps the composing text as urgent state and
+  renders it until `compositionend`.
+- **4.3: the selection is also read on `focus`, `select`, `keyup` and after the library's own
+  writes**, besides `selectionchange` (jsdom fires none on inputs; an engine may batch it late).
+  The click mapping takes the Slot box containing the point, else the nearest; it leaves the
+  browser's selection alone on a double click (`detail > 1`) or after a drag that made a range.
+- **7: the Input calls `useFieldControl`**, not the Root (the design said the Root calls it
+  and the Input merges): the hook's ref and the consumer's `id` warning belong to the element
+  part, and the Root resolves "own or the Field's" with `resolveFieldDefaults`, as NumberField
+  does. Same registration.
+- **7: a reset adopts the computed target, not the input's text.** Found in the browser tests:
+  after a click on a `<button type="reset">`, `useFormReset`'s microtask runs **before** the
+  browser's reset algorithm, because there is a microtask checkpoint after each `reset`
+  listener when the event is dispatched by the browser (not by script `form.reset()`, after
+  which the microtask runs once the reset is done). Reading `input.value` there read the old
+  text, and the React commit that followed rewrote `defaultValue` with it, so the reset
+  restored the typed text. The Root now dispatches its own reset target. **The same defect is
+  in `Combobox` today** (`use-combobox-form.ts` reads the input's text in `onReset`): a probe in
+  Chromium and Firefox, `defaultInputValue="Jap"`, typed `xyz`, a real reset-button click, left
+  the input empty instead of `Jap`; `form.reset()` from script restored `Jap`. Not fixed here
+  (out of scope); conventions 3.8 rule 5 ("`onReset` in a microtask, when the inputs hold their
+  reset values") holds only for a script reset. To be filed as an issue in this repo.
+- **9: hydration adoption runs in the Input's first layout effect** (the Root's would miss an
+  Input that mounts later), writes the filtered text back when it differs, and reports
+  `onValueChange` with `"platform"` and no event.
+- **Development warnings** as designed, plus an invalid `length` (not a positive integer; the
+  field then uses `max(1, floor(length))`).
+
+Probes run in desktop browsers (Playwright 1.64.1 builds; `otp-field.browser.test.tsx`; Chromium
+and Firefox locally, WebKit in branch CI):
+
+- **Probe 4, caret after a write-back**: correct in every row (dropped letter, overtype in the
+  middle, the last character of a complete code, a filtered paste, a controlled `setCode("")`
+  after an awaited check). See the write-back amendment.
+- **Probe 6, forced colours**: Chromium with `forced-colors: active` emulated through CDP keeps
+  the Input's text `rgba(0, 0, 0, 0)` (`forced-color-adjust: none`), while an ordinary input's
+  text is forced to a system colour (the positive control). Windows High Contrast itself is a
+  device check.
+- **Probe 2, composition, desktop half**: Chromium through CDP `Input.imeSetComposition` with
+  `charset="alphanumeric"`: the composing text (`aか`) stays in the input, the Slots show `a`,
+  and the write-back at `compositionend` leaves `a`; typing continues. Firefox and WebKit have
+  no IME driver: the row scripts the event sequence there.
+- **Real clipboard paste** (`userEvent.copy()` / `paste()`): `insertFromPaste` with a
+  `beforeinput` first; `123 456` replaces a half-typed `98` with `123456`, caret at the end,
+  one completion.
+- **The Input covers the Root**: `elementFromPoint` over a Slot is the input, and a real click
+  on a Slot focuses it and puts the caret there (clamped to the text).
+- **Before hydration**: the server input takes real typing with transparent text; hydration
+  adopts `12 34` as `1234` with no recoverable error and no completion.
+- Not reachable from a desktop browser: probe 1 (iOS selection, paste callout, SMS suggestion,
+  zoom), the Android half of probe 2 (Gboard), probe 3 (the event sequence of a real autofill:
+  the filter's rule 6 covers an `input` with no `beforeinput`), probe 5 (password-manager
+  badges), WebOTP with a real SMS.
+
+Device checks still owed (human; the inline style list and the composition rule stay
+provisional until they are done):
+
+1. iOS Safari: the selection highlight and handles over transparent text (`::selection` does
+   not apply there), the paste callout and the "From Messages" code suggestion with the inline
+   style, no zoom on focus with a 16px font.
+2. Android Chrome with Gboard, `charset="alphanumeric"`: the `inputType`s, whether composition
+   ends before blur, whether the write-back at `compositionend` fights the keyboard; the SMS
+   code suggestion of `autocomplete="one-time-code"`.
+3. SMS autofill on iOS and Android, and password-manager TOTP fill (1Password, Bitwarden,
+   iCloud Keychain, Google Password Manager): one `input` per fill, the filter's result,
+   completion; where each manager's badge lands on an input that covers the row.
+4. Windows forced colours (High Contrast themes): the transparent text and the Slots.
+5. WebOTP with an origin-bound SMS on Android Chrome and iOS Safari (`experimental_webOTP`).
+6. Screen readers (VoiceOver macOS and iOS, NVDA, TalkBack): the one textbox, its name and the
+   characters echoed; the Slots silent.
+
+Implementation notes (not rules):
+
+- Source: `packages/ui/src/otp-field/` (`otp-field-filter.ts` directive-free with its own unit
+  tests; `otp-field-root.tsx`, `otp-field-input.tsx`, `otp-field-slot.tsx`,
+  `otp-field-context.ts` client modules). Tests: `otp-field.test.tsx` (jsdom),
+  `otp-field-transition-types.test.tsx` (isolated), `otp-field.types.test.tsx`,
+  `otp-field.browser.test.tsx`; directive rows and the action-naming allow-list updated.
+- Docs: `/components/otp-field` (a verify-code example with a failing check, an auto-submit
+  example inside a Form with the WCAG 3.2.2 notice, the `scripting: none` recipe, WebOTP),
+  roadmap entry, agent skill line, playground demo. Notes in `memo/developer/issue-171-otp.md`.

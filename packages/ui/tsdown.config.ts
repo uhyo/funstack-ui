@@ -24,6 +24,7 @@ export default defineConfig({
     "src/toast/index.ts",
     "src/slider/index.ts",
     "src/number-field/index.ts",
+    "src/otp-field/index.ts",
     "src/field/index.ts",
     "src/form/index.ts",
     "src/progress/index.ts",

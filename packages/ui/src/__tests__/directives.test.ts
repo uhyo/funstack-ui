@@ -232,6 +232,11 @@ const clientFiles = [
   "number-field/number-field-increment.mjs",
   "number-field/number-field-decrement.mjs",
   "number-field/use-step-button.mjs",
+  // Every OTPField part and its context are client modules (design/components/otp-field.md 10).
+  "otp-field/otp-field-context.mjs",
+  "otp-field/otp-field-root.mjs",
+  "otp-field/otp-field-input.mjs",
+  "otp-field/otp-field-slot.mjs",
   // Button (design/components/button.md 11, row 20).
   "button/button.mjs",
   // The context menu region (design/components/context-menu.md 7, 13.1 "Directive").
@@ -315,6 +320,9 @@ const directiveFreeFiles = [
   "number-field/number-field-format.mjs",
   "number-field/number-field-arithmetic.mjs",
   "internal/decimal.mjs",
+  // The filter and the charset table (otp-field.md 10).
+  "otp-field/index.mjs",
+  "otp-field/otp-field-filter.mjs",
   "button/index.mjs",
   // The CSP subpath's entry and data, and Tooltip's skip-delay constants (conventions 12).
   "csp/index.mjs",
