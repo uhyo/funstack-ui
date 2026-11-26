@@ -457,3 +457,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #169+#180 impl c47d414e (feat/169-small-parts, CI green; NumberField step buttons also fixed) → reviewer on review/169. Second usage limit; resume: merge #167 and #169 after reviews.
 - Usage reset. User: release when I like; #182 yes (align) → done on feat/167-alert-dialog. Plan: merge #167+#182 and #169 after fixes, then release alpha.20.
 - #169/#180 MERGED 4883dc52.
+- #167 + #182 MERGED 7c10d4d6. WAVE 24 DONE. Next: release alpha.20 (user OK: 'release when you like'), then wave 25.
