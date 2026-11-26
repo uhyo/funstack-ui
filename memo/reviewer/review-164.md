@@ -153,3 +153,50 @@ that no "restored" announcement is made.
   one Tab stop verified with the real keyboard.
 - Transition types `fsui-combobox-select` / `fsui-combobox-deselect` per the 5.3 table, tested.
 - Docs props tables match the TS declarations except m4; the SKILL.md entry is accurate.
+
+## Follow-up: re-review of 33fdcb17 (one commit on 43919d24)
+
+Verdict: **merge**. Two small follow-ups below (F1, F2); neither blocks.
+
+Runs (after `pnpm build`): jsdom 4013/4013; browser Chromium + Firefox `src/combobox` 144 pass,
+4 engine-gated skips. Branch CI green on all three engines (coordinator).
+
+Per finding:
+- M1 fixed: `chip-text.ts` walks text nodes, skipping `aria-hidden="true"` subtrees and the
+  registered ChipRemove elements; whitespace collapsed. Test covers both kinds of "×".
+- M2 fixed for the listed cases (rollback, controlled drop, reset; a re-registering chip keeps
+  focus). Robustness of the effect ordering:
+  - StrictMode: the double mount runs before any chip has focus; a re-registration is caught
+    by `isConnected`. Fine.
+  - Suspense hide and `<Activity hidden>`: the chip's layout cleanup records the focused chip,
+    but the node stays connected (display: none), so the Root effect drops the record. The
+    move is (rightly) not attempted; focus loss from hiding is the platform's.
+  - **F1 (minor): the record can outlive its commit.** The Root effect only runs when the Root
+    commits. A cleanup in a commit the Root is not part of (a Chip `label` from state below the
+    Root, a Suspense or Activity boundary inside the Root toggled from below) leaves a stale
+    record; a later Root commit that removes that chip while focus is on the body then pulls
+    focus into the combobox. Reproduced in jsdom: focus a chip, change its `label` from a wrapper's
+    own state, blur to the body, the parent drops the chip: focus jumps to the previous chip.
+    Fix: in the cleanup, `queueMicrotask(() => { if (focusedChipGone.current === record)
+    focusedChipGone.current = null; })` (the same commit's layout effects run before
+    microtasks), or do the move itself in that microtask and drop the Root effect.
+- m1 fixed as `popover.intended() && !popover.committed`, multiple branch only. Correct. The
+  slow-open and own-keystroke cases are intended open and committed closed; Escape-then-Enter
+  is committed open until the toggle fact, so it falls through to the closed rules; a refused
+  controlled open turns `intended()` false once settled. `committed` comes from the render the
+  handler was built in, which is the last commit, so it is current.
+- m2 fixed, but **F2 (minor, contract):** the cancel is `popover.requestClose(event,
+  "dismiss")`, so `openChangeAction(false, { reason: "dismiss" })` runs (the test asserts
+  `[true, false]`), while the openChangeAction JSDoc (combobox-root.tsx:164) and design
+  combobox.md:341 say it is "never called for a dismissal". Either list this close among the
+  requests (reason `"activate"`, like Alt+ArrowUp, since the library asks for it) in the JSDoc,
+  design 3.x and docs, or document the exception. Wording only, plus the reason.
+- m3 fixed: AltGr via `getModifierState("AltGraph")`, `"Process"` / 229, code-point length;
+  Ctrl/Meta skip navigation keys only. The IME hand-over itself is still for the manual pass.
+- m4, n1 to n5 fixed (JSDoc, docs type column, `Partial` note, "A third exception", the #151
+  row, the optimistic-announcement sentence).
+
+Single mode: no regressions found. Every change is gated on `multiple` (the Enter rule sits
+inside the `multiple !== undefined` branch; the chip keys, focusIn, registerRemove and chipText
+are chip-only); the new no-deps Root layout effect returns at once while there is no record;
+the `popover` Pick only widens a type. Single tests unchanged and green.
