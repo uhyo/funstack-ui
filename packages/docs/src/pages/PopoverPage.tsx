@@ -159,20 +159,20 @@ export function PopoverPage() {
           <code>"dismiss"</code> facts.
         </li>
         <li>
-          <strong>Hover card (Chromium):</strong> a <code>&lt;button interestfor&gt;</code> naming
-          the Popup (your own button, or the Trigger with <code>interestfor</code> added) opens it
-          on interest (hover or keyboard focus) through the library, and in library mode the Popup
-          hides again on lost interest: a <code>"dismiss"</code> fact,{" "}
-          <code>onOpenChange(false)</code>, whose <code>details.event</code> is the{" "}
-          <code>loseinterest</code> event (its <code>source</code> is the button). Lost interest
-          while the open is still pending cancels it (a request,{" "}
-          <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>, superseding the open), so
-          the card never appears under a pointer that has left. A Trigger-click open stays open on
-          lost interest, as in the platform. As with the platform's own lost-interest hide, focus is
-          not returned to the Trigger. Firefox and Safari ignore <code>interestfor</code>, so give
-          the button a click path (make it the Trigger) when the card must open everywhere. For a
-          name or description (<code>role="tooltip"</code> content), use{" "}
-          <a href="/components/tooltip">Tooltip</a>.
+          <strong>Interest invokers (Chromium):</strong> a <code>&lt;button interestfor&gt;</code>{" "}
+          of your own naming the Popup, one that does nothing else to it, opens it on interest
+          (hover or keyboard focus) through the library, and in library mode the Popup hides again
+          on lost interest: a <code>"dismiss"</code> fact, <code>onOpenChange(false)</code>, whose{" "}
+          <code>details.event</code> is the <code>loseinterest</code> event (its <code>source</code>{" "}
+          is the button). Lost interest while the open is still pending cancels it (a request,{" "}
+          <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>, superseding the open). A
+          Trigger-click open stays open on lost interest, as in the platform, and focus is not
+          returned to the Trigger after a lost-interest hide. Do not add <code>interestfor</code> to
+          the Trigger itself: HTML's author guidance rules out one element that shows the same rich
+          content on interest and on activation, so "hover to preview, click to pin" is not a
+          pattern the library recommends. For a hover preview in every engine, use{" "}
+          <a href="/components/hover-card">HoverCard</a>; for a name or description (
+          <code>role="tooltip"</code> content), use <a href="/components/tooltip">Tooltip</a>.
         </li>
       </ul>
 
