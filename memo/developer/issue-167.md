@@ -34,7 +34,8 @@ Branch `feat/167-alert-dialog`, from `design/167-alert-dialog` (2f9ec4a0) + mast
 ## Verification (browser)
 
 - Local: Chromium + Firefox pass (`FUNSTACK_BROWSERS=chromium,firefox`); WebKit lacks host libs
-  locally, run through branch CI (`gh workflow run ci.yml --ref feat/167-alert-dialog`).
+  locally, run through branch CI (`gh workflow run ci.yml --ref feat/167-alert-dialog`):
+  run 45770030438 green on all jobs (ci, chromium, firefox, webkit).
 - Disabled `autofocus` skipped -> next `autofocus`, else first focusable.
 - React `autoFocus` on a Cancel mounting into an open JS-free dialog takes focus.
 
