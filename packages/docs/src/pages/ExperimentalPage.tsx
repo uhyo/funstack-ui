@@ -41,7 +41,7 @@ export function ExperimentalPage() {
             "`experimental_interpolateSize`",
             "`interpolate-size`",
             "Chromium",
-            "[Accordion.Root](/components/accordion#props)",
+            "[Accordion.Root](/components/accordion#props), [Collapsible.Root](/components/collapsible#props)",
           ],
           [
             "`experimental_interestFor`",

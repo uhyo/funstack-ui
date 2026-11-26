@@ -1,0 +1,82 @@
+/* Collapsible: the Root is the <details>. `:open` is committed state (both modes);
+   [data-open] is optimistic state (library mode only). */
+.demo-collapsible {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.demo-collapsible-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.6em 0.9em;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none; /* hides the UA marker; the chevron below replaces it */
+}
+
+.demo-collapsible-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.demo-collapsible-trigger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.demo-collapsible-trigger[data-pending] {
+  cursor: progress;
+}
+
+.demo-collapsible-trigger[data-disabled] {
+  color: GrayText;
+  cursor: not-allowed;
+}
+
+/* Chevron. While pending, the optimistic attribute alone decides, so closing flips the chevron
+   at once instead of waiting for :open to go. */
+.demo-collapsible-trigger::before {
+  content: "";
+  inline-size: 0.5em;
+  block-size: 0.5em;
+  border-inline-end: 2px solid currentColor;
+  border-block-end: 2px solid currentColor;
+  rotate: -45deg;
+  transition: rotate 150ms;
+}
+
+.demo-collapsible:open > .demo-collapsible-trigger:not([data-pending])::before,
+.demo-collapsible-trigger[data-open]::before {
+  rotate: 45deg;
+}
+
+/* Open/close animation on ::details-content (grid-rows form, every engine, both modes). */
+.demo-collapsible::details-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 200ms ease,
+    content-visibility 200ms allow-discrete;
+}
+
+.demo-collapsible:open::details-content {
+  grid-template-rows: 1fr;
+}
+
+.demo-collapsible-panel {
+  min-height: 0; /* the grid item */
+  overflow: hidden;
+  padding: 0 0.9em;
+}
+
+.demo-collapsible-panel :is(p, ul) {
+  margin: 0 0 0.8em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-collapsible::details-content,
+  .demo-collapsible-trigger::before {
+    transition: none;
+  }
+}
