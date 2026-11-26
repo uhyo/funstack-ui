@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useEffectEvent, useRef } from "react";
+import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import type { RefObject } from "react";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
@@ -52,7 +52,7 @@ export function useHoverCardInterest(
   trigger: HTMLElement | null,
   popup: HTMLElement | null,
   options: HoverCardInterestOptions,
-): void {
+): HoverCardInterest {
   const { disabled, interestForRequested, suppressed, active } = options;
   const getEnv = useEffectEvent(() => ({
     delay: options.delay,
@@ -87,6 +87,33 @@ export function useHoverCardInterest(
   useEffect(() => {
     controller.current?.listenDocument(active);
   }, [active]);
+
+  const listenDocumentNow = useCallback(() => {
+    controller.current?.listenDocument(true);
+  }, []);
+  return { listenDocumentNow };
+}
+
+/** What the Root passes on to its parts. */
+export interface HoverCardInterest {
+  /**
+   * Attach the document Escape and outside-press listeners now: an open routed at the Popup's
+   * `beforetoggle` (the flagged path's interest show), before its optimistic commit. Stable.
+   */
+  readonly listenDocumentNow: () => void;
+}
+
+/**
+ * Blurs the element focused inside `popup` (the popup itself included), so a hide that must
+ * return no focus to the Trigger leaves it on `<body>`: neither the Popup hook's focus-return
+ * fallback nor a `hint` popover's own restore applies (design 6.2). Returns whether focus was
+ * inside.
+ */
+export function blurFocusInside(popup: HTMLElement): boolean {
+  const active = popup.ownerDocument.activeElement;
+  if (!(active instanceof HTMLElement) || !popup.contains(active)) return false;
+  active.blur();
+  return true;
 }
 
 interface AttachOptions {

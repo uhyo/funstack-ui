@@ -226,9 +226,10 @@ What the timers do when they fire:
   - Neither: nothing.
 
 Why hover and focus share one delay, why touch is ignored and why Escape is prevented while
-the card is open: tooltip.md 2.2. The differences from Tooltip's table are the three the
-research names: focus inside the card keeps it open, a press inside the card does not close it,
-and the focus return after Escape does not re-open it (2.4).
+the card is open: tooltip.md 2.2. The differences from Tooltip's table: focus moving into the
+card cancels the close timer (`focusin`), but the latest event wins, so a later pointer leave
+still closes it (2.1); a press inside the card does not close it; and the focus return after
+Escape does not re-open it (2.4).
 
 ### 2.3 The flagged path (`experimental_interestFor`, Chromium)
 
@@ -272,18 +273,19 @@ After **Escape**, after **a press on the Trigger**, and after **the library retu
 the Trigger** (6.2), nothing opens the card until the user shows interest afresh: the pointer
 leaves the Trigger and comes back, or focus leaves and returns.
 
-- JS path: opens start only at `pointerenter` and `focus`, so Escape and a press need no state
-  (as Tooltip). The focus return is the library's own `focus()` call on a Trigger that then
-  matches `:focus-visible`; a flag set before the hide (a `hint` popover may restore focus to
-  the Trigger inside it) makes that `focus` event start no timer. It is one flag for both paths,
-  set by Escape, a press on the Trigger and the focus return, and read by the JS path's `focus`
-  listener.
+One flag ("no open until fresh interest") serves both paths. It is set by Escape, by a press on
+the Trigger and right before the library's focus return (before the hide, since a `hint` popover
+may restore focus to the Trigger inside `hidePopover()`); it is cleared by the Trigger's
+`pointerenter`, `pointerleave` and `blur` (a `pointerenter` is the pointer coming back). It is
+read in two places:
+
+- JS path: the Trigger's `focus` listener starts no open timer while it is set (the focus
+  return is a `focus()` on a Trigger that then matches `:focus-visible`).
 - Flagged path: the platform may grant interest again on its own (a script `focus()` on the
   invoker does, Chromium 156, probe row B2; an interest timer that was already running when the
   user pressed the link still fires). Every open passes the library's `beforetoggle`
-  interception, so the same flag is read there: a suppressed interest open is cancelled and
-  dispatches nothing. The flag is cleared by the Trigger's `pointerenter`, `pointerleave` and
-  `blur` (a `pointerenter` is the pointer coming back), on both paths.
+  interception (`allowOpen`), where an interest open of the Trigger is cancelled while the flag
+  is set and dispatches nothing.
 
 A press on the Trigger closes the card because the user has chosen the destination: after a
 client-side navigation that keeps the link mounted, a preview still hanging over the new page
@@ -846,8 +848,14 @@ const [open, setOpen] = useState(false);
   interception of foreign and interest opens, close intents, the fact report from `toggle`,
   `held`, the focus-return fallback, `renderContent`, the lost-interest rows
   (`use-interest-dismiss.ts`). The popover type is the part's attribute; the hook does not
-  read it. New for HoverCard: every show is a no-focus show, and a dismissal can say that it
-  returns no focus to the Trigger (today only the lost-interest hide can).
+  read it. HoverCard passes the hook's opt-in options: `quietShow` (every show is a no-focus
+  show), `allowOpen` (the 2.4 flag at the `beforetoggle` interception), `elements` (a `<span>`
+  card), `beforeInterestHide` (blur focus inside the card before the flagged path's
+  lost-interest hide) and `onRoutedOpen` (attach the document listeners at a routed open's
+  dispatch). That a close returns no focus to the Trigger (6.2) is HoverCard's own blur of the
+  element focused inside the card, before its dismissal's `hidePopover()` and through
+  `beforeInterestHide`: with focus on `<body>` neither the hook's focus-return fallback nor a
+  `hint` popover's own restore applies.
 - **Placement**: `useAnchoredPlacement`.
 - **Timers**: `createDelayedPair` (`use-delayed-pair.ts`), shared with Tooltip and Menu.
 - **Interest tracking** (the listeners of 2.2) is HoverCard's own. Tooltip's

@@ -11,6 +11,7 @@ import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { useHoverCardContext } from "./hover-card-context.js";
+import { blurFocusInside } from "./use-hover-card-interest.js";
 
 /** `inline-start` / `inline-end` follow the popup's `direction` (conventions 13.1). */
 export type HoverCardSide = AnchorSide;
@@ -138,6 +139,11 @@ export function HoverCardPopup({
     // a press on the Trigger or the library's focus return is cancelled and dispatches nothing.
     allowOpen: (event) => !(suppressed.current && eventSource(event) === triggerRef.current),
     elements: POPUP_ELEMENTS,
+    // The flagged path's lost-interest hide returns no focus to the Trigger (design 6.2): with
+    // `hint` the platform would restore it there, and that focus is interest again.
+    beforeInterestHide: blurFocusInside,
+    // Escape and a press outside work from the dispatch of a routed open (design 2.2).
+    onRoutedOpen: () => ctx.listenDocumentNow(),
   });
 
   const placement = useAnchoredPlacement({ side: sideProp, align: alignProp });

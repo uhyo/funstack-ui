@@ -30,7 +30,16 @@ export interface InterestDismiss {
  * task and runs only if the popup is still shown and still meant to be open, and returns no focus
  * to the Trigger. A pending interest open is cancelled instead.
  */
-export function useInterestDismiss(ctx: PopoverRootValue): InterestDismiss {
+export function useInterestDismiss(
+  ctx: PopoverRootValue,
+  options: {
+    /**
+     * Called right before the lost-interest `hidePopover()` (HoverCard: blur focus inside the
+     * popup, so a `hint` popover cannot restore it to the Trigger; hover-card.md 6.2).
+     */
+    readonly beforeHide?: ((popup: HTMLElement) => void) | undefined;
+  } = {},
+): InterestDismiss {
   const isLibrary = ctx.mode === "library";
   const { popupRef } = ctx;
   // The button that has interest in the popup (`InterestEvent.source`), whether the current open
@@ -64,6 +73,7 @@ export function useInterestDismiss(ctx: PopoverRootValue): InterestDismiss {
         // Recorded right before the hide, so its one-task clear cannot run first.
         ctx.recordCloseIntent({ reason: "dismiss", event });
         interestHide.current = true;
+        options.beforeHide?.(element);
         element.hidePopover();
       }, 0);
     } else if (ctx.intended()) {

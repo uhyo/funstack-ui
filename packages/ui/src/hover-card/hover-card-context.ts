@@ -27,6 +27,8 @@ export interface HoverCardContextValue extends PopoverRootValue {
    * disabled), so the Root's effect re-detects the flagged path.
    */
   readonly setInterestForRequested: (requested: boolean) => void;
+  /** The Root's document listeners attach now (an open routed at the Popup's `beforetoggle`). */
+  readonly listenDocumentNow: () => void;
 }
 
 export const HoverCardContext = createContext<HoverCardContextValue | null>(null);

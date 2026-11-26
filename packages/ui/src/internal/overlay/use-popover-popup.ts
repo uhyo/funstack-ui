@@ -73,6 +73,18 @@ export interface UsePopoverPopupOptions {
    * `["DIALOG", "DIV"]`; HoverCard adds `"SPAN"` for a card inside running text.
    */
   readonly elements?: readonly string[] | undefined;
+  /**
+   * Called right before the lost-interest hide of an interest-opened popup
+   * (`use-interest-dismiss.ts`). HoverCard blurs focus inside the card there, so neither the
+   * focus-return fallback nor a `hint` popover's own restore moves focus to the Trigger
+   * (hover-card.md 6.2).
+   */
+  readonly beforeInterestHide?: ((popup: HTMLElement) => void) | undefined;
+  /**
+   * Called when a routed foreign or interest open passed `allowOpen`, right before it is
+   * dispatched (HoverCard attaches its document listeners there).
+   */
+  readonly onRoutedOpen?: ((event: ToggleEvent) => void) | undefined;
 }
 
 export interface PopoverPopupHook {
@@ -158,7 +170,11 @@ export function usePopoverPopup(
   const focusWasInside = useRef(false);
   const initialFocusTarget = useInitialFocusTarget(part, "popup");
   // `interestfor` (library mode, popover.md lost-interest amendment).
-  const interest = useInterestDismiss(ctx);
+  // The latest render's callback, read at the hide (an insertion-effect ref).
+  const beforeInterestHide = useLatest(options.beforeInterestHide);
+  const interest = useInterestDismiss(ctx, {
+    beforeHide: (element) => beforeInterestHide.current?.(element),
+  });
   // The cleanup of `whileShown` while the popup is shown.
   const stopWhileShown = useRef<(() => void) | null>(null);
   const stopListeningWhileShown = (): void => {
@@ -307,6 +323,7 @@ export function usePopoverPopup(
           return;
         }
         interest.noteOpen(toggle);
+        options.onRoutedOpen?.(toggle);
         ctx.requestOpen(event, "activate");
       } else if (!reshowing.current) {
         // A Close action that resolves after this open must not close it (design 3.4). A re-show

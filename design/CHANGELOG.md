@@ -12791,3 +12791,33 @@ Refinements of the design while implementing, edited into `hover-card.md` in the
 Not changed, for review: hover-card.md 2.2's paragraph after the table still says "focus inside
 the card keeps it open" among the differences from Tooltip, which contradicts Decisions 6 and
 2.1 ("the latest event wins", the probe). The implementation follows Decisions 6.
+## 2026-11-26, #166: HoverCard review fixes
+
+Developer, after the review of `feat/166-hovercard` (memo/reviewer/review-166.md on branch
+`review/166`).
+
+- Fixed (review finding 1): with both flags, focus inside the card and lost interest, the
+  flagged path's lost-interest hide (`use-interest-dismiss.ts`) called `hidePopover()` with
+  focus inside, so a `hint` card restored focus to the link (the element focused at its show).
+  That broke hover-card.md 6.2 and, as focus on an `interestfor` invoker is interest, re-opened
+  the card. `useInterestDismiss` takes a `beforeHide` callback and `usePopoverPopup` a
+  `beforeInterestHide` option; HoverCard passes the same blur of the element focused inside the
+  card that its own dismissal uses. Other components pass nothing: no behaviour change. A
+  Chromium row (both flags, Tab in, the pointer crosses the card and leaves: focus not on the
+  link, the card closed for 600 ms) and a jsdom row cover it; both fail without the fix.
+- Fixed (finding 5): on the flagged path the document Escape and outside-press listeners now
+  attach at the dispatch of a routed interest open (`usePopoverPopup`'s new `onRoutedOpen`
+  option), as the JS path's open timer already did, instead of in the passive effect after the
+  optimistic commit. jsdom row: Escape right after the interest show cancels the pending open.
+- Test (finding 4): the Chromium "Escape with focus inside" row asserts that
+  `openChangeAction` only ever saw `true`.
+- Design text (finding 3), `hover-card.md`: 2.2's list of differences from Tooltip now says
+  focus moving into the card cancels the close timer but the latest event wins; 2.4 states the
+  one-flag rule once (set by Escape, a press and before the focus return; cleared by the
+  Trigger's `pointerenter`, `pointerleave` and `blur`; read by the JS path's `focus` listener
+  and at the `beforetoggle` interception); section 12 lists the hook options HoverCard passes
+  and says the "no focus return" is HoverCard's own blur. `internal-hooks.md` names the new
+  options.
+- Not changed here: findings 2 (a non-modal Dialog's Escape and a `manual` popover inside it,
+  which predates HoverCard) and 6 (the Chromium 160 re-probe) go to issues filed by the
+  coordinator.

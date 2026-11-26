@@ -1054,6 +1054,46 @@ describe("Flagged path (experimental_interestFor)", () => {
     expect(isPopoverOpen(popup())).toBe(false);
   });
 
+  it("the lost-interest hide blurs focus inside the card first; the link is not focused", async () => {
+    defineInterestFor();
+    const blurred: EventTarget[] = [];
+    await renderAsync(<Harness trigger={{ experimental_interestFor: true }} />);
+    act(() => gainInterest(popup(), trigger()));
+    await task();
+    const button = follow();
+    act(() => button.focus());
+    button.addEventListener("blur", (event) => {
+      // Blurred while the card is still shown: before the hide, not by its focus fixup.
+      if (isPopoverOpen(popup())) blurred.push(event.target!);
+    });
+    act(() => {
+      dispatchLoseInterest(popup(), trigger());
+    });
+    await task();
+    await task();
+    expect(isPopoverOpen(popup())).toBe(false);
+    expect(blurred).toEqual([button]);
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  it("Escape and a press outside work right after a routed interest open, before its commit", async () => {
+    defineInterestFor();
+    const d = deferred();
+    const action = vi.fn<(next: boolean, details: Details) => unknown>(() => d.promise);
+    await renderAsync(
+      <Harness root={{ openChangeAction: action }} trigger={{ experimental_interestFor: true }} />,
+    );
+    let key!: KeyboardEvent;
+    act(() => {
+      gainInterest(popup(), trigger());
+      key = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+      document.body.dispatchEvent(key);
+    });
+    await flush();
+    expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
+    expect(action.mock.calls[1]?.[1].event).toBe(key);
+  });
+
   it("a script showPopover() is routed even while suppressed (not the Trigger's interest)", async () => {
     defineInterestFor();
     const action = vi.fn();

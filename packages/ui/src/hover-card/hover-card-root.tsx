@@ -129,7 +129,7 @@ export function HoverCardRoot({
   const [interestForRequested, setInterestForRequested] = useState(false);
   const suppressed = useRef(false);
 
-  useHoverCardInterest(popover, trigger, popup, {
+  const { listenDocumentNow } = useHoverCardInterest(popover, trigger, popup, {
     delay,
     closeDelay,
     disabled,
@@ -148,8 +148,9 @@ export function HoverCardRoot({
       setTriggerElement,
       setPopupElement,
       setInterestForRequested,
+      listenDocumentNow,
     }),
-    [popover, disabled, delay, closeDelay],
+    [popover, disabled, delay, closeDelay, listenDocumentNow],
   );
 
   const state: HoverCardRootState = {

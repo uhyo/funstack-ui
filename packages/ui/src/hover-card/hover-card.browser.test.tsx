@@ -367,9 +367,10 @@ describe("HoverCard (browser)", () => {
     });
 
     it("Escape with focus inside returns focus to the link; its interest does not re-open the card", async () => {
+      const openChangeAction = vi.fn();
       render(
         <Harness
-          root={{ delay: 100, closeDelay: 100 }}
+          root={{ delay: 100, closeDelay: 100, openChangeAction }}
           trigger={{ experimental_interestFor: true }}
         />,
       );
@@ -383,6 +384,31 @@ describe("HoverCard (browser)", () => {
       expect(trigger()).toHaveFocus();
       await quietPeriod(400, "the focus return's interest must not re-open the card");
       expect(isOpen()).toBe(false);
+      // Only the open was a request: no `loseinterest` arrived before the toggle as a cancel.
+      expect(openChangeAction.mock.calls.map(([next]) => next)).toEqual([true]);
+    });
+
+    it("both flags: Tab in, the pointer crosses the card and leaves; focus is not returned to the link and the card stays closed", async () => {
+      render(
+        <Harness
+          root={{ delay: 100, closeDelay: 100 }}
+          trigger={{ experimental_interestFor: true }}
+          popup={{ experimental_hint: true }}
+        />,
+      );
+      before().focus();
+      await userEvent.tab();
+      await expect.poll(isOpen, { timeout: 3000 }).toBe(true);
+      await userEvent.tab();
+      expect(follow()).toHaveFocus();
+      await userEvent.hover(follow());
+      await userEvent.hover(after());
+      await expect.poll(isOpen, { timeout: 3000 }).toBe(false);
+      expect(trigger()).not.toHaveFocus();
+      expect(popup().contains(document.activeElement)).toBe(false);
+      await quietPeriod(600, "a focus restore to the link would grant interest and re-open it");
+      expect(isOpen()).toBe(false);
+      expect(trigger()).not.toHaveFocus();
     });
 
     it("disabled removes interestfor and closes a shown card", async () => {
