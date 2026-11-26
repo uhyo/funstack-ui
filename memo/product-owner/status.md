@@ -464,3 +464,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - User: go. Architects designing both (design/168-drawer, design/171-avatar-scrollarea-otp).
 - Wave 25 decisions: all recommendations (see #168, #171 comments). ScrollArea = docs recipe. → developers: feat/168-drawer, feat/171-avatar (+ScrollArea recipe), feat/171-otp-field.
 - Avatar + Scroll areas recipe MERGED d5d8db29 (9ca33984). OTPField fix 4852e40f in re-review. #185 Combobox real reset bug, #186 OTP human checks filed. Drawer dev running.
+- OTPField MERGED 109b67e1 (4852e40f + review + dup-comment fix). #171 closed. Remaining wave 25: Drawer (#168, dev running).
