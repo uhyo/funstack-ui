@@ -81,6 +81,7 @@ export const routes = [
               page("/components/toast", "ToastPage"),
               page("/components/slider", "SliderPage"),
               page("/components/number-field", "NumberFieldPage"),
+              page("/components/otp-field", "OTPFieldPage"),
               page("/components/field", "FieldPage"),
               page("/components/progress", "ProgressPage"),
               page("/components/meter", "MeterPage"),

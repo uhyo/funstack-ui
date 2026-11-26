@@ -29,6 +29,12 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/otp-field">OTPField</a> (<a href={issue(171)}>#171</a>
+          ): a one-time-code field that is one <code>autocomplete="one-time-code"</code> input drawn
+          as a row of boxes, with <code>completeAction</code> for the complete code,{" "}
+          <code>submitOnComplete</code> and <code>experimental_webOTP</code>.
+        </li>
+        <li>
           A <code>Dialog.Close</code> or <code>Popover.Close</code> with an <code>action</code> no
           longer renders <code>commandfor</code> / <code>command</code> (
           <a href={issue(182)}>#182</a>). A click before hydration used to close the dialog or
