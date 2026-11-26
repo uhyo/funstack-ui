@@ -56,3 +56,5 @@ Probe (Chromium + Firefox, a `<details>` with a 100px child):
 - `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm build`: pass.
 - `pnpm test:jsdom`: 83 files / 4025 tests pass. `pnpm test:browser` (Chromium + Firefox
   locally): 56 files / 1061 pass, 39 skipped.
+- Branch CI run 45747867624 (workflow_dispatch on feat/163-collapsible, head 1ec97c8f): success
+  (ci, browser chromium / firefox / webkit).
