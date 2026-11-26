@@ -873,7 +873,10 @@ theoretical). The browser suite carries a dedicated WebKit row (section 14.2).
   Chrome 145 only, and the value would be `string[]` with `details.added` / `removed` (the
   CheckboxGroup diff shape). When it arrives it is `Select.Root multiple` with the set-valued
   conventions already written (2.2, 3.4), and `<selectedcontent>` inside `multiple` is still
-  experimental. Chips, search and virtualization stay with Combobox regardless.
+  experimental. Chips, search and virtualization stay with Combobox regardless. Until then a
+  multi-select with a library-owned listbox is proposed in
+  `design/components/multi-select.md` (#165); whether it is a component of its own or this
+  prop is the user's decision recorded there (part A).
 - **`Select.Popup`, controlled `open`, open/close `<ViewTransition>`**: impossible on a native
   select. A consumer who needs them needs Combobox.
 
