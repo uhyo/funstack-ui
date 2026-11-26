@@ -109,6 +109,8 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
 | `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending`. The general one is the single-element `Button` (`@funstack/ui/button`; `whilePending`, 2.5.1), which is also a Toolbar's command button: the Toolbar has no button part, and `Button` reads `ToolbarContext` so that a disabled one stays focusable there (3.6). | `button` |
+| `Image` | A picture the owner shows while it is available, mirrored as a load `status` (Avatar): an `<img alt="">` rendered from the server render on, unmounted once its source failed; the owner carries the name. Never an `onLoad` prop of the library's (react-dom's commit wait, `design/components/avatar.md` 5). | `img` |
+| `Fallback` | What the owner shows in an `Image`'s place: rendered until the image has loaded, **under** it (the consumer's CSS stacks them), so nothing is swapped while it loads (Avatar). | `span` |
 | `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default; inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. The standalone single-element `Separator` (`@funstack/ui/separator`, directive-free) takes `orientation` and `decorative` (`role="none"`, no `aria-orientation`; the one spelling allowed inside a listbox). | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
@@ -906,6 +908,11 @@ pair:
   the first invalid control a microtask later (a transition commit would land after the focus
   move, and later still while any async action is pending). No `transition` prop
   (`design/components/field-form.md` 2.4).
+- **A mirror of an image's load state.** `Avatar.Root`'s `status` is written with `useState`
+  from the image's native `load` / `error` events and from a layout effect that reads
+  `img.complete` at mount and on a source change, never inside `startTransition`: the DOM
+  already holds the fact, and a status held by an unrelated pending action would leave the
+  fallback over a loaded picture. No `transition` prop (`design/components/avatar.md` 4, 7).
 - **The draft text of a NumberField** is internal: written from the `input` event with
   `useState`, because the text is not a value until it is parsed at commit (blur, Enter, or
   before a step). The value under a held `Increment` / `Decrement` button follows Slider's
@@ -1400,6 +1407,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `region` | `"optimum" \| "suboptimum" \| "even-less-good"` | Meter, every part | HTML's meter region for the value against `low` / `high` / `optimum`, the platform's words. |
 | `side` | `"top" \| "bottom" \| "left" \| "right"` while shown; the requested `side` (which may be `"inline-start"` / `"inline-end"`) otherwise | Tooltip, Popover and Menu `Popup`; Tooltip `Arrow` | **The resolved side** (section 13): while the popup is shown, the side of the anchor the browser actually placed it on, read from the computed `position-area` after `position-try-fallbacks` chose an option, so it changes after a flip (on open, on scroll, on resize); on the server, while closed, and when the computed value cannot be read (a vertical writing mode, a consumer `position-area` the parser does not know), the value of the `side` prop. Absent with `side={null}` and on a point-placed menu (`context`). Written urgently (geometry, observed; conventions 3.5). |
 | `align` | `"start" \| "center" \| "end"` | same parts | The resolved alignment along that side, same rules. `start` / `end` are **inline-relative** on a top / bottom side (`start`: the popup's inline-start edge meets the anchor's; mirrored under `direction: rtl`) and block-relative on a left / right / inline side (`start`: top edges meet). |
+| `status` | `"idle" \| "loading" \| "loaded" \| "error"` | Avatar, every part | The load state of the avatar's image, an urgent mirror (2.6): `"idle"` until an image with a source reports (the server render and the hydration render too), `"loading"` while it is not complete, `"loaded"` once available, `"error"` when its current source failed (`design/components/avatar.md` 4). |
 | `instant` | boolean | `Tooltip.Popup` | The tooltip is shown by an open that began while another `[role="tooltip"]:popover-open` existed in the document (the skip-delay condition, `design/components/tooltip.md` 6), so a stylesheet can skip the entry animation of a warm open and keep a cold one's. **Attribute only, no `state.instant`**: browser-owned, like the open state it qualifies (no `state.open` exists), written by a DOM write from the popup's synchronous `beforetoggle` on both paths, before the open's first style recalc, and removed at the close's (section 7.4). Never server-rendered. |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
@@ -1522,7 +1530,8 @@ have none and animate in CSS instead:
    optimistic); every Slider and NumberField part (the value is urgent or optimistic; a
    Slider's rollback animates with a CSS transition on a registered custom property).
 3. **Every commit on the urgent lane by design** (Toast, 2.6; Field and Form, whose state is an
-   urgent mirror of browser-owned validity and whose own commits display nothing): react-dom
+   urgent mirror of browser-owned validity and whose own commits display nothing; Avatar, whose
+   status is an urgent mirror of its image's load state): react-dom
    never starts a view transition for an urgent commit, so a boundary could animate nothing and
    would still pay the page cross-fade when the part mounted inside another component's
    transition commit. CSS: `@starting-style`, `data-ending`; `Field.Error` enters with
@@ -1652,6 +1661,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Button | none (`useActionTrigger`; `transition` animates the commit that ends the action) |
 | Progress, Meter | none (no `transition` prop: a consumer-owned value in the consumer's lane, section 5.1) |
 | NumberField | `fsui-number-field`, `fsui-number-field-change` (each step), `fsui-number-field-commit` (each gesture's commit); no `transition` prop on any part |
+| Avatar | none (no `transition` prop: the status is an urgent mirror, 2.6; a consumer `<ViewTransition>` around it gets react-dom's commit wait for the image, `design/components/avatar.md` 5) |
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync

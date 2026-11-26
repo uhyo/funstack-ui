@@ -99,6 +99,9 @@ type PublicProps = {
   AlertDialogRootProps: UI.AlertDialogRootProps;
   AlertDialogTitleProps: UI.AlertDialogTitleProps;
   AlertDialogTriggerProps: UI.AlertDialogTriggerProps;
+  AvatarFallbackProps: UI.AvatarFallbackProps;
+  AvatarImageProps: UI.AvatarImageProps;
+  AvatarRootProps: UI.AvatarRootProps;
   ButtonProps: UI.ButtonProps;
   CSPProviderProps: UI.CSPProviderProps;
   CheckboxGroupItemProps: UI.CheckboxGroupItemProps;
@@ -244,6 +247,9 @@ const listedKeys = {
   AlertDialogRootProps: true,
   AlertDialogTitleProps: true,
   AlertDialogTriggerProps: true,
+  AvatarFallbackProps: true,
+  AvatarImageProps: true,
+  AvatarRootProps: true,
   ButtonProps: true,
   CSPProviderProps: true,
   CheckboxGroupItemProps: true,

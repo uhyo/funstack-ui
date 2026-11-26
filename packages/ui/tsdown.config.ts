@@ -31,6 +31,7 @@ export default defineConfig({
     "src/toggle-group/index.ts",
     "src/toolbar/index.ts",
     "src/separator/index.ts",
+    "src/avatar/index.ts",
     "src/csp/index.ts",
     // The `funstack-ui-skill-installer` bin, not a module of the package.
     "src/bin/skill-installer.ts",

@@ -221,3 +221,22 @@ document keydown listener (JS path prevents). design/components/tabs.md and conv
   150 ms block in a document pointerdown bubble listener (after React's root handler started the
   timer). Fix: stamp both ends in capture listeners on the button (as the mouse hold row did), and
   assert the hold >= 650 ms. Rule: for CDP-driven rows, never stamp time after `session.send`.
+
+## Avatar and the Scroll areas recipe (#171)
+
+- Playwright's Firefox (157, Playwright 1.64.1) computes `scrollbar-width: none` for every
+  element, including one with an inline `scrollbar-width: thin !important`: the test harness
+  hides scrollbars. `CSS.supports("scrollbar-width: thin")` is true. The recipe test branches on a
+  probe element (`scrollbarsForcedNone`).
+- That Firefox predates scroll-driven animations (shipped in 159): `CSS.supports("animation-timeline:
+  scroll()")` and `timeline-scope` are false. Without an `@supports` guard, the fade animations ran
+  on the document clock with `both` fill and kept their end values (a fade over the top for ever);
+  the recipe now guards. With `firefoxUserPrefs: { "layout.css.scroll-driven-animations.enabled":
+  true }` (temporary vitest config change) every fade row passes in Gecko.
+- An SVG data URL with no width/height/viewBox: `naturalWidth` 300 in Chromium 156 and Firefox
+  157 (default object size), `complete` false right after `src` is set, `decode()` resolves. A
+  blob of non-image bytes: `naturalWidth` 0, `decode()` rejects. Blob URLs load asynchronously in
+  both (needed for the commit-wait row: without React's wait the image is not complete at commit).
+- react-dom 19.3.1 under `<ViewTransition>` + `startTransition`: an `<img>` without `onLoad` is
+  `complete` when its ref attaches (the commit was held for `decode()`); with `onLoad` it is not.
+  Chromium and Firefox; WebKit via branch CI.

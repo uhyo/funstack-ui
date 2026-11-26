@@ -35,6 +35,7 @@
     ".": "./dist/index.mjs",
     "./accordion": "./dist/accordion/index.mjs",
     "./alert-dialog": "./dist/alert-dialog/index.mjs",
+    "./avatar": "./dist/avatar/index.mjs",
     "./button": "./dist/button/index.mjs",
     "./checkbox": "./dist/checkbox/index.mjs",
     "./checkbox-group": "./dist/checkbox-group/index.mjs",

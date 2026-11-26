@@ -1,8 +1,9 @@
 # Avatar
 
-Status: **proposed** (#171, part of #162). Not accepted, not implemented. History, the open
-decisions and the test plan: `design/CHANGELOG.md`. Follows `design/conventions.md`; where this
-document and the conventions disagree, the conventions win.
+Status: **accepted**, implemented (#171, part of #162): `packages/ui/src/avatar/`. History, the
+decisions and the test plan: `design/CHANGELOG.md`. The code is the ground truth where this
+document is silent. Follows `design/conventions.md`; where this document and the conventions
+disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.1, 1.2, 2.6, 4.1, 5, 6, 7.1),
 `design/components/separator.md` (how a small part accounts for itself), the React 19.3
@@ -15,7 +16,7 @@ UI 1.9 `Avatar`, Ark UI `Avatar`; React Aria, Headless UI and Ariakit have none)
 A picture of a person or a thing, with something to show in its place when there is no picture
 or the picture does not load. It has no action and nothing pending: its one state, whether the
 image loaded, is a fact the browser owns and the library mirrors. Section 2 says what the part
-adds over `<img alt>`, so that the product owner can weigh it.
+adds over `<img alt>`.
 
 ## Summary
 
@@ -109,7 +110,7 @@ What the part is for:
 
 The alternative is a docs recipe: `<img>` with a ref callback that checks `complete` and
 listens for `error`. The cost of the part is three small client files, a context and a docs
-page. Open decision 1 in the changelog.
+page. The user chose the part (2026-11-26, changelog).
 
 ## 3. Props and types
 
@@ -198,13 +199,21 @@ is about (the Image's `src` and `srcSet`). The Image reports:
   - `img.complete` is false: `"loading"`;
   - `img.complete` with a non-zero `naturalWidth`: `"loaded"`;
   - `img.complete` with `naturalWidth === 0`: undecided. An image with no intrinsic size (some
-    SVGs) and a broken image look the same here, so the part asks `img.decode()`: a resolved
-    promise is `"loaded"`, a rejected one `"error"`. A complete image settles `decode()`
-    without a request.
+    SVGs) and a broken image look the same here, so the part reports `"loading"` and asks
+    `img.decode()`: a resolved promise is `"loaded"`, a rejected one `"error"`. A complete
+    image settles `decode()` without a request. An element with no `decode()` (jsdom) is
+    `"error"`. (Chromium and Firefox give an SVG with no width, height or viewBox the default
+    object size, 300 × 150, as its natural size, so there the branch is reached by broken images
+    only.)
 - **On the native `load` and `error` events**, through listeners added in the ref callback:
   `"loaded"` and `"error"`.
+- **At unmount** of the Image (and when its source goes away): back to `"idle"`, if the Root's
+  status is still about that source.
 
-A report is dropped when the Image's source is no longer the one it was made for.
+A report is dropped when the Image's source is no longer the one it was made for: a
+`decode()` result is dropped when the source changed meanwhile, and an event is taken only
+while the element is `complete` (a late event for a previous source finds the element busy with
+the new request).
 
 Every write is a plain `setState` from the event or the layout effect, never inside
 `startTransition`: the DOM already holds the fact, nothing is awaited or optimistic, and a
@@ -223,6 +232,8 @@ Consequences:
 - **`loading="lazy"`** off screen stays `"loading"`, and the Fallback shows, until the browser
   fetches it.
 - **Two `Avatar.Image` parts in one Root** warn in development; the last report wins.
+- A part that is not rendered (the Image after its source failed, the Fallback once loaded)
+  does not call its function `render` or `children`.
 
 ## 5. Suspense, and the commit wait React already has
 
@@ -354,9 +365,12 @@ is about; it animates the avatar's mount, not its status.
 - The server renders the Root, the `<img>` (when a source is given) and the Fallback, all with
   `data-status="idle"`. The hydration render is the same, so there is no mismatch.
 - The image request starts from the HTML. Nothing in the part delays or repeats it.
+  (react-dom's server renderer also emits a `<link rel="preload" as="image">` for an `<img>`
+  with a `src`, before the shell; that is React's, not the part's.)
 - At hydration the Image's layout effect reads the element: an image that already loaded makes
-  the status `"loaded"` in the hydration commit itself, and one that already failed `"error"`,
-  so neither waits for an event that has passed.
+  the status `"loaded"` in the hydration commit itself, and one that already failed `"error"`
+  (after `decode()` rejects, a microtask or so later), so neither waits for an event that has
+  passed.
 - Without JavaScript: section 6.
 
 ## 10. Server/client boundary

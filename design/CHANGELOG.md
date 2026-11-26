@@ -13715,3 +13715,93 @@ Test plan, OTPField (jsdom unless marked):
   the `details` of both callbacks are serialisable.
 - Browser: click on a Slot places the caret; `selectionchange` drives `data-active`; a real
   paste; the server render is interactive before hydration and adopted after.
+
+## 2026-11-26, #171: Avatar decided and implemented, ScrollArea as a recipe
+
+The user's decisions on the Avatar and ScrollArea questions of the entry above (2026-11-26,
+#171 comment), all as recommended. The OTPField decisions (3 to 7) are recorded with its
+implementation, not here.
+
+1. **Avatar: build the three parts** (`@funstack/ui/avatar`): `Root`, `Image`, `Fallback`.
+   `avatar.md` status: accepted, implemented in `packages/ui/src/avatar/`.
+2. **Avatar: `alt` is required on `Avatar.Root`** (`role="img"` + `aria-label`, or
+   `aria-hidden` for `alt=""`); the inner image is always `alt=""`.
+8. **ScrollArea: no part; a docs recipe page** (`/components/scroll-area`, "Scroll areas",
+   group "Layout").
+
+Implementation notes (avatar.md amended where the design was silent; no rule of the design
+changed):
+
+- **No `onLoad` prop, ever.** `Avatar.Image` listens with native `load` / `error` listeners
+  added in its ref callback; a consumer's `onLoad` / `onError` pass through untouched. The
+  status is read again from `img.complete` / `naturalWidth` in a layout effect at mount and on
+  every source change (`src` / `srcSet`), so an image that finished before hydration is right in
+  the hydration commit.
+- **Dropped reports** (avatar.md 4, the mechanism is new): a `decode()` result is dropped when
+  the source changed meanwhile, and an event is taken only while the element is `complete`, so
+  a late event for a previous source (the element is busy with the new request) is ignored.
+- **Unmounting the Image** (or removing its source) puts the Root back to `"idle"` when the
+  status was about that source. An element without `decode()` (jsdom) decides a complete image
+  with no natural width as `"error"`.
+- **Not rendered, not run.** The Image after its source failed and the Fallback once loaded
+  return `null` without calling a function `render` / `children`; so neither uses `useRender`:
+  the Image merges its refs with `useMergedRefs` (the listening ref keeps its identity across
+  status changes) and calls `renderElement`, the Fallback uses `renderElement` +
+  `mergeRenderRef`.
+- **react-dom's server renderer emits `<link rel="preload" as="image">`** for the `<img>` before
+  the shell (React's, noted in avatar.md 9).
+- **Sizeless SVG.** Chromium and Firefox report the default object size (300 × 150) as the
+  natural size of an SVG with no width, height or viewBox, so the `decode()` branch is reached
+  by broken images there. WebKit's value was not read (WebKit does not run on the development
+  machine); the browser rows assert only the status, which holds either way.
+
+Registry rows (to-do list of the entry above, Avatar and ScrollArea parts only): conventions 1.1
+`Image` and `Fallback` in the part vocabulary; 2.6 Avatar's status as "a mirror of an image's
+load state"; 4.1 `status`; 5.1 item 3 names Avatar; 5.3 an Avatar row (none). 9.2 needs no
+row (the subpath is generated from the entry list). `docs/research/modern-platform-survey.md`:
+a dated note that scroll-driven animations shipped in Firefox 159 (BCD `version_added: "159"`
+for `animation-timeline`), the summary row left as of its research date with a pointer.
+
+Tests added:
+
+- Avatar (jsdom, `avatar.test.tsx`, faked `complete` / `naturalWidth` / `decode` per element):
+  the design entry's plan. Server HTML (with React's preload link) and no `<img>` without a
+  source or with `src=""`; hydration without a mismatch and with an image still loading, already
+  loaded (loaded in the hydration commit, no Fallback) and already failed (`decode()` rejects →
+  `"error"`, `<img>` removed); `load` / `error`; mount with a complete image (natural width,
+  `decode()` resolving, no `decode()`); a new `src` on the same element back to `"loading"` with
+  the Fallback rendered again; a late `decode()` for the old source dropped; a new `src` after an
+  error mounts a new `<img>`; removing the source and unmounting the Image → `"idle"`; an event
+  while incomplete dropped; StrictMode; the name (`role="img"` in every status, one `img` role,
+  `alt=""` → `aria-hidden`), owned keys over a `render` element's; not focusable; the rendered
+  props carry no `onLoad` / `onError`, a consumer's pass through and the status still follows;
+  urgent status writes while an unrelated async action is pending (and inside the transition
+  that renders the avatar); two Images warn once, one does not; parts outside a Root throw;
+  function props on every part, a function `render` of the Fallback not run once loaded, refs on
+  every part and a `render` element's ref. Types (`avatar.types.test.tsx`): `alt` required, no
+  `role`, no `alt` or `children` on the Image, the state. Directive rows: four client files and
+  the index directive-free. Action naming: the three Props types listed.
+- Avatar (browser, `avatar.browser.test.tsx`, three engines): a real load and a real failure
+  (blob URLs); a sizeless SVG is `"loaded"`; status after hydration for a PNG, a broken image
+  and a sizeless SVG that finished before any listener; the commit wait under a
+  `<ViewTransition>` in a transition: without `onLoad` the image is `complete` when its ref
+  attaches and the status never shows `"loading"`, with a consumer `onLoad` it commits before
+  the image loaded and passes through `"loading"`; without script a broken `<img alt="">` sized
+  by CSS paints nothing over the Fallback (screenshot pixels).
+- ScrollArea recipe (browser, `src/__tests__/scroll-area-recipe.browser.test.tsx`, reads the docs
+  stylesheet `packages/docs/src/examples/scroll-area.css`): the computed scrollbar properties, a
+  stable gutter, the fade lengths at the top / after 10px / middle / bottom, no fade without
+  overflow, `tabindex="0"` + `role="region"` + a name is a Tab stop that ArrowDown and PageDown
+  scroll. Two engine branches: Playwright's Firefox forces `scrollbar-width: none` on every
+  element (an inline `!important` loses too), and its build (157) predates scroll timelines, so
+  the recipe's fades are behind `@supports (animation-timeline: scroll())` and the test asserts
+  "no fade at any position" where the feature is missing. The fade branch was run once in that
+  Firefox with `layout.css.scroll-driven-animations.enabled` on (a temporary config change, not
+  committed): it passes.
+
+Docs: an Avatar page (`/components/avatar`, group "Output", live example `AvatarPeople.tsx`,
+props tables, the commit wait under Suspense) and the "Scroll areas" recipe page
+(`ScrollAreaNotes.tsx`, a Server Component example; support tables from BCD; the
+`::-webkit-scrollbar` and overlay variants are marked as not run). Roadmap entry. Agent skill:
+Avatar, and "no ScrollArea". Playground: `avatar-demo.tsx` (statuses, and the commit wait with an
+`onLoad` opt-out toggle).
