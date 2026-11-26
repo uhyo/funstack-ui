@@ -12,6 +12,7 @@ import { RadioGroupDemo } from "./radio-group-demo.js";
 import { CheckboxGroupDemo } from "./checkbox-group-demo.js";
 import { SelectDemo } from "./select-demo.js";
 import { ComboboxDemo } from "./combobox-demo.js";
+import { MultiSelectDemo } from "./multi-select-demo.js";
 import { Notifications, ToastDemo } from "./toast-demo.js";
 import { SliderDemo } from "./slider-demo.js";
 import { FieldFormDemo } from "./field-form-demo.js";
@@ -45,6 +46,7 @@ export function App() {
       <RadioGroupDemo />
       <SelectDemo />
       <ComboboxDemo />
+      <MultiSelectDemo />
       <SliderDemo />
       <NumberFieldDemo />
       <ProgressMeterDemo />
