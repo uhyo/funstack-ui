@@ -225,7 +225,8 @@ Consequences:
 
 - **A new `src`** remounts nothing. The browser keeps painting the previous picture until the
   new one is available, the status goes back to `"loading"`, and the Fallback is rendered
-  under the image again, unseen.
+  under the image again, unseen (unless a stylesheet hides a `"loading"` image: the fade-in
+  recipe of section 6 and its caveat).
 - **A failed source** unmounts the `<img>` (not `hidden`, which a consumer's
   `display: block` would defeat). A different `src` mounts a new one. The same `src` is not
   tried again: no retry in v1.
@@ -329,6 +330,14 @@ delay applies only then, and works before hydration:
   .avatar-image[data-status="loading"] { opacity: 0; }
 }
 ```
+
+The rule hides any image whose status is `"loading"`, so it also fades out a **loaded picture
+whose `src` changes** (section 4: the status goes back to `"loading"` on the same element), and
+the initials show until the new one arrives: the "unseen" Fallback of section 4 is then seen.
+CSS cannot tell a first load from a source change. Where a mounted avatar can change its
+picture, either leave the fade out, or key the Root by the source (`key={src}`): each picture
+is then a new avatar, the old one goes at once, and the new one fades in over the initials as
+on a first load.
 
 **Transparent pictures** (a PNG logo) let the initials show through until hydration removes
 the Fallback. Give `.avatar-image` a `background` if the pictures can be transparent; the

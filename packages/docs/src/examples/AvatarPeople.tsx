@@ -2,7 +2,7 @@
 // Three people: a picture that loads, one whose picture fails (initials take its place), and one
 // with no picture at all. Each Root is named by `alt`; the status under each avatar comes from
 // the Root's `render` function, so it sits outside the role="img" element. "Change picture"
-// swaps Ada's source: the status goes back to "loading" until the new one is in.
+// swaps Ada's source; the Root is keyed by it, so the new picture is a new avatar that fades in.
 import { Avatar } from "@funstack/ui/avatar";
 import { useState } from "react";
 
@@ -29,33 +29,36 @@ export function AvatarPeople() {
   return (
     <div className="demo-stack">
       <ul className="demo-avatar-people">
-        {people.map((person) => (
-          <li key={person.id}>
-            <Avatar.Root
-              alt={person.name}
-              className="demo-avatar"
-              // The function form wraps the avatar in a figure, so the caption is outside the
-              // role="img" element (its children are presentational).
-              render={(props, { status }) => (
-                <figure className="demo-avatar-figure">
-                  <span {...props} />
-                  <figcaption>
-                    {person.name}
-                    <code>{status}</code>
-                  </figcaption>
-                </figure>
-              )}
-            >
-              <Avatar.Image
-                className="demo-avatar-image"
-                src={person.id === "ada" ? pictures[picked] : person.src}
-                width={80}
-                height={80}
-              />
-              <Avatar.Fallback className="demo-avatar-fallback">{person.initials}</Avatar.Fallback>
-            </Avatar.Root>
-          </li>
-        ))}
+        {people.map((person) => {
+          const src = person.id === "ada" ? pictures[picked] : person.src;
+          return (
+            <li key={person.id}>
+              <Avatar.Root
+                // Keyed by the source: with the fade-in recipe (avatar.css) a new picture on the
+                // same avatar would first fade the old one out; a new avatar fades in instead.
+                key={src}
+                alt={person.name}
+                className="demo-avatar"
+                // The function form wraps the avatar in a figure, so the caption is outside the
+                // role="img" element (its children are presentational).
+                render={(props, { status }) => (
+                  <figure className="demo-avatar-figure">
+                    <span {...props} />
+                    <figcaption>
+                      {person.name}
+                      <code>{status}</code>
+                    </figcaption>
+                  </figure>
+                )}
+              >
+                <Avatar.Image className="demo-avatar-image" src={src} width={80} height={80} />
+                <Avatar.Fallback className="demo-avatar-fallback">
+                  {person.initials}
+                </Avatar.Fallback>
+              </Avatar.Root>
+            </li>
+          );
+        })}
       </ul>
       <p>
         <button

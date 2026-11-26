@@ -4,7 +4,10 @@
 // only claims what they do. Rows: the standard scrollbar properties apply; `scrollbar-gutter:
 // stable` keeps the content width when the content starts to overflow; the edge fades follow
 // the scroll position from a scroll timeline and are absent when nothing overflows; a scroller
-// with `tabindex="0"`, a role and a name is a Tab stop that the arrow keys and Page Down scroll.
+// with `tabindex="0"`, a role and a name is a Tab stop that the arrow keys and Page Down scroll;
+// its focus ring is drawn on the frame (the fade mask would fade the scroller's own outline).
+// The gutter row asserts a non-zero gutter where the recipe's bar takes space (headless
+// Chromium) and none where bars are hidden (Playwright's Firefox).
 //
 // Two engine branches (memo/developer/cross-engine.md):
 // - Playwright's Firefox forces `scrollbar-width: none` on every element (an inline
@@ -28,6 +31,21 @@ const scrollbarsForcedNone = (() => {
   probe.remove();
   return forced;
 })();
+/**
+ * Whether the recipe's scrollbar takes layout space here (a classic bar): an `overflow: scroll`
+ * box with the recipe's class, measured after the stylesheet is in. Headless Chromium hides a
+ * default scrollbar (0px) but draws one styled by the recipe; Playwright's Firefox hides every
+ * scrollbar.
+ */
+function classicScrollbars(): boolean {
+  const probe = document.createElement("div");
+  probe.className = "demo-scroll-area";
+  probe.style.cssText = "overflow: scroll; inline-size: 100px; block-size: 100px;";
+  document.body.append(probe);
+  const classic = probe.offsetWidth - probe.clientWidth > 0;
+  probe.remove();
+  return classic;
+}
 
 async function recipe(): Promise<void> {
   const css = await commands.readFile("../docs/src/examples/scroll-area.css");
@@ -40,20 +58,22 @@ function Area({ rows, fade = true }: { rows: number; fade?: boolean }) {
   return (
     <>
       <button type="button">before</button>
-      <div
-        className={fade ? "demo-scroll-area demo-scroll-fade" : "demo-scroll-area"}
-        tabIndex={0}
-        role="region"
-        aria-label="Release notes"
-        data-testid="area"
-        style={{ inlineSize: "200px" }}
-      >
-        {Array.from({ length: rows }, (_, i) => (
-          <p key={i} style={{ margin: 0, blockSize: "24px" }}>
-            Row {i}
-          </p>
-        ))}
-      </div>
+      <section className="demo-scroll-area-frame" data-testid="frame">
+        <div
+          className={fade ? "demo-scroll-area demo-scroll-fade" : "demo-scroll-area"}
+          tabIndex={0}
+          role="region"
+          aria-label="Release notes"
+          data-testid="area"
+          style={{ inlineSize: "200px" }}
+        >
+          {Array.from({ length: rows }, (_, i) => (
+            <p key={i} style={{ margin: 0, blockSize: "24px" }}>
+              Row {i}
+            </p>
+          ))}
+        </div>
+      </section>
     </>
   );
 }
@@ -80,14 +100,25 @@ describe("Scroll areas recipe (browser)", () => {
     expect(style.scrollbarColor).toBe("rgb(200, 200, 200) rgba(0, 0, 0, 0)");
   });
 
-  it("scrollbar-gutter: stable keeps the content width when the content starts to overflow", async () => {
+  const gap = () => area().offsetWidth - area().clientWidth;
+
+  it("scrollbar-gutter: stable reserves the bar's space where bars take space", async () => {
     await recipe();
+    const classic = classicScrollbars();
     const { rerender } = render(<Area rows={2} />);
-    const short = area().clientWidth;
     expect(area().scrollHeight).toBe(area().clientHeight);
+    const reserved = gap();
+    if (classic) {
+      // Classic bars: the gutter is there before the content overflows.
+      expect(reserved).toBeGreaterThan(0);
+    } else {
+      // Overlay or hidden bars (Playwright's Firefox): nothing to reserve.
+      expect(reserved).toBe(0);
+    }
     rerender(<Area rows={40} />);
     expect(area().scrollHeight).toBeGreaterThan(area().clientHeight);
-    expect(area().clientWidth).toBe(short);
+    // No shift when the content starts to overflow.
+    expect(gap()).toBe(reserved);
   });
 
   it.runIf(!scrollTimelines)("without scroll timelines: no fade at any position", async () => {
@@ -135,5 +166,18 @@ describe("Scroll areas recipe (browser)", () => {
     const afterArrow = area().scrollTop;
     await user.keyboard("{PageDown}");
     await expect.poll(() => area().scrollTop).toBeGreaterThan(afterArrow);
+  });
+
+  it("the focus ring is drawn on the frame, outside the fade mask", async () => {
+    await recipe();
+    render(<Area rows={40} />);
+    const frame = screen.getByTestId("frame");
+    expect(getComputedStyle(frame).outlineStyle).toBe("none");
+    screen.getByRole("button", { name: "before" }).focus();
+    await user.tab();
+    expect(document.activeElement).toBe(area());
+    expect(getComputedStyle(area()).outlineStyle).toBe("none");
+    expect(getComputedStyle(frame).outlineStyle).toBe("solid");
+    expect(getComputedStyle(frame).outlineColor).toBe("rgb(0, 0, 255)");
   });
 });

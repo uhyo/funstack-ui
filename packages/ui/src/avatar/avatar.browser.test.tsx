@@ -101,6 +101,17 @@ describe("Avatar (browser)", () => {
       expect(screen.getByTestId("fallback")).toHaveAttribute("data-status", "error");
     });
 
+    it("a URL that answers 404 reports error (the network-error path)", async () => {
+      addStyle(css);
+      const src = `/__avatar-missing__/${Math.random().toString(36).slice(2)}.png`;
+      // The test server really answers 404 for it (not an HTML fallback page).
+      expect((await fetch(src)).status).toBe(404);
+      render(<Basic src={src} />);
+      await expect.poll(() => root().dataset["status"]).toBe("error");
+      expect(img()).toBeNull();
+      expect(screen.getByTestId("fallback")).toHaveAttribute("data-status", "error");
+    });
+
     it("an SVG with no intrinsic size is loaded, not an error", async () => {
       addStyle(css);
       render(<Basic src={sizelessSvg} />);

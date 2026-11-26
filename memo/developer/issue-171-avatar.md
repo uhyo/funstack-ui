@@ -41,3 +41,13 @@ is another developer's (`feat/171-otp-field`); otp-field.md untouched here.
 - Run 45831842711 (head 95424b27): WebKit failed only the recipe's fade row (`9.999999px`).
   Fixed by rounding (dc46b76d). Run 45832566374 (dc46b76d): ci, chromium, firefox, webkit all
   green.
+
+## Review (29a55d4a) fixes
+
+- Applied findings 1-6. Headless Chromium hides a default scrollbar (offsetWidth - clientWidth
+  = 0 on a plain `overflow: scroll`) but draws the recipe-styled one (10px): the gutter probe
+  must carry the recipe's class and run after the stylesheet is in.
+- Vitest browser server answers 404 for `/__avatar-missing__/x.png` (checked with fetch in the
+  row).
+- Chrome version for focusable scrollers: release notes / blink-dev say 130, the blog's update
+  note says pushed back to 132; page uses 132 and cites the blog.

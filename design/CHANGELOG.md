@@ -13805,3 +13805,33 @@ props tables, the commit wait under Suspense) and the "Scroll areas" recipe page
 `::-webkit-scrollbar` and overlay variants are marked as not run). Roadmap entry. Agent skill:
 Avatar, and "no ScrollArea". Playground: `avatar-demo.tsx` (statuses, and the commit wait with an
 `onLoad` opt-out toggle).
+
+## 2026-11-26, #171: Avatar and Scroll areas, review amendments
+
+Review of `feat/171-avatar` (`memo/reviewer/review-171-avatar.md` on `review/171-avatar`,
+29a55d4a): merge after fixes. Findings 1 to 6 applied; finding 7 (an error queued for an old
+source taken for a new source that is synchronously complete) is information, no change.
+
+- **avatar.md 6 (amended): the fade-in recipe and a source change.** The rule hides every
+  `"loading"` image, so it also fades a loaded picture out when its `src` changes and shows the
+  initials until the new one arrives, which section 4 called "unseen". CSS cannot tell a first
+  load from a change; the recipe now says so and gives the two ways out (no fade, or
+  `key={src}` on the Root). Section 4 points at it. The docs example and the playground key
+  their Roots by the source. No code change.
+- **Scroll areas: the focus ring goes on the frame.** The fade mask faded the focusable
+  scroller's own outline at an edge with content beyond it. The recipe removes the scroller's
+  outline and draws the ring on its frame
+  (`.frame:has(> .scroll-area:focus-visible)`); the page says why. New browser row: the frame
+  has the ring, the scroller none.
+- **Gutter row no longer trivial.** It measures whether the recipe's bar takes space (a probe
+  with the recipe's class) and asserts a non-zero gutter before the content overflows there
+  (headless Chromium draws the styled bar, 10px), or explicitly none (Playwright's Firefox hides
+  every scrollbar); in both cases no change when the content starts to overflow.
+- **Avatar browser row for a 404** (the network-error path; the test server's 404 is checked
+  with `fetch` first), next to the decode-failure row.
+- **Versions on the page.** `timeline-scope` is Chrome 116 (not 115), Firefox 159, Safari 26.
+  Keyboard-focusable scrollers: Chrome 132, citing the update note in Chrome's "Keyboard
+  focusable scrollers" post (first announced for 130, pushed back to 132).
+- **iOS and `::-webkit-scrollbar`.** iOS Safari matches the selector but honours only
+  `display: none`, so `@supports not selector(::-webkit-scrollbar)` leaves iOS with neither
+  styling; noted next to the variant.

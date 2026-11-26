@@ -35,7 +35,9 @@
   }
 }
 
-/* Fade the picture in, only where script runs (without it the status never leaves "idle"). */
+/* Fade the picture in, only where script runs (without it the status never leaves "idle").
+   It would also fade a loaded picture out when its src changes (the status goes back to
+   "loading"), so the example keys each Root by its source. */
 @media (scripting: enabled) {
   .demo-avatar-image {
     transition: opacity 150ms;

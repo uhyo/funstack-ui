@@ -80,7 +80,11 @@ export function ScrollAreaPage() {
 }`}</CodeBlock>
       <p>
         The pseudo-elements are non-standard: forced colours and the user&apos;s scrollbar settings
-        do not reach a thumb drawn with them either.
+        do not reach a thumb drawn with them either. <strong>iOS Safari</strong> matches the
+        selector (so the <code>@supports not selector(…)</code> block does not apply there) but
+        honours only <code>display: none</code> on it, so iOS gets neither the drawn thumb nor the
+        standard properties: its overlay scrollbar stays the system&apos;s. If you want{" "}
+        <code>scrollbar-color</code> on iOS, use the standard properties everywhere instead.
       </p>
 
       <h3 id="edge-fades">Edge fades</h3>
@@ -125,8 +129,9 @@ export function ScrollAreaPage() {
           The mask also fades the ends of a classic scrollbar, which is part of the masked box. If
           that matters, put the scroller inside a wrapper and draw the fades as overlays in the
           wrapper&apos;s background colour, driven by a named timeline (<code>scroll-timeline</code>{" "}
-          on the scroller, <code>timeline-scope</code> on the wrapper; the same engine versions).
-          That variant is a sketch: the browser test below does not run it.
+          on the scroller, <code>timeline-scope</code> on the wrapper; <code>timeline-scope</code>{" "}
+          is Chrome 116, Firefox 159, Safari 26). That variant is a sketch: the browser test below
+          does not run it.
         </li>
         <li>
           The fade is a mask, not motion: <code>prefers-reduced-motion</code> needs nothing here.
@@ -136,18 +141,28 @@ export function ScrollAreaPage() {
       <h3 id="keyboard">Keyboard access</h3>
       <p>
         A keyboard user scrolls a scroller by focusing something inside it. When the content has
-        nothing focusable (text, images), Chrome (since 132) and Firefox make the scroller itself a
-        Tab stop; <strong>Safari does not</strong> (WebKit bug 277290), so there the content is out
-        of reach. Make such a scroller focusable, and give it a role and a name so that the Tab stop
-        is announced as something:
+        nothing focusable (text, images), Chrome (since 132, per the update note in Chrome&apos;s{" "}
+        <a href="https://developer.chrome.com/blog/keyboard-focusable-scrollers">
+          Keyboard focusable scrollers
+        </a>{" "}
+        post: first announced for 130, then pushed back) and Firefox make the scroller itself a Tab
+        stop; <strong>Safari does not</strong> (WebKit bug 277290), so there the content is out of
+        reach. Make such a scroller focusable, and give it a role and a name so that the Tab stop is
+        announced as something:
       </p>
       <CodeBlock language="html">{`<!-- Only when the content has nothing focusable. -->
 <div class="scroll-area" tabindex="0" role="region" aria-label="Release notes">…</div>`}</CodeBlock>
       <ul>
         <li>
           Once focused, the arrow keys and Page Up / Page Down scroll it, in every engine (the
-          browser&apos;s own scrolling keys; no script). Give it a <code>:focus-visible</code>{" "}
-          outline.
+          browser&apos;s own scrolling keys; no script).
+        </li>
+        <li>
+          Give it a visible focus ring, but <strong>not on the scroller itself</strong> when it has
+          the edge fades: the mask fades its own outline away at an edge with content beyond it.
+          Draw the ring on a frame around it instead:
+          <CodeBlock language="css">{`.scroll-area:focus-visible { outline: none; }
+.scroll-frame:has(> .scroll-area:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }`}</CodeBlock>
         </li>
         <li>
           Do not add it when the content has links, buttons or fields: Tab reaches them and the
@@ -197,13 +212,14 @@ export function ScrollAreaPage() {
         <p>
           The stylesheet of the example above is run by a browser test in Chromium, Firefox and
           WebKit (<code>scroll-area-recipe.browser.test.tsx</code> in the repository): the computed
-          scrollbar properties, a stable gutter, the fade lengths at the top, in the middle and at
-          the bottom, no fade without overflow, no fade at all in an engine without scroll
-          timelines, and the focusable region scrolled with the arrow keys and Page Down. The
-          Firefox the test runs (Playwright's build, 157) predates scroll timelines, so there it
-          checks the no-fade branch; the fade branch was run in it once with the feature&apos;s
-          preference on. The <code>::-webkit-scrollbar</code> and overlay variants above are not
-          run.
+          scrollbar properties, a gutter that is reserved before the content overflows where the bar
+          takes space, the fade lengths at the top, in the middle and at the bottom, no fade without
+          overflow, no fade at all in an engine without scroll timelines, the focusable region
+          scrolled with the arrow keys and Page Down, and its focus ring on the frame. The Firefox
+          the test runs (Playwright's build, 157) hides every scrollbar and predates scroll
+          timelines, so there it checks the no-gutter and no-fade branches; the fade branch was run
+          in it once with the feature&apos;s preference on. The <code>::-webkit-scrollbar</code> and
+          overlay variants above are not run.
         </p>
       </Callout>
     </DocPage>

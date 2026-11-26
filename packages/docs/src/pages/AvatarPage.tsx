@@ -295,6 +295,15 @@ export function AvatarPage() {
   .avatar-image[data-status="loading"] { opacity: 0; }
 }`}</CodeBlock>
       <p>
+        This hides every image whose status is <code>"loading"</code>, so it also fades a loaded
+        picture <strong>out</strong> when its <code>src</code> changes (the status goes back to{" "}
+        <code>"loading"</code> on the same element) and shows the initials until the new one
+        arrives. CSS cannot tell a first load from a change. If a mounted avatar can change its
+        picture, leave the fade out, or key the Root by the source (
+        <code>{"<Avatar.Root key={src} …>"}</code>): each picture is then a new avatar that fades in
+        like a first load, as in the example above.
+      </p>
+      <p>
         Transparent pictures (a PNG logo) let the initials show through until hydration removes the
         fallback: give <code>.avatar-image</code> a <code>background</code>. Tailwind:{" "}
         <code>data-[status=loading]:opacity-0</code>, <code>has-[img]:…</code>.

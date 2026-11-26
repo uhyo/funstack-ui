@@ -93,7 +93,12 @@
   border-block-end: 1px solid var(--color-border);
   font-size: 0.875rem;
 }
+/* The focus ring goes on the frame, not on the scroller: the fade mask would fade the
+   scroller's own outline away at an edge with content beyond it. */
 .demo-scroll-area:focus-visible {
+  outline: none;
+}
+.demo-scroll-area-frame:has(> .demo-scroll-area:focus-visible) {
   outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }

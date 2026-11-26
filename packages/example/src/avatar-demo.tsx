@@ -51,7 +51,8 @@ function Statuses() {
     <section>
       <h3>Statuses</h3>
       <div className="av-row">
-        <Person name="Ada Lovelace" initials="AL" src={src} />
+        {/* Keyed by the source: the fade-in rule would otherwise fade the old picture out. */}
+        <Person key={src} name="Ada Lovelace" initials="AL" src={src} />
         <Person name="Grace Hopper" initials="GH" src="/does-not-exist.png" />
         <Person name="Alan Turing" initials="AT" />
       </div>
