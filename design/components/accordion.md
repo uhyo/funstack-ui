@@ -66,7 +66,14 @@ Why these four and not more:
 Element constraints for `render`: Item must render a `<details>` and Trigger a `<summary>`; any
 other element breaks the platform semantics. The element form is accepted (so a consumer can pass
 `<details className="card">`), the function form receives props to spread; the library warns in
-development when the mounted element's `tagName` is not `DETAILS` / `SUMMARY`.
+development when the mounted element's `tagName` is not `DETAILS` / `SUMMARY`. The click rule
+of the Trigger and these element checks are shared with Collapsible
+(`internal/details-summary.ts`).
+
+**An Item outside any Root** keeps working as a JS-free disclosure (the browser owns `open`,
+`defaultOpen` renders the initial attribute). It is not the documented way to write one
+disclosure: the docs point to `Collapsible` (`design/components/collapsible.md`), which also
+has a library mode.
 
 ---
 

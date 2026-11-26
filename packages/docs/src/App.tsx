@@ -61,6 +61,7 @@ export const routes = [
               page("/components/toggle", "TogglePage"),
               page("/components/tabs", "TabsPage"),
               page("/components/accordion", "AccordionPage"),
+              page("/components/collapsible", "CollapsiblePage"),
               page("/components/tooltip", "TooltipPage"),
               page("/components/dialog", "DialogPage"),
               page("/components/popover", "PopoverPage"),

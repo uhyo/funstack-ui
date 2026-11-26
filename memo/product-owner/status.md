@@ -439,3 +439,8 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - #163 design a7ebb08c (branch design/163-collapsible); user took all 4 recommendations (defaultOpen → library mode; openChangeAction only; <details> only; Accordion.Item standalone kept, docs point to Collapsible). → developer feat/163-collapsible.
 - #164 design c23291f1 (branch design/164-combobox-multiple; conventions 1.1 exception for hidden inputs); user took all 6 recommendations. → developer feat/164-combobox-multiple.
 - Research merged c3242830. #165 user: build JS listbox now (option C); architect proposes API home (Select.Root multiple vs input-less Combobox). #166 → architect design (manual popover default, hint flag, interestfor flag, Tab into card).
+- #163 MERGED 129fa622 (review fixes 2b4381cb). #175 filed (details echo rule gap, Accordion+Collapsible; needs architect).
+- #164 impl 43919d24 reviewed (review/164): merge after fixes (M1 aria-hidden label, M2 lost focus, m1 PO decision: multiple-mode Enter during pending open prevented + text kept). Developer fixing.
+- #166 HoverCard design c97c91e6: user took all 7 recommendations → developer feat/166-hovercard.
+- #165 MultiSelect design 8cbb1892: user took all 8 recommendations (dedicated MultiSelect, Value part, hidden validity select, pick order, full open API, no extras, multiple only). Implement after #164 merges.
+- To report upstream (human): MDN BCD ::interest-button listed as Chrome 149 but not shipped; Chromium rich interest card lacks aria-expanded/tooltip role (re-check after M160).
