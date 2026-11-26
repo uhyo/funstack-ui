@@ -29,6 +29,16 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/drawer">Drawer</a> (<a href={issue(168)}>#168</a>): a
+          Dialog attached to an edge (<code>side</code>, rendered as <code>data-side</code>) that
+          the user can swipe back to it with mouse, pen or touch. The swipe writes{" "}
+          <code>data-swiping</code> and <code>--drawer-swipe-x</code> / <code>-y</code> /{" "}
+          <code>-progress</code> for your CSS, finishes the slide, and closes the drawer as a
+          dismissal reported to <code>onOpenChange</code>. Its transition types are{" "}
+          <code>fsui-drawer*</code>. Snap points and the pull from a scrolled-to-top list are not in
+          this version.
+        </li>
+        <li>
           A <code>Dialog.Close</code> or <code>Popover.Close</code> with an <code>action</code> no
           longer renders <code>commandfor</code> / <code>command</code> (
           <a href={issue(182)}>#182</a>). A click before hydration used to close the dialog or
