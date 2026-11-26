@@ -730,8 +730,10 @@ export interface DialogCloseProps
    * (`openChangeAction(false)` awaited, view transition if set), in JS-free mode with
    * `close(value)`. A rejection reaches the nearest Error Boundary above the Close part and
    * leaves the dialog open. If the dialog was dismissed and opened again while the action ran,
-   * the close is dropped: it belonged to the earlier open. Without `action` in JS-free mode the
-   * button is a native `command="request-close"` invoker.
+   * the close is dropped: it belonged to the earlier open. With `action` the button is no native
+   * close invoker (no `commandfor` / `command`, conventions 7.3): a click before hydration does
+   * nothing. Without `action` in JS-free mode the button is a native `command="request-close"`
+   * invoker.
    */
   action?: Action<[details: DialogCloseDetails]>;
   /**
@@ -757,16 +759,18 @@ export interface DialogCloseDetails extends ActionDetails {
 }
 ```
 
-Owned keys: `type`, `commandfor`, `command`, `value`, `disabled`, `onClick` (library mode, or
-with `action`), `data-pending`, `data-disabled` (`disabled` is owned on every part that takes
+Owned keys: `type`, `commandfor`, `command` (neither rendered with `action`), `value`,
+`disabled`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled` (`disabled` is owned on every part that takes
 the prop, conventions 1.2). In library mode the click is always `preventDefault()`ed (which
 cancels the `request-close` command) and the close goes through the Root (2.3): without
 `action`, `requestClose(event, "activate", value ?? "")` at once; with `action`, the part runs
 the action through the shared `useActionTrigger` (conventions 3.4), its own transition, and
-`requestClose` in its continuation: `run(() => action(details), () => requestClose(...))`. The
-markup is the same in both modes, so a pre-hydration click still closes natively. In JS-free
-mode without `action` the browser runs the command; with `action` the part runs it and then
-calls `dialog.close(value)` directly (a browser-owned close; there is no Root state). A
+`requestClose` in its continuation: `run(() => action(details), () => requestClose(...))`. With
+`action` the button renders no `commandfor` / `command` in either mode (#182, conventions 7.3):
+a pre-hydration click does nothing, instead of closing the dialog without running the action;
+without `action` the markup is the same in both modes and a pre-hydration click closes
+natively. In JS-free mode without `action` the browser runs the command; with `action` the part
+runs the action and then calls `dialog.close(value)` directly (a browser-owned close; there is no Root state). A
 non-button `render` works in library mode (click handler) and never in JS-free mode without
 `action` (dev warning), the Trigger's rule.
 

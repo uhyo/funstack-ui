@@ -89,7 +89,7 @@ export function AlertDialogPage() {
           ],
           [
             "Action",
-            "`Dialog.Close` with an `action`, except that with `action` it renders no `commandfor` / `command`: a click before hydration does nothing",
+            "`Dialog.Close` under another name, usually with an `action`; with one it renders no `commandfor` / `command` (as every Close part), so a click before hydration does nothing",
           ],
           [
             "Modes",

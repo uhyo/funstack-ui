@@ -343,10 +343,12 @@ export function DialogPage() {
                 the action ran, the close is dropped: it belonged to the previous opening. A second
                 click while it is pending is ignored, and the button is{" "}
                 <code>aria-disabled="true"</code> meanwhile, unless <code>whilePending</code> is{" "}
-                <code>"run"</code>. Without <code>action</code> the button is a native{" "}
-                <code>command="request-close"</code> invoker in JS-free mode and goes straight
-                through the Root in library mode. <code>details.returnValue</code> is the{" "}
-                <code>value</code>.
+                <code>"run"</code>. With <code>action</code> the button renders no{" "}
+                <code>commandfor</code> / <code>command</code>, so a click before hydration does
+                nothing (rather than closing the dialog without running the action). Without{" "}
+                <code>action</code> the button is a native <code>command="request-close"</code>{" "}
+                invoker in JS-free mode and goes straight through the Root in library mode.{" "}
+                <code>details.returnValue</code> is the <code>value</code>.
               </>
             ),
           },
@@ -377,7 +379,7 @@ export function DialogPage() {
       <PartFacts
         state={"`DialogCloseState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
           'By default (`whilePending="ignore"`) a second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'
@@ -729,7 +731,7 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
       <BehaviourSection
         id="before-hydration"
         summary={
-          'JS-free mode: everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons (`command="request-close"`), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup, CSS animation; a `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open. Library mode: the Trigger opens the dialog natively, but its content is not in the HTML; on hydration it is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.'
+          'JS-free mode: everything for a modal dialog: open (`command="show-modal"`), Escape, Close buttons without `action` (`command="request-close"`; one with `action` does nothing until hydration), `<form method="dialog">`, focus and focus return, `autoFocus` in server-rendered markup, CSS animation; a `Dialog.Form` with a Server Function action submits with React\'s progressive enhancement. Hydration adds `initialFocus`, `lightDismiss` and closing after a form action. A non-modal dialog needs JavaScript to open. Library mode: the Trigger opens the dialog natively, but its content is not in the HTML; on hydration it is reconciled with one `openChangeAction(true)` call (`reason: "platform"`) and the content mounts.'
         }
       >
         <h4>

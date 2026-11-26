@@ -1886,6 +1886,18 @@ provider (7.1), and their parts are client modules that read it. "JS-free" and "
 Component" coincide at the Root, so function props (`getAriaValueText`, `children(state)`,
 `render`) may be passed from a Server Component and run on the server.
 
+**A closing part with an action is no native invoker** (#182). A part that runs a consumer
+`action` and then closes its popup (`Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel` and
+`AlertDialog.Action` with `action`) renders no `commandfor` / `command` (and no
+`popovertarget`): before hydration a native command would close the popup **without running
+the action**, which reads as if the work had been done. Such a part is a plain
+`<button type="button">` until hydration (a click does nothing) and its click handler is the
+only thing that closes it, in both modes. The same part without `action` keeps the native
+command, as there is nothing to skip. The JS-free way to run work and close is a form
+(`Dialog.Form` / `AlertDialog.Form` with a Server Function). Parts that close with an action but
+render no native command anyway (`Menu.Item`, `Toast.Action`) are not affected: they need
+hydration in every case.
+
 **A component whose baseline cannot be JS-free** (Menu: arrow keys, typeahead and focus
 management) runs in library mode always, with no mode switch, and still renders the declarative
 invoker on its Trigger (`popovertarget`) for the implicit anchor, the platform's implicit

@@ -13365,3 +13365,31 @@ Sections changed: alert-dialog.md 2.2, 3.4, 7 (walkthrough 4); the docs page.
   (the Action is gone: `reportError`, no boundary). Skill: AlertDialog's Cancel and Action in
   the pure-trigger list and the Close-parts default. Docs example: focus goes to Restore after
   a successful delete.
+## 2026-11-26, #182: a Close part with an `action` is no native invoker
+
+User decision (issue comment, 2026-11-26): align with `AlertDialog.Action`. A shipped
+behaviour change. Sections changed: conventions 7.3 (new paragraph), dialog.md 3.4, popover.md
+3.4, alert-dialog.md (decision 8, the anatomy table, 3.2).
+
+- **The rule.** `Dialog.Close`, `Popover.Close` (and AlertDialog's `Cancel` and `Action`, which
+  are `Dialog.Close`) with an `action` render no `commandfor` / `command`, in JS-free and library
+  mode. Before hydration such a button is a plain `<button type="button">` and a click does
+  nothing; it used to close the popup natively **without running the action**. After hydration
+  nothing changes: the action runs in the part's transition, then the close. Without `action`
+  the part keeps the native command.
+- **Why.** A pre-hydration close that skips the action reads as if the work had been done (a
+  "Save and close" that saved nothing). Doing nothing until hydration is the honest failure;
+  the JS-free way to run work and close is a form (`Dialog.Form` / `AlertDialog.Form` with a
+  Server Function).
+- **Other closing parts that take an action.** `Menu.Item` (`closeOnActivate`) and
+  `Toast.Action` (`closeOnSettle`) render no native command in any mode (a menu and a toast need
+  hydration), so they are unchanged. `Button` with a consumer `commandfor` is the consumer's
+  own invoker, not a closing part: unchanged.
+- **Code.** `useOverlayClose` derives it from `action` (the `nativeCommand` option of the #167
+  implementation is gone). Tests: the shared Close-part suite
+  (`packages/ui/src/__tests__/overlay-close-part-suite.tsx`) gains rows for Dialog, Popover and
+  AlertDialog: no command with `action` in library mode (a Close without `action` keeps it), and
+  a pre-hydration click on server markup that closes nothing while a plain Close closes
+  natively, then the same click after hydration running the action and closing.
+- **Docs.** Dialog and Popover pages (the `action` rows, the owned keys, before hydration), the
+  roadmap's behaviour changes, the agent skill.

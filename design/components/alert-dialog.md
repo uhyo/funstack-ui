@@ -30,7 +30,7 @@ on itself, closes the dialog when the action resolves and leaves it open when it
 | 5 | Escape closes | Escape, Android back and an assistive-technology dismiss close the dialog, as the APG and Radix have it. It is the platform's close request: a fact, `onOpenChange(false, { reason: "dismiss" })`, and it means "cancel". There is no prop to turn it off (section 4). |
 | 6 | Initial focus | The first enabled `AlertDialog.Cancel`, through Dialog's `autofocus` mechanism. `initialFocus` on Popup overrides it. Without a Cancel the platform chooses. |
 | 7 | `Cancel` | `Dialog.Close` under another name, plus being the default focus target. |
-| 8 | `Action` | `Dialog.Close` with an `action` under another name: the action runs in the part's own transition, `data-pending` and (by default) `aria-disabled` meanwhile, then the close goes through the Root; a rejection leaves the dialog open. One difference: an Action **with `action` is not a native close invoker** (section 3.2). |
+| 8 | `Action` | `Dialog.Close` with an `action` under another name: the action runs in the part's own transition, `data-pending` and (by default) `aria-disabled` meanwhile, then the close goes through the Root; a rejection leaves the dialog open. With `action` it is not a native close invoker (section 3.2), as every Close part with an `action` (conventions 7.3). |
 | 9 | No-JS path | JS-free mode as Dialog's. The Trigger and Cancel are Invoker Commands; the confirm that works without JS is `AlertDialog.Form action={serverFunction}` with a submit button (section 6). |
 | 10 | Requests and facts | Unchanged from `dialog.md` 2.7, minus the rows that cannot occur (light dismiss, non-modal). |
 | 11 | Styling surface | The same as a Dialog's: `:open`, `:modal`, `::backdrop`, `data-modal`, `data-open` / `data-pending` on the Trigger, `data-pending` on Cancel and Action, the `fsui-dialog*` transition types. One stylesheet styles both. |
@@ -78,7 +78,7 @@ Rendered HTML (JS-free mode):
 | `Title` | `h2` | `Dialog.Title` | nothing |
 | `Description` | `p` | `Dialog.Description` | nothing |
 | `Cancel` | `button` | `Dialog.Close` | the default initial focus target |
-| `Action` | `button` | `Dialog.Close` | no native command when `action` is given |
+| `Action` | `button` | `Dialog.Close` | nothing (with `action` no native command, as every Close part) |
 | `Form` | `form` | `Dialog.Form` | nothing |
 
 Why a separate namespace and not `<Dialog.Root alert>` or a documented recipe:
@@ -247,13 +247,13 @@ This is `Dialog.Close` with an `action`, rule for rule (`dialog.md` 3.4; convent
 | `openChangeAction(false)` rejects, or a controlled parent keeps `open` | as `dialog.md` 4.3: Error Boundary above the Root; snap-back (a real veto) |
 | Stale close | dropped by the open-generation guard |
 
-**One difference from `Dialog.Close`: an Action with `action` renders no `commandfor` /
-`command`.** `Dialog.Close` always renders `command="request-close"`, so a click before
-hydration closes the dialog natively, and with an `action` it closes **without running it**.
-For a neutral Close that is the lesser evil. For a confirm button it is a false answer: the
-dialog goes away as if the project had been deleted. So an Action that has an `action` is a
-plain `<button type="button">` until hydration (the click does nothing), and the click handler
-is the only thing that ever closes it. This matters in JS-free mode only: in library mode the
+**An Action with `action` renders no `commandfor` / `command`.** A native command would close
+the dialog before hydration **without running the action**: for a confirm button a false
+answer, the dialog going away as if the project had been deleted. So an Action that has an
+`action` is a plain `<button type="button">` until hydration (the click does nothing), and the
+click handler is the only thing that ever closes it. This started as the one difference from
+`Dialog.Close`; since #182 it is the rule for every Close part with an `action` (conventions
+7.3), so there is no difference left. This matters in JS-free mode only: in library mode the
 content is not in the server HTML, so there is no Action to click before hydration. An Action
 **without** `action` keeps the native command, as there is nothing to skip. The confirm that
 must work before hydration is the Form (section 6).

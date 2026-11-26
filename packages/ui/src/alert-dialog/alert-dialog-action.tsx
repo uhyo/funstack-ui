@@ -74,10 +74,8 @@ export interface AlertDialogActionProps extends Omit<
  * @see https://ui.funstack.work/components/alert-dialog
  */
 export function AlertDialogAction(props: AlertDialogActionProps) {
-  return useDialogClose(props, {
-    part: "AlertDialog.Action",
-    nativeCommand: props.action === undefined,
-  });
+  // With `action` no native command, as every Close part (#182).
+  return useDialogClose(props, { part: "AlertDialog.Action" });
 }
 
 AlertDialogAction.displayName = "AlertDialogAction";
