@@ -80,6 +80,14 @@ const clientFiles = [
   "alert-dialog/alert-dialog-cancel.mjs",
   "alert-dialog/alert-dialog-action.mjs",
   "alert-dialog/alert-dialog-form.mjs",
+  // Every Drawer part is a client module (drawer.md 9).
+  "drawer/drawer-root.mjs",
+  "drawer/drawer-trigger.mjs",
+  "drawer/drawer-popup.mjs",
+  "drawer/drawer-title.mjs",
+  "drawer/drawer-description.mjs",
+  "drawer/drawer-close.mjs",
+  "drawer/drawer-form.mjs",
   "internal/form/use-native-group-reconciliation.mjs",
   // Every RadioGroup part and its context are client modules (design/components/radio-group.md,
   // decision 12 and 13.1).
@@ -276,6 +284,11 @@ const directiveFreeFiles = [
   "checkbox/index.mjs",
   "dialog/index.mjs",
   "alert-dialog/index.mjs",
+  "drawer/index.mjs",
+  // The swipe: the Drawer's DOM glue and the dialog-agnostic tracker (drawer.md 9).
+  "drawer/drawer-swipe.mjs",
+  "internal/swipe.mjs",
+  "internal/swipe-arithmetic.mjs",
   "radio-group/index.mjs",
   "checkbox-group/index.mjs",
   "internal/form/sync-presence.mjs",

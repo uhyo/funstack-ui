@@ -1,0 +1,170 @@
+/* Drawer: the starter stylesheet of the docs, for every side. The library writes `data-side`,
+   `data-swiping` and `--drawer-swipe-*`; these rules place and move the drawer. */
+
+.drw {
+  position: fixed;
+  margin: 0;
+  padding: 0 16px 16px;
+  border: 0;
+  box-sizing: border-box;
+  max-inline-size: none;
+  max-block-size: none;
+  overflow: hidden;
+  flex-direction: column;
+  gap: 8px;
+  background: white;
+  box-shadow: 0 0 32px rgb(0 0 0 / 0.3);
+  transition:
+    translate 300ms cubic-bezier(0.32, 0.72, 0, 1),
+    display 300ms allow-discrete,
+    overlay 300ms allow-discrete;
+}
+
+.drw:where([data-side="top"]) {
+  inset: 0 0 auto 0;
+  inline-size: 100%;
+  translate: 0 -100%;
+}
+
+.drw:where([data-side="bottom"]) {
+  inset: auto 0 0 0;
+  inline-size: 100%;
+  max-block-size: 70dvh;
+  translate: 0 100%;
+}
+
+.drw:where(
+  [data-side="left"],
+  [data-side="right"],
+  [data-side="inline-start"],
+  [data-side="inline-end"]
+) {
+  inset-block: 0;
+  block-size: 100dvh;
+  inline-size: min(20rem, 85vw);
+  overflow-y: auto;
+}
+
+.drw:where([data-side="left"]) {
+  inset-inline: auto;
+  left: 0;
+  translate: -100% 0;
+}
+
+.drw:where([data-side="right"]) {
+  inset-inline: auto;
+  right: 0;
+  translate: 100% 0;
+}
+
+.drw:where([data-side="inline-start"]) {
+  inset-inline: 0 auto;
+}
+
+.drw:where([data-side="inline-end"]) {
+  inset-inline: auto 0;
+}
+
+.drw:where([data-side="inline-start"]:dir(ltr), [data-side="inline-end"]:dir(rtl)) {
+  translate: -100% 0;
+}
+
+.drw:where([data-side="inline-end"]:dir(ltr), [data-side="inline-start"]:dir(rtl)) {
+  translate: 100% 0;
+}
+
+.drw:open {
+  display: flex;
+  translate: var(--drawer-swipe-x, 0px) var(--drawer-swipe-y, 0px);
+}
+
+@starting-style {
+  .drw[data-side="top"]:open {
+    translate: 0 -100%;
+  }
+  .drw[data-side="bottom"]:open {
+    translate: 0 100%;
+  }
+  .drw[data-side="left"]:open,
+  .drw[data-side="inline-start"]:dir(ltr):open,
+  .drw[data-side="inline-end"]:dir(rtl):open {
+    translate: -100% 0;
+  }
+  .drw[data-side="right"]:open,
+  .drw[data-side="inline-end"]:dir(ltr):open,
+  .drw[data-side="inline-start"]:dir(rtl):open {
+    translate: 100% 0;
+  }
+}
+
+.drw::backdrop {
+  background: rgb(0 0 0 / 0.4);
+  opacity: 0;
+  transition:
+    opacity 300ms,
+    display 300ms allow-discrete,
+    overlay 300ms allow-discrete;
+}
+
+.drw:open::backdrop {
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+}
+
+@starting-style {
+  .drw:open::backdrop {
+    opacity: 0;
+  }
+}
+
+.drw[data-swiping],
+.drw[data-swiping]::backdrop {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drw,
+  .drw::backdrop {
+    transition: none;
+  }
+}
+
+html:has(.drw:modal) {
+  overflow: hidden;
+}
+
+.drw-grabber {
+  align-self: center;
+  inline-size: 40px;
+  block-size: 5px;
+  margin-block: 10px 0;
+  border-radius: 3px;
+  background: #ccc;
+}
+
+.drw-body {
+  flex: 1;
+  min-block-size: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.drw-body li {
+  padding: 6px 0;
+}
+
+.drw-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  user-select: none;
+}
+
+.drw-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 8px;
+}

@@ -1,0 +1,176 @@
+/* Drawer: the Popup is the <dialog> itself, with `data-side`. The library places nothing and
+   moves nothing: these rules put it on its edge, slide it in and out, and follow the swipe
+   through `--drawer-swipe-x` / `-y` / `-progress`, which the library writes while a pointer
+   drags (with `data-swiping`). One `transition` on `translate` is the enter, the exit, the
+   release of a swipe and the return of a cancelled one. */
+
+.demo-drawer {
+  position: fixed;
+  margin: 0;
+  padding: 0 20px 16px;
+  border: 0;
+  box-sizing: border-box;
+  max-inline-size: none;
+  max-block-size: none;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  box-shadow: 0 0 40px rgb(0 0 0 / 0.3);
+  transition:
+    translate 300ms cubic-bezier(0.32, 0.72, 0, 1),
+    display 300ms allow-discrete,
+    overlay 300ms allow-discrete;
+}
+
+.demo-drawer h2 {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 1.1rem;
+}
+
+/* Placement per side. `:where()` keeps the closed positions at the specificity of
+   `.demo-drawer`, below the `:open` rule. */
+.demo-drawer:where([data-side="bottom"]) {
+  inset: auto 0 0 0;
+  inline-size: 100%;
+  max-block-size: min(70dvh, 32rem);
+  border-radius: 14px 14px 0 0;
+  translate: 0 100%;
+  /* The dialog does not scroll: its body does (a bottom drawer's swipe owns the vertical axis
+     for touch, so the dialog itself could not be scrolled by touch). */
+  overflow: hidden;
+}
+
+.demo-drawer:where([data-side="inline-start"]) {
+  inset-block: 0;
+  inset-inline: 0 auto;
+  block-size: 100dvh;
+  inline-size: min(18rem, 85vw);
+  padding-block-start: 16px;
+  /* A side drawer scrolls in the Popup itself; its swipe is horizontal. */
+  overflow-y: auto;
+}
+
+.demo-drawer:where([data-side="inline-start"]:dir(ltr)) {
+  translate: -100% 0;
+}
+
+.demo-drawer:where([data-side="inline-start"]:dir(rtl)) {
+  translate: 100% 0;
+}
+
+/* Open: rest at the edge, moved by the swipe while a pointer drags. `display` only here: a
+   closed <dialog> keeps the browser's `display: none`. */
+.demo-drawer:open {
+  display: flex;
+  translate: var(--drawer-swipe-x, 0px) var(--drawer-swipe-y, 0px);
+}
+
+@starting-style {
+  .demo-drawer[data-side="bottom"]:open {
+    translate: 0 100%;
+  }
+  .demo-drawer[data-side="inline-start"]:dir(ltr):open {
+    translate: -100% 0;
+  }
+  .demo-drawer[data-side="inline-start"]:dir(rtl):open {
+    translate: 100% 0;
+  }
+}
+
+/* The backdrop fades with the drag: `::backdrop` inherits the custom properties. */
+.demo-drawer::backdrop {
+  background: rgb(0 0 0 / 0.45);
+  opacity: 0;
+  transition:
+    opacity 300ms,
+    display 300ms allow-discrete,
+    overlay 300ms allow-discrete;
+}
+
+.demo-drawer:open::backdrop {
+  opacity: calc(1 - var(--drawer-swipe-progress, 0));
+}
+
+@starting-style {
+  .demo-drawer:open::backdrop {
+    opacity: 0;
+  }
+}
+
+/* The finger leads while dragging: no transition, on the drawer and its backdrop. */
+.demo-drawer[data-swiping],
+.demo-drawer[data-swiping]::backdrop {
+  transition: none;
+}
+
+/* Reduced motion: no slide. A swipe still follows the pointer (direct manipulation); its
+   release closes at once or snaps back. */
+@media (prefers-reduced-motion: reduce) {
+  .demo-drawer,
+  .demo-drawer::backdrop {
+    transition: none;
+  }
+}
+
+/* CSS-only scroll lock while a modal drawer is open (Dialog's recipe). */
+html:has(.demo-drawer:modal) {
+  overflow: hidden;
+}
+
+.demo-drawer-grabber {
+  align-self: center;
+  inline-size: 40px;
+  block-size: 5px;
+  margin-block: 10px 4px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+
+/* The body scrolls; a press in it is the scroller's, for every pointer type. */
+.demo-drawer-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-block-size: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.demo-drawer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+}
+
+.demo-drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-block-start: 8px;
+  border-block-start: 1px solid var(--color-border);
+  /* A drag that starts here moves the drawer instead of selecting the buttons' text. */
+  user-select: none;
+}
+
+.demo-drawer-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+}
+
+.demo-drawer-nav a {
+  display: block;
+  padding: 10px 8px;
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.demo-drawer-nav a:hover {
+  background: var(--color-bg-secondary, rgb(127 127 127 / 0.12));
+}

@@ -140,6 +140,27 @@ export type {
 } from "./dialog/index.js";
 
 export { AlertDialog } from "./alert-dialog/index.js";
+
+export { Drawer } from "./drawer/index.js";
+export type {
+  DrawerRootProps,
+  DrawerRootState,
+  DrawerOpenChangeDetails,
+  DrawerTriggerProps,
+  DrawerTriggerState,
+  DrawerPopupProps,
+  DrawerPopupState,
+  DrawerSide,
+  DrawerTitleProps,
+  DrawerTitleState,
+  DrawerDescriptionProps,
+  DrawerDescriptionState,
+  DrawerCloseProps,
+  DrawerCloseState,
+  DrawerCloseDetails,
+  DrawerFormProps,
+  DrawerFormState,
+} from "./drawer/index.js";
 export type {
   AlertDialogRootProps,
   AlertDialogRootState,

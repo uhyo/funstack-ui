@@ -122,7 +122,7 @@ const isDialogOpen = (dialog: HTMLDialogElement): boolean => dialog.open;
  * @see https://ui.funstack.work/components/dialog
  */
 export function DialogRoot({ modal = true, ...props }: DialogRootProps) {
-  return useDialogRoot(props, { namespace: "Dialog", modal });
+  return useDialogRoot(props, { namespace: "Dialog", modal, component: "dialog" });
 }
 
 DialogRoot.displayName = "DialogRoot";
@@ -131,20 +131,26 @@ DialogRoot.displayName = "DialogRoot";
 export interface DialogRootOptions {
   readonly namespace: DialogNamespace;
   readonly modal: boolean;
+  /**
+   * The component of the transition types (`fsui-<component>`, conventions 5.3): `"dialog"` for
+   * Dialog and AlertDialog, `"drawer"` for Drawer (design/components/drawer.md 9).
+   */
+  readonly component: "dialog" | "drawer";
 }
 
 /**
  * The body of `Dialog.Root`, also run by `AlertDialog.Root` with `modal` fixed to `true`
- * (design/components/alert-dialog.md 8).
+ * (design/components/alert-dialog.md 8) and by `Drawer.Root` with its own transition types
+ * (drawer.md 9).
  */
 export function useDialogRoot(
   { open, defaultOpen, openChangeAction, onOpenChange, children }: Omit<DialogRootProps, "modal">,
-  { namespace, modal }: DialogRootOptions,
+  { namespace, modal, component }: DialogRootOptions,
 ): ReactNode {
   // The popover machinery (design/components/popover.md 14.1) with the `<dialog>`'s `open` and
   // `returnValue` in the details: an open's `returnValue` is an own `undefined`.
   const root = useOverlayRoot<DialogOpenChangeDetails, HTMLDialogElement, [returnValue: string]>({
-    component: "dialog",
+    component,
     part: `${namespace}.Root`,
     open,
     defaultOpen,

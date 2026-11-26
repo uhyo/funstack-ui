@@ -66,6 +66,7 @@ export const routes = [
               page("/components/hover-card", "HoverCardPage"),
               page("/components/dialog", "DialogPage"),
               page("/components/alert-dialog", "AlertDialogPage"),
+              page("/components/drawer", "DrawerPage"),
               page("/components/popover", "PopoverPage"),
               page("/components/menu", "MenuPage"),
               page("/components/context-menu", "ContextMenuPage"),

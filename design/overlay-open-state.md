@@ -19,7 +19,8 @@ of the user (a fact, `onOpenChange`). This section is the rule for the five over
 `internal/overlay/use-overlay-root.ts`. Each component doc has a table of which cause goes to
 which channel: `popover.md` 2.8, `menu.md` 2.4, `combobox.md` 5.6, `dialog.md` 2.7,
 `hover-card.md` 2.5. `AlertDialog.Root` is `Dialog.Root` with `modal` fixed
-(`alert-dialog.md` 5): what this section says of Dialog holds for it. Tooltip has no `open` prop and no callback
+(`alert-dialog.md` 5), and `Drawer.Root` is `Dialog.Root` with its own transition types
+(`drawer.md` 4.4, 9): what this section says of Dialog holds for both. Tooltip has no `open` prop and no callback
 (`tooltip.md` 4.1); a toast has no open state, its fact is `onClose` (`toast.md` 9).
 
 ### 3.9.1 The props
@@ -70,7 +71,8 @@ so a dismissal during a pending part close is a fact and not mistaken for the ec
 includes hides the library _triggers_ but cannot hold, because holding them would leave a popup
 on screen that the user has already left: Menu's Tab-out, right-click outside and scroll close,
 Combobox's focus-leaving close, the lost-interest hide (HoverCard's on both of its paths),
-HoverCard's Escape and press outside, Dialog's JS Escape and light dismiss.
+HoverCard's Escape and press outside, Dialog's JS Escape and light dismiss, a Drawer's swipe
+(the library finishes the slide, then calls `requestClose()`; `drawer.md` 4.4).
 
 **Channel and `reason` are independent.** The channel says whether the library held the change;
 `reason` (2.2) says what the user did. Most facts are `"dismiss"` and most requests

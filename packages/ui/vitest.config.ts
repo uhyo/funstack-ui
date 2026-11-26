@@ -56,8 +56,9 @@ const mouse: BrowserCommand<
     x: number,
     y: number,
     button?: MouseButton,
+    steps?: number,
   ]
-> = async (context, action, x, y, button = "left") => {
+> = async (context, action, x, y, button = "left", steps = 1) => {
   const { mouse } = context.page;
   if (action === "click") {
     await mouse.click(x, y, { button });
@@ -71,9 +72,28 @@ const mouse: BrowserCommand<
     await mouse.move(x, y);
     return;
   }
-  await mouse.move(x, y);
+  // An `up` with `steps` > 1 moves there in steps (about one per frame) and releases in the
+  // same command, with no pause between the last move and the release: a flick
+  // (design/components/drawer.md 4.1).
+  await mouse.move(x, y, { steps: action === "up" ? steps : 1 });
   if (action === "down") await mouse.down({ button });
   else await mouse.up({ button });
+};
+
+/**
+ * A real press at (fromX, fromY), `steps` moves to (toX, toY) and the release there, in one
+ * command: no round trip to the test between the press, the moves and the release, so the
+ * gesture's speed is the engine's input pacing (about one move per frame). A flick
+ * (design/components/drawer.md 4.1).
+ */
+const mouseFlick: BrowserCommand<
+  [fromX: number, fromY: number, toX: number, toY: number, steps: number]
+> = async (context, fromX, fromY, toX, toY, steps) => {
+  const { mouse } = context.page;
+  await mouse.move(fromX, fromY);
+  await mouse.down();
+  await mouse.move(toX, toY, { steps });
+  await mouse.up();
 };
 
 /**
@@ -173,6 +193,10 @@ export default defineConfig({
         test: {
           name: "browser",
           include: ["src/**/*.browser.test.{ts,tsx}"],
+          // Rows that need fast real input (a Drawer flick) require it in CI, where each engine
+          // runs alone; a loaded local run may only check that the outcome fits the input
+          // (`inject("strictInputTiming")`, src/__tests__/browser-commands.ts).
+          provide: { strictInputTiming: Boolean(process.env["CI"]) },
           // Hooks run in stack order: vitest.browser.setup.ts's afterEach (release the mouse) runs
           // before vitest.setup.ts's (close the top layer, unmount).
           setupFiles: [
@@ -184,7 +208,7 @@ export default defineConfig({
             enabled: true,
             headless: true,
             provider: playwright(),
-            commands: { emulateReducedMotion, mouse, wheel },
+            commands: { emulateReducedMotion, mouse, mouseFlick, wheel },
             // Firefox runs its files one at a time: headless Firefox shares one mouse and one
             // pointer-capture state between the pages of the browser, so another file's
             // Playwright pointer input lands in a running drag or click (#62).

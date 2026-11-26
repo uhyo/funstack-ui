@@ -136,6 +136,13 @@ type PublicProps = {
   DialogRootProps: UI.DialogRootProps;
   DialogTitleProps: UI.DialogTitleProps;
   DialogTriggerProps: UI.DialogTriggerProps;
+  DrawerCloseProps: UI.DrawerCloseProps;
+  DrawerDescriptionProps: UI.DrawerDescriptionProps;
+  DrawerFormProps: UI.DrawerFormProps;
+  DrawerPopupProps: UI.DrawerPopupProps;
+  DrawerRootProps: UI.DrawerRootProps;
+  DrawerTitleProps: UI.DrawerTitleProps;
+  DrawerTriggerProps: UI.DrawerTriggerProps;
   FieldControlProps: UI.FieldControlProps;
   FieldDescriptionProps: UI.FieldDescriptionProps;
   FieldErrorProps: UI.FieldErrorProps;
@@ -287,6 +294,13 @@ const listedKeys = {
   DialogRootProps: true,
   DialogTitleProps: true,
   DialogTriggerProps: true,
+  DrawerCloseProps: true,
+  DrawerDescriptionProps: true,
+  DrawerFormProps: true,
+  DrawerPopupProps: true,
+  DrawerRootProps: true,
+  DrawerTitleProps: true,
+  DrawerTriggerProps: true,
   FieldControlProps: true,
   FieldDescriptionProps: true,
   FieldErrorProps: true,
@@ -450,6 +464,7 @@ describe("action naming (conventions 10.1)", () => {
       | "ComboboxSingleProps"
       | "ComboboxMultipleProps"
       | "DialogRootProps"
+      | "DrawerRootProps"
       | "HoverCardRootProps"
       | "MenuRootProps"
       | "MultiSelectRootProps"
@@ -469,6 +484,9 @@ describe("action naming (conventions 10.1)", () => {
     >();
     expectTypeOf<UI.AlertDialogRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.AlertDialogOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.DrawerRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.DrawerOpenChangeDetails> | undefined
     >();
     expectTypeOf<UI.HoverCardRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.HoverCardOpenChangeDetails> | undefined

@@ -14016,3 +14016,211 @@ Review of `feat/171-otp-field` at 59995614 (`memo/reviewer/review-171-otp.md` on
   `input`; also scripted in the browser row for engines without an IME driver), a controlled
   parent that ignores edits. The accessibility-tree row branches inside one test instead of
   `it.runIf`. The Combobox reset defect found at implementation is #185.
+
+## 2026-11-26, #168: drawer.md, the Drawer design (proposed)
+
+Architect, for the product owner and the user; part of #162 (wave 25). New document:
+`design/components/drawer.md`. Not implemented, and no conventions rule changes. Notes:
+`memo/architect/drawer-notes.md`.
+
+A correction to the issue first: **Toast has no swipe.** #162 and #168 say "Toast already has
+Pointer Events swipe"; toast.md 9.2 defers it and only reserves `swipeDirection`, and no file
+under `packages/ui/src` tracks a swipe. So there is no code to share in that direction. The
+design turns it around: the swipe tracker is written as a flat `internal/` module that knows
+nothing of dialogs, so Toast can use it when its swipe is built.
+
+What the document proposes:
+
+- A separate namespace `Drawer` at `@funstack/ui/drawer` (`Root`, `Trigger`, `Popup`, `Title`,
+  `Description`, `Close`, `Form`), every part a caller of the Dialog part hooks, as
+  AlertDialog. Chosen over props on `Dialog.Popup` because the defaults are the component and
+  because, in an unbundled build, a prop would make every Dialog import the gesture.
+- `side` on the Popup with the `AnchorSide` vocabulary of conventions 13.1 (`inline-start` /
+  `inline-end`, not `start` / `end`), default `"bottom"`, rendered as `data-side` (a prop
+  echo). The library places nothing.
+- `modal` kept (default `true`). `lightDismiss` defaults to `modal`.
+- `swipeDismiss` (default `true`): Pointer Events for mouse, pen and touch; 6 px slop with an
+  axis check; close at 25% of the extent or 0.5 px/ms over the last 100 ms, return on a
+  reversal. Constants, no props.
+- The swipe close is a **fact**: the library slides the drawer out with the consumer's CSS
+  transition, then calls `requestClose()`, and Dialog's existing fact path reports
+  `onOpenChange(false, { reason: "dismiss", event: pointerup })`. It is `lightDismiss` with
+  another gesture. No new `reason`.
+- The drag is `data-swiping` plus `--drawer-swipe-x` / `-y` / `-progress` written through the
+  DOM; the consumer's `translate` uses them; `::backdrop` inherits them.
+- Scroll: a press inside a scroll container along the drawer's axis is the scroller's; the
+  Popup renders an inline `touch-action` for the cross axis. A top / bottom drawer scrolls in a
+  child.
+- Own transition types `fsui-drawer*`.
+- Not in v1: snap points, the pull from a scrolled-to-top body, swipe to open, threshold
+  props, virtual keyboard handling, parent and background scaling.
+
+Platform facts checked on 2026-11-26 (BCD 8.1.11; stable Chrome 158, Firefox 161, Safari 27.2):
+
+- `transition-behavior` is still partial in Firefox: `display` does not transition, so a
+  `<dialog>` has no CSS exit there. This is why the swipe's release is animated before the
+  close and not by the CSS exit.
+- `touch-action: pan-up` / `pan-down` / `pan-left` / `pan-right`: Chrome 55, not in Firefox,
+  not in Safari. So the scroll-edge hand-off cannot be declared in CSS.
+- `::backdrop` inherits from its originating element: Chrome 122, Firefox 120, Safari 17.4.
+- `closedby`: Chrome 134, Firefox 141, Safari 27.3 (not yet stable).
+- `overscroll-behavior` in Safari: no effect on a scroll container without scrollable
+  overflow. `scrollsnapchange` and `scroll-initial-target`: Chromium only (the reason a
+  scroll-snap sheet was not taken, see the notes).
+
+Prior art read the same day: Base UI Drawer 1.9.0 (docs and the published source: Pointer
+Events for the drag, plus Touch Events with a non-passive `touchmove` for the scroll edge;
+fast swipe 0.5 px/ms, release velocity over 80 ms, reverse cancel 10 px), Ark UI Drawer
+(`closeThreshold` 0.25, `swipeVelocityThreshold` 700, `preventDragOnScroll`), vaul
+(`CLOSE_THRESHOLD` 0.25, `VELOCITY_THRESHOLD` 0.4, a 500 ms no-drag window after open, an
+ancestor walk for `scrollTop`), React Aria `Sheet` (`position`, `swipeDirection`,
+`snapPoints`, `preventDismissal`; it is a component, not only an example).
+
+Open decisions for the user (recommendation first):
+
+1. **Separate namespace** (recommended), or `side` / `swipeDismiss` on `Dialog.Popup`.
+2. **The release: the library finishes the slide, then the browser closes** (recommended;
+   animates in Firefox), or `requestClose()` at the release and the CSS exit does the rest
+   (less code, but the drawer vanishes under the finger in Firefox). Either way the close is a
+   fact; making it a request would hold a drawer the user has thrown away.
+3. **Scroll versus drag in v1: regions through `touch-action`** (recommended), or also the
+   pull from a scrolled-to-top body through a non-passive `touchmove` (the phone idiom; Touch
+   Events, per-engine probes on real hardware, a much larger module).
+4. **Snap points not in v1** (recommended), or in v1.
+5. **`lightDismiss` defaults to `modal`** (recommended), or Dialog's `false`.
+6. **Own transition types `fsui-drawer*`** (recommended), or Dialog's, as AlertDialog.
+7. **`inline-start` / `inline-end`** (recommended; conventions 13.1), or `start` / `end` as
+   the task sketched.
+8. **Mouse and pen swipe too** (recommended; testable in three engines), or touch only.
+9. **No parent scaling and no background scaling** (recommended; CSS recipes), or a
+   `--nested-drawers` style count and an `Indent` part.
+10. **Fixed thresholds** (recommended), or props (`swipeThreshold`, `swipeVelocity`).
+
+Not verified; to check at implementation:
+
+- A touch pan inside a child scroll container scrolls it although the Popup has
+  `touch-action: pan-x`, and a vertical touch drag outside it keeps delivering pointer events,
+  in the three engines (iOS Safari on hardware).
+- No `click` is synthesised on the element a touch drag started on.
+- `exitAnimations` lists the `translate` transition a custom-property write starts.
+- After the slide, the CSS exit in Chromium and Safari shows no jump.
+- A top-layer inner dialog is not scaled by `scale` on the outer Popup (the recipe of 8.2).
+- A view transition that starts during a drag: which engines cancel the pointer.
+- Playwright mouse drags with pointer capture on a top-layer dialog in Firefox and WebKit.
+- Logical insets on a top-layer dialog follow the dialog's own `direction` (section 2).
+
+## 2026-11-26, #168: `Drawer` decided and implemented
+
+The user accepted the ten recommendations of the entry above (issue comment, 2026-11-26):
+
+1. A separate namespace, `Drawer` (`@funstack/ui/drawer`).
+2. On release the library finishes the slide, then calls `requestClose()`; the close is a fact.
+3. Swipe and scroll are separated by `touch-action` regions only; no pull from a scrolled-to-top
+   body.
+4. Own transition types, `fsui-drawer*`.
+5. No snap points.
+6. `lightDismiss` defaults to `modal`.
+7. Physical sides plus `inline-start` and `inline-end`.
+8. Mouse, pen and touch all swipe.
+9. No parent or background scaling; CSS recipes.
+10. Fixed thresholds.
+
+drawer.md is now "decided and implemented". Conventions registry rows added (no rule changes):
+conventions 2.1 and the handler table list `Drawer.Root`'s `onOpenChange`; 4.1 gains `swiping`
+(`Drawer.Popup`, attribute only) and a `side` row for `Drawer.Popup` (a prop echo, not a
+resolved side), and the `modal` row names the parts that run Dialog.Popup's code; 5.3 gains the
+Drawer row. overlay-open-state.md 3.9 says `Drawer.Root` is `Dialog.Root`, and 3.9.2 lists the
+swipe among the hides the library triggers but cannot hold.
+
+Amendments made at implementation (drawer.md):
+
+- **4.1 Move: a mouse drag removes the selection the press made.** Firefox keeps extending the
+  text selection of the press under pointer capture, also from padding (it starts a selection
+  at the nearest caret), so a drag selected the drawer's text as it moved. Chromium selects
+  nothing once the pointer is captured. The "Not a start" rule for a selection the press made
+  stays, but with real (Playwright) input the selection is still collapsed when the 6 px slop
+  is crossed, in both engines, so it rarely refuses anything.
+- **4.1 Release: the press is the first velocity sample.** Chromium coalesces a flick's moves
+  into one `pointermove` per frame, so the move that starts the drag can already be the end of
+  the flick; without the press as a sample the release velocity was 0.
+- **4.3 starter stylesheet: closed positions in `:where()`.** As written,
+  `.drawer[data-side="inline-end"]:dir(rtl)` (0,3,0) outranked `.drawer:open` (0,2,0), so a
+  right-to-left inline drawer stayed off screen when open. Every closed position now has the
+  specificity of `.drawer`.
+- **5.1: computed `overflow` pairs the axes.** `overflow-y: auto` alone computes `overflow-x`
+  to `auto`, so a vertically scrolling child of a side drawer is a horizontal scroll container
+  by the rule, and its presses do not drag (by touch too: the touch-action chain ends at that
+  child). Stated as a consequence with the recipe (`overflow-x: hidden; touch-action: pan-y` on
+  the child); the rule is unchanged. This contradicts the design's "a side drawer has no
+  conflict" only for content that scrolls in a child.
+- **9: the options as built.** `useDialogPopup` gained `attachDismiss` (as designed) and
+  `ownProps`; `useDialogRoot` gained `component`. The "no Close part" warning learns of the
+  Close parts through a development-only context, `DialogCloseRegistry`, which the Drawer
+  Popup provides and every Dialog-family Close part reports to; it is logged at the `close` of
+  a showing during which none was mounted. The Popup's `side` is added to the state by
+  wrapping the function props, not by a generic state option.
+
+The points left to verify by the entry above, as found (`drawer.browser.test.tsx`; Chromium and
+Firefox locally, WebKit in branch CI):
+
+- `exitAnimations` lists the `translate` transition a custom-property write starts: the dialog
+  is still open right after the release and closes when the slide ends, Firefox included.
+- After the slide, the CSS exit (Chromium, WebKit) starts off screen: no jump.
+- Playwright mouse drags with pointer capture on a top-layer dialog work in the three engines.
+- The `click` after a mouse drag that started on a button lands on the dialog; the button is
+  not activated.
+- Logical insets on a top-layer dialog follow the dialog's inherited `direction`: an
+  `inline-end` drawer in a `dir="rtl"` subtree sits at the left and swipes left.
+- Not verifiable here (no touch hardware; Playwright has touch drags in Chromium only): the
+  `touch-action` chain with an inner scroller, the absence of a synthesised click after a touch
+  drag, pinch zoom, iOS edge-swipe back. Listed for a device check in
+  `memo/developer/issue-168.md`. Not probed: a view transition starting during a drag; the
+  parent-scaling recipe of 8.2.
+
+Implementation notes (not rules):
+
+- Tests: `packages/ui/src/internal/swipe-arithmetic.test.ts` and `swipe.test.ts` (the tracker
+  on a plain element), `packages/ui/src/drawer/drawer.test.tsx` (the shared open-state and
+  Close-part suites against a Drawer harness, `__tests__/drawer-harness.tsx`, plus the swipe
+  rows with synthetic pointer events and a fake `Date`), `drawer-transition-types.test.tsx`,
+  `drawer.browser.test.tsx`. The browser `mouse` command's `up` takes `steps` so a flick's last
+  move and its release are one command. Notes in `memo/developer/issue-168.md`.
+
+## 2026-11-26, #168: `Drawer`, review amendments
+
+From the review (`memo/reviewer/review-168.md` on `review/168`) and the product owner's
+decision on gap 4:
+
+- **5.1: a development warning for a vertical list in a side drawer** (the reviewer's option D,
+  decided by the PO). The rule is unchanged: a press inside a scroll container along the
+  drawer's axis never drags. The silent case is now reported, once per instance: a press in a
+  side drawer refused by a scroll container whose computed `overflow-x` is `auto`, whose
+  `overflow-y` is not `visible`, and which has no horizontal overflow (`scrollWidth <=
+  clientWidth`). The message gives the recipe, `overflow-x: hidden; touch-action: pan-y
+  pinch-zoom`, which the starter stylesheet of 4.3 now carries (`.drawer-list`). Rejected: the
+  amount of overflow as the rule (mouse and touch would disagree: by touch the child still ends
+  the touch-action chain) and library writes on consumer scrollers.
+- **5.1 recipe: `pan-y pinch-zoom`**, not `pan-y`: the list keeps pinch zoom, as the Popup does.
+- **4.2: a release belongs to its showing.** The slide's wait compares an open generation,
+  bumped at every open (`beforetoggle`), so a dialog closed another way during the slide and
+  opened again before the slide settled is not closed by the old gesture (and takes presses at
+  once). Code only; the text of 4.2 already said "if the dialog is still open".
+- **4.1 Not a start: the text-selection clause reworded.** With real input a mouse drag along
+  the drawer's axis moves the drawer and selects nothing, and a drag across the axis drops the
+  press and selects text; the clause rarely refuses anything.
+- **7: the "no Close" warning described as built**: once per instance, at the close of a
+  showing, when no Close part of the Popup has mounted since the Popup did. The #168
+  implementation entry's "a showing during which none was mounted" overstated it.
+- Docs: the "resistance" recipe scales the swipe variables under `[data-swiping]` only (the
+  release writes the full extent, which an always-scaled rule stopped 20% short of the edge);
+  the `onPointerDown` `preventDefault()` opt-out also stops a mouse press from focusing or
+  selecting, so it is recommended for non-focusable regions only. The agent skill gains the
+  side-drawer list recipe.
+- Code: the Close parts register with the Drawer's development registry only in development
+  (`useMergedRefs(ref, isDev ? reportClose : undefined)`), so production passes a consumer's
+  `ref` through untouched.
+- Tests: the release's wait with a fake finite animation (a press meanwhile starts nothing; a
+  release outliving its showing closes nothing), unmount and a `side` change during a drag and
+  during the wait (`drawer-swipe-lifecycle.test.tsx`), the side-drawer list warning, and a
+  browser row for reduced motion (`transition: none`: the release closes in its own task, a short
+  drag snaps back in the same frame).
