@@ -99,7 +99,12 @@ export function DrawerPopup({
   const extend = (state: DialogPopupState): DrawerPopupState => ({ ...state, side });
 
   // Development checks (design 5.1, 7), once per instance.
-  const checks = useRef<DevChecks>({ closeSeen: false, closeWarned: false, scrollWarned: false });
+  const checks = useRef<DevChecks>({
+    closeSeen: false,
+    closeWarned: false,
+    scrollWarned: false,
+    listWarned: false,
+  });
   const registerClose = useCallback(
     (element: Element) => {
       const dialog = popupRef.current;
@@ -112,7 +117,14 @@ export function DrawerPopup({
 
   const attachDismiss = useCallback(
     (dialog: HTMLDialogElement, dismiss: (event: Event) => void) => {
-      const stopSwipe = listenDrawerSwipe(dialog, side, dismiss);
+      const stopSwipe = listenDrawerSwipe(
+        dialog,
+        side,
+        dismiss,
+        isDev && !isVerticalSide(side)
+          ? (scroller) => warnVerticalListInSideDrawer(scroller, checks.current)
+          : undefined,
+      );
       const stopChecks = isDev ? watchDevChecks(dialog, side, checks.current) : undefined;
       return () => {
         stopSwipe();
@@ -165,6 +177,30 @@ interface DevChecks {
   closeSeen: boolean;
   closeWarned: boolean;
   scrollWarned: boolean;
+  /** The side-drawer list warning (design 5.1) has been logged. */
+  listWarned: boolean;
+}
+
+/**
+ * Development check (design 5.1): a press in a side drawer refused by a scroll container that
+ * scrolls only vertically. Computed `overflow` pairs the axes (`overflow-y: auto` makes
+ * `overflow-x` compute to `auto`), so a vertical list is also a horizontal scroll container by
+ * the rule, and a swipe never starts in it. Warns once per instance when the refusing element has
+ * `overflow-x: auto`, a non-`visible` `overflow-y`, and nothing to scroll horizontally.
+ */
+function warnVerticalListInSideDrawer(scroller: Element, checks: DevChecks): void {
+  if (checks.listWarned) return;
+  const style = getComputedStyle(scroller);
+  if (style.overflowX !== "auto" || style.overflowY === "visible") return;
+  if (scroller.scrollWidth > scroller.clientWidth) return;
+  checks.listWarned = true;
+  console.error(
+    "Drawer.Popup: a press in a vertically scrolling element of this side drawer did not start " +
+      "a swipe. `overflow-y: auto` makes `overflow-x` compute to `auto`, so the element is a " +
+      "horizontal scroll container, which keeps its presses (also for touch). To let the drawer " +
+      "be swiped from it, give it `overflow-x: hidden; touch-action: pan-y pinch-zoom`.",
+    scroller,
+  );
 }
 
 /**

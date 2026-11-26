@@ -12,7 +12,7 @@ import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, inject, it, vi } from "vitest";
-import { mouse } from "../__tests__/browser-commands.js";
+import { mouse, withReducedMotion } from "../__tests__/browser-commands.js";
 import { addStyle, flushFor, settle, sleep } from "../__tests__/browser-helpers.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
@@ -43,6 +43,7 @@ const CSS = `
 .drawer[data-swiping] { transition: none; }
 .drawer-body { overflow-y: auto; block-size: 120px; overscroll-behavior: contain; }
 .drawer-body p { margin: 0; block-size: 40px; user-select: none; }
+@media (prefers-reduced-motion: reduce) { .drawer { transition: none; } }
 `;
 
 const popup = () => screen.getByTestId("popup") as HTMLDialogElement;
@@ -432,6 +433,30 @@ describe("Drawer (browser)", () => {
     expect(popup().style.getPropertyValue("--drawer-swipe-x")).toBe("-100px");
     await release();
     await settle(() => expect(popup().open).toBe(false));
+  });
+
+  it("reduced motion: a release past the quarter closes at once; a short one snaps back", async () => {
+    addStyle(CSS);
+    const onOpenChange = vi.fn();
+    render(<Sheet root={{ defaultOpen: false, onOpenChange }} />);
+    await withReducedMotion(async () => {
+      await openSheet();
+      // The drag still follows the pointer: direct manipulation.
+      await press(handle());
+      await moveBy(0, 40);
+      expect(translateY()).toBe(40);
+      await release();
+      // No transition: back in the same frame.
+      expect(translateY()).toBe(0);
+      expect(popup().getAnimations()).toHaveLength(0);
+
+      await press(handle());
+      await moveBy(0, 120);
+      await release();
+      // Nothing to wait for: closed in the release's task.
+      expect(popup().open).toBe(false);
+      await settle(() => expect(onOpenChange).toHaveBeenCalledTimes(1));
+    });
   });
 
   it("Escape during a drag closes once and ends the gesture", async () => {

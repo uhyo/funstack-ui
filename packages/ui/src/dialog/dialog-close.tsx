@@ -14,6 +14,8 @@ import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { DialogCloseRegistry, useDialogContext } from "./dialog-context.js";
 import type { DialogNamespace } from "./dialog-context.js";
 
+const isDev = process.env.NODE_ENV !== "production";
+
 /**
  * State of `Dialog.Close`, passed to the function forms of `className`, `style`, `children` and
  * `render`.
@@ -140,7 +142,8 @@ export function useDialogClose(
     },
     [registerClose],
   );
-  const mergedRef = useMergedRefs<HTMLButtonElement | null>(ref, reportClose);
+  // Production passes the consumer's ref through untouched.
+  const mergedRef = useMergedRefs<HTMLButtonElement | null>(ref, isDev ? reportClose : undefined);
   const { popupRef, recordCloseIntent } = ctx;
   const isLibrary = ctx.mode === "library";
   return useOverlayClose({
