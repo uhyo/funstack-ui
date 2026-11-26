@@ -12515,3 +12515,77 @@ modules). No code, rule or public path changed: the 25 consumer bundles are byte
 - The file index in `design/internal-hooks.md` is grouped by folder. Code spans in the design
   documents name the new paths. Entries above this one, the memos and `docs/research/` keep the
   old flat paths on purpose: they are history.
+
+## 2026-11-26, #164: Combobox `multiple` with chips (proposed)
+
+Design for GitHub issue #164 (part of #162, wave 23). **Proposed**: written by the architect,
+not yet accepted by the user and not implemented. The open decisions are listed at the end;
+working notes in `memo/architect/combobox-multiple-notes.md`.
+
+Sections changed:
+
+- combobox.md: new section 15 (the whole design of `multiple`); decisions table row 2 (the
+  chip parts and the hidden inputs), row 14 (no longer lists `multiple`), new row 16; 3.1 (the
+  props shown are the single variant of a union); 9 (`aria-multiselectable`); 13 (the
+  `multiple` item is replaced by what stays out: delimiters, a maximum, reordering, a disabled
+  chip, an overflow part); the Status line.
+- conventions.md 1.1: a second exception to "each part renders at most one DOM element", the
+  hidden inputs of a Combobox Root (one per value with `multiple`). This is the one rule that
+  changes. 2.5 (the list of set-valued owners names Combobox with `multiple`), 5.3 (the
+  Combobox row: `fsui-combobox-deselect`) and 11 (the removal announcement) are additions to
+  lists, not new rules.
+
+The reasoning worth keeping:
+
+- **Single mode is untouched.** `multiple: true` selects a second variant of the Root's props
+  union (the `exclusive` pattern of ToggleGroup and Accordion with the default the other way
+  round, because single selection shipped first). The mode is fixed at mount.
+- **The text changes meaning, not shape.** In single mode the text is the selection's label,
+  so the library writes it on a pick and rolls it back on a rejection. With `multiple` the
+  text is only a search: a pick clears it and nothing ever rolls it back. That removes the
+  per-dispatch text record and the "close in the commit that ends the action" path from the
+  multiple mode instead of adding to them.
+- **Set-valued rules apply as written** (conventions 2.2, 2.5, 3.3): `added` / `removed`, the
+  patch reducer, the replay of resolved changes, the absolute form reset. The one difference
+  from CheckboxGroup is order: pick order (the value's own order), because most options are
+  not mounted and document order means nothing.
+- **Chips render optimistic state**, so a removed chip disappears at once and a chip can only
+  be pending while it is being added. Considered and not chosen: rendering the union of the
+  optimistic and committed values so that a chip being removed stays with `data-pending`.
+- **`Chips` is a list, not the field box** (Base UI's `Chips` wraps the Input). A `list` may
+  not own a textbox, and without a list a screen reader has no "2 items".
+- **Chip labels.** The library derives no label from a value, and with an async search the
+  consumer may hold nothing but the value. `Chip`'s state therefore carries `label` from the
+  label cache (2.3), which is written at the pick.
+- **Real focus on chips, one Tab stop** (Base UI's model). Rejected: React Aria's separate
+  grid (a second Tab stop and two more roles), Ark `TagsInput`'s highlight without focus
+  (silent for a screen reader), and Backspace-only (no keyboard path to a chip that is not
+  the last one except through the listbox).
+- **`required` is computed** on the Input (conventions 3.6, CheckboxGroup 7): rendered only
+  while the optimistic value is empty. A `required` on the Root was not chosen: the Input is
+  where it is in single mode and where the browser shows the message. Unmatched text must not
+  satisfy it, which is why focus leaving and Enter in a closed combobox clear the text.
+- **One hidden input per value** rather than one hidden `<select multiple>`: a hidden select
+  would be one element and post natively, but Firefox restores a select's state on reload and
+  its reset algorithm would run against `selected` attributes React does not keep in step.
+  While the selection is empty one nameless hidden input keeps a form-associated element for
+  the reset listener and the Field.
+- **A press on `ChipRemove` while the listbox is open closes it** (light dismiss, as `Clear`).
+  Capturing the pointer to the Popup, the Input's trick, would retarget the click away from
+  the button.
+
+Open decisions for the user (recommendation first):
+
+1. The text after a pick: cleared / kept / a prop.
+2. The listbox after a pick: stays open / closes / a `closeOnSelect`-style prop.
+3. Chip keyboard: real focus with arrows, Backspace and Delete / Backspace on the empty
+   input only.
+4. A chip whose removal is pending: disappears at once / stays with `data-pending`.
+5. `allowCustomValue` text when focus leaves: added as a value / discarded.
+6. The built-in English removal announcement (`announceRemoved`): ship it / no announcement.
+
+To verify in a browser at implementation: focusing the Input in a chip's `keydown` delivers the
+character to the Input in Chromium, Firefox and WebKit; screen readers announce the
+`aria-selected` change of the active option in a multiselectable listbox (NVDA, JAWS,
+VoiceOver), else the toggle needs an announcement too; a focusable `listitem` is read with its
+position.

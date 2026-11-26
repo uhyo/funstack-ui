@@ -120,6 +120,10 @@ the control as a **visually hidden child** of its one styled element (`Slider.Th
 goes to the styled element, a documented `inputRef` to the control, and the props the control
 needs (`name`, `form`, the `aria-label` / `aria-labelledby` / `aria-describedby` trio) are
 listed as forwarded to it rather than landing on the styled element.
+A second exception (Combobox): a `Root` that has no element of its own renders the form
+value as hidden inputs, one for a single selection and **one per value** with `multiple`
+(`design/components/combobox.md` 15.8); they are form plumbing, take no `ref`, `className` or
+`render`, and sit before the children, outside every `<ViewTransition>`.
 A second exception (NumberField): a part whose user surface is itself a native input and
 whose form control must be a different element renders the control as a **visually hidden
 sibling immediately after it** (`NumberField.Input`): `ref` goes to the visible input, a
@@ -666,8 +670,8 @@ React neither cancels nor orders overlapping actions. The library's stance:
   dispatched action, ignoring earlier ones that resolve later. (Verified: without this guard the
   slowest promise wins.) An earlier action's *rejection* changes nothing on screen; it is
   reported through `reportError` (section 2.4).
-- **Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`): every
-  resolved change is kept**. Each dispatch is one change to the set (a patch: `added` /
+- **Set-valued state (CheckboxGroup; ToggleGroup and Accordion without `exclusive`; Combobox
+  with `multiple`): every resolved change is kept**. Each dispatch is one change to the set (a patch: `added` /
   `removed`, or one item opened or closed), and the changes are independent intents, so "latest
   wins" would be wrong in both directions: the latest `next` is computed from the intended set
   and so contains earlier in-flight changes, including one whose action later rejects. The
@@ -1618,7 +1622,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
 | Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
 | Select | `fsui-select` (no direction variants) |
-| Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch) |
+| Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch; with `multiple` only when `details.added` is non-empty) and, with `multiple`, `fsui-combobox-deselect` (when `details.removed` is non-empty) |
 | Toast | none (no `transition` prop; every commit is urgent, section 5.1) |
 | Field, Form | none (no `transition` prop: an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
 | Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
@@ -2106,6 +2110,9 @@ result-count announcement through `ariaNotify`). Rules:
   (following `hotkey`). The name is **static**, so its override is the ordinary `aria-label`
   pass-through rather than a function prop: the function form exists for strings that depend on
   state, and a label with no state would only add a prop.
+- Combobox with `multiple` adds one: the removal announcement (`"Japan removed"`, the removed
+  chips' labels joined with `", "`), overridable through `announceRemoved(labels, state)`,
+  `null` for silence (`design/components/combobox.md` 15.7).
 - Field adds **no** string: `Field.Error`'s default text is the browser's own localised
   `validationMessage` (a platform string, not a library one), and the override is the function
   form of `children` (`({ validity, messages }) => …`), per `ValidityState` key.
