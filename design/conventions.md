@@ -37,7 +37,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
-| 11 | Handlers (facts) and strings | A change the library cannot hold (the browser performed it before the library heard: a keystroke in a controlled text input, a dismissed popup, a toast that left) is reported to a **handler**, `on<State>Change: UrgentChangeHandler` or `on<Event>: UrgentHandler`, named as a handler precisely because it is not an action. **One rule for every `on*` handler the library defines**: called synchronously, outside any transition, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. The handlers: `onInputValueChange` (Combobox), `onOpenChange` (Popover, Menu, Combobox, Dialog, HoverCard Roots), `onClose` (a toast). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
+| 11 | Handlers (facts) and strings | A change the library cannot hold (the browser performed it before the library heard: a keystroke in a controlled text input, a dismissed popup, a toast that left) is reported to a **handler**, `on<State>Change: UrgentChangeHandler` or `on<Event>: UrgentHandler`, named as a handler precisely because it is not an action. **One rule for every `on*` handler the library defines**: called synchronously, outside any transition, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. The handlers: `onInputValueChange` (Combobox), `onOpenChange` (Popover, Menu, Combobox, Dialog, AlertDialog, HoverCard Roots), `onClose` (a toast). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 | 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/overlay/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/overlay/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13). |
 | 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay): shipped CSS covers placement and interaction timing, never visuals. A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>`. |
 
@@ -100,9 +100,11 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Track` | The rail of a Slider (owns pointer interaction and is the geometry reference for pointer math) or of a Progress / Meter bar (no interaction). | `div` |
 | `Thumb` | A draggable value handle (Slider, one per value, explicit `index`): a styled element **containing** a visually hidden native `<input type="range">`, which is the focusable, labelled, form-participating `slider`. | `span` + `input[type=range]` |
 | `Increment` / `Decrement` | `button[type=button][tabindex=-1]` that steps a numeric value, with press-and-hold (NumberField); natively `disabled` when the next step would change nothing. | `button` |
-| `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
+| `Form` | A form whose successful submission completes the component's interaction (Dialog, AlertDialog). | `form` |
+| `Cancel` | The safe answer of an AlertDialog: a close button that is the default initial focus target (`Dialog.Close` under another name). | `button` |
+| `Action` | The confirm button of an AlertDialog: a close button whose `action` runs first in its own transition and that, with `action`, is no native close invoker. Not Toast's `Action`, which is a toast's own button. | `button` |
 | `Control` | The native form control a Field labels and describes (`input`, or `textarea` / `select` through `render`), inside a Field or alone (outside a `Field.Root` it is the plain control, nothing added). Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (3.8). | `input` |
-| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the control (Field) or the `<dialog>` (Dialog) always references, mounted or not. | `p` |
+| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the control (Field) or the `<dialog>` (Dialog, AlertDialog) always references, mounted or not. | `p` |
 | `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown and referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
@@ -359,7 +361,7 @@ prop, section 1.5):
 | Handler | On | Reports |
 | --- | --- | --- |
 | `onInputValueChange` | `Combobox.Root` | the text of the input changed (2.6) |
-| `onOpenChange` | `Popover.Root`, `Menu.Root`, `Combobox.Root`, `Dialog.Root` | the popup was closed by something other than a request: Escape, light dismiss, focus leaving, script, … (always `false`; `design/components/overlay-open-change.md`) |
+| `onOpenChange` | `Popover.Root`, `Menu.Root`, `Combobox.Root`, `Dialog.Root`, `AlertDialog.Root` | the popup was closed by something other than a request: Escape, light dismiss, focus leaving, script, … (always `false`; `design/components/overlay-open-change.md`) |
 | `onClose` | a toast (`ToastOptions`) | the toast left, with `details.reason` |
 
 For a state with a handler the triple reads `inputValue` / `defaultInputValue` /
@@ -759,8 +761,8 @@ changes, 2.5).
 | `Button` with `action` | runs the consumer's `action` | user | `"run"` |
 | `Button` with a function `formAction` | React submits the form with the consumer's function | user (React runs it) | `"run"` |
 | `Button` with neither (plain, URL `formAction`, `command`, link) | the native default action | – | nothing is ever pending: the prop has no effect |
-| `Dialog.Close`, `Popover.Close` without `action` | the library closes the overlay | library | nothing pends in the part (the close is the Root's dispatch, and a repeat is a no-op, 2.3 item 8): the prop has no effect |
-| `Dialog.Close`, `Popover.Close` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` |
+| `Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` without `action` | the library closes the overlay | library | nothing pends in the part (the close is the Root's dispatch, and a repeat is a no-op, 2.3 item 8): the prop has no effect |
+| `Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` |
 | `Menu.Item` with `action`, `closeOnActivate` (default `true`) | the consumer's `action`, then the library closes the menu | mixed | `"ignore"` |
 | `Menu.Item` with `action`, `closeOnActivate={false}` | the consumer's `action`; the menu stays | user | `"run"` |
 | `Menu.Item` without `action` | the library closes the menu, synchronously | library | nothing pends: no effect |
@@ -768,7 +770,7 @@ changes, 2.5).
 | `Toast.Action`, `closeOnSettle={false}` | the consumer's `action`; the toast stays | user | `"run"` |
 | `Menu.CheckboxItem`, `Menu.RadioItem` | a state change (`useControllableAction`) | state owner | no prop: latest intent wins |
 | `Slider.Root`, `NumberField.Root` steps (`valueChangeAction`; `NumberField.Increment` / `Decrement` request them) | a state change, one step of a gesture | state owner's second channel | no prop: every step runs |
-| `Form.Submit`, `Dialog.Form` | the form channel (2.7) | React's form | no prop, never guarded |
+| `Form.Submit`, `Dialog.Form`, `AlertDialog.Form` | the form channel (2.7) | React's form | no prop, never guarded |
 | a toast's `onClose` | a handler, not an action (2.1): runs once when the toast leaves, by construction | – | no prop |
 
 A default that depends on another prop (`closeOnActivate`, `closeOnSettle`) is a cost each
@@ -1636,6 +1638,7 @@ Each dispatch adds `fsui-<component>` and, when the change has a direction or ki
 | RadioGroup | `fsui-radio-group` (no direction variants) |
 | CheckboxGroup | `fsui-checkbox-group`, `fsui-checkbox-group-check` (when `details.added` is non-empty), `fsui-checkbox-group-uncheck` (when `details.removed` is non-empty; a reset may carry both) |
 | Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
+| AlertDialog | Dialog's: `fsui-dialog`, `fsui-dialog-open`, `fsui-dialog-close` (no types of its own, so one stylesheet styles both; `alert-dialog.md` 8) |
 | HoverCard | `fsui-hover-card`, `fsui-hover-card-open`, `fsui-hover-card-close` (the close is only the cancel of a pending open; every close of a shown card is a fact) |
 | Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
 | Select | `fsui-select` (no direction variants) |
@@ -1889,6 +1892,18 @@ are directive-free (only `useId`, arithmetic and `Intl`), render the client-crea
 provider (7.1), and their parts are client modules that read it. "JS-free" and "a Server
 Component" coincide at the Root, so function props (`getAriaValueText`, `children(state)`,
 `render`) may be passed from a Server Component and run on the server.
+
+**A closing part with an action is no native invoker** (#182). A part that runs a consumer
+`action` and then closes its popup (`Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel` and
+`AlertDialog.Action` with `action`) renders no `commandfor` / `command` (and no
+`popovertarget`): before hydration a native command would close the popup **without running
+the action**, which reads as if the work had been done. Such a part is a plain
+`<button type="button">` until hydration (a click does nothing) and its click handler is the
+only thing that closes it, in both modes. The same part without `action` keeps the native
+command, as there is nothing to skip. The JS-free way to run work and close is a form
+(`Dialog.Form` / `AlertDialog.Form` with a Server Function). Parts that close with an action but
+render no native command anyway (`Menu.Item`, `Toast.Action`) are not affected: they need
+hydration in every case.
 
 **A component whose baseline cannot be JS-free** (Menu: arrow keys, typeahead and focus
 management) runs in library mode always, with no mode switch, and still renders the declarative

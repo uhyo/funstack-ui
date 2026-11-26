@@ -18,6 +18,7 @@ import {
   expectNotPending,
   expectPending,
   flushTasks,
+  hydrateFromServer,
   recordClicks,
   renderBoth,
   setupUser,
@@ -479,6 +480,59 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         await act(async () => work.resolve());
         await flushTasks(2);
         expect(closeAction).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("no native command with action (#182)", () => {
+      /** A Close with `action` and one without, side by side. */
+      const both = (action: ClosePartProps["action"]): ReactNode => (
+        <>
+          {withClose({ action })}
+          <Close data-testid="plain">Plain</Close>
+        </>
+      );
+
+      renderBoth("library mode", (mode) => {
+        it("with action no commandfor / command; without, the native command", async () => {
+          const user = setupUser();
+          render(<Harness mode={mode} content={both(() => {})} />);
+          await openThroughTrigger(user);
+          expect(part()).not.toHaveAttribute("command");
+          expect(part()).not.toHaveAttribute("commandfor");
+          expect(part()).toHaveAttribute("type", "button");
+          expect(screen.getByTestId("plain")).toHaveAttribute("command");
+          expect(screen.getByTestId("plain")).toHaveAttribute("commandfor");
+        });
+      });
+
+      it("before hydration a click on the action Close closes nothing; one without action closes natively", async () => {
+        const action = vi.fn();
+        const ui = <Harness mode="static" content={both(action)} />;
+        await hydrateFromServer(ui, {
+          mutate: async () => {
+            expect(part()).not.toHaveAttribute("command");
+            expect(part()).not.toHaveAttribute("commandfor");
+            await config.openStatic();
+            fireEvent.click(part());
+            await flushTasks(2);
+            // Not hydrated: no handler, no command. The popup stays open.
+            expect(isOpen()).toBe(true);
+            fireEvent.click(screen.getByTestId("plain"));
+            await flushTasks(2);
+            // The control: the shim runs a native invoker.
+            expect(isOpen()).toBe(false);
+            await config.openStatic();
+          },
+          flush: () => flushTasks(2),
+        });
+        expect(action).not.toHaveBeenCalled();
+        expect(isOpen()).toBe(true);
+        // After hydration the same click runs the action, then closes.
+        const user = setupUser();
+        await user.click(part());
+        await flushTasks(2);
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(false);
       });
     });
 

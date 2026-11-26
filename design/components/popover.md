@@ -736,8 +736,9 @@ export interface PopoverCloseProps
    * transition if set), in JS-free mode with `hidePopover()`. A rejection reaches the nearest
    * Error Boundary above the Close part and leaves the popover open. If the popover was
    * dismissed and opened again while the action ran, the close is dropped: it belonged to the
-   * earlier open. Without `action` in JS-free mode the button is a native
-   * `command="hide-popover"` invoker.
+   * earlier open. With `action` the button is no native close invoker (no `commandfor` /
+   * `command`, conventions 7.3): a click before hydration does nothing. Without `action` in
+   * JS-free mode the button is a native `command="hide-popover"` invoker.
    */
   action?: Action<[details: ActionDetails]>;
   /**
@@ -757,7 +758,8 @@ export interface PopoverCloseProps
 ```
 
 Owned keys: `type`, `commandfor`, `command` (`"hide-popover"`; on a `<button>` or a component
-render only), `disabled`, `onClick` (library
+render only, and never with `action`: #182, conventions 7.3, a pre-hydration click on a Close
+with `action` does nothing instead of hiding the popover without running the action), `disabled`, `onClick` (library
 mode, or with `action`), `data-pending`, `data-disabled`. No `value` and no `returnValue`:
 popovers have none. The Close keeps `commandfor` + `command="hide-popover"` under #121
 (`popovertargetaction="hide"` would buy nothing: Chromium and Firefox expose no expanded state for

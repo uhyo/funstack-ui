@@ -31,6 +31,7 @@ const DEV_CALLEES = new Set([
   "useElementCheck",
   "useNameWarning",
   "useShownNameWarning",
+  "useShownDescriptionWarning",
 ]);
 
 /**

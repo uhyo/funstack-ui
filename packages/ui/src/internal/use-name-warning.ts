@@ -104,3 +104,67 @@ function useShownNameWarningDev(
     console.error(message);
   }, [element, shown, message, applies]);
 }
+
+/**
+ * Development check that a dialog has a description (AlertDialog,
+ * design/components/alert-dialog.md 2.2): an id of its `aria-describedby` that names an element
+ * in the document. Judged over the dialog's first showing rather than its first frame, so a
+ * description behind a Suspense boundary still pending when the dialog opens counts once it
+ * arrives: checked when the dialog opens (`toggle`), then on every change inside it, and
+ * `message` is logged at its first `close` if none was found by then. Once per instance. Pass
+ * `message` as `isDev && "..."`; a no-op in production.
+ */
+export const useShownDescriptionWarning: (
+  element: RefObject<HTMLElement | null>,
+  message: string | false,
+) => void = isDev ? useShownDescriptionWarningDev : noop;
+
+function hasDescription(element: Element): boolean {
+  const doc = element.ownerDocument;
+  return (element.getAttribute("aria-describedby") ?? "")
+    .split(/\s+/)
+    .some((id) => id !== "" && doc.getElementById(id) !== null);
+}
+
+function useShownDescriptionWarningDev(
+  element: RefObject<HTMLElement | null>,
+  message: string | false,
+): void {
+  const done = useRef(false);
+  useEffect(() => {
+    const target = element.current;
+    if (message === false || target === null || done.current) return;
+    let observer: MutationObserver | null = null;
+    const stop = () => {
+      observer?.disconnect();
+      observer = null;
+    };
+    const found = (): boolean => {
+      if (!hasDescription(target)) return false;
+      done.current = true;
+      stop();
+      return true;
+    };
+    const onToggle = (event: Event) => {
+      if (event.target !== target || done.current || observer !== null) return;
+      if ((event as ToggleEvent).newState !== "open" || found()) return;
+      observer = new MutationObserver(() => {
+        found();
+      });
+      observer.observe(target, { childList: true, subtree: true });
+    };
+    const onClose = (event: Event) => {
+      if (event.target !== target || done.current || found()) return;
+      done.current = true;
+      stop();
+      console.error(message);
+    };
+    target.addEventListener("toggle", onToggle);
+    target.addEventListener("close", onClose);
+    return () => {
+      stop();
+      target.removeEventListener("toggle", onToggle);
+      target.removeEventListener("close", onClose);
+    };
+  }, [element, message]);
+}

@@ -29,6 +29,22 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          A <code>Dialog.Close</code> or <code>Popover.Close</code> with an <code>action</code> no
+          longer renders <code>commandfor</code> / <code>command</code> (
+          <a href={issue(182)}>#182</a>). A click before hydration used to close the dialog or
+          popover natively without running the action; it now does nothing until the page has
+          hydrated, and then runs the action and closes. A Close without <code>action</code> is
+          unchanged (a native invoker). Selectors on <code>[command]</code> no longer match such a
+          button.
+        </li>
+        <li>
+          New component <a href="/components/alert-dialog">AlertDialog</a> (
+          <a href={issue(167)}>#167</a>): a Dialog with <code>role="alertdialog"</code>, no light
+          dismiss and focus on Cancel, whose <code>Action</code> runs an async action and closes
+          when it resolves. Development messages of a Dialog part outside its Root now name the Root
+          of its own namespace.
+        </li>
+        <li>
           New component <a href="/components/separator">Separator</a> (<a href={issue(169)}>#169</a>
           ). <code>Field.Control</code> no longer throws outside a <code>Field.Root</code>: it
           renders the plain control and accepts <code>id</code>. A Slider's Track and Thumb and

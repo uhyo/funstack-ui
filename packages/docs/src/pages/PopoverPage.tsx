@@ -376,8 +376,11 @@ export function PopoverPage() {
                 rejection reaches the nearest Error Boundary above the button and leaves the popover
                 open. A second click while it is pending is ignored, and the button is{" "}
                 <code>aria-disabled="true"</code> meanwhile, unless <code>whilePending</code> is{" "}
-                <code>"run"</code>. Without <code>action</code> in JS-free mode the button is a
-                native <code>command="hide-popover"</code> invoker.
+                <code>"run"</code>. With <code>action</code> the button renders no{" "}
+                <code>commandfor</code> / <code>command</code>, so a click before hydration does
+                nothing (rather than hiding the popover without running the action). Without{" "}
+                <code>action</code> in JS-free mode the button is a native{" "}
+                <code>command="hide-popover"</code> invoker.
               </>
             ),
           },
@@ -402,7 +405,7 @@ export function PopoverPage() {
       <PartFacts
         state={"`PopoverCloseState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not on a link or other non-button host element), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
         note={
           'In library mode the click is always intercepted, so every Close goes through the Root. By default (`whilePending="ignore"`) a second click while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending` (the action and the hide); never natively disabled, so it keeps focus. To hide at once and finish the work in the background, do not return the promise: `action={() => { void apply(); }}`. If the user dismisses the popover and opens it again while the action runs, the action\'s close is dropped: it belonged to the earlier open. Popovers have no return value.'
@@ -673,7 +676,7 @@ export function PopoverPage() {
       <BehaviourSection
         id="before-hydration"
         summary={
-          'JS-free mode: everything, including `autoFocus` in server-rendered markup. Library mode: the Trigger opens the popover natively, but the content is not in the HTML yet; on hydration the Popup finds it open, dispatches `openChangeAction(true)` with `reason: "platform"` and the content mounts.'
+          'JS-free mode: everything, including `autoFocus` in server-rendered markup, except a `Popover.Close` with `action`, which does nothing until hydration. Library mode: the Trigger opens the popover natively, but the content is not in the HTML yet; on hydration the Popup finds it open, dispatches `openChangeAction(true)` with `reason: "platform"` and the content mounts.'
         }
       >
         <h4 id="the-platform-paths">

@@ -45,7 +45,8 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
 
 /**
  * The Close part of a popover-like or dialog overlay (design/components/popover.md 3.4,
- * dialog.md 3.4): `<button type="button" commandfor command>`. In JS-free mode without `action`
+ * dialog.md 3.4): `<button type="button" commandfor command>` without `action`, a plain
+ * `<button type="button">` with one (#182). In JS-free mode without `action`
  * the browser runs the command. Otherwise the click is cancelled, refused while disabled, and
  * `close` runs, after the `action` when there is one, inside this part's own transition; a
  * second click meanwhile starts nothing (`whilePending`, default `"ignore"`) or runs the action
@@ -57,6 +58,10 @@ export function useOverlayClose<Details extends ActionDetails>(
   options: OverlayCloseOptions<Details>,
 ): ReactNode {
   const { part, noun, isLibrary, popupId, command, action, disabled, render } = options;
+  // A Close with `action` is no native invoker (#182, alert-dialog.md 3.2): before hydration a
+  // click would close the popup without running the action. It renders a plain button, and the
+  // click handler is the only thing that closes it.
+  const nativeCommand = action === undefined;
   // The library owns the close, so a Close ignores clicks while pending by default (2.5.1).
   const trigger = usePureTrigger({
     whilePending: options.whilePending,
@@ -101,8 +106,10 @@ export function useOverlayClose<Details extends ActionDetails>(
     // Owned: a render element must not re-enable a disabled Close.
     disabled: disabledProps.props.disabled,
     // Only on a button (or a component, assumed to render one): another element is no invoker.
-    commandfor: disabledProps.invoker && rendersButton(render) ? popupId : undefined,
-    command: disabledProps.invoker && rendersButton(render) ? command : undefined,
+    // Not rendered with `action` (above).
+    commandfor:
+      nativeCommand && disabledProps.invoker && rendersButton(render) ? popupId : undefined,
+    command: nativeCommand && disabledProps.invoker && rendersButton(render) ? command : undefined,
     ...options.ownProps,
     ...(installClick && { onClick }),
     // JS-free mode without `action`, disabled in the `aria-disabled` branch (a host link):

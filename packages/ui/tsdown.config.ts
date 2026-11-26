@@ -13,6 +13,7 @@ export default defineConfig({
     "src/switch/index.ts",
     "src/checkbox/index.ts",
     "src/dialog/index.ts",
+    "src/alert-dialog/index.ts",
     "src/radio-group/index.ts",
     "src/checkbox-group/index.ts",
     "src/popover/index.ts",

@@ -8,6 +8,7 @@ import { useElementCheck } from "../internal/use-element-check.js";
 import { cancelClick, disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import type { DialogNamespace } from "./dialog-context.js";
 
 /**
  * State of `Dialog.Trigger`, passed to the function forms of `className`, `style`, `children` and
@@ -69,15 +70,18 @@ const isDev = process.env.NODE_ENV !== "production";
  *
  * @see https://ui.funstack.work/components/dialog
  */
-export function DialogTrigger({
-  disabled = false,
-  className,
-  style,
-  children,
-  render,
-  ...rest
-}: DialogTriggerProps) {
-  const ctx = useDialogContext("Dialog.Trigger");
+export function DialogTrigger(props: DialogTriggerProps) {
+  return useDialogTrigger(props, "Dialog");
+}
+
+DialogTrigger.displayName = "DialogTrigger";
+
+/** The body of `Dialog.Trigger`, also run by `AlertDialog.Trigger` (alert-dialog.md 8). */
+export function useDialogTrigger(
+  { disabled = false, className, style, children, render, ...rest }: DialogTriggerProps,
+  namespace: DialogNamespace,
+): ReactNode {
+  const ctx = useDialogContext(`${namespace}.Trigger`);
   const isLibrary = ctx.mode === "library";
   const { modal, ids, triggerRef, popupRef } = ctx;
 
@@ -94,9 +98,9 @@ export function DialogTrigger({
     isDev &&
       ((element) =>
         !isLibrary && modal && element.tagName !== "BUTTON"
-          ? `Dialog.Trigger: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. Only a ` +
-            '<button> runs `command="show-modal"`; this trigger will not open the dialog. Render ' +
-            "a <button>, or put the Dialog in library mode (`defaultOpen={false}`)."
+          ? `${namespace}.Trigger: rendered a <${element.tagName.toLowerCase()}> in JS-free mode. ` +
+            'Only a <button> runs `command="show-modal"`; this trigger will not open the dialog. ' +
+            `Render a <button>, or put the ${namespace} in library mode (\`defaultOpen={false}\`).`
           : null),
   );
   // A Trigger without a Popup opens nothing (design 14, dev warnings). Checked when the Trigger's
@@ -105,16 +109,17 @@ export function DialogTrigger({
     isDev &&
       (() =>
         document.getElementById(ids.popup) === null
-          ? "Dialog.Trigger: no Dialog.Popup is rendered for this Dialog.Root; the trigger opens nothing."
+          ? `${namespace}.Trigger: no ${namespace}.Popup is rendered for this ${namespace}.Root; ` +
+            "the trigger opens nothing."
           : null),
   );
   const libraryRef = useCallback(
     (element: HTMLElement) => {
       checkElement?.(element);
       checkPopup?.(element);
-      return registerTrigger(triggerRef, element, "Dialog.Trigger");
+      return registerTrigger(triggerRef, element, `${namespace}.Trigger`);
     },
-    [checkElement, checkPopup, triggerRef],
+    [checkElement, checkPopup, triggerRef, namespace],
   );
 
   // Library mode (both modal and non-modal) and non-modal JS-free mode need a click handler;
@@ -188,5 +193,3 @@ export function DialogTrigger({
     ref: libraryRef,
   });
 }
-
-DialogTrigger.displayName = "DialogTrigger";

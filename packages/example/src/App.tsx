@@ -7,6 +7,7 @@ import { TooltipDemo } from "./tooltip-demo.js";
 import { HoverCardDemo } from "./hover-card-demo.js";
 import { SwitchCheckboxDemo } from "./switch-checkbox-demo.js";
 import { DialogDemo } from "./dialog-demo.js";
+import { AlertDialogDemo } from "./alert-dialog-demo.js";
 import { PopoverDemo } from "./popover-demo.js";
 import { MenuDemo } from "./menu-demo.js";
 import { RadioGroupDemo } from "./radio-group-demo.js";
@@ -41,6 +42,7 @@ export function App() {
       <HoverCardDemo />
       <PopoverDemo />
       <DialogDemo />
+      <AlertDialogDemo />
       <MenuDemo />
       <ToastDemo />
       <FieldFormDemo />

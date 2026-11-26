@@ -231,7 +231,7 @@ packages/ui/src/internal/
   use-latest.ts           # useLatest(value): a ref written in an insertion effect
   use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)
   use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
-  use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2)
+  use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2); useShownDescriptionWarning (AlertDialog's missing Description, judged over the first showing)
   dev-warn.ts             # warnOnce for directive-free parts
   use-item-order.ts       # section 3.8: the Items' document order in state (CheckboxGroup, ToggleGroup)
   value-set.ts            # set / order arithmetic of the set-valued components; directive-free
@@ -288,7 +288,7 @@ packages/ui/src/internal/
     overlay-popup.tsx     # renderOverlayContent, useCloseHold, useInitialFocusTarget, returnFocusToTrigger, commandOf, useJsFreePropWarnings
     overlay-show.ts       # createPopupFlags (awaitingClose, the library echo, refusedFact), showWithFocus (the refused re-open's `inert`, the `autofocus` write; 3.9.4): the popup state both Popup implementations share; directive-free
     use-apply-open-state.ts # useApplyOpenState: the apply effect (popover.md 2.5, dialog.md 2.5) both Popup implementations share, over an `isShown` / `show` / `hide` driver
-    use-overlay-close.ts  # useOverlayClose: the one Close part of Popover and Dialog
+    use-overlay-close.ts  # useOverlayClose: the one Close part of Popover and Dialog (and AlertDialog's Cancel and Action); no `commandfor` / `command` with `action` (conventions 7.3)
     content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
     use-exit-animation.ts # held content while an exit animates (popover.md 4.4)
     popover-open.ts       # isPopoverOpen(element); directive-free

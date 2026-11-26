@@ -1308,7 +1308,8 @@ describe("Popover", () => {
       );
       await openThroughTrigger(user);
       const close = screen.getByTestId("close");
-      expect(close).toHaveAttribute("command", "hide-popover");
+      // With `action` the merged props carry no native command (#182).
+      expect(close).not.toHaveAttribute("command");
       expect(close).toHaveAttribute("data-state", "idle");
       await user.click(close);
       expect(closeStates.at(-1)).toEqual({ pending: true, disabled: false });

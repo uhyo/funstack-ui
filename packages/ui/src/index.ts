@@ -139,6 +139,29 @@ export type {
   DialogDescriptionState,
 } from "./dialog/index.js";
 
+export { AlertDialog } from "./alert-dialog/index.js";
+export type {
+  AlertDialogRootProps,
+  AlertDialogRootState,
+  AlertDialogOpenChangeDetails,
+  AlertDialogTriggerProps,
+  AlertDialogTriggerState,
+  AlertDialogPopupProps,
+  AlertDialogPopupState,
+  AlertDialogTitleProps,
+  AlertDialogTitleState,
+  AlertDialogDescriptionProps,
+  AlertDialogDescriptionState,
+  AlertDialogCancelProps,
+  AlertDialogCancelState,
+  AlertDialogCancelDetails,
+  AlertDialogActionProps,
+  AlertDialogActionState,
+  AlertDialogActionDetails,
+  AlertDialogFormProps,
+  AlertDialogFormState,
+} from "./alert-dialog/index.js";
+
 export { Popover } from "./popover/index.js";
 export type {
   PopoverRootProps,

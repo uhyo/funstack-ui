@@ -3,6 +3,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
+import type { DialogNamespace } from "./dialog-context.js";
 import type { DialogPopupState } from "./dialog-popup.js";
 
 /** State of `Dialog.Description`: the Popup's state. */
@@ -34,14 +35,18 @@ export interface DialogDescriptionProps extends Omit<
  *
  * @see https://ui.funstack.work/components/dialog
  */
-export function DialogDescription({
-  className,
-  style,
-  children,
-  render,
-  ...rest
-}: DialogDescriptionProps) {
-  const ctx = useDialogContext("Dialog.Description");
+export function DialogDescription(props: DialogDescriptionProps) {
+  return useDialogDescription(props, "Dialog");
+}
+
+DialogDescription.displayName = "DialogDescription";
+
+/** The body of `Dialog.Description`, also run by `AlertDialog.Description` (alert-dialog.md 8). */
+export function useDialogDescription(
+  { className, style, children, render, ...rest }: DialogDescriptionProps,
+  namespace: DialogNamespace,
+): ReactNode {
+  const ctx = useDialogContext(`${namespace}.Description`);
   const state: DialogDescriptionState = { open: ctx.committed, modal: ctx.modal };
   return useRender<ComponentPropsWithRef<"p">, DialogDescriptionState>({
     defaultElement: "p",
@@ -54,5 +59,3 @@ export function DialogDescription({
     libraryProps: { id: ctx.ids.description },
   });
 }
-
-DialogDescription.displayName = "DialogDescription";

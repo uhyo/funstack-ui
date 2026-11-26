@@ -91,6 +91,14 @@ type PublicProps = {
   AccordionRootMultipleProps: UI.AccordionRootMultipleProps;
   AccordionRootProps: UI.AccordionRootProps;
   AccordionTriggerProps: UI.AccordionTriggerProps;
+  AlertDialogActionProps: UI.AlertDialogActionProps;
+  AlertDialogCancelProps: UI.AlertDialogCancelProps;
+  AlertDialogDescriptionProps: UI.AlertDialogDescriptionProps;
+  AlertDialogFormProps: UI.AlertDialogFormProps;
+  AlertDialogPopupProps: UI.AlertDialogPopupProps;
+  AlertDialogRootProps: UI.AlertDialogRootProps;
+  AlertDialogTitleProps: UI.AlertDialogTitleProps;
+  AlertDialogTriggerProps: UI.AlertDialogTriggerProps;
   ButtonProps: UI.ButtonProps;
   CSPProviderProps: UI.CSPProviderProps;
   CheckboxGroupItemProps: UI.CheckboxGroupItemProps;
@@ -228,6 +236,14 @@ const listedKeys = {
   AccordionRootMultipleProps: true,
   AccordionRootProps: true,
   AccordionTriggerProps: true,
+  AlertDialogActionProps: true,
+  AlertDialogCancelProps: true,
+  AlertDialogDescriptionProps: true,
+  AlertDialogFormProps: true,
+  AlertDialogPopupProps: true,
+  AlertDialogRootProps: true,
+  AlertDialogTitleProps: true,
+  AlertDialogTriggerProps: true,
   ButtonProps: true,
   CSPProviderProps: true,
   CheckboxGroupItemProps: true,
@@ -402,11 +418,12 @@ describe("action naming (conventions 10.1)", () => {
     expectTypeOf<UI.ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<string, UI.ComboboxInputValueChangeDetails> | undefined
     >();
-    // Exactly the five overlay Roots, each with the details type of its `openChangeAction`.
+    // Exactly the overlay Roots, each with the details type of its `openChangeAction`.
     type WithOpenChange = {
       [K in keyof PublicProps]: "onOpenChange" extends OwnHandlerKeys<PublicProps[K]> ? K : never;
     }[keyof PublicProps];
     expectTypeOf<WithOpenChange>().toEqualTypeOf<
+      | "AlertDialogRootProps"
       | "ComboboxRootProps"
       | "ComboboxSingleProps"
       | "ComboboxMultipleProps"
@@ -427,6 +444,9 @@ describe("action naming (conventions 10.1)", () => {
     >();
     expectTypeOf<UI.DialogRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.DialogOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.AlertDialogRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.AlertDialogOpenChangeDetails> | undefined
     >();
     expectTypeOf<UI.HoverCardRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.HoverCardOpenChangeDetails> | undefined
