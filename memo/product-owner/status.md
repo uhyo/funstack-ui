@@ -438,3 +438,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - Wave 23 started: architect designs #163 and #164 (worktrees), platform-researcher on #166 + #165. Designs go to the user for decisions before implementation.
 - #163 design a7ebb08c (branch design/163-collapsible); user took all 4 recommendations (defaultOpen → library mode; openChangeAction only; <details> only; Accordion.Item standalone kept, docs point to Collapsible). → developer feat/163-collapsible.
 - #164 design c23291f1 (branch design/164-combobox-multiple; conventions 1.1 exception for hidden inputs); user took all 6 recommendations. → developer feat/164-combobox-multiple.
+- Research merged c3242830. #165 user: build JS listbox now (option C); architect proposes API home (Select.Root multiple vs input-less Combobox). #166 → architect design (manual popover default, hint flag, interestfor flag, Tab into card).
