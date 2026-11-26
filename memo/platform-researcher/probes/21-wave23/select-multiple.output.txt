@@ -1,0 +1,46 @@
+
+### chromium 156.0.8078.4
+base=false size=none initial {"sel":"-","log":[],"h":83,"open":false}
+base=false size=none click Apple {"sel":"a","log":["input","change:a"],"h":83,"open":false}
+base=false size=none click Banana {"sel":"b","log":["input","change:b"],"h":83,"open":false}
+base=false size=none click Banana again {"sel":"b","log":[],"h":83,"open":false}
+base=false size=none ArrowDown {"sel":"c","log":["input","change:c"],"h":83,"open":false}
+base=false size=none Space {"sel":"c","log":[],"h":83,"open":false}
+base=false size=none AX listbox multiselectable=true | option selected=false | option selected=false | option selected=true | option selected=false
+base=false size=1 initial {"sel":"-","log":[],"h":21,"open":false}
+base=false size=1 after clicking the select {"sel":"-","log":[],"h":21,"open":true} picker style: block appearance=auto
+base=false size=1 click Apple {"sel":"a","log":["input","change:a"],"h":21,"open":true}
+base=false size=1 click Banana {"sel":"ab","log":["input","change:ab"],"h":21,"open":true}
+base=false size=1 click Banana again {"sel":"a","log":["input","change:a"],"h":21,"open":true}
+base=false size=1 ArrowDown {"sel":"a","log":[],"h":21,"open":true}
+base=false size=1 Space {"sel":"ac","log":["input","change:ac"],"h":21,"open":true}
+base=false size=1 AX combobox hasPopup=menu expanded=true | MenuListPopup | option selected=true | option selected=false | option selected=true | option selected=false
+base=true size=none initial {"sel":"-","log":[],"h":98,"open":false}
+base=true size=none click Apple {"sel":"a","log":["input","change:a"],"h":98,"open":false}
+base=true size=none click Banana {"sel":"ab","log":["input","change:ab"],"h":98,"open":false}
+base=true size=none click Banana again {"sel":"a","log":["input","change:a"],"h":98,"open":false}
+base=true size=none ArrowDown {"sel":"a","log":[],"h":98,"open":false}
+base=true size=none Space {"sel":"ac","log":["input","change:ac"],"h":98,"open":false}
+base=true size=none AX listbox multiselectable=true | option selected=true | option selected=false | option selected=true | option selected=false
+base=true size=1 initial {"sel":"-","log":[],"h":21,"open":false}
+base=true size=1 after clicking the select {"sel":"-","log":[],"h":21,"open":true} picker style: block appearance=base-select
+base=true size=1 click Apple {"sel":"a","log":["input","change:a"],"h":21,"open":true}
+base=true size=1 click Banana {"sel":"ab","log":["input","change:ab"],"h":21,"open":true}
+base=true size=1 click Banana again {"sel":"a","log":["input","change:a"],"h":21,"open":true}
+base=true size=1 ArrowDown {"sel":"a","log":[],"h":21,"open":true}
+base=true size=1 Space {"sel":"ac","log":["input","change:ac"],"h":21,"open":true}
+base=true size=1 AX combobox hasPopup=menu expanded=true | MenuListPopup | option selected=true | option selected=false | option selected=true | option selected=false
+
+### firefox 157.0
+base=false size=none initial {"sel":"-","log":[],"h":98,"open":false}
+base=false size=none click Apple {"sel":"a","log":["input","change:a"],"h":98,"open":false}
+base=false size=none click Banana {"sel":"b","log":["input","change:b"],"h":98,"open":false}
+base=false size=none click Banana again {"sel":"b","log":[],"h":98,"open":false}
+base=false size=none ArrowDown {"sel":"c","log":["input","change:c"],"h":98,"open":false}
+base=false size=none Space {"sel":"c","log":[],"h":98,"open":false}
+base=false size=1 initial {"sel":"-","log":[],"h":29,"open":false}
+base=false size=1 click Apple {"sel":"a","log":["input","change:a"],"h":29,"open":false}
+base=false size=1 click Banana {"sel":"a","log":[],"h":29,"open":false}
+base=false size=1 click Banana again {"sel":"a","log":[],"h":29,"open":false}
+base=false size=1 ArrowDown {"sel":"a","log":[],"h":29,"open":false}
+base=false size=1 Space {"sel":"a","log":[],"h":29,"open":false}
