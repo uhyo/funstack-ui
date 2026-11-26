@@ -34,6 +34,16 @@ export interface StepButtonHandlers {
 }
 
 /**
+ * Disabled by the platform rather than by a prop: an ancestor `<fieldset disabled>` disables the
+ * button and the visible input, which then match `:disabled` while the part's state does not see
+ * it. Pointer events still reach a natively disabled button (Chromium and Firefox, #180), so the
+ * press handler reads this at the press (conventions 3.6).
+ */
+function inheritsDisabled(ctx: NumberFieldContextValue, element: HTMLElement): boolean {
+  return element.matches(":disabled") || (ctx.visibleRef.current?.matches(":disabled") ?? false);
+}
+
+/**
  * The press-and-hold of `NumberField.Increment` / `Decrement` (design 4.3): one step at
  * `pointerdown`, a repeat after 400 ms then every 60 ms, one commit at the release
  * (`pointerup`, `pointercancel`, `lostpointercapture`, or `blur` on the window). The press is
@@ -64,7 +74,7 @@ export function useStepButton(
 
   const onPointerDown = (event: ReactPointerEvent<HTMLElement>): void => {
     if (event.button !== 0 || !event.isPrimary) return;
-    if (disabled) {
+    if (disabled || inheritsDisabled(ctx, event.currentTarget)) {
       // A focusable disabled render (`aria-disabled`) must not take focus from the input
       // either; native `disabled` focused nothing.
       event.preventDefault();
@@ -140,7 +150,7 @@ export function useStepButton(
       pointerSeen.current = false;
       return;
     }
-    if (disabled) return;
+    if (disabled || inheritsDisabled(ctx, event.currentTarget)) return;
     ctx.activate(direction, event.nativeEvent);
   };
 

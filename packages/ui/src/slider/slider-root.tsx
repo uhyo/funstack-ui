@@ -521,6 +521,12 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     (index: number | null, event: PointerEvent, element: HTMLElement) => {
       const { disabled: off } = latest.current;
       if (off || event.button !== 0 || activeGesture.current !== null) return;
+      // Disabled by the platform (an ancestor `<fieldset disabled>`): the range inputs match
+      // `:disabled` while the Root's state does not see it, and the Track and Thumb spans still
+      // take the pointer (conventions 3.6, #180). Read at the press, like the direction.
+      for (const input of registry.values()) {
+        if (input.matches(":disabled")) return;
+      }
       const track = trackRef.current;
       if (track === null) {
         if (isDev && !warnedNoTrack.current) {

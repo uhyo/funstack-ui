@@ -1,0 +1,82 @@
+/* Separator: reset the <hr>'s user-agent margin and border, draw from data-orientation. */
+.sp-line {
+  margin: 0;
+  border: 0;
+  background: #c8c8d0;
+  flex: none;
+}
+.sp-line[data-orientation="horizontal"] {
+  block-size: 1px;
+  inline-size: 100%;
+}
+.sp-line[data-orientation="vertical"] {
+  inline-size: 1px;
+  align-self: stretch;
+}
+
+.sp-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+}
+
+/* A native fieldset around Fields: inherited `disabled` is selected with :disabled. */
+.sp-fieldset {
+  display: grid;
+  gap: 0.8em;
+  max-inline-size: 26em;
+  margin-block: 0.75em;
+}
+.sp-field {
+  display: grid;
+  gap: 0.25em;
+}
+.sp-fieldset :is(.sp-field, .sp-slider, .sp-number):has(:disabled) {
+  opacity: 0.5;
+}
+.sp-input {
+  font: inherit;
+  padding: 0.3em 0.5em;
+}
+.sp-grow {
+  field-sizing: content;
+  min-block-size: 2lh;
+  max-block-size: 8lh;
+  resize: none;
+}
+
+.sp-slider {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4em;
+}
+.sp-track {
+  grid-column: 1 / -1;
+  position: relative;
+  block-size: 1.2em;
+  background: #e4e4ea;
+  border-radius: 999px;
+}
+.sp-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--slider-start);
+  inset-inline-end: calc(100% - var(--slider-end));
+  background: #6b7cff;
+  border-radius: inherit;
+}
+.sp-thumb {
+  position: absolute;
+  inline-size: 1.2em;
+  block-size: 1.2em;
+  inset-inline-start: var(--slider-value);
+  translate: -50% 0;
+  background: #fff;
+  border: 2px solid #6b7cff;
+  border-radius: 50%;
+}
+.sp-number {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+}

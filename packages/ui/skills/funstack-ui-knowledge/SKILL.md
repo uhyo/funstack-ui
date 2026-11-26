@@ -51,7 +51,7 @@ Each line: import path, parts, main state props.
 - `Dialog` (`@funstack/ui/dialog`): `Root`, `Trigger`, `Popup` (`<dialog>`), `Close`, `Form`, `Title`, `Description`. Same modes as Popover; `Dialog.Form` closes after its form action settles.
 - `Menu` (`@funstack/ui/menu`): `Root`, `Trigger`, `Popup`, `Item` (`action`), `CheckboxItem`, `RadioGroup`, `RadioItem`, `Group`, `GroupLabel`, `Separator`, `SubmenuTrigger`, `ContextTrigger` (context menu). A `Root` inside a `Popup` is a submenu.
 - `Toast` (`@funstack/ui/toast`): `toast()` (also `toast.promise`, `toast.update`, `toast.dismiss`), `createToastManager`, parts `Viewport`, `Root`, `Title`, `Description`, `Action`, `Close`.
-- `Field` (`@funstack/ui/field`): `Root`, `Label`, `Control`, `Description`, `Error`. Native constraint validation, no validation engine.
+- `Field` (`@funstack/ui/field`): `Root`, `Label`, `Control`, `Description`, `Error`. Native constraint validation, no validation engine. A textarea is `<Field.Control render={<textarea />} />`, grown with CSS `field-sizing: content` (no auto-size prop). `Field.Control` also works outside a `Field.Root` as the plain control (it takes `id` there; the other parts throw). There is no Input, Textarea or Fieldset part: use the native elements, and group Fields in a native `<fieldset>` / `<legend>` (`<fieldset disabled>` disables every FUNSTACK control inside, but their `data-disabled` does not see it: select `:disabled`). Never disable a fieldset because a submission is pending (focus is lost); use `form[data-pending]`.
 - `Form` (`@funstack/ui/form`): `Root` (`action`, `errors` for server errors per field), `Submit`.
 - `Checkbox` (`@funstack/ui/checkbox`): native checkbox; `checked` / `checkedChangeAction`, controlled-only `indeterminate`.
 - `CheckboxGroup` (`@funstack/ui/checkbox-group`): `Root`, `Label`, `Item`, `Parent` (select-all). `value` is `string[]`.
@@ -63,6 +63,7 @@ Each line: import path, parts, main state props.
 - `Slider` (`@funstack/ui/slider`): `Root`, `Label`, `Track`, `Indicator`, `Thumb`, `Value`. `valueChangeAction` per step, `valueCommitAction` once per gesture; `value` is a number or `number[]`.
 - `NumberField` (`@funstack/ui/number-field`): `Root`, `Label`, `Input`, `Increment`, `Decrement`. Locale-formatted; `valueChangeAction`, `valueCommitAction`.
 - `Progress` (`@funstack/ui/progress`) and `Meter` (`@funstack/ui/meter`): `Root`, `Track`, `Indicator`, `Label`, `Value`. Output only, no actions; the Root renders in a Server Component.
+- `Separator` (`@funstack/ui/separator`): a single `<hr>`; `orientation` (`"horizontal"` default, `"vertical"`), `decorative` (`role="none"`, no `aria-orientation`: for a purely visual line; it is also the separator element that is valid inside a Combobox or MultiSelect listbox, where a Group boundary styled in CSS is the other option). `data-orientation` always; reset the `<hr>`'s margin and border in CSS. No `"use client"`: a Server Component may render it. Inside a Toolbar, Menu or Select use their own `Separator` part.
 - `CSPProvider`, `STYLE_SHA256` (`@funstack/ui/csp`): for a strict `style-src` Content Security Policy.
 
 ## Full documentation

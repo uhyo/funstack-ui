@@ -1,7 +1,9 @@
 "use client";
+import { use } from "react";
 import type { ComponentPropsWithRef, CSSProperties } from "react";
-import { fieldDataAttributes, useFieldContext } from "../internal/form/field-context.js";
+import { FieldContext, fieldDataAttributes } from "../internal/form/field-context.js";
 import type { FieldState } from "../internal/form/field-context.js";
+import { VALID } from "../internal/form/validity.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useFieldControl } from "../internal/form/use-field-control.js";
@@ -19,6 +21,11 @@ export interface FieldControlProps extends Omit<
   ComponentPropsWithRef<"input">,
   "id" | "aria-invalid" | "className" | "style" | "children"
 > {
+  /**
+   * Native `id`, used outside a `Field.Root` only. Inside one the Field owns the id (so that
+   * `Field.Label` can point at it) and this prop is ignored with a development warning.
+   */
+  id?: string;
   /**
    * Native `name`.
    *
@@ -50,30 +57,57 @@ export interface FieldControlProps extends Omit<
 const CONTROL_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 
 /**
+ * The states the function props receive outside a `Field.Root` (design/components/field-form.md
+ * 4.3): never invalid or pending (no validation without a Field), with `disabled` / `required`
+ * from the control's own props, as inside a Field and as a standalone Checkbox reports them.
+ * One frozen object per combination, indexed `disabled * 2 + required`.
+ */
+const NO_MESSAGES: readonly string[] = Object.freeze([]);
+const STANDALONE_STATES: readonly FieldState[] = [false, true].flatMap((disabled) =>
+  [false, true].map((required) =>
+    Object.freeze({
+      invalid: false,
+      messages: NO_MESSAGES,
+      validity: VALID,
+      disabled,
+      required,
+      pending: false,
+    }),
+  ),
+);
+
+function standaloneState(disabled: boolean | undefined, required: boolean | undefined) {
+  return STANDALONE_STATES[(disabled === true ? 2 : 0) + (required === true ? 1 : 0)]!;
+}
+
+/**
  * The field's native control: an `<input>` (or a `<textarea>` / `<select>` through `render`)
  * wired to the Field: `id` for the Label, `aria-describedby` (the consumer's tokens, the
  * description, the error while shown), an explicit `aria-invalid`, and `name` / `disabled` /
  * `required` from the Field unless given. Everything else passes through, including `onChange`
  * / `value` for a controlled input; the Field's listeners are native and run independently.
  *
- * Owned keys (conventions 1.2): `id`, `name`, `disabled`, `required`, `aria-invalid`,
- * `aria-describedby` (token-merged), `data-invalid`, `data-disabled`, `data-required`,
- * `data-pending`.
+ * Owned keys inside a Field (conventions 1.2): `id`, `name`, `disabled`, `required`,
+ * `aria-invalid`, `aria-describedby` (token-merged), `data-invalid`, `data-disabled`,
+ * `data-required`, `data-pending`.
+ *
+ * Outside a `Field.Root` it is the plain native control: every prop passes through (`id`
+ * included), the library adds no attribute, and the function props receive a state that is
+ * never invalid or pending, with `disabled` / `required` from the own props.
  *
  * @see https://ui.funstack.work/components/field
  */
 export function FieldControl({
+  id: consumerId,
   name,
   disabled,
   required,
   className,
   style,
   render,
-  ...rest
+  ...props
 }: FieldControlProps) {
-  const ctx = useFieldContext("Field.Control");
-  // `id` is not in the props type (the Field owns it); a JS caller's is ignored with a warning.
-  const { id: consumerId, ...props } = rest as typeof rest & { id?: string };
+  const ctx = use(FieldContext);
   const field = useFieldControl({
     labelable: true,
     name,
@@ -96,19 +130,24 @@ export function FieldControl({
   return useRender<ComponentPropsWithRef<"input">, FieldState>({
     defaultElement: "input",
     render,
-    state: ctx.state,
+    state: ctx === null ? standaloneState(disabled, required) : ctx.state,
     className,
     style,
     children: undefined,
-    props,
-    libraryProps: {
-      id: field.id,
-      name: field.name,
-      disabled: field.disabled,
-      required: field.required,
-      ...field.attributes,
-      ...fieldDataAttributes(ctx.state),
-    },
+    // Outside a Field the own props are ordinary pass-through: a `render` element's own `id` /
+    // `disabled` / `required` win over them, as for any pass-through prop (conventions 1.2).
+    props: ctx === null ? { ...props, id: consumerId, name, disabled, required } : props,
+    libraryProps:
+      ctx === null
+        ? undefined
+        : {
+            id: field.id,
+            name: field.name,
+            disabled: field.disabled,
+            required: field.required,
+            ...field.attributes,
+            ...fieldDataAttributes(ctx.state),
+          },
     ref,
   });
 }

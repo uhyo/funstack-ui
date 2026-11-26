@@ -189,6 +189,7 @@ type PublicProps = {
   SelectSeparatorProps: UI.SelectSeparatorProps;
   SelectTriggerProps: UI.SelectTriggerProps;
   SelectValueProps: UI.SelectValueProps;
+  SeparatorProps: UI.SeparatorProps;
   SliderIndicatorProps: UI.SliderIndicatorProps;
   SliderLabelProps: UI.SliderLabelProps;
   SliderRootProps: UI.SliderRootProps;
@@ -325,6 +326,7 @@ const listedKeys = {
   SelectSeparatorProps: true,
   SelectTriggerProps: true,
   SelectValueProps: true,
+  SeparatorProps: true,
   SliderIndicatorProps: true,
   SliderLabelProps: true,
   SliderRootProps: true,

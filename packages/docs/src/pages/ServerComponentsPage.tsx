@@ -51,7 +51,10 @@ export function Settings() {
         and <a href="/components/meter">Meter</a>: their Roots have no <code>"use client"</code>{" "}
         (they only compute, then render a context provider created in a client module), so a Server
         Component renders the Root on the server, may pass it function props, and only the small
-        context module and the parts reach the browser.
+        context module and the parts reach the browser.{" "}
+        <a href="/components/separator">Separator</a> is directive-free too and reads no context at
+        all: rendered by a Server Component, it runs on the server, function props included, and
+        sends no code to the browser.
       </p>
       <p>
         A framework that renders several server payloads into one page must give each its own{" "}

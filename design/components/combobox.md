@@ -150,7 +150,8 @@ Why this shape:
 - **`Clear` exists** because "clear the selection" has no keyboard-free spelling otherwise
   (Escape closes; it does not clear, section 8), and prior art agrees (Base UI, Ark).
 - **No `Separator`** in v1: `role="separator"` is not in a listbox's content model; a visual
-  divider is a `Group` boundary styled in CSS.
+  divider is a `Group` boundary styled in CSS, or the standalone `<Separator decorative />`
+  (`role="none"`, which a listbox allows; `design/components/separator.md` 4).
 
 Every part renders exactly one element; only `Popup` renders a `<ViewTransition>` (decision 13),
 as the outermost node around the `<div popover>` and only when `transition` is given.

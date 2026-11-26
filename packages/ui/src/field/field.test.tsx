@@ -703,10 +703,160 @@ describe("Field: development warnings", () => {
     expect(twoErrors.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("parts outside a Field.Root throw", () => {
+  it("parts outside a Field.Root throw, except Field.Control", () => {
     silenceErrors();
     expect(() => render(<Field.Label>x</Field.Label>)).toThrow(
       "Field.Label must be rendered inside a Field.Root.",
     );
+    expect(() => render(<Field.Description>x</Field.Description>)).toThrow(
+      "Field.Description must be rendered inside a Field.Root.",
+    );
+    expect(() => render(<Field.Error />)).toThrow(
+      "Field.Error must be rendered inside a Field.Root.",
+    );
+    expect(() => render(<Field.Control aria-label="q" />)).not.toThrow();
+  });
+});
+
+describe("Field.Control outside a Field.Root (design 4.3)", () => {
+  it("renders the plain control: own id, name, disabled, required; no library attribute", () => {
+    const error = silenceErrors();
+    render(
+      <>
+        <label htmlFor="q">Search</label>
+        <Field.Control
+          id="q"
+          name="query"
+          type="search"
+          required
+          disabled
+          aria-describedby="hint"
+          data-testid="c"
+        />
+        <p id="hint">Hint</p>
+      </>,
+    );
+    const control = screen.getByTestId("c") as HTMLInputElement;
+    expect(control.tagName).toBe("INPUT");
+    expect(control).toHaveAttribute("id", "q");
+    expect(control).toHaveAttribute("name", "query");
+    expect(control).toHaveAttribute("type", "search");
+    expect(control).toBeRequired();
+    expect(control).toBeDisabled();
+    expect(screen.getByLabelText("Search")).toBe(control);
+    // The consumer's tokens only; no explicit aria-invalid, no data-* state.
+    expect(control).toHaveAttribute("aria-describedby", "hint");
+    expect(control).not.toHaveAttribute("aria-invalid");
+    for (const attr of ["data-invalid", "data-disabled", "data-required", "data-pending"]) {
+      expect(control).not.toHaveAttribute(attr);
+    }
+    // No `id` warning outside a Field.
+    expect(error.mock.calls.some((c) => String(c[0]).includes("`id` prop is ignored"))).toBe(false);
+  });
+
+  it("function props receive own disabled / required; never invalid or pending; no data-*", () => {
+    const seen: FieldState[] = [];
+    const className = (s: FieldState) => {
+      seen.push(s);
+      return s.disabled ? "off" : "on";
+    };
+    const { rerender } = render(
+      <Field.Control
+        aria-label="q"
+        required
+        disabled
+        className={className}
+        style={(s) => (s.invalid ? { color: "red" } : { color: "blue" })}
+        data-testid="c"
+      />,
+    );
+    const control = screen.getByTestId("c");
+    // The same styled input reads the same state inside a Field and alone.
+    expect(control).toHaveClass("off");
+    expect(control.style.color).toBe("blue");
+    expect(seen.at(-1)).toEqual({
+      invalid: false,
+      messages: [],
+      validity: expect.objectContaining({ valid: true, valueMissing: false }),
+      disabled: true,
+      required: true,
+      pending: false,
+    });
+    expect(control).not.toHaveAttribute("data-disabled");
+    expect(control).not.toHaveAttribute("data-required");
+    rerender(<Field.Control aria-label="q" className={className} data-testid="c" />);
+    expect(control).toHaveClass("on");
+    expect(seen.at(-1)).toMatchObject({ disabled: false, required: false });
+    // Frozen constants: the same object for the same combination.
+    rerender(
+      <Field.Control aria-label="q" disabled={false} className={className} data-testid="c" />,
+    );
+    expect(seen.at(-1)).toBe(seen.at(-2));
+    // Inside a Field the same props give the same `disabled` / `required`.
+    rerender(
+      <Field.Root name="q">
+        <Field.Control required disabled className={className} data-testid="c" />
+      </Field.Root>,
+    );
+    expect(seen.at(-1)).toMatchObject({ disabled: true, required: true });
+  });
+
+  it("render={<textarea />}: a textarea with its own props; a ref reaches the element", () => {
+    const ref = { current: null as HTMLInputElement | null };
+    render(<Field.Control aria-label="Notes" ref={ref} render={<textarea rows={4} />} />);
+    const textarea = screen.getByRole("textbox", { name: "Notes" });
+    expect(textarea.tagName).toBe("TEXTAREA");
+    expect(textarea).toHaveAttribute("rows", "4");
+    expect(ref.current).toBe(textarea);
+  });
+
+  it("is a native, uncontrolled or controlled input; inside a form it submits by its name", async () => {
+    const user = setupUser();
+    function Controlled() {
+      const [value, setValue] = useState("");
+      return (
+        <>
+          <Field.Control aria-label="c" value={value} onChange={(e) => setValue(e.target.value)} />
+          <output data-testid="out">{value}</output>
+        </>
+      );
+    }
+    render(
+      <form data-testid="form">
+        <Field.Control aria-label="u" name="u" defaultValue="x" />
+        <Controlled />
+      </form>,
+    );
+    await user.type(screen.getByLabelText("c"), "ab");
+    expect(screen.getByTestId("out")).toHaveTextContent("ab");
+    const data = new FormData(screen.getByTestId("form") as HTMLFormElement);
+    expect(data.get("u")).toBe("x");
+  });
+
+  it("a render element's own id and disabled win over the pass-through props", () => {
+    render(
+      <Field.Control
+        id="part"
+        disabled={false}
+        render={<input id="el" disabled aria-label="x" />}
+      />,
+    );
+    const control = screen.getByLabelText("x");
+    expect(control).toHaveAttribute("id", "el");
+    expect(control).toBeDisabled();
+  });
+
+  it("inside a Field.Root the id prop is still ignored with a warning", async () => {
+    const error = silenceErrors();
+    render(
+      <Field.Root name="n">
+        <Field.Label>N</Field.Label>
+        <Field.Control id="mine" data-testid="c" />
+      </Field.Root>,
+    );
+    await flushMicrotasks();
+    expect(screen.getByTestId("c").id).not.toBe("mine");
+    expect(screen.getByLabelText("N")).toBe(screen.getByTestId("c"));
+    expect(error.mock.calls.some((c) => String(c[0]).includes("`id` prop is ignored"))).toBe(true);
   });
 });

@@ -251,7 +251,8 @@ export function NumberFieldPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Disables both inputs (not submitted) and the buttons.",
+            description:
+              "Disables both inputs (not submitted) and the buttons. An ancestor `<fieldset disabled>` does the same (the buttons ignore the pointer too), but `data-disabled` and `state.disabled` stay this prop's.",
           },
           {
             name: "readOnly",

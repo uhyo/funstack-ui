@@ -26,6 +26,9 @@ export type {
   ToggleGroupItemState,
 } from "./toggle-group/index.js";
 
+export { Separator } from "./separator/index.js";
+export type { SeparatorProps, SeparatorState, SeparatorOrientation } from "./separator/index.js";
+
 export { Toolbar } from "./toolbar/index.js";
 export type {
   ToolbarRootProps,
