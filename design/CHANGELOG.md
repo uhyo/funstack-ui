@@ -13569,3 +13569,95 @@ behaviour change. Sections changed: conventions 7.3 (new paragraph), dialog.md 3
   natively, then the same click after hydration running the action and closing.
 - **Docs.** Dialog and Popover pages (the `action` rows, the owned keys, before hydration), the
   roadmap's behaviour changes, the agent skill.
+
+## 2026-11-26, #168: drawer.md, the Drawer design (proposed)
+
+Architect, for the product owner and the user; part of #162 (wave 25). New document:
+`design/components/drawer.md`. Not implemented, and no conventions rule changes. Notes:
+`memo/architect/drawer-notes.md`.
+
+A correction to the issue first: **Toast has no swipe.** #162 and #168 say "Toast already has
+Pointer Events swipe"; toast.md 9.2 defers it and only reserves `swipeDirection`, and no file
+under `packages/ui/src` tracks a swipe. So there is no code to share in that direction. The
+design turns it around: the swipe tracker is written as a flat `internal/` module that knows
+nothing of dialogs, so Toast can use it when its swipe is built.
+
+What the document proposes:
+
+- A separate namespace `Drawer` at `@funstack/ui/drawer` (`Root`, `Trigger`, `Popup`, `Title`,
+  `Description`, `Close`, `Form`), every part a caller of the Dialog part hooks, as
+  AlertDialog. Chosen over props on `Dialog.Popup` because the defaults are the component and
+  because, in an unbundled build, a prop would make every Dialog import the gesture.
+- `side` on the Popup with the `AnchorSide` vocabulary of conventions 13.1 (`inline-start` /
+  `inline-end`, not `start` / `end`), default `"bottom"`, rendered as `data-side` (a prop
+  echo). The library places nothing.
+- `modal` kept (default `true`). `lightDismiss` defaults to `modal`.
+- `swipeDismiss` (default `true`): Pointer Events for mouse, pen and touch; 6 px slop with an
+  axis check; close at 25% of the extent or 0.5 px/ms over the last 100 ms, return on a
+  reversal. Constants, no props.
+- The swipe close is a **fact**: the library slides the drawer out with the consumer's CSS
+  transition, then calls `requestClose()`, and Dialog's existing fact path reports
+  `onOpenChange(false, { reason: "dismiss", event: pointerup })`. It is `lightDismiss` with
+  another gesture. No new `reason`.
+- The drag is `data-swiping` plus `--drawer-swipe-x` / `-y` / `-progress` written through the
+  DOM; the consumer's `translate` uses them; `::backdrop` inherits them.
+- Scroll: a press inside a scroll container along the drawer's axis is the scroller's; the
+  Popup renders an inline `touch-action` for the cross axis. A top / bottom drawer scrolls in a
+  child.
+- Own transition types `fsui-drawer*`.
+- Not in v1: snap points, the pull from a scrolled-to-top body, swipe to open, threshold
+  props, virtual keyboard handling, parent and background scaling.
+
+Platform facts checked on 2026-11-26 (BCD 8.1.11; stable Chrome 158, Firefox 161, Safari 27.2):
+
+- `transition-behavior` is still partial in Firefox: `display` does not transition, so a
+  `<dialog>` has no CSS exit there. This is why the swipe's release is animated before the
+  close and not by the CSS exit.
+- `touch-action: pan-up` / `pan-down` / `pan-left` / `pan-right`: Chrome 55, not in Firefox,
+  not in Safari. So the scroll-edge hand-off cannot be declared in CSS.
+- `::backdrop` inherits from its originating element: Chrome 122, Firefox 120, Safari 17.4.
+- `closedby`: Chrome 134, Firefox 141, Safari 27.3 (not yet stable).
+- `overscroll-behavior` in Safari: no effect on a scroll container without scrollable
+  overflow. `scrollsnapchange` and `scroll-initial-target`: Chromium only (the reason a
+  scroll-snap sheet was not taken, see the notes).
+
+Prior art read the same day: Base UI Drawer 1.9.0 (docs and the published source: Pointer
+Events for the drag, plus Touch Events with a non-passive `touchmove` for the scroll edge;
+fast swipe 0.5 px/ms, release velocity over 80 ms, reverse cancel 10 px), Ark UI Drawer
+(`closeThreshold` 0.25, `swipeVelocityThreshold` 700, `preventDragOnScroll`), vaul
+(`CLOSE_THRESHOLD` 0.25, `VELOCITY_THRESHOLD` 0.4, a 500 ms no-drag window after open, an
+ancestor walk for `scrollTop`), React Aria `Sheet` (`position`, `swipeDirection`,
+`snapPoints`, `preventDismissal`; it is a component, not only an example).
+
+Open decisions for the user (recommendation first):
+
+1. **Separate namespace** (recommended), or `side` / `swipeDismiss` on `Dialog.Popup`.
+2. **The release: the library finishes the slide, then the browser closes** (recommended;
+   animates in Firefox), or `requestClose()` at the release and the CSS exit does the rest
+   (less code, but the drawer vanishes under the finger in Firefox). Either way the close is a
+   fact; making it a request would hold a drawer the user has thrown away.
+3. **Scroll versus drag in v1: regions through `touch-action`** (recommended), or also the
+   pull from a scrolled-to-top body through a non-passive `touchmove` (the phone idiom; Touch
+   Events, per-engine probes on real hardware, a much larger module).
+4. **Snap points not in v1** (recommended), or in v1.
+5. **`lightDismiss` defaults to `modal`** (recommended), or Dialog's `false`.
+6. **Own transition types `fsui-drawer*`** (recommended), or Dialog's, as AlertDialog.
+7. **`inline-start` / `inline-end`** (recommended; conventions 13.1), or `start` / `end` as
+   the task sketched.
+8. **Mouse and pen swipe too** (recommended; testable in three engines), or touch only.
+9. **No parent scaling and no background scaling** (recommended; CSS recipes), or a
+   `--nested-drawers` style count and an `Indent` part.
+10. **Fixed thresholds** (recommended), or props (`swipeThreshold`, `swipeVelocity`).
+
+Not verified; to check at implementation:
+
+- A touch pan inside a child scroll container scrolls it although the Popup has
+  `touch-action: pan-x`, and a vertical touch drag outside it keeps delivering pointer events,
+  in the three engines (iOS Safari on hardware).
+- No `click` is synthesised on the element a touch drag started on.
+- `exitAnimations` lists the `translate` transition a custom-property write starts.
+- After the slide, the CSS exit in Chromium and Safari shows no jump.
+- A top-layer inner dialog is not scaled by `scale` on the outer Popup (the recipe of 8.2).
+- A view transition that starts during a drag: which engines cancel the pointer.
+- Playwright mouse drags with pointer capture on a top-layer dialog in Firefox and WebKit.
+- Logical insets on a top-layer dialog follow the dialog's own `direction` (section 2).
