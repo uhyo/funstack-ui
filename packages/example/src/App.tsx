@@ -4,6 +4,7 @@ import { ButtonDemo } from "./button-demo.js";
 import { ToggleDemo } from "./toggle-demo.js";
 import { TabsDemo } from "./tabs-demo.js";
 import { TooltipDemo } from "./tooltip-demo.js";
+import { HoverCardDemo } from "./hover-card-demo.js";
 import { SwitchCheckboxDemo } from "./switch-checkbox-demo.js";
 import { DialogDemo } from "./dialog-demo.js";
 import { PopoverDemo } from "./popover-demo.js";
@@ -35,6 +36,7 @@ export function App() {
       <AccordionDemo />
       <CollapsibleDemo />
       <TooltipDemo />
+      <HoverCardDemo />
       <PopoverDemo />
       <DialogDemo />
       <MenuDemo />
