@@ -683,6 +683,37 @@ pass-through: `type`, `defaultValue`, `value` / `onChange` for a controlled inpu
 are native (`addEventListener` through the ref, section 14), so no `on*` prop is omitted and the
 consumer's `onInput` / `onBlur` run independently.
 
+**There is no `Input` and no `Textarea` part** (#169). A text control has no library state
+outside a Field: its text is the browser's, typing is free, and the request is the form's
+submission, which `Form.Root` already runs. So:
+
+- **Outside a Field the control is the native element**: `<input aria-label="Search">`,
+  `<textarea>`. A part there would render the same element and add nothing (the rule conventions
+  7.3 applies to the directive-free form controls).
+- **A textarea is `Field.Control render={<textarea />}`**; textarea-only props (`rows`, `wrap`)
+  and a `ref` typed for the textarea go on the `render` element. It grows with its content
+  through `field-sizing: content` in the consumer's CSS (6.2), which is why there is no
+  `autoSize` prop.
+- **No `valueChangeAction` on text.** The text of an input is a fact, not a request (vision,
+  principle 3; conventions 2.6): it cannot be held, and rolling it back on a rejection would
+  delete what the user typed. A controlled input is the native `value` / `onChange`, passed
+  through. What the text drives (a search, a filter) leaves the urgent lane in the consumer's
+  code (`useDeferredValue`, or Combobox when the result is a list of options).
+- **No commit action in this part.** "Save this text when the user is done with it" (blur or
+  Enter, `data-pending` on the input, a rule for a rejected save) is a component of its own
+  with NumberField's draft-and-commit model, not a prop of `Field.Control`. Section 12.
+
+**Proposed (#169), not implemented: `Field.Control` outside a `Field.Root`.** Today it throws.
+Every FUNSTACK form control works both inside and outside a Field (`useFieldControl` returns
+nothing to merge outside, 7.1); `Field.Control` is the one exception, and the cost falls on a
+consumer's own styled input built on it, which then cannot be used for a search box or a table
+cell without a wrapping `Field.Root`. The proposal: outside a Field it renders the plain
+control (no `id`, `aria-invalid`, `aria-describedby` or `data-*` from the library; function
+props receive a constant all-`false`, `valid` `FieldState`), and `id` joins the props type
+(inside a Field it stays owned: ignored with the existing warning). The other Field parts keep
+throwing: a Label, Description or Error outside a Field is a mistake, a control is not. The
+docs keep recommending the native element for a direct call site.
+
 ### 4.4 `Form.Root`
 
 ```ts
@@ -1028,6 +1059,58 @@ transition is entangled with it (conventions 2.3 item 5), as everywhere. "Submit
 intercept like a click (`requestSubmit()` fires `submit`; `submit()` never does and must not be
 used, research §1).
 
+### 7.4 Fields in a native `<fieldset>`
+
+**There is no `Fieldset` part** (#169). A set of Fields with a common caption is the native
+element, which already does the three jobs a part would have:
+
+```tsx
+<fieldset disabled={!canEdit} aria-describedby="address-hint">
+  <legend>Shipping address</legend>
+  <p id="address-hint">Used for this order only.</p>
+  <Field.Root name="street"><Field.Label>Street</Field.Label><Field.Control required /><Field.Error /></Field.Root>
+  <Field.Root name="city"><Field.Label>City</Field.Label><Field.Control required /><Field.Error /></Field.Root>
+</fieldset>
+```
+
+- **Naming and description.** `<legend>` names the `group`; `aria-describedby` describes it.
+  Screen readers read both when focus enters the group, before the control's own label.
+- **`disabled`.** `<fieldset disabled>` disables every native control inside it, which is
+  every FUNSTACK form control's own element (`Field.Control`, Checkbox, Switch, the radios, the
+  `<select>`, a Thumb's range input, NumberField's two inputs, the Combobox Input, MultiSelect's
+  Trigger, any `Button`). The platform then excludes them from the `FormData`, bars them from
+  constraint validation (a `validate` result on one does not block the submission) and skips
+  them in the Tab order.
+- **Errors stay per Field.** There is no group-level validity: a rule over several controls is
+  one Field's `validate`, which receives the whole `FormData` (4.1), and a server error is keyed
+  by one field's `name` (3.3). A message that belongs to no control is the consumer's element,
+  referenced from the fieldset's `aria-describedby`.
+
+What the library's state does **not** see: `disabled` inherited from a fieldset is a platform
+fact, so `data-disabled` and `state.disabled` stay the props' (conventions 3.6, as RadioGroup
+and CheckboxGroup already document for their Items). Style inheritance with the platform's
+selector, which covers both sources:
+
+```css
+.field:has(.control:disabled) { opacity: .5; }   /* Field.Root disabled, or an ancestor fieldset */
+```
+
+Rules that follow:
+
+- **A group control is its own fieldset.** `RadioGroup.Root` and `CheckboxGroup.Root` render
+  the `<fieldset>` and their `Label` the `<legend>`; do not wrap one in another fieldset to
+  caption it. Nesting is for a real outer group (an address fieldset that contains a RadioGroup).
+- **`Field.Root` is not a fieldset** and does not become one (section 1).
+- **Do not disable a fieldset while a submission is pending.** `<fieldset disabled={pending}>`
+  drops focus from the control the user is on (conventions 3.6); mark pending with
+  `form[data-pending]` (6.2).
+- **Proposed (#169), not implemented: a part's pointer surface honours inherited `disabled`.**
+  Where a part handles a pointer on an element that is not the native control (`Slider.Track`,
+  a Thumb's styled `span`), it reads only the Root's or the Field's `disabled` today, so a drag
+  inside `<fieldset disabled>` would still dispatch for an input the browser has disabled. The
+  rule to add to conventions 3.6: such a handler also bails when the part's native control
+  matches `:disabled`. Found by reading the Slider code, not yet reproduced in a browser.
+
 ---
 
 ## 8. Server rendering, progressive enhancement, before hydration
@@ -1331,10 +1414,28 @@ default and mention the summary as the alternative.)
 <Form.Submit render={<MyButton variant="primary" />} className="data-pending:opacity-60">Save</Form.Submit>
 ```
 
+### 11.8 A search box (no Field)
+
+```tsx
+// No label element, no description, no validation: nothing for a Field to wire. The native
+// element is the control; the query leaves the urgent lane through useDeferredValue.
+const [query, setQuery] = useState("");
+const deferredQuery = useDeferredValue(query);
+
+<input type="search" aria-label="Search issues" value={query} onChange={(e) => setQuery(e.target.value)} />
+<Suspense fallback={<Spinner />}>
+  <Results query={deferredQuery} />            {/* stale results stay while the new ones load */}
+</Suspense>
+```
+
 ---
 
 ## 12. Not in v1
 
+- A `Fieldset` / `Legend` part (7.4) and `Input` / `Textarea` parts (4.3): the native elements.
+- A text field with a **commit action** (save on blur or Enter, with `data-pending` and a rule
+  for a rejected save; Ark UI's `Editable` is the nearest prior art): a separate component if it
+  is built, with NumberField's draft-and-commit model. Not a prop of `Field.Control`.
 - Async or debounced `validate` (Base UI's `validationDebounceTime`): a v2 question once a demo
   needs a uniqueness check before submit; the sync slot and the server channel cover it today.
 - `Field.Root invalid` / `error` overrides (Base UI's `invalid`, React Aria's `isInvalid` +

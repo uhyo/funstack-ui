@@ -13206,3 +13206,74 @@ Implementation notes (not rules):
   function read in the layout effect (the Status's ref count): render state missed a Status
   that registered in the open commit itself.
 - `use-multiple-selection.ts` casts the component's extra fields, not the whole details.
+## 2026-11-26, #169: small parts, Separator / Fieldset / Input / Textarea (proposed)
+
+Architect, wave 24 (#162). Nothing here is accepted by the user or implemented. New document
+`design/components/separator.md` (status proposed). `design/components/field-form.md` gained
+paragraphs in 4.3 (no `Input` / `Textarea`; a proposal for `Field.Control` outside a Field),
+7.4 (the native `<fieldset>`; a proposal for inherited `disabled` on pointer surfaces), 11.8
+and two lines in 12. No conventions rule changed. Notes: `memo/architect/small-parts-notes.md`.
+
+Per part:
+
+- **Separator: build, as the smallest part.** A single-element `Separator` (`<hr>`,
+  `orientation`, `decorative`, `data-orientation`), directive-free, so a Server Component.
+  Its value over a bare `<hr>` is the vertical case (`aria-orientation` plus a styling hook),
+  the decorative case (`role="none"`, and no `aria-orientation`, which would be invalid there)
+  and a name; the document says so plainly. `Toolbar.Separator`, `Menu.Separator` and
+  `Select.Separator` stay as they are: the first needs context (a client module), the other
+  two are a bare `<hr>` in a content model that allows it, and a shared helper would be
+  longer than the three render calls. Combobox and MultiSelect get no `Separator` part; a
+  `role="none"` line is valid inside a listbox, so `<Separator decorative />` is the spelling.
+- **Fieldset: do not build.** `<fieldset>` / `<legend>` already name the group, describe it
+  and disable every native control inside, and every FUNSTACK form control has a native
+  element. A part could add only one thing: a context that copies `disabled` into every
+  control's `data-disabled` / `state.disabled` (Headless UI's design). That means a context
+  read in every control for a state `:disabled` already selects. Group-level errors would be a
+  third validity channel, which field-form 12 already declines. RadioGroup and CheckboxGroup
+  are fieldsets themselves. The pattern is field-form 7.4.
+- **Input / Textarea: do not build.** Outside a Field a text control has no library state, so
+  the part would be the native element under another name. The Async React candidates were
+  checked one by one: a per-keystroke `valueChangeAction` contradicts the request / fact
+  contract (text cannot be held or rolled back; conventions 2.6); a controlled input is native
+  `value` / `onChange`; `field-sizing: content` is one line of consumer CSS in all three
+  engines; pending for a form is `Form.Root`'s. The one real candidate is a **commit action**
+  (save on blur or Enter with `data-pending`), which is NumberField's draft-and-commit model
+  applied to text. It needs decisions of its own (what a rejected save does to the text, Enter
+  in a textarea, Escape) and is a component, not a prop: recorded in field-form 12 and as open
+  decision 4.
+
+Open decisions for the user:
+
+1. **Separator: build or recipe.** (a) Build the part as designed (recommended). (b) Build
+   nothing; a docs recipe with `<hr>`, `aria-orientation` and `role="none"`.
+2. **`Field.Control` outside a `Field.Root`.** (a) Render the plain control instead of
+   throwing, and accept `id` (recommended: every other control works in both places, and a
+   consumer's styled input built on `Field.Control` needs it). (b) Keep the throw. (c) Add
+   `Input` and `Textarea` exports as the same thing under a standalone name, `Textarea` typed
+   for the element (Base UI's shape): better types for a textarea, two names for one part.
+3. **Inherited `disabled` on pointer surfaces** (field-form 7.4): (a) add the conventions 3.6
+   rule and fix `Slider.Track` / `Slider.Thumb` after reproducing it in a browser
+   (recommended; a GitHub issue in this repository). (b) Document that `Slider.Root disabled`
+   must be set as well.
+4. **A commit-action text field.** (a) Not now; open an issue and research prior art first
+   (recommended). (b) Design it in this wave. (c) Never; consumers write the transition.
+5. **A `Fieldset` part after all.** (a) No (recommended). (b) `Fieldset.Root` /
+   `Fieldset.Legend` with a `disabled` context every control reads.
+
+To do when decided (registry rows, not rule changes):
+
+- Separator: conventions 1.1 part vocabulary (`Separator` row: the standalone part with
+  `orientation` / `decorative`), 7.1 (a third directive-free component file), 9.2 (the
+  `@funstack/ui/separator` subpath); combobox.md and multi-select.md "no `Separator`" lines
+  point at `<Separator decorative />`; a docs page.
+- Decision 2: field-form 4.3 loses "Proposed", section 1's element-constraint paragraph and
+  the `Control` row of conventions 1.1 say "inside a Field or alone".
+- Decision 3: one sentence in conventions 3.6 and a row in the Slider tests.
+
+Test plan for Separator (jsdom): default renders `hr` with `aria-orientation="horizontal"` and
+`data-orientation`; `orientation="vertical"`; `decorative` renders `role="none"` and no
+`aria-orientation`, and wins over a `render` element's role; a `render` element's
+`role="separator"` survives when not decorative; function `className` / `style` / `render`
+receive `{ orientation, decorative }`; `ref`; the Directive row (no `"use client"`); a server
+render from a Server Component with a function `className`.
