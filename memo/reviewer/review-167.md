@@ -63,3 +63,42 @@ L6 Docs example AlertDialogDeleteProject.tsx: success unmounts the Root, focus d
 - Ref writes autofocus on client render: needed (React does not write it); fine.
 - autoFocus only on an enabled Cancel: matches "first enabled"; engines skip disabled anyway.
 - Docs example cannot call a Server Function on a static site: acceptable, code block shows it.
+
+## Follow-up: ee08bd92..35c1d668 (5cc855e2 review fixes, 35c1d668 #182)
+
+Verdict: merge. jsdom 4463/4463; Chromium + Firefox for alert-dialog/dialog/popover 268 pass,
+10 skipped; the developer's CI run green on all three engines.
+
+Findings fixed:
+- M1: option (a) taken; walkthrough 4, docs Callout and skill now say the Cancel click shows
+  nothing and point at the 9.3 recipe; option (b) recorded as a separate issue. OK.
+- L1: autoFocus prop only in the server / hydration render (useHydratedMount server snapshot);
+  the ref writes the attribute always. Client mounts and remounts take no focus; tests for two
+  Cancels, a key remount, and hydration followed by a re-render. OK (design 3.4 amended).
+- L2: useShownDescriptionWarning in use-name-warning.ts, a no-op in production, added to the
+  production-bundle DEV_CALLEES. OK.
+- L3: role?: "alertdialog". L4: skill lists the AlertDialog parts. L5: rejection after Escape
+  -> reportError test. L6: Restore button autoFocus. All OK.
+
+New description-warning timing: armed on the dialog's `toggle` (open), MutationObserver until
+a describedby target exists, logged at the first `close` if never found. It does not warn
+falsely when the content unmounts before `close`: a Description seen at the open, or any time
+during the showing, sets done. Dialog `toggle` events: Chrome 132, Firefox 133, Safari 26 (BCD),
+within the latest-stable policy. Notes, not blocking:
+- N1 (use-name-warning.ts, effect deps [element, message]): listeners are attached once to the
+  element seen at mount; a remounted <dialog> (#159, a `transition` change) is not observed.
+  Dev only.
+- N2: a JS-free alert dialog that is never closed (navigation while open) never warns; accepted
+  by the "end of the first showing" rule.
+
+#182: correct and complete.
+- useOverlayClose now derives nativeCommand from `action === undefined`, so Dialog.Close,
+  Popover.Close, AlertDialog.Cancel and AlertDialog.Action all follow; nativeCommand option
+  gone. A source search finds no other part rendering commandfor/command for closing (Menu.Item and
+  Toast.Action render none; Button with a consumer `command` stays the consumer's markup).
+- Library mode loses nothing: the click was already cancelled there, so the command never ran.
+- Shared suite overlay-close-part-suite.tsx adds markup rows for both modes and a
+  pre-hydration click test (action Close does nothing, plain Close closes natively) for every
+  part that uses it; the one Popover test edit is the intended change.
+- Conventions 7.3 rule, dialog.md / popover.md, Dialog and Popover pages, Roadmap (breaking
+  note, [command] selectors), skill, CHANGELOG entry, `fix(ui)!` commit: all present.
