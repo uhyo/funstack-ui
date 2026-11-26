@@ -1,0 +1,57 @@
+Chromium 156.0.8078.4
+
+== popover="hint"
+AX closed  inv: link name="@user" desc="" {"focusable":true,"url":"about:blank#u"}
+AX closed card: none name="" desc="" {}
+focus inv +800ms: { open: true, focus: 'inv', log: [ 'interest', 'card:open' ] }
+AX open    inv: link name="@user" desc="" {"focusable":true,"focused":true,"url":"about:blank#u"}
+AX open   card: group name="" desc="" {}
+Tab: { open: true, focus: 'cardLink', log: [] }
+Tab: { open: true, focus: 'follow', log: [] }
+Shift+Tab x2 (back to inv): { open: true, focus: 'inv', log: [] }
+Escape: { open: false, focus: 'inv', log: [ 'loseinterest', 'card:closed' ] }
+Tab away + back after Escape: { open: true, focus: 'inv', log: [ 'interest', 'card:open' ] }
+focus leaves card to #after: { open: false, focus: 'after', log: [ 'loseinterest', 'card:closed' ] }
+hover inv +800ms: { open: true, focus: 'after', log: [ 'interest', 'card:open' ] }
+pointer into card +800ms: { open: true, focus: 'after', log: [] }
+pointer leaves +800ms: { open: false, focus: 'after', log: [ 'loseinterest', 'card:closed' ] }
+menu open, hover inv: {
+  open: true,
+  focus: 'menuBtn',
+  log: [ 'menu:open', 'interest', 'card:open' ]
+}
+click select in card: {
+  open: true,
+  focus: 'OPTION',
+  log: [ 'interest', 'card:open' ],
+  pickerOpen: true
+}
+
+== popover="auto"
+AX closed  inv: link name="@user" desc="" {"focusable":true,"url":"about:blank#u"}
+AX closed card: none name="" desc="" {}
+focus inv +800ms: { open: true, focus: 'inv', log: [ 'interest', 'card:open' ] }
+AX open    inv: link name="@user" desc="" {"focusable":true,"focused":true,"url":"about:blank#u"}
+AX open   card: group name="" desc="" {}
+Tab: { open: true, focus: 'cardLink', log: [] }
+Tab: { open: true, focus: 'follow', log: [] }
+Shift+Tab x2 (back to inv): { open: true, focus: 'inv', log: [] }
+Escape: { open: false, focus: 'inv', log: [ 'loseinterest', 'card:closed' ] }
+Tab away + back after Escape: { open: true, focus: 'inv', log: [ 'interest', 'card:open' ] }
+focus leaves card to #after: { open: false, focus: 'after', log: [ 'loseinterest', 'card:closed' ] }
+hover inv +800ms: { open: true, focus: 'after', log: [ 'interest', 'card:open' ] }
+pointer into card +800ms: { open: true, focus: 'after', log: [] }
+pointer leaves +800ms: { open: false, focus: 'after', log: [ 'loseinterest', 'card:closed' ] }
+menu open, hover inv: {
+  open: true,
+  focus: 'menuBtn',
+  log: [ 'menu:open', 'interest', 'menu:closed', 'card:open' ]
+}
+click select in card: {
+  open: true,
+  focus: 'OPTION',
+  log: [ 'interest', 'card:open' ],
+  pickerOpen: true
+}
+firefox 157.0 { interestForElement: false, hint: 'hint', baseSelect: false }
+webkit launch failed browserType.launch: 

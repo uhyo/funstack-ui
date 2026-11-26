@@ -1,0 +1,52 @@
+Chromium 156.0.8078.4
+
+== plain (open=true)
+   generic "" 
+   button "first" invalid=false
+   link "@user" desc="Ada Lovelace, mathematician" focused=true
+   link "mid" 
+   group "" 
+   link "last" 
+   Tab order after inv: mid > last > BODY > first | card open: true
+
+== rich (open=true)
+   generic "" 
+   button "first" invalid=false
+   link "@user" focused=true details=
+   link "mid" 
+   group "" 
+   link "last" 
+   heading "Ada" 
+   link "Profile" 
+   Tab order after inv: cardLink > mid > last > BODY | card open: true
+
+== richFar (open=true)
+   generic "" 
+   button "first" invalid=false
+   link "@user" focused=true details=
+   link "mid" 
+   link "mid2" 
+   link "last" 
+   group "" 
+   link "Profile" 
+   Tab order after inv: cardLink > mid > mid2 > last | card open: true
+
+== richButton (open=true)
+   generic "" 
+   button "first" invalid=false
+   button "@user" invalid=false focused=true details=
+   link "mid" 
+   group "" 
+   link "last" 
+   link "Profile" 
+   Tab order after inv: cardLink > mid > last > BODY | card open: true
+
+== richExplicit (open=true)
+   generic "" 
+   button "first" invalid=false
+   link "@user" desc="Ada" focused=true describedby=card details=
+   link "mid" 
+   dialog "Ada" modal=false
+   link "last" 
+   link "Profile" 
+   Tab order after inv: cardLink > mid > last > BODY | card open: true

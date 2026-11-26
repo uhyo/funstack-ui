@@ -1,0 +1,28 @@
+
+### chromium 156.0.8078.4
+hint open card while other auto open: {"card":true,"inner":false,"other":true,"focus":"otherBtn","log":["other:open","card:open"]}
+hint click menu button inside card: {"card":true,"inner":true,"other":false,"focus":"menuBtn","log":["other:closed","inner:open"]}
+hint Escape in nested menu: {"card":true,"inner":false,"other":false,"focus":"BODY","log":["inner:closed"]}
+hint Escape with focus in card: {"card":false,"inner":false,"other":false,"focus":"BODY","log":["card:closed"]}
+manual open card while other auto open: {"card":true,"inner":false,"other":true,"focus":"otherBtn","log":["other:open","card:open"]}
+manual click menu button inside card: {"card":true,"inner":true,"other":false,"focus":"menuBtn","log":["other:closed","inner:open"]}
+manual Escape in nested menu: {"card":true,"inner":false,"other":false,"focus":"menuBtn","log":["inner:closed"]}
+manual Escape with focus in card: {"card":true,"inner":false,"other":false,"focus":"menuBtn","log":[]}
+auto open card while other auto open: {"card":true,"inner":false,"other":false,"focus":"otherBtn","log":["other:open","other:closed","card:open"]}
+auto click menu button inside card: {"card":true,"inner":true,"other":false,"focus":"menuBtn","log":["inner:open"]}
+auto Escape in nested menu: {"card":true,"inner":false,"other":false,"focus":"BODY","log":["inner:closed"]}
+auto Escape with focus in card: {"card":false,"inner":false,"other":false,"focus":"otherBtn","log":["card:closed"]}
+
+### firefox 157.0
+hint open card while other auto open: {"card":true,"inner":false,"other":true,"focus":"otherBtn","log":["other:open","card:open"]}
+hint click menu button inside card: {"card":true,"inner":true,"other":false,"focus":"menuBtn","log":["other:closed","inner:open"]}
+hint Escape in nested menu: {"card":true,"inner":false,"other":false,"focus":"BODY","log":["inner:closed"]}
+hint Escape with focus in card: {"card":false,"inner":false,"other":false,"focus":"BODY","log":["card:closed"]}
+manual open card while other auto open: {"card":true,"inner":false,"other":true,"focus":"otherBtn","log":["other:open","card:open"]}
+manual click menu button inside card: {"card":true,"inner":true,"other":false,"focus":"menuBtn","log":["other:closed","inner:open"]}
+manual Escape in nested menu: {"card":true,"inner":false,"other":false,"focus":"menuBtn","log":["inner:closed"]}
+manual Escape with focus in card: {"card":true,"inner":false,"other":false,"focus":"menuBtn","log":[]}
+auto open card while other auto open: {"card":true,"inner":false,"other":false,"focus":"otherBtn","log":["other:open","other:closed","card:open"]}
+auto click menu button inside card: {"card":true,"inner":true,"other":false,"focus":"menuBtn","log":["inner:open"]}
+auto Escape in nested menu: {"card":true,"inner":false,"other":false,"focus":"BODY","log":["inner:closed"]}
+auto Escape with focus in card: {"card":false,"inner":false,"other":false,"focus":"otherBtn","log":["card:closed"]}
