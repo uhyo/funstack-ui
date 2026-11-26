@@ -59,12 +59,14 @@ function Area({ rows, fade = true }: { rows: number; fade?: boolean }) {
 }
 
 const area = () => screen.getByTestId("area");
+/** The two fade lengths, rounded to whole pixels (WebKit interpolates 10px as 9.999999px). */
 const fades = () => {
   const style = getComputedStyle(area());
-  return [
-    style.getPropertyValue("--scroll-fade-start").trim(),
-    style.getPropertyValue("--scroll-fade-end").trim(),
-  ];
+  return ["--scroll-fade-start", "--scroll-fade-end"].map((name) => {
+    const value = style.getPropertyValue(name).trim();
+    if (!value.endsWith("px")) return value;
+    return `${Math.round(Number.parseFloat(value))}px`;
+  });
 };
 
 describe("Scroll areas recipe (browser)", () => {
