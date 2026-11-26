@@ -68,15 +68,18 @@ AX (Chromium CDP): Trigger `combobox`, `expanded` false -> true -> false; listbo
 - `Select.Root multiple`: warns and is **dropped** (not passed to the `<select>`): a
   `<select multiple>` with `value={string}` would be broken React state. Design said "gains a
   development warning"; dropping is recorded in select.md 13 and the CHANGELOG.
-- Trigger owns `onKeyUp` (Space is prevented on keyup too, a guard for the keyup half of a
-  button's activation; not probed without it). Verified in all three engines: Space opens /
-  toggles exactly once.
+- No `onKeyUp` guard (review 3): with only the `keydown` of Space prevented, no engine fires
+  the button's click on `keyup` (Chromium, Firefox locally; WebKit in branch CI run
+  45763695849). The browser row "Space toggles the active option exactly once" asserts three
+  presses, three toggles, no click. `onKeyUp` passes through (composed) and is in the props
+  type.
 - Trigger focuses itself in the click handler only when it is not already focused.
 - Without `name` the reset listener follows the validity element, else the Trigger (a button
   has a form owner).
 - The validity `<select>` has `autocomplete="off"` (no Firefox form-state restoration) and is
   disabled with the Trigger.
-- The anchor name is `--fsui-multi-select-<trigger id, non-word chars replaced>`.
+- The validity element is no longer anchored to the Trigger (review 2): a plain clipped 1px
+  box. The Trigger has the Root's `form` (review 6).
 
 ## Commands
 
@@ -89,3 +92,18 @@ AX (Chromium CDP): Trigger `combobox`, `expanded` false -> true -> false; listbo
 - Screen-reader pass (NVDA, JAWS, VoiceOver) of the toggle under `aria-activedescendant`.
 - WebKit `flip-block` nested in a Popover (302008) not probed.
 - Firefox form-state restoration across a reload not probed (ruled out by `autocomplete="off"`).
+
+## Review fixes (review/165, memo/reviewer/review-165.md)
+
+1. Double report: the Trigger's `invalid` listener returns when `defaultPrevented` (the Field's
+   capture listener runs first at the target and already reported). Browser rows: two invalid
+   Fields, real submit click, focus stays on the first; one Field, no `ariaNotify`.
+2. Anchoring dropped (above).
+3. `onKeyUp` guard dropped (above).
+4. `pendingEdgeRef` cleared by the keyboard's `activate` (all moves) and by the context's
+   `setActive` (Option hover). The new jsdom row exposed a second problem: `loading` was render
+   state, so the open commit (in which the Status registers) still saw `false` and took the edge
+   at once from the options mounted outside the boundary. `loading` is now a function reading
+   the Status ref count.
+5. `...(extra as Extra)` in the literal, `as Details` on the result.
+6. `form: ctx.form` on the Trigger (owned, omitted from the props type).

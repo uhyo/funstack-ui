@@ -13002,3 +13002,32 @@ The points left to verify by the entry above (B.16), as found:
 - WebKit: focus is on the Trigger after a mouse press.
 - Still manual: the screen-reader pass (the toggle under `aria-activedescendant`, the
   Trigger's text as the value); WebKit's `flip-block` nested in a Popover (302008).
+## 2026-11-26, #165: `MultiSelect`, review amendments
+
+From the review of the implementation (`memo/reviewer/review-165.md` on `review/165`).
+Sections changed: multi-select.md B.3, B.10; the docs page's Trigger row.
+
+- **B.10: the submission attempt is reported once.** Inside a Field with a `Field.Error`, the
+  Field's capture listener on the validity element cancels the `invalid` and reports the
+  Trigger to the first-invalid collector; the Trigger's own listener reported it again, which
+  the collector took for a new attempt: focus left document order (a MultiSelect below an
+  invalid text field took focus) and the browser's message was announced on top of the
+  `Field.Error` description. The Trigger now reports only when the event was not cancelled
+  already.
+- **B.10: the validity element is not anchored.** With the bubble cancelled nothing points
+  at its box, so it is a plain visually hidden element, and the Trigger no longer gets an
+  inline `anchor-name` (which overrode a consumer's).
+- **B.3: the Trigger carries the Root's `form`** (owned; `form` is omitted from
+  `MultiSelectTriggerProps`), so the reset listener follows the right form when there is
+  neither `name` nor `required`.
+- **`onKeyUp` is no longer owned.** Probed: with the `keydown` of Space prevented, no engine
+  activates the button on `keyup` (Chromium, Firefox, WebKit through branch CI), so the guard
+  went; `onKeyUp` passes through (it was never in B.3's `Omit`).
+
+Implementation notes (not rules):
+
+- A key or a hover while the List is loading disarms the pending edge, so the user's choice is
+  not replaced when the options arrive. The `loading` hold of `use-active-option.ts` is now a
+  function read in the layout effect (the Status's ref count): render state missed a Status
+  that registered in the open commit itself.
+- `use-multiple-selection.ts` casts the component's extra fields, not the whole details.

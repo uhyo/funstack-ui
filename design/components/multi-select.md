@@ -346,7 +346,7 @@ export interface MultiSelectTriggerProps
     | "type" | "role" | "onClick" | "onKeyDown" | "onFocus" | "onBlur"
     | "popoverTarget" | "popoverTargetAction" | "commandfor" | "command"
     | "aria-expanded" | "aria-controls" | "aria-activedescendant" | "aria-required"
-    | "disabled" | "className" | "style" | "children"
+    | "form" | "disabled" | "className" | "style" | "children"
   > {
   disabled?: boolean;
   className?: StateValue<string | undefined, MultiSelectTriggerState>;
@@ -596,18 +596,24 @@ No announcement is built in. Toggling changes `aria-selected` on the element
   its value; **`required` is rendered only while the optimistic value is empty** (a computed
   native validity attribute, conventions 3.6, as CheckboxGroup's and combobox.md 15.8's). So a
   submit with nothing selected is blocked natively; removing the last value marks it required
-  at once, a rollback un-marks it. It is visually hidden by inline styles (not
-  `display: none`, which would make it unreportable), `autocomplete="off"` (no form-state
-  restoration) and laid over the Trigger's box with CSS anchor positioning: the Trigger gets
-  an inline `anchor-name` (under the consumer's `style`) while `required` is set. The Trigger
-  carries `aria-required="true"` whenever the prop is set. `ref` goes to the button; the
-  validity element takes no props.
+  at once, a rollback un-marks it. It is visually hidden by inline styles (a clipped 1px box
+  with no pointer input; not `display: none`, which would bar it from validation) and
+  `autocomplete="off"` (no form-state restoration). It is not anchored to the Trigger: no
+  bubble is shown (below), so nothing points at its box. The Trigger carries
+  `aria-required="true"` whenever the prop is set, and the Root's `form` (so the reset
+  listener finds the form through the Trigger when there is neither `name` nor `required`).
+  `ref` goes to the button; the validity element takes no props.
 
   **The browser's bubble is not shown** (the fallback of the B.16 check). The validity
   element's `invalid` event is cancelled, and on a submission attempt (the element matches
   `:user-invalid`; `checkValidity()` and `reportValidity()` move nothing) the Trigger is
   focused through the Field's first-invalid collector (`focus-first-invalid.ts`), so with
-  several invalid controls the first in document order still takes focus. The message is
+  several invalid controls the first in document order still takes focus. The attempt is
+  reported **once**: inside a Field with a `Field.Error` the Field's capture listener on the
+  validity element runs first, cancels the event and reports the Trigger, and the Trigger's own
+  listener then reports nothing (it checks `defaultPrevented`); a second report would start a
+  new attempt in the collector, which moves focus out of document order and announces the
+  browser's message. The message is
   `Field.Error`'s: **`required` shows its message only inside a `Field.Root` with a
   `Field.Error`**; outside one, a submit with nothing selected is blocked and focus lands on
   the Trigger (`aria-required`), with no text. Why: in Firefox the bubble of the hidden

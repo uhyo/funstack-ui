@@ -279,10 +279,10 @@ export function MultiSelectPage() {
           "`MultiSelectTriggerState` is `{ value, open, pending, disabled }`; `value` and `open` are optimistic, `pending` is the Root's."
         }
         owned={
-          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget` (written as an attribute after hydration), `onClick`, `onKeyDown`, `onKeyUp`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. With `required`, an inline `anchor-name` under your `style`. Never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (not in its props type).'
+          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget` (written as an attribute after hydration), `form` (from the Root), `onClick`, `onKeyDown`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (not in its props type).'
         }
         note={
-          "With `required` it renders the validity element right after itself: a visually hidden one-option `<select>` with no name, laid over the button. A `render` element must stay a `<button>` (development warns). `ref` goes to the button."
+          "With `required` it renders the validity element right after itself: a visually hidden one-option `<select>` with no name. A `render` element must stay a `<button>` (development warns). `ref` goes to the button."
         }
       />
 
