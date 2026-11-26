@@ -13,11 +13,12 @@ section of `design/conventions.md`, or of the document its stub there names.
 
 The `open` state of an overlay is the one state in the library that has both channels of 2.1:
 parts ask for a change (a request, `openChangeAction`), and the browser performs one in front
-of the user (a fact, `onOpenChange`). This section is the rule for the four overlay Roots:
+of the user (a fact, `onOpenChange`). This section is the rule for the five overlay Roots:
 `Popover.Root`, `Menu.Root` (a context-menu Root and each submenu Root included),
-`Combobox.Root` (`open` only) and `Dialog.Root`. All four run on `internal/overlay/use-overlay-root.ts`.
-Each component doc has a table of which cause goes to which channel: `popover.md` 2.8,
-`menu.md` 2.4, `combobox.md` 5.6, `dialog.md` 2.7. Tooltip has no `open` prop and no callback
+`Combobox.Root` (`open` only), `Dialog.Root` and `HoverCard.Root`. All five run on
+`internal/overlay/use-overlay-root.ts`. Each component doc has a table of which cause goes to
+which channel: `popover.md` 2.8, `menu.md` 2.4, `combobox.md` 5.6, `dialog.md` 2.7,
+`hover-card.md` 2.5. Tooltip has no `open` prop and no callback
 (`tooltip.md` 4.1); a toast has no open state, its fact is `onClose` (`toast.md` 9).
 
 ### 3.9.1 The props
@@ -67,7 +68,8 @@ hide is recognised by a marker set in the apply effect, not by "`false` is alrea
 so a dismissal during a pending part close is a fact and not mistaken for the echo. The set
 includes hides the library _triggers_ but cannot hold, because holding them would leave a popup
 on screen that the user has already left: Menu's Tab-out, right-click outside and scroll close,
-Combobox's focus-leaving close, the lost-interest hide, Dialog's JS Escape and light dismiss.
+Combobox's focus-leaving close, the lost-interest hide (HoverCard's on both of its paths),
+HoverCard's Escape and press outside, Dialog's JS Escape and light dismiss.
 
 **Channel and `reason` are independent.** The channel says whether the library held the change;
 `reason` (2.2) says what the user did. Most facts are `"dismiss"` and most requests
@@ -76,7 +78,7 @@ Combobox's focus-leaving close, the lost-interest hide, Dialog's JS Escape and l
 | Channel | `reason` | Where |
 | --- | --- | --- |
 | `onOpenChange` | `"activate"` | A consumer's own invoker button (`popovertarget`, `commandfor` with a popover command) closes a popover, menu or listbox: the user acted on a button, the browser performed the hide. A non-button Trigger pressed while open (light dismiss hides the popup before the click; the click records the intent and the `toggle` reports it). |
-| `openChangeAction` | `"dismiss"` | A close the library does hold although no part asked: the pointer leaving a hover-opened submenu, lost interest while an interest open is still pending (nothing is shown yet; the `false` supersedes the open). |
+| `openChangeAction` | `"dismiss"` | A close the library does hold although no part asked: the pointer leaving a hover-opened submenu, lost interest while an interest open is still pending (nothing is shown yet; the `false` supersedes the open), a HoverCard's Escape or press while its open is still pending. |
 
 `onOpenChange` is never called for a change the consumer made through the `open` prop, for the
 library's own hide after a request, for the library's re-open of a refused fact, or for removal
@@ -238,7 +240,7 @@ Popover and Dialog select JS-free mode when the Root has **none of** `open`, `de
 `openChangeAction`, `onOpenChange`. In it the browser owns every open and close, no callback
 exists, and the CSS exit is the only animation. A Root with only `onOpenChange` is an
 uncontrolled library-mode Root; there is no "JS-free plus listener" mode (a `toggle` listener
-on a `ref` covers the need). Menu and Combobox have no JS-free mode.
+on a `ref` covers the need). Menu, Combobox and HoverCard have no JS-free mode.
 
 ### 3.9.12 A popup found open at hydration is a request
 
@@ -255,7 +257,7 @@ ever called with `false`.**
 ### 3.9.13 The development warning
 
 `open !== undefined && onOpenChange === undefined`, checked once per Root instance after mount
-(`useDevWarning`), in the four Roots:
+(`useDevWarning`), in the five Roots:
 
 ```
 Dialog.Root: `open` is set without `onOpenChange`. The browser can close this dialog without

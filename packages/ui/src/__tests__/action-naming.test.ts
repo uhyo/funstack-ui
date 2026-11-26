@@ -127,6 +127,9 @@ type PublicProps = {
   FieldRootProps: UI.FieldRootProps;
   FormRootProps: UI.FormRootProps;
   FormSubmitProps: UI.FormSubmitProps;
+  HoverCardPopupProps: UI.HoverCardPopupProps;
+  HoverCardRootProps: UI.HoverCardRootProps;
+  HoverCardTriggerProps: UI.HoverCardTriggerProps;
   MenuCheckboxItemProps: UI.MenuCheckboxItemProps;
   MenuContextTriggerProps: UI.MenuContextTriggerProps;
   MenuGroupLabelProps: UI.MenuGroupLabelProps;
@@ -244,6 +247,9 @@ const listedKeys = {
   FieldRootProps: true,
   FormRootProps: true,
   FormSubmitProps: true,
+  HoverCardPopupProps: true,
+  HoverCardRootProps: true,
+  HoverCardTriggerProps: true,
   MenuCheckboxItemProps: true,
   MenuContextTriggerProps: true,
   MenuGroupLabelProps: true,
@@ -362,12 +368,16 @@ describe("action naming (conventions 10.1)", () => {
     expectTypeOf<UI.ComboboxRootProps["onInputValueChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<string, UI.ComboboxInputValueChangeDetails> | undefined
     >();
-    // Exactly the four overlay Roots, each with the details type of its `openChangeAction`.
+    // Exactly the five overlay Roots, each with the details type of its `openChangeAction`.
     type WithOpenChange = {
       [K in keyof PublicProps]: "onOpenChange" extends OwnHandlerKeys<PublicProps[K]> ? K : never;
     }[keyof PublicProps];
     expectTypeOf<WithOpenChange>().toEqualTypeOf<
-      "ComboboxRootProps" | "DialogRootProps" | "MenuRootProps" | "PopoverRootProps"
+      | "ComboboxRootProps"
+      | "DialogRootProps"
+      | "HoverCardRootProps"
+      | "MenuRootProps"
+      | "PopoverRootProps"
     >();
     expectTypeOf<UI.PopoverRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.PopoverOpenChangeDetails> | undefined
@@ -380,6 +390,9 @@ describe("action naming (conventions 10.1)", () => {
     >();
     expectTypeOf<UI.DialogRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.DialogOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.HoverCardRootProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.HoverCardOpenChangeDetails> | undefined
     >();
   });
 

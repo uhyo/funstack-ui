@@ -43,6 +43,7 @@
     "./dialog": "./dist/dialog/index.mjs",
     "./field": "./dist/field/index.mjs",
     "./form": "./dist/form/index.mjs",
+    "./hover-card": "./dist/hover-card/index.mjs",
     "./menu": "./dist/menu/index.mjs",
     "./meter": "./dist/meter/index.mjs",
     "./number-field": "./dist/number-field/index.mjs",

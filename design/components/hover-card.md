@@ -1,7 +1,7 @@
 # HoverCard
 
-Status: **proposed** (#166, part of #162). Not implemented. History and the questions still
-open for the user: `design/CHANGELOG.md`, entry "hover-card.md". Follows
+Status: **decided** (#166, part of #162; the user's decisions of 2026-11-26). Implemented in
+`packages/ui/src/hover-card/`. History: `design/CHANGELOG.md`, the #166 entries. Follows
 `design/conventions.md`; where this document and the conventions disagree, the conventions win.
 **Read `design/components/popover.md` first** (library mode, the apply effect, requests and
 facts, 2.9 on interest invokers), then `design/components/tooltip.md` (the hover / focus timers,
@@ -205,7 +205,7 @@ Root's effect attaches, through `addEventListener`:
 | Popup | `pointerenter`, `focusin` | cancel the close timer |
 | Popup | `pointerleave` | start the close timer. With a button held (a text selection dragged out of the card) the timer starts at the release instead |
 | Popup | `focusout` to an element outside the Popup that is not the Trigger | start the close timer |
-| document, while the card is intended open | `keydown` Escape | close now and `preventDefault()`, unless the event is already prevented or the Popup contains a shown popover or an open modal dialog (2.6) |
+| document, while the card is intended open | `keydown` Escape | close now, unless the event is already prevented or the Popup contains a shown popover or an open modal dialog (2.6); `preventDefault()` when a shown card closed (an Escape that only cancels an open nobody sees passes through) |
 | document, capture, while the card is intended open | `pointerdown` outside the Popup | close now |
 
 "Intended open" is `intended()` of the Root: from the dispatch of the open until a close, so
@@ -274,13 +274,16 @@ leaves the Trigger and comes back, or focus leaves and returns.
 
 - JS path: opens start only at `pointerenter` and `focus`, so Escape and a press need no state
   (as Tooltip). The focus return is the library's own `focus()` call on a Trigger that then
-  matches `:focus-visible`; a one-shot flag set around the call makes that `focus` event start
-  no timer.
+  matches `:focus-visible`; a flag set before the hide (a `hint` popover may restore focus to
+  the Trigger inside it) makes that `focus` event start no timer. It is one flag for both paths,
+  set by Escape, a press on the Trigger and the focus return, and read by the JS path's `focus`
+  listener.
 - Flagged path: the platform may grant interest again on its own (a script `focus()` on the
   invoker does, Chromium 156, probe row B2; an interest timer that was already running when the
   user pressed the link still fires). Every open passes the library's `beforetoggle`
   interception, so the same flag is read there: a suppressed interest open is cancelled and
-  dispatches nothing. The flag is cleared by the Trigger's `pointerleave` and `blur`.
+  dispatches nothing. The flag is cleared by the Trigger's `pointerenter`, `pointerleave` and
+  `blur` (a `pointerenter` is the pointer coming back), on both paths.
 
 A press on the Trigger closes the card because the user has chosen the destination: after a
 client-side navigation that keeps the link mounted, a preview still hanging over the new page
