@@ -432,3 +432,7 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - MERGED #159 94be7f1 (attach + replay of lost facts, Suspense-safe), 3.9 → overlay-open-state.md c4b3b6e (conventions.md 2,140 lines), internal/ light reorg d097fb0 (action/ form/ overlay/; bundles byte-identical; check-internal-layers in lint). CLAUDE.md updated.
 - #157 refactoring wave essentially complete. Next: wait CI, propose alpha.19 to user.
 - RELEASED 0.1.0-alpha.19 (f3add5d; Publish + Deploy Docs green; npm alpha = 0.1.0-alpha.19). Notes: memo/product-owner/notes-alpha19.md. WAVE 22 (#157 refactoring) DONE. Open: human/upstream tasks only.
+
+## Wave 23+: #162 component gaps (user request 2026-11-26)
+- Sub-issues: #163 Collapsible, #164 Combobox multiple, #165 Select multiple (research first), #166 HoverCard, #167 AlertDialog, #168 Drawer, #169 Separator/Fieldset/Input, #170 Menubar/NavigationMenu, #171 Avatar/ScrollArea/OTP, #172 direction/locale decision. Wave plan commented on #162.
+- Wave 23 started: architect designs #163 and #164 (worktrees), platform-researcher on #166 + #165. Designs go to the user for decisions before implementation.
