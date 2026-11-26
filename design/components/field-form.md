@@ -125,7 +125,8 @@ Why these parts:
 - **`Field.Control` exists** for the plain native control, which is the common case and the
   JS-free one. It does nothing a FUNSTACK control does not also do inside a Field: it calls the
   same internal hook (section 7). `render={<textarea />}` and `render={<select />}` keep it a
-  native control; the hook warns in development for any other element.
+  native control; the hook warns in development for any other element. It works inside a Field
+  or alone: outside a `Field.Root` it is the plain control with nothing added (4.3).
 - **`Field.Error` is library-mounted** (rendered only while an error is shown) so that the
   consumer writes it once, unconditionally, and the accessible description is exactly the visible
   text. One `Field.Error` per Field (a second is a dev warning): messages are a list, so a single
@@ -660,7 +661,9 @@ unmounted `Field.Description` (developer choice 5, accepted by the review as L5)
 
 ```ts
 export interface FieldControlProps
-  extends Omit<ComponentPropsWithRef<"input">, "id" | "aria-invalid" | "className" | "style"> {
+  extends Omit<ComponentPropsWithRef<"input">, "aria-invalid" | "className" | "style"> {
+  /** Native `id`, outside a Field only; inside a Field the Field's (owned). */
+  id?: string;
   /** Native `name`; defaults to the Field's `name`. */
   name?: string;
   /** Native `disabled`; the Field's `disabled` also disables the control. Owned. */
@@ -675,7 +678,7 @@ export interface FieldControlProps
 ```
 
 No `children` prop (`<input>` is void; a `render={<select />}` carries its options on the render
-element, as `Select.Root`'s do). Owned keys: `id`, `name`, `disabled`, `required`,
+element, as `Select.Root`'s do). Owned keys inside a Field: `id`, `name`, `disabled`, `required`,
 `aria-invalid`, `aria-describedby` (token-merged with the consumer's, the consumer's tokens
 first), `data-invalid`, `data-disabled`, `data-required`, `data-pending`. Everything else is
 pass-through: `type`, `defaultValue`, `value` / `onChange` for a controlled input, `pattern`,
@@ -703,16 +706,18 @@ submission, which `Form.Root` already runs. So:
   Enter, `data-pending` on the input, a rule for a rejected save) is a component of its own
   with NumberField's draft-and-commit model, not a prop of `Field.Control`. Section 12.
 
-**Proposed (#169), not implemented: `Field.Control` outside a `Field.Root`.** Today it throws.
-Every FUNSTACK form control works both inside and outside a Field (`useFieldControl` returns
-nothing to merge outside, 7.1); `Field.Control` is the one exception, and the cost falls on a
-consumer's own styled input built on it, which then cannot be used for a search box or a table
-cell without a wrapping `Field.Root`. The proposal: outside a Field it renders the plain
-control (no `id`, `aria-invalid`, `aria-describedby` or `data-*` from the library; function
-props receive a constant all-`false`, `valid` `FieldState`), and `id` joins the props type
-(inside a Field it stays owned: ignored with the existing warning). The other Field parts keep
-throwing: a Label, Description or Error outside a Field is a mistake, a control is not. The
-docs keep recommending the native element for a direct call site.
+**`Field.Control` outside a `Field.Root`** (#169) renders the plain control instead of
+throwing. Every FUNSTACK form control works both inside and outside a Field (`useFieldControl`
+returns nothing to merge outside, 7.1), and a consumer's own styled input built on
+`Field.Control` must work for a search box or a table cell without a wrapping `Field.Root`.
+Outside a Field the library adds nothing: no `aria-invalid`, `aria-describedby` or `data-*`;
+`id`, `name`, `disabled` and `required` are ordinary pass-through (a `render` element's own win,
+as for any pass-through prop); the function props receive a constant `FieldState` that is valid
+and all-`false` (`messages` empty), since the plain control's own `disabled` / `required` are
+selected with `:disabled` / `:required`. `id` is in the props type; inside a Field it stays
+owned (ignored with the existing development warning). The other Field parts keep throwing: a
+Label, Description or Error outside a Field is a mistake, a control is not. The docs keep
+recommending the native element for a direct call site.
 
 ### 4.4 `Form.Root`
 
@@ -1104,12 +1109,13 @@ Rules that follow:
 - **Do not disable a fieldset while a submission is pending.** `<fieldset disabled={pending}>`
   drops focus from the control the user is on (conventions 3.6); mark pending with
   `form[data-pending]` (6.2).
-- **Proposed (#169), not implemented: a part's pointer surface honours inherited `disabled`.**
-  Where a part handles a pointer on an element that is not the native control (`Slider.Track`,
-  a Thumb's styled `span`), it reads only the Root's or the Field's `disabled` today, so a drag
-  inside `<fieldset disabled>` would still dispatch for an input the browser has disabled. The
-  rule to add to conventions 3.6: such a handler also bails when the part's native control
-  matches `:disabled`. Found by reading the Slider code, not yet reproduced in a browser.
+- **A part's pointer surface honours inherited `disabled`** (#180, conventions 3.6). Where a
+  part handles a pointer itself (`Slider.Track`, a Thumb's styled `span`, NumberField's
+  Increment / Decrement), the handler also bails when the part's native control matches
+  `:disabled`, read at the press. Reproduced in Chromium and Firefox before the fix: a drag
+  inside `<fieldset disabled>` moved the Slider and dispatched, and a press on a
+  fieldset-disabled Increment stepped, because both engines still dispatch `pointerdown` to a
+  natively disabled `<button>` (only `click` is withheld).
 
 ---
 

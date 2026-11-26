@@ -241,7 +241,9 @@ Why this shape:
   write "Ham, Olive" by itself for a preselected value. B.7.
 - **No `Chips`.** A chip with a remove button is interactive content, which a `<button>` may
   not contain. A field of removable chips is Combobox `multiple`.
-- **No `Clear`, no `Separator`** in v1 (B.14).
+- **No `Clear`, no `Separator`** in v1 (B.14). A visual line between options or groups is the
+  standalone `<Separator decorative />` (`role="none"`, allowed in a listbox;
+  `design/components/separator.md` 4).
 
 Every part renders exactly one element, with the two documented exceptions: the Root's hidden
 inputs (the Combobox exception of conventions 1.1 that #164 adds) and the Trigger's validity

@@ -101,13 +101,13 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Thumb` | A draggable value handle (Slider, one per value, explicit `index`): a styled element **containing** a visually hidden native `<input type="range">`, which is the focusable, labelled, form-participating `slider`. | `span` + `input[type=range]` |
 | `Increment` / `Decrement` | `button[type=button][tabindex=-1]` that steps a numeric value, with press-and-hold (NumberField); natively `disabled` when the next step would change nothing. | `button` |
 | `Form` | A form whose successful submission completes the component's interaction (Dialog). | `form` |
-| `Control` | The native form control a Field labels and describes (`input`, or `textarea` / `select` through `render`). Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (3.8). | `input` |
+| `Control` | The native form control a Field labels and describes (`input`, or `textarea` / `select` through `render`), inside a Field or alone (outside a `Field.Root` it is the plain control, nothing added). Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (3.8). | `input` |
 | `Description` | Describes the owner through `aria-describedby`: a `p[id]` the control (Field) or the `<dialog>` (Dialog) always references, mounted or not. | `p` |
 | `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown and referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
 | `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending`. The general one is the single-element `Button` (`@funstack/ui/button`; `whilePending`, 2.5.1), which is also a Toolbar's command button: the Toolbar has no button part, and `Button` reads `ToolbarContext` so that a disabled one stays focusable there (3.6). | `button` |
-| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default; inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. | as named |
+| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default; inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. The standalone single-element `Separator` (`@funstack/ui/separator`, directive-free) takes `orientation` and `decorative` (`role="none"`, no `aria-orientation`; the one spelling allowed inside a listbox). | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
 top layer and CSS Anchor Positioning places it, so the platform does both jobs (see
@@ -1275,7 +1275,12 @@ where the APG pattern allows it; where the pattern wants a focusable disabled co
 keeps disabled commands focusable so screen-reader users still find them), the
 part sets `aria-disabled` instead. In both cases the part emits `data-disabled` and never
 dispatches for user interaction (platform dispatches from the form owner are the exception,
-section 2.3 item 7).
+section 2.3 item 7). **Inherited `disabled`** (an ancestor `<fieldset disabled>`) is a platform
+fact that `data-disabled` and `state.disabled` do not see; where a part handles a pointer itself
+(a Slider's Track and Thumb, NumberField's Increment / Decrement), the handler also bails when
+the part's native control matches `:disabled`, read at the press: pointer events still reach a
+styled `span` inside the fieldset and, in Chromium and Firefox, a natively disabled `<button>`
+(only `click` is withheld). #180; `design/components/field-form.md` 7.4.
 
 **A part is never natively disabled while pending** (library-wide). The library does not set `disabled` or `inert` on a trigger because its
 action is in flight: native `disabled` drops keyboard focus to `<body>` in Chromium and Firefox
@@ -1733,7 +1738,9 @@ is allowed because Server Components may render client-created contexts. No init
 needed the second exception; `Progress.Root` and `Meter.Root` are its first users: a
 directive-free Root renders `<ProgressContext value>` imported from its `"use client"` context
 module and imports no other client module (the Server render row in 10.1 guards the import graph);
-a component that does this says so in its design doc. Pure modules are
+a component that does this says so in its design doc. The standalone `Separator`
+(`separator/separator.tsx`) is the third directive-free component file and needs no exception:
+it reads no context and imports no client module. Pure modules are
 directive-free: arithmetic and formatting (`slider/slider-arithmetic.ts`; NumberField's
 `number-field-format.ts`, `number-field-arithmetic.ts` and `internal/decimal.ts`), pure
 DOM reads, prop builders and listener installers (`internal/overlay/popover-open.ts`, `dom-order.ts`,
@@ -2050,7 +2057,8 @@ import { Tabs, Toggle } from "@funstack/ui";   // also works
 With an unbundled build both resolve to the same files, so there is no duplication. The exports
 map is generated by tsdown from the entry list (section 7.2); adding a component means adding its
 `index.ts` to `entry`. One subpath is not a component: `@funstack/ui/csp` (`CSPProvider`,
-`STYLE_SHA256`; section 12).
+`STYLE_SHA256`; section 12). Single-element components have their own subpath like any other
+(`@funstack/ui/button`, `@funstack/ui/toggle`, `@funstack/ui/separator`).
 
 ### 9.3 Namespace object
 

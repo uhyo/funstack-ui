@@ -4,6 +4,7 @@ import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
+import { FieldAddress } from "../examples/FieldAddress.js";
 import { FieldControls } from "../examples/FieldControls.js";
 import { FieldSignUp } from "../examples/FieldSignUp.js";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
@@ -66,7 +67,10 @@ import { Form } from "@funstack/ui/form";
           , or a <code>&lt;textarea&gt;</code> / <code>&lt;select&gt;</code> through{" "}
           <code>render</code>. Every other input prop passes through (<code>type</code>,{" "}
           <code>defaultValue</code>, a controlled <code>value</code> / <code>onChange</code>,{" "}
-          <code>pattern</code>, …).
+          <code>pattern</code>, …). Outside a <code>Field.Root</code> it is the plain control (
+          <a href="#field-control-alone">on its own</a>). There is no Input, Textarea or Fieldset
+          part: the native elements, with the <a href="#textarea">textarea</a> and{" "}
+          <a href="#fieldset">fieldset</a> recipes below.
         </li>
         <li>
           <strong>Any FUNSTACK form control is a Field's control</strong> without a wrapper:
@@ -324,6 +328,12 @@ import { Form } from "@funstack/ui/form";
       <PropsTable
         rows={[
           {
+            name: "id",
+            type: "string",
+            description:
+              "Native `id`, outside a `Field.Root` only. Inside one the Field owns the id (so `Field.Label` can point at it) and this prop is ignored with a development warning.",
+          },
+          {
             name: "name",
             type: "string",
             default: "the Field's",
@@ -353,7 +363,10 @@ import { Form } from "@funstack/ui/form";
       <PartFacts
         state={"the Field's."}
         owned={
-          '`id`, `name`, `required`, `disabled`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description, then the error while shown), and the Field\'s four `data-*` attributes.'
+          'Inside a Field: `id`, `name`, `required`, `disabled`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description, then the error while shown), and the Field\'s four `data-*` attributes.'
+        }
+        note={
+          "Outside a `Field.Root` it is the plain native control: every prop passes through (`id` included), the library adds no attribute, and the function props receive a constant valid, all-`false` `FieldState`. The other Field parts still throw outside a Field. See [Field.Control on its own](#field-control-alone)."
         }
       />
 
@@ -620,6 +633,90 @@ form[data-pending]           { cursor: progress; }
           the Form.
         </li>
       </ul>
+
+      <h4 id="fieldset">Fields in a fieldset</h4>
+      <p>
+        There is no Fieldset part: a set of Fields with a common caption is the native{" "}
+        <code>&lt;fieldset&gt;</code>, which already names the group (<code>&lt;legend&gt;</code>),
+        describes it (<code>aria-describedby</code>) and disables every native control inside it.
+        Every FUNSTACK form control has a native element, so <code>&lt;fieldset disabled&gt;</code>{" "}
+        reaches them all: they leave the <code>FormData</code>, skip validation and the Tab order,
+        and the pointer surfaces (a Slider's Track, NumberField's buttons) ignore presses too.
+      </p>
+      <Example file="FieldAddress.tsx" css="field.css">
+        <FieldAddress />
+      </Example>
+      <CodeBlock>{`<fieldset disabled={!canEdit} aria-describedby="address-hint">
+  <legend>Shipping address</legend>
+  <p id="address-hint">Used for this order only.</p>
+  <Field.Root name="street"><Field.Label>Street</Field.Label><Field.Control required /><Field.Error /></Field.Root>
+  <Field.Root name="city"><Field.Label>City</Field.Label><Field.Control required /><Field.Error /></Field.Root>
+</fieldset>`}</CodeBlock>
+      <ul>
+        <li>
+          An inherited <code>disabled</code> is the platform's: <code>data-disabled</code> and{" "}
+          <code>state.disabled</code> stay the props'. Style it with the platform's selector, which
+          covers both sources: <code>{".field:has(.control:disabled) { opacity: .5; }"}</code>.
+        </li>
+        <li>
+          Errors stay per Field. A rule over several controls is one Field's <code>validate</code>{" "}
+          (it receives the whole <code>FormData</code>); a message that belongs to no control is
+          your own element, referenced from the fieldset's <code>aria-describedby</code>.
+        </li>
+        <li>
+          <a href="/components/radio-group">RadioGroup</a> and{" "}
+          <a href="/components/checkbox-group">CheckboxGroup</a> are fieldsets themselves (their{" "}
+          <code>Label</code> is the <code>&lt;legend&gt;</code>): do not wrap one in another
+          fieldset to caption it.
+        </li>
+        <li>
+          Do not disable a fieldset while a submission is pending:{" "}
+          <code>{"<fieldset disabled={pending}>"}</code> drops focus from the control the user is
+          on. Mark pending with <code>form[data-pending]</code>.
+        </li>
+      </ul>
+
+      <h4 id="textarea">A textarea that grows</h4>
+      <p>
+        A textarea is <code>{"Field.Control render={<textarea />}"}</code>; textarea-only props (
+        <code>rows</code>, <code>wrap</code>) go on the render element. It grows with its content
+        through CSS, so there is no <code>autoSize</code> prop (the notes in the example above):
+      </p>
+      <CodeBlock>{`<Field.Root name="notes">
+  <Field.Label>Delivery notes</Field.Label>
+  <Field.Control render={<textarea rows={1} maxLength={500} />} className="control grow" />
+</Field.Root>`}</CodeBlock>
+      <CodeBlock language="css">{`.grow { field-sizing: content; min-block-size: 2lh; max-block-size: 8lh; resize: none; }`}</CodeBlock>
+
+      <h4 id="field-control-alone">Field.Control on its own</h4>
+      <p>
+        Outside a <code>Field.Root</code>, <code>Field.Control</code> renders the plain native
+        control: <code>id</code>, <code>name</code>, <code>disabled</code> and <code>required</code>{" "}
+        pass through, and nothing is added. For a direct call site write the native element (
+        <code>{'<input type="search" aria-label="Search">'}</code>); the standalone form is for your
+        own styled input built on <code>Field.Control</code>, which then works in a form field and
+        in a search box or a table cell alike:
+      </p>
+      <CodeBlock>{`function TextInput(props: FieldControlProps) {
+  return <Field.Control {...props} className={(s) => (s.invalid ? "input invalid" : "input")} />;
+}
+
+<Field.Root name="email" required>
+  <Field.Label>Email</Field.Label>
+  <TextInput type="email" />                     {/* wired to the Field */}
+</Field.Root>
+
+<label htmlFor="q">Search</label>
+<TextInput id="q" type="search" />               {/* the plain <input>, state always valid */}`}</CodeBlock>
+      <p>
+        Outside a Field the function props receive a constant <code>FieldState</code> (valid, not
+        disabled, not required, not pending): select a plain control's own state with{" "}
+        <code>:disabled</code>, <code>:required</code> and <code>:user-invalid</code>. A search box
+        has no Field to wire; let the query leave the urgent lane with <code>useDeferredValue</code>
+        , or use a <a href="/components/combobox">Combobox</a> when the result is a list of options.
+        The text of an input is a fact, not a request, so there is no <code>valueChangeAction</code>{" "}
+        on a text control.
+      </p>
     </DocPage>
   );
 }

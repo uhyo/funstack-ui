@@ -13277,3 +13277,76 @@ Test plan for Separator (jsdom): default renders `hr` with `aria-orientation="ho
 `role="separator"` survives when not decorative; function `className` / `style` / `render`
 receive `{ orientation, decorative }`; `ref`; the Directive row (no `"use client"`); a server
 render from a Server Component with a function `className`.
+
+## 2026-11-26, #169 and #180: small parts decided and implemented
+
+The user's decisions on the five open questions of the design entry above, all as the design
+recommended:
+
+1. **Separator: build** (`@funstack/ui/separator`): a single `<hr>`, directive-free (a Server
+   Component), `orientation` and `decorative`. `separator.md` status: accepted, implemented in
+   `packages/ui/src/separator/separator.tsx`.
+2. **No `Input` / `Textarea` parts. `Field.Control` outside a `Field.Root`** renders the plain
+   control instead of throwing, and `id` is in its props type (field-form 4.3, the paragraph
+   is now a rule). Outside a Field `id`, `name`, `disabled` and `required` are ordinary
+   pass-through, so a `render` element's own win (inside a Field they stay owned); the function
+   props receive a frozen constant `FieldState` (valid, all `false`, `messages` empty), as 4.3
+   proposed, not the own `disabled` / `required`: a plain control's own state is selected with
+   `:disabled` / `:required`. The development element check (`<input>`, `<textarea>`,
+   `<select>`) still runs outside a Field. Label, Description and Error still throw.
+3. **Inherited `disabled` on pointer surfaces: reproduced, rule added, fixed (#180).** Before
+   the fix, in Chromium and Firefox (WebKit does not run on the development machine; branch CI
+   ran it): a track press and a thumb drag inside `<fieldset disabled>` moved a Slider to 75 and
+   dispatched `valueChangeAction` / `valueCommitAction`; a pointer press on a fieldset-disabled
+   `NumberField.Increment` stepped 5 → 6. The second case was not in the design: both engines
+   still dispatch `pointerdown` / `pointerup` to a natively disabled `<button>` (only `click` and
+   the compatibility mouse events are withheld), and the step button's press-and-hold starts on
+   `pointerdown`. Conventions 3.6 gains the sentence; field-form 7.4's proposed bullet is now a
+   rule and names NumberField. Fixes: `beginGesture` in `slider/slider-root.tsx` bails when a
+   registered range input matches `:disabled`; `use-step-button.ts` bails (press and the
+   no-pointer `click`) when the button itself or the visible input matches `:disabled`, so a
+   `render={<span />}` button inside a disabled fieldset is covered too. Read at the press, as
+   the RTL direction is. `data-disabled` / `state.disabled` are unchanged (the props').
+   Other pointer surfaces checked, by reading, none dispatches: Toast has no swipe (toast.md 9.2,
+   not in v1); Combobox Trigger / Clear / Option, MultiSelect Option and the hidden select only
+   `preventDefault()` on `pointerdown` and act on `click`, which a disabled button does not get;
+   `useRovingFocus`'s `pointerdown` only moves the tab stop; `Dialog.Trigger`'s records the open
+   state; `Menu.ContextTrigger` and the Menu's outside-press handlers belong to no native
+   control. One edge left open: an option `div` of a Combobox or MultiSelect popup that is
+   already open when its fieldset becomes disabled would still take a click, since a `div` is
+   never disabled. Not reproduced; noted in `memo/developer/issue-169.md` for a follow-up.
+4. **A commit-action text field: not now.** Recorded in field-form 12; prior-art research first.
+5. **No `Fieldset` part.** The native pattern is field-form 7.4, documented on the Field page.
+
+Registry rows updated, no rule change beyond 3.6: conventions 1.1 (`Control`: "inside a Field
+or alone"; `Separator`: the standalone part), 7.1 (the third directive-free component file,
+which needs no exception), 9.2 (single-element components have subpaths), 3.6 (the inherited
+`disabled` sentence); field-form section 1 (`Field.Control` bullet), 4.3, 7.4; combobox.md and
+multi-select.md "no `Separator`" lines point at `<Separator decorative />`.
+
+Tests added:
+
+- Separator (jsdom): the design entry's plan, plus a render `<hr>`'s own `aria-orientation` /
+  `data-orientation` overridden, not focusable, the function `render` form, a `render` element's
+  `ref`, and hydration of the server markup. The Directive rows: `separator/index.mjs` and
+  `separator/separator.mjs` in `directiveFreeFiles`, and an import-graph row asserting the
+  part reaches no client module. Types: no `role`, no `children` (a hyphenated `aria-*` name is
+  never checked by TSX, so `aria-orientation` cannot have a type row).
+- `Field.Control` outside a Field (jsdom): plain control with own `id` / `name` / `disabled` /
+  `required` and the consumer's `aria-describedby` only; no `aria-invalid` or `data-*`; no `id`
+  warning; the constant state; `render={<textarea />}` with a ref; controlled and uncontrolled
+  inputs and `FormData`; a render element's own `id` / `disabled` win; inside a Field `id` is
+  still ignored with the warning; the other parts still throw. Types: `id` accepted.
+- #180: Slider browser rows (three engines) for a track press and a thumb drag inside
+  `<fieldset disabled>` (no value change, no dispatch, no `data-dragging`, no focus) and for the
+  drag working again once enabled; a jsdom row for the same with the inputs' `:disabled`.
+  NumberField browser row (a forced pointer press and hold on the disabled Increment and
+  Decrement do not step) and a jsdom row (a host button and a `render={<span />}` button, the
+  no-pointer `click` too, then enabled again).
+
+Docs: a Separator page (`/components/separator`, group "Layout", a Server Component example);
+the Field page gains the `id` row, the outside-a-Field facts, and the recipes "Fields in a
+fieldset" (a live example with a NumberField inside the fieldset), "A textarea that grows" and
+"Field.Control on its own"; the Slider and NumberField `disabled` rows mention an ancestor
+fieldset. Agent skill: Separator, and the Field line (textarea, standalone `Field.Control`,
+the fieldset pattern). Playground: `separator-demo.tsx`.

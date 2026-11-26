@@ -1,7 +1,7 @@
 # Separator
 
-Status: **proposed** (#169, part of #162). Not implemented, not yet accepted by the user. History
-and the test plan: `design/CHANGELOG.md`. Follows `design/conventions.md`; where this document
+Status: **accepted**, implemented (#169, part of #162): `packages/ui/src/separator/separator.tsx`.
+History and the test plan: `design/CHANGELOG.md`. Follows `design/conventions.md`; where this document
 and the conventions disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.1 part vocabulary, 1.2, 7.1, 7.3),
@@ -77,8 +77,7 @@ An honest account. A horizontal, semantic separator is `<hr>`, and the part adds
 The alternative is to build nothing and show `<hr>`, `<hr aria-orientation="vertical">` and
 `<hr role="none">` as a recipe on a docs page, which is what conventions 7.3 does for the
 directive-free form controls. The cost of the part is one directive-free file of about forty
-lines and one docs page. This document recommends building it; "do not build" is open decision 1
-in the changelog entry.
+lines and one docs page. The user chose to build it (the #169 entries in the changelog).
 
 ## 3. Props and types
 

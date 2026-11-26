@@ -52,6 +52,7 @@
     "./progress": "./dist/progress/index.mjs",
     "./radio-group": "./dist/radio-group/index.mjs",
     "./select": "./dist/select/index.mjs",
+    "./separator": "./dist/separator/index.mjs",
     "./slider": "./dist/slider/index.mjs",
     "./switch": "./dist/switch/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",

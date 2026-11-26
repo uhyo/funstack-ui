@@ -79,6 +79,24 @@
   border: 0;
 }
 
+/* A native fieldset around several Fields (no Fieldset part). Its `disabled` is inherited by
+   every control, which `data-disabled` does not see: select the platform's `:disabled`. */
+.demo-address {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0.75rem 1rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  min-inline-size: 0;
+}
+.demo-address > legend {
+  padding: 0 0.3em;
+}
+.demo-address .demo-fieldset:has(:disabled) {
+  opacity: 0.5;
+}
+
 /* The form's submission: the whole form dims, the button blocks repeat clicks with CSS. */
 .demo-form[data-pending] .demo-fieldset {
   opacity: 0.7;

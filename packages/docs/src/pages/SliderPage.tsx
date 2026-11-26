@@ -207,7 +207,8 @@ export function SliderPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Disables every input (not submitted) and the pointer.",
+            description:
+              "Disables every input (not submitted) and the pointer. An ancestor `<fieldset disabled>` does the same (the pointer reads the inputs' `:disabled`), but `data-disabled` and `state.disabled` stay this prop's.",
           },
           ...functionProps(
             "SliderRootState<T>",

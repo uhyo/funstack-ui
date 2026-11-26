@@ -290,6 +290,9 @@ const directiveFreeFiles = [
   "meter/meter-region.mjs",
   "internal/range-value.mjs",
   "internal/render-element.mjs",
+  // The standalone Separator reads no context (design/components/separator.md 7).
+  "separator/index.mjs",
+  "separator/separator.mjs",
   "internal/dev-warn.mjs",
   // The rejection fallback and the `on*` handler rule (conventions 2.1, 2.4).
   "internal/action/report-dropped.mjs",
@@ -382,6 +385,18 @@ describe("directive-free Roots", () => {
         .filter((file) => /^"use client";/.test(readFileSync(file, "utf8").trimStart()))
         .map((file) => relative(src, file));
       expect(clients).toEqual([context]);
+    },
+  );
+
+  // A directive-free part with no context at all (design/components/separator.md 7).
+  it.each(["separator/separator.tsx", "separator/index.ts"])(
+    "%s reaches no client module",
+    (file) => {
+      const graph = runtimeImportGraph(resolve(src, file), "");
+      const clients = [...graph]
+        .filter((path) => /^"use client";/.test(readFileSync(path, "utf8").trimStart()))
+        .map((path) => relative(src, path));
+      expect(clients).toEqual([]);
     },
   );
 });
