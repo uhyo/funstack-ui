@@ -119,8 +119,8 @@ export function useMultipleSelection<Extra extends object>({
       reason,
       added,
       removed: ordered,
-      ...extra,
-    }) as unknown as Details;
+      ...(extra as Extra),
+    }) as Details;
     latestIsReset.current = false;
     dispatch(applyPatch(optimistic, details), details);
     return true;

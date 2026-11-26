@@ -18,7 +18,7 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { optionId } from "../internal/use-option-registry.js";
-import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useMultiSelectContext } from "./multi-select-context.js";
 
@@ -50,7 +50,6 @@ export interface MultiSelectTriggerProps extends Omit<
   | "role"
   | "onClick"
   | "onKeyDown"
-  | "onKeyUp"
   | "onFocus"
   | "onBlur"
   | "popoverTarget"
@@ -61,6 +60,7 @@ export interface MultiSelectTriggerProps extends Omit<
   | "aria-controls"
   | "aria-activedescendant"
   | "aria-required"
+  | "form"
   | "disabled"
   | "className"
   | "style"
@@ -82,27 +82,19 @@ export interface MultiSelectTriggerProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"button">, MultiSelectTriggerState>;
 }
 
-/** Visually hidden over the Trigger's box, unfocusable by the user, out of the accessibility tree (B.10). */
-function validityStyle(anchorName: string): CSSProperties {
-  return {
-    position: "absolute",
-    positionAnchor: anchorName,
-    top: "anchor(top)",
-    left: "anchor(left)",
-    width: "anchor-size(width)",
-    height: "anchor-size(height)",
-    margin: 0,
-    padding: 0,
-    border: 0,
-    opacity: 0,
-    pointerEvents: "none",
-  } as CSSProperties;
-}
-
-/** A dashed ident from a React id (`_r_1_`, `«r1»`). */
-function anchorNameOf(id: string): string {
-  return `--fsui-multi-select-${id.replace(/[^\w-]/g, "_")}`;
-}
+/** Visually hidden, out of the user's reach and out of the accessibility tree (B.10). */
+const VALIDITY_STYLE: CSSProperties = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  margin: "-1px",
+  padding: 0,
+  border: 0,
+  opacity: 0,
+  overflow: "hidden",
+  clipPath: "inset(50%)",
+  pointerEvents: "none",
+};
 
 const preventDefault = (event: { preventDefault(): void }) => event.preventDefault();
 
@@ -115,17 +107,16 @@ const preventDefault = (event: { preventDefault(): void }) => event.preventDefau
  * toggles the listbox against the state the user saw. It renders `aria-expanded` from the shown
  * listbox (the role requires the state, and before hydration there is no invoker). With
  * `required` it renders the **validity element** right after itself: a visually hidden one-option
- * `<select tabindex="-1" aria-hidden="true">`, `required` while the optimistic selection is empty,
- * laid over the button with CSS anchor positioning (B.10). It blocks a submission natively; its
+ * `<select tabindex="-1" aria-hidden="true">`, `required` while the optimistic selection is empty
+ * (B.10). It blocks a submission natively; its
  * `invalid` is cancelled (no browser bubble) and the attempt focuses the button, so the message is
  * `Field.Error`'s. Focus it receives passes to the button.
  *
  * Owned keys (conventions 1.2): `id`, `type`, `role`, `disabled`, `aria-expanded`,
  * `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget`
- * (written after hydration), `onClick`, `onKeyDown`, `onKeyUp`, `onFocus`, `onBlur`,
+ * (written after hydration), `form`, `onClick`, `onKeyDown`, `onFocus`, `onBlur`,
  * `data-open`, `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-describedby`
- * (token-merged), `aria-invalid` and `data-invalid`. With `required`, an inline `anchor-name`
- * under the consumer's `style`.
+ * (token-merged), `aria-invalid` and `data-invalid`.
  *
  * @see https://ui.funstack.work/components/multi-select
  */
@@ -212,7 +203,12 @@ export function MultiSelectTrigger({
   const validityCallbackRef = useCallback(
     (select: HTMLSelectElement) => {
       const onInvalid = (event: Event) => {
+        // Inside a Field with a Field.Error, the Field's capture listener (it runs first) has
+        // cancelled the event and reported the Trigger already: a second report would start a
+        // new batch of the collector (focus out of document order, a stray announcement).
+        const handled = event.defaultPrevented;
         event.preventDefault();
+        if (handled) return;
         // A submission attempt sets user validity first; `checkValidity()` does not.
         const attempt = supportsUserInvalid() ? select.matches(":user-invalid") : true;
         if (attempt) collectInvalid(triggerRef.current, select.validationMessage, select);
@@ -231,12 +227,12 @@ export function MultiSelectTrigger({
     disabled,
   };
 
-  const anchorName = anchorNameOf(ids.trigger);
-
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
     ...field.attributes,
     id: ids.trigger,
     type: "button",
+    // The form owner of the reset listener when there is neither `name` nor `required` (B.10).
+    form: ctx.form,
     role: "combobox",
     disabled,
     // Shown (the listbox is in the top layer); `data-open` is the optimistic one (B.9).
@@ -254,11 +250,6 @@ export function MultiSelectTrigger({
     onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => {
       ctx.keyDown(event.nativeEvent);
     },
-    // Space activates a button on `keyup` in some engines even when its `keydown` was
-    // prevented: the key already opened or toggled (B.8).
-    onKeyUp: (event: KeyboardEvent<HTMLButtonElement>) => {
-      if (event.key === " ") event.preventDefault();
-    },
     onFocus: (event: FocusEvent<HTMLButtonElement>) => {
       ctx.focusIn(event.nativeEvent);
     },
@@ -275,11 +266,7 @@ export function MultiSelectTrigger({
     render,
     state,
     className,
-    // The validity element is laid over the Trigger's box (B.10); the consumer wins.
-    style: (s) => ({
-      ...(required && { anchorName }),
-      ...resolveStateValue(style, s),
-    }),
+    style,
     children,
     props: rest,
     libraryProps,
@@ -300,7 +287,7 @@ export function MultiSelectTrigger({
         form={ctx.form}
         disabled={disabled}
         required={ctx.values.length === 0}
-        style={validityStyle(anchorName)}
+        style={VALIDITY_STYLE}
         onFocus={() => triggerRef.current?.focus()}
         onPointerDown={preventDefault}
         onMouseDown={preventDefault}

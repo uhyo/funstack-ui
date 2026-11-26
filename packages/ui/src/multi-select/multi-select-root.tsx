@@ -252,6 +252,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     registry,
     optionCount,
     statusCount,
+    statusCountRef,
     labelCount,
     registerOption,
     registerStatus,
@@ -281,7 +282,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     orderedOptions,
     autoHighlight: false,
     stale: false,
-    loading,
+    loading: () => statusCountRef.current > 0,
   });
   const { activeValue, activeRef, setActive, pendingEdgeRef } = active;
 
@@ -414,7 +415,11 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     registerOption,
     registerStatus,
     registerLabel,
-    setActive,
+    // Hover on an option: as the keys, it disarms an edge waiting for the options to load.
+    setActive: (v) => {
+      pendingEdgeRef.current = null;
+      setActive(v);
+    },
     toggle,
     triggerClick,
     keyDown,

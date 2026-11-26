@@ -604,6 +604,68 @@ describe("MultiSelect (jsdom)", () => {
       expect(shown()).toBe("Corn");
     });
 
+    it("a key pressed while the list loads is not overridden when the options arrive", async () => {
+      const user = setupUser();
+      const suspender = createSuspender();
+      render(
+        <Harness
+          root={{ defaultValue: ["corn"] }}
+          list={
+            <>
+              <MultiSelect.Option value="first" data-testid="opt-first">
+                First
+              </MultiSelect.Option>
+              <MultiSelect.Option value="second" data-testid="opt-second">
+                Second
+              </MultiSelect.Option>
+              <Suspense fallback={<MultiSelect.Status>Loading…</MultiSelect.Status>}>
+                <suspender.Suspender value="rest" />
+                <Options />
+              </Suspense>
+            </>
+          }
+        />,
+      );
+      trigger().focus();
+      await user.keyboard("{ArrowDown}");
+      await flushTasks(2);
+      expect(list()).toHaveAttribute("aria-busy", "true");
+      // The armed edge waits for the load; the user moves meanwhile.
+      await user.keyboard("{ArrowDown}");
+      expect(activeValue()).toBe("opt-first");
+      await act(async () => suspender.resolve("rest"));
+      await flushTasks(2);
+      expect(activeValue()).toBe("opt-first");
+    });
+
+    it("hover while the list loads is not overridden either", async () => {
+      const user = setupUser();
+      const suspender = createSuspender();
+      render(
+        <Harness
+          root={{ defaultValue: ["corn"] }}
+          list={
+            <>
+              <MultiSelect.Option value="second" data-testid="opt-second">
+                Second
+              </MultiSelect.Option>
+              <Suspense fallback={<MultiSelect.Status>Loading…</MultiSelect.Status>}>
+                <suspender.Suspender value="rest" />
+                <Options />
+              </Suspense>
+            </>
+          }
+        />,
+      );
+      trigger().focus();
+      await user.keyboard("{ArrowDown}");
+      await flushTasks(2);
+      fireEvent.pointerMove(option("second"));
+      await act(async () => suspender.resolve("rest"));
+      await flushTasks(2);
+      expect(activeValue()).toBe("opt-second");
+    });
+
     it("shows Empty when the list has no option", async () => {
       const user = setupUser();
       render(<Harness list={<></>} />);
@@ -691,10 +753,11 @@ describe("MultiSelect (jsdom)", () => {
       expect(select).not.toHaveAttribute("name");
       expect(select).not.toBeRequired();
       expect(select.options).toHaveLength(1);
-      expect(trigger().style.getPropertyValue("anchor-name")).toMatch(/^--fsui-multi-select-/);
-      expect(select.style.getPropertyValue("position-anchor")).toBe(
-        trigger().style.getPropertyValue("anchor-name"),
-      );
+      // Visually hidden, with no anchoring: there is no bubble to point at the Trigger (B.10).
+      expect(select.style.position).toBe("absolute");
+      expect(select.style.getPropertyValue("position-anchor")).toBe("");
+      expect(trigger().style.getPropertyValue("anchor-name")).toBe("");
+      expect(trigger()).not.toHaveAttribute("form");
       await openWithClick(user);
       await user.click(option("ham"));
       // Optimistic: required at once, before the removal commits (B.11 walkthrough 5).
@@ -760,6 +823,19 @@ describe("MultiSelect (jsdom)", () => {
       expect(calls[1]).toMatchObject({ reason: "platform", removed: ["olive"] });
       await act(async () => gate.resolve());
       expect(formValues()).toEqual(["ham"]);
+    });
+
+    it("the Trigger carries the Root's `form`", () => {
+      render(
+        <>
+          <form id="other" data-testid="other" />
+          <MultiSelect.Root form="other">
+            <MultiSelect.Trigger aria-label="Toppings" data-testid="trigger" />
+          </MultiSelect.Root>
+        </>,
+      );
+      expect(trigger()).toHaveAttribute("form", "other");
+      expect((trigger() as HTMLButtonElement).form).toBe(screen.getByTestId("other"));
     });
 
     it("works without name: the reset listener follows the Trigger's form", async () => {

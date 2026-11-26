@@ -19,11 +19,12 @@ export interface ActiveOptionOptions {
   /** The results shown are for an older text: never auto-highlighted. */
   readonly stale: boolean;
   /**
-   * The List is loading (a `Status` is mounted inside it): the pending edge waits until it
-   * settles (MultiSelect, multi-select.md B.8). Default `false`: the edge is taken as soon as an
-   * enabled option is mounted (Combobox).
+   * Whether the List is loading (a `Status` is mounted inside it): the pending edge waits until
+   * it settles (MultiSelect, multi-select.md B.8). Read in the layout effect, so it must see a
+   * Status that registered in the same commit (a ref count, not render state). Default: never
+   * loading, the edge is taken as soon as an enabled option is mounted (Combobox).
    */
-  readonly loading?: boolean;
+  readonly loading?: () => boolean;
 }
 
 export interface ActiveOption {
@@ -52,7 +53,7 @@ export function useActiveOption({
   orderedOptions,
   autoHighlight,
   stale,
-  loading = false,
+  loading,
 }: ActiveOptionOptions): ActiveOption {
   const [activeValue, setActiveValue] = useState<string | null>(null);
   const activeRef = useRef<string | null>(null);
@@ -76,7 +77,7 @@ export function useActiveOption({
     const enabled = orderedOptions().filter((option) => !option.disabled);
     let next = current;
     const edge = pendingEdgeRef.current;
-    if (edge !== null && enabled.length > 0 && !loading) {
+    if (edge !== null && enabled.length > 0 && loading?.() !== true) {
       next =
         typeof edge === "function"
           ? edge(enabled)

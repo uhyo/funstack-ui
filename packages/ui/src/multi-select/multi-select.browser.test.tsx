@@ -23,9 +23,11 @@ import { axNodeOf, axProperty } from "../__tests__/ax-tree.js";
 import { mouse } from "../__tests__/browser-commands.js";
 import { flushFor, quietPeriod, settle } from "../__tests__/browser-helpers.js";
 import { user } from "../__tests__/browser-user.js";
-import { browserName } from "../__tests__/engine.js";
+import { onCleanup } from "../__tests__/browser-helpers.js";
+import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
 import { deferred } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
+import { Field } from "../field/index.js";
 import { MultiSelect } from "./index.js";
 import type {
   MultiSelectOpenChangeDetails,
@@ -179,6 +181,30 @@ describe("MultiSelect (browser)", () => {
     expect(document.activeElement).toBe(trigger());
   });
 
+  it("Space toggles the active option exactly once per press, also across key repeats of the release", async () => {
+    const action = vi.fn<Action>();
+    const clicks = vi.fn();
+    render(<Harness root={{ valueChangeAction: action }} />);
+    trigger().addEventListener("click", clicks);
+    trigger().focus();
+    await user.keyboard("{ArrowDown}");
+    await settle(() => expect(activeOption()).toBe(option("ham")));
+    for (let i = 1; i <= 3; i++) {
+      await user.keyboard(" ");
+      await settle(() => expect(action).toHaveBeenCalledTimes(i));
+    }
+    await quietPeriod(80, "no click from the button's own Space activation");
+    expect(action).toHaveBeenCalledTimes(3);
+    expect(action.mock.calls.map(([, d]) => [d.added, d.removed])).toEqual([
+      [["ham"], []],
+      [[], ["ham"]],
+      [["ham"], []],
+    ]);
+    // Space never reached the button's activation behaviour: no click, the listbox stayed open.
+    expect(clicks).not.toHaveBeenCalled();
+    expect(isOpen()).toBe(true);
+  });
+
   it("Tab closes the listbox and toggles nothing", async () => {
     const action = vi.fn<Action>();
     render(<Harness root={{ valueChangeAction: action }} />);
@@ -268,12 +294,10 @@ describe("MultiSelect (browser)", () => {
       expect(select.tagName).toBe("SELECT");
       expect(select.required).toBe(true);
       expect(select.willValidate).toBe(true);
-      // Laid over the Trigger's box (anchor positioning), so the bubble points at it.
-      const t = trigger().getBoundingClientRect();
+      // Visually hidden: a 1px box, clipped, no pointer input (B.10).
       const s = select.getBoundingClientRect();
-      expect(Math.abs(s.left - t.left)).toBeLessThan(1);
-      expect(Math.abs(s.top - t.top)).toBeLessThan(1);
-      expect(Math.abs(s.width - t.width)).toBeLessThan(1);
+      expect(s.width).toBeLessThanOrEqual(1);
+      expect(getComputedStyle(select).pointerEvents).toBe("none");
       const invalid: Event[] = [];
       select.addEventListener("invalid", (event) => invalid.push(event));
       await user.click(screen.getByTestId("submit"));
@@ -322,6 +346,87 @@ describe("MultiSelect (browser)", () => {
       await act(async () => form.requestSubmit());
       expect(onSubmit).toHaveBeenCalledTimes(1);
       expect(onSubmit.mock.calls[0]![0].getAll("toppings")).toEqual(["corn"]);
+    });
+  });
+
+  describe("inside Fields with Field.Error (B.10)", () => {
+    it("a real submit focuses the first invalid control in document order", async () => {
+      render(
+        <form data-testid="form" onSubmit={(e) => e.preventDefault()}>
+          <Field.Root name="email">
+            <Field.Label>Email</Field.Label>
+            <Field.Control data-testid="email" required />
+            <Field.Error />
+          </Field.Root>
+          <Field.Root name="toppings">
+            <Field.Label>Toppings</Field.Label>
+            <MultiSelect.Root required>
+              <MultiSelect.Trigger data-testid="trigger">
+                <MultiSelect.Value placeholder="Choose" />
+              </MultiSelect.Trigger>
+              <MultiSelect.Popup data-testid="popup" style={popupStyle}>
+                <MultiSelect.List>
+                  <MultiSelect.Option value="ham">Ham</MultiSelect.Option>
+                </MultiSelect.List>
+              </MultiSelect.Popup>
+            </MultiSelect.Root>
+            <Field.Error data-testid="error" />
+          </Field.Root>
+          <button type="submit" data-testid="submit">
+            Save
+          </button>
+        </form>,
+      );
+      await user.click(screen.getByTestId("submit"));
+      await settle(() => expect(screen.getByTestId("error")).toBeInTheDocument());
+      await settle(() => expect(document.activeElement).toBe(screen.getByTestId("email")));
+      await quietPeriod(80, "focus must stay on the first invalid control");
+      expect(document.activeElement).toBe(screen.getByTestId("email"));
+    });
+
+    it("one Field: focus moves to the Trigger and nothing is announced on top", async () => {
+      const calls: string[] = [];
+      type Notifying = { ariaNotify(message: string, options?: object): void };
+      const proto = Element.prototype as unknown as Notifying;
+      if (supportsAriaNotify) {
+        vi.spyOn(proto, "ariaNotify").mockImplementation((message: string) => {
+          calls.push(message);
+        });
+      } else {
+        Object.defineProperty(Element.prototype, "ariaNotify", {
+          configurable: true,
+          value: (message: string) => calls.push(message),
+        });
+        onCleanup(() => {
+          delete (Element.prototype as { ariaNotify?: unknown }).ariaNotify;
+        });
+      }
+      render(
+        <form data-testid="form" onSubmit={(e) => e.preventDefault()}>
+          <Field.Root name="toppings">
+            <Field.Label>Toppings</Field.Label>
+            <MultiSelect.Root required>
+              <MultiSelect.Trigger data-testid="trigger">
+                <MultiSelect.Value placeholder="Choose" />
+              </MultiSelect.Trigger>
+              <MultiSelect.Popup data-testid="popup" style={popupStyle}>
+                <MultiSelect.List>
+                  <MultiSelect.Option value="ham">Ham</MultiSelect.Option>
+                </MultiSelect.List>
+              </MultiSelect.Popup>
+            </MultiSelect.Root>
+            <Field.Error data-testid="error" />
+          </Field.Root>
+          <button type="submit" data-testid="submit">
+            Save
+          </button>
+        </form>,
+      );
+      await user.click(screen.getByTestId("submit"));
+      await settle(() => expect(document.activeElement).toBe(trigger()));
+      expect(screen.getByTestId("error")).toBeInTheDocument();
+      await quietPeriod(80, "no second batch announces the browser message");
+      expect(calls).toEqual([]);
     });
   });
 

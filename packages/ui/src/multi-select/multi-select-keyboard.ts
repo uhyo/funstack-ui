@@ -60,6 +60,8 @@ export function createMultiSelectKeyDown({
 
   const activate = (target: OrderedOption | undefined): void => {
     if (target === undefined) return;
+    // The user moved: an edge armed for the open (still loading) must not replace this.
+    pendingEdgeRef.current = null;
     setActive(target.value);
     if (typeof target.element.scrollIntoView === "function") {
       target.element.scrollIntoView({ block: "nearest" });
