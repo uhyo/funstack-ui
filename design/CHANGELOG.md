@@ -12515,3 +12515,83 @@ modules). No code, rule or public path changed: the 25 consumer bundles are byte
 - The file index in `design/internal-hooks.md` is grouped by folder. Code spans in the design
   documents name the new paths. Entries above this one, the memos and `docs/research/` keep the
   old flat paths on purpose: they are history.
+
+## 2026-11-26, #163: Collapsible designed (proposed)
+
+Architect, wave 23 (#162). New document `design/components/collapsible.md`, status proposed;
+not implemented, and not yet accepted by the user. No conventions rule changed. Notes:
+`memo/architect/collapsible-notes.md`.
+
+What the design decides, and why:
+
+- **`<details>` base, three parts.** `Collapsible.Root` is the `<details>` and the state owner,
+  `Trigger` the `<summary>`, `Panel` a `div`. No wrapper `div` as in Accordion: a single
+  disclosure has no set and no arrow keys. Cost, stated in the document: the Trigger must be the
+  first child of the Root, so the Radix shape "trigger anywhere inside the Root" (a header row
+  with other controls, a "show more" button under the content) is not available; an outside
+  control uses controlled `open`. A second base (`button[aria-expanded]` plus a
+  `hidden="until-found"` region, the Tabs machinery) was not designed: #163 asks for the
+  `<details>` base, and two bases would be two components under one name.
+- **`open` / `defaultOpen` / `openChangeAction`, no `onOpenChange`.** #163 names
+  "`openAction` / `onOpenChange`"; the conventions' name for the request is `openChangeAction`
+  (2.1), and the pair with `onOpenChange` exists only on overlay Roots, for a change the library
+  cannot hold. A `<details>` has none: the click is intercepted, and what the browser does by
+  itself (find-in-page, a click before hydration) is rolled back cheaply, which is why Accordion
+  already treats it as a request with `reason: "platform"`. So conventions 3.9 does not apply
+  and the `on*` allow-list is unchanged.
+- **`defaultOpen` selects library mode.** Mode selection is conventions 3.9.11 without
+  `onOpenChange`: JS-free when the Root has none of `open`, `defaultOpen`, `openChangeAction`.
+  This differs from `Accordion.Item`, where `defaultOpen` is the JS-free spelling. Reason: the
+  Root is the element and the owner at once, and with `defaultOpen` kept JS-free there is no
+  uncontrolled library mode without an action (Accordion's `defaultValue={[]}`), which lazy
+  Panel content needs. The HTML and the behaviour before hydration are the same either way.
+- **Single-valued state, no reducer**, latest dispatch wins, as Toggle. `pending` on Root and
+  Trigger is the Root's transition (the owner rule of 4.3), not Accordion's per-item
+  "optimistic differs from committed".
+- **Transition types** `fsui-collapsible`, `fsui-collapsible-expand`,
+  `fsui-collapsible-collapse`: Accordion's change names, not the overlays' `open` / `close`.
+- **`experimental_interpolateSize` on the Root**, which is the `<details>` itself here;
+  `::details-content` inherits from its originating element.
+
+To do when the design is accepted and implemented (registry rows, not rule changes):
+
+- conventions 1.1, part vocabulary: `Root` may be the `<details>` itself (Collapsible).
+- conventions 3.5 (the browser-owned examples), 3.7 (no `keepMounted`), 5.3 (the types row),
+  7.3 (Collapsible next to Accordion) and 8 (`experimental_interpolateSize` on
+  `Collapsible.Root`).
+- `design/internal-hooks.md`: the index line of whatever is extracted (below).
+
+Sharing with Accordion (a plan for the developer, not a rule):
+
+- `Accordion.Trigger`'s click rule (the nested-interactive selectors, `preventDefault`, the
+  disabled branch) and the `<details>` / `<summary>` element checks move to one flat module in
+  `internal/`, used by both Triggers.
+- The state side is not shared: Accordion's Root owns a set, reconciles all items in one mount
+  dispatch and re-applies per item; Collapsible's Root is one `useControllableAction` over a
+  boolean with one `toggle` handler, one mount reconciliation and one re-apply effect. Building
+  Collapsible as a one-item exclusive Accordion was rejected: it brings the trigger registry,
+  the arrow keys, the set machinery and a wrapper `div`.
+- `Accordion.Item` outside any Root already works as a JS-free disclosure; whether it stays
+  documented is open.
+
+Test plan (conventions 10.1; jsdom unless noted):
+
+- Roles and ARIA: `details` / `summary` / `div`; no `aria-expanded`; `aria-disabled` when
+  disabled; element-check warnings for a wrong `render` element.
+- Keyboard: Enter and Space (browser test: real engines synthesize the click; jsdom does not).
+- Sync action, async action, rejection, superseded rejection, overlap (open then close, both
+  orders of settling), post-await rule, controlled / uncontrolled parity: the Toggle rows on
+  `open`, asserting `data-open` / `data-pending` on Root and Trigger, and the `open` attribute
+  and Panel state on commit.
+- Suspending content: the Panel's function form; the `<details>` stays closed and pending.
+- Platform path: mount reconciliation (`renderToString`, set `open` before `hydrateRoot`, one
+  dispatch with `reason: "platform"` and no event, StrictMode still one); `toggle` from
+  `setAttribute("open", "")` dispatches with the event; a refused or rejected reveal is closed
+  again; a reveal equal to the intended value does not dispatch; a disabled Root does not
+  dispatch and is re-closed.
+- Mode: none of the three props renders no handler and no `data-open`; `defaultOpen={false}`
+  is library mode; switching modes warns; `transition` in JS-free mode warns.
+- Function props and `render` element; the Directive row (three client files).
+- Browser: `experimental_interpolateSize` (computed `interpolate-size` on the `<details>`),
+  the `::details-content` transition, and one `transition` run with the types. Find-in-page is
+  not scriptable.
