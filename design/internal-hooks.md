@@ -48,8 +48,8 @@ const { committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFa
 
 **The `reducer` option.** A component passes **no `reducer`** for single-valued state (the
 optimistic value is the dispatched `next`, the uncontrolled commit is the latest dispatch's
-`next`): Toggle, Tabs, Select, RadioGroup, overlay `open`, and the `exclusive` modes of
-ToggleGroup and Accordion. It passes one for set-valued state: CheckboxGroup, and ToggleGroup
+`next`): Toggle, Tabs, Select, RadioGroup, overlay `open`, Collapsible `open`, and the
+`exclusive` modes of ToggleGroup and Accordion. It passes one for set-valued state: CheckboxGroup, and ToggleGroup
 and Accordion without `exclusive`. Passing one changes two things at once: the optimistic value
 is re-based change by change, and the uncontrolled commit becomes the replay of 3.3. A reducer:
 
@@ -239,6 +239,7 @@ packages/ui/src/internal/
   toolbar-context.ts      # section 7.1: ToolbarContext, read across folders
   use-roving-focus.ts     # section 7.4: DOM-written roving tabindex
   arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine; Accordion.Root uses resolveArrowKey); directive-free
+  details-summary.ts      # the <details> / <summary> pair of Accordion and Collapsible: interceptSummaryClick (the Trigger click rule, accordion.md 2.2), useDetailsCheck / useSummaryCheck (the element checks)
   use-native-focusgroup.ts  # useNativeFocusgroup(flag): the native `focusgroup` detection (section 8)
   announce.ts             # announce(target, message, priority?), canAnnounce(target) (section 8, number-field.md 8.3); directive-free
   shipped-styles.ts       # FSUI_PRECEDENCE (section 12); directive-free
