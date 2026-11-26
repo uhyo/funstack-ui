@@ -108,7 +108,9 @@ describe("HoverCard (browser)", () => {
       expect(isOpen()).toBe(true);
       await userEvent.hover(after());
       await expect.poll(isOpen).toBe(false);
-      expect(screen.queryByText("Ada Lovelace")).toBeNull();
+      // `hidePopover()` clears `:popover-open` at once; the children unmount only after the
+      // `toggle` task commits `false` and React renders, so a poll can land in between (#179).
+      await expect.poll(() => screen.queryByText("Ada Lovelace")).toBeNull();
     });
 
     it("a hover shorter than the delay opens nothing", async () => {
