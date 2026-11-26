@@ -1,0 +1,99 @@
+/* Scroll areas: a native scroller, styled with the standard scrollbar properties, with edge
+   fades driven by a scroll timeline (no script). Run in Chromium, Firefox and WebKit by
+   packages/ui/src/__tests__/scroll-area-recipe.browser.test.tsx, which reads this file. */
+
+.demo-scroll-area {
+  max-block-size: 12rem;
+  overflow: auto;
+  /* auto | thin | none. The thumb's shape and exact width stay the engine's. */
+  scrollbar-width: thin;
+  /* thumb, then track. */
+  scrollbar-color: var(--color-border) transparent;
+  /* Space for the bar even before the content overflows: no shift when it starts to. */
+  scrollbar-gutter: stable;
+  /* Reaching an end does not scroll the page behind. */
+  overscroll-behavior: contain;
+}
+.demo-scroll-area:hover,
+.demo-scroll-area:focus-visible {
+  scrollbar-color: var(--color-text-secondary) transparent;
+}
+
+/* Edge fades. The two lengths are 0 unless the timeline moves them: when nothing overflows the
+   timeline is inactive and no fade is drawn. Each fade grows over the first (last) 2rem of
+   scrolling, whatever the length of the content. Behind @supports: an engine without scroll
+   timelines would run the animations once on the document clock and keep their end values,
+   a fade over the top of the content for ever. */
+@property --scroll-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --scroll-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@supports (animation-timeline: scroll()) {
+  .demo-scroll-fade {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--scroll-fade-start),
+      #000 calc(100% - var(--scroll-fade-end)),
+      transparent
+    );
+    /* The shorthand resets the timeline, so the timeline and the ranges come after it. */
+    animation:
+      scroll-fade-start linear both,
+      scroll-fade-end linear both;
+    animation-timeline: scroll(self), scroll(self);
+    animation-range:
+      0 2rem,
+      calc(100% - 2rem) 100%;
+  }
+}
+@keyframes scroll-fade-start {
+  from {
+    --scroll-fade-start: 0px;
+  }
+  to {
+    --scroll-fade-start: 2rem;
+  }
+}
+@keyframes scroll-fade-end {
+  from {
+    --scroll-fade-end: 2rem;
+  }
+  to {
+    --scroll-fade-end: 0px;
+  }
+}
+
+/* The demo's content. */
+.demo-scroll-area-list {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  list-style: none;
+  display: grid;
+  gap: 0.5rem;
+}
+.demo-scroll-area-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 16rem));
+  gap: 1rem;
+}
+.demo-scroll-area-frame {
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+.demo-scroll-area-frame h4 {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-block-end: 1px solid var(--color-border);
+  font-size: 0.875rem;
+}
+.demo-scroll-area:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}

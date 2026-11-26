@@ -1,0 +1,75 @@
+/* Avatar: the image and the fallback share one grid cell, the image above. A loaded picture
+   paints over the initials; a broken <img alt=""> paints nothing, so the initials show, with or
+   without script. */
+.demo-avatar {
+  display: inline-grid;
+  inline-size: 4rem;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: clip;
+}
+.demo-avatar > * {
+  grid-area: 1 / 1;
+}
+.demo-avatar-image {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+}
+.demo-avatar-fallback {
+  display: grid;
+  place-items: center;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* No flash of initials during a fast load: while an image may still arrive (:has(img)), the
+   fallback becomes visible only after 400ms. Works before hydration too. */
+.demo-avatar:has(img) .demo-avatar-fallback {
+  animation: demo-avatar-fallback-in 1ms 400ms backwards;
+}
+@keyframes demo-avatar-fallback-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Fade the picture in, only where script runs (without it the status never leaves "idle"). */
+@media (scripting: enabled) {
+  .demo-avatar-image {
+    transition: opacity 150ms;
+  }
+  .demo-avatar-image[data-status="loading"] {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-avatar-image {
+    transition: none;
+  }
+}
+
+/* The demo's layout. */
+.demo-avatar-people {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.demo-avatar-figure {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+.demo-avatar-figure figcaption {
+  display: grid;
+  justify-items: center;
+  font-size: 0.875rem;
+}
+.demo-avatar-figure code {
+  color: var(--color-text-secondary);
+}

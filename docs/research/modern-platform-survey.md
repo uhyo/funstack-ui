@@ -127,7 +127,7 @@ Version numbers are the first supporting stable release. `TP` = Safari Technolog
 | Scroll snap (`scroll-snap-type/align/stop`) | 69/75 | 11/15 | 99/103 | adopt | Carousel, Tabs strip |
 | `scrollsnapchange` / `scrollsnapchanging` events | 129 | ✗ | ✗ | not yet | Carousel |
 | `scrollend` event | 114 | 26.2 | 109 | adopt | Carousel |
-| Scroll-driven animations (`animation-timeline`, `scroll()`, `view()`) | 115 | 26 | ✗ (Nightly only; pref `layout.css.scroll-driven-animations.enabled`) | flag | Carousel, progress indicators |
+| Scroll-driven animations (`animation-timeline`, `scroll()`, `view()`) | 115 | 26 | ✗ (Nightly only; pref `layout.css.scroll-driven-animations.enabled`) | flag (159 since; see the update in Per-feature notes) | Carousel, progress indicators |
 | `scroll-state()` container queries | 133 | ✗ (evaluation bugs opened Oct 2026) | ✗ | not yet | sticky headers, Toolbar |
 | `::scroll-marker`, `::scroll-button`, `scroll-marker-group: tabs` | 135/154 | ✗ | ✗ | not yet | Carousel, Tabs |
 | `scrollbar-width` / `scrollbar-color` | 121 | 18.2 / 26.2 | 64 | adopt | scroll areas |
@@ -337,6 +337,13 @@ is n/a; use `data-*` attributes.
 
 - Scroll-driven animations: Chrome 115, Safari 26 (threaded in 26.4), Firefox only in Nightly
   (`layout.css.scroll-driven-animations.enabled`; off in release 158). Flag.
+  - **Update 2026-11-26 (#171):** shipped in **Firefox 159** (browser-compat-data:
+    `css.properties.animation-timeline`, `version_added: "159"`), so scroll-driven animations are
+    now in the latest stable of all three engines: **adopt**. The summary table row above keeps
+    the verdict of the research date. The "Scroll areas" docs recipe uses them for edge fades,
+    behind `@supports (animation-timeline: scroll())`; its browser test ran the recipe in
+    Chromium, in Playwright's Firefox 157 (no support: no fade, as the `@supports` guard intends)
+    and in that Firefox with the pref on (the recipe works).
 - Scroll snap: Baseline. `scrollsnapchange`/`scrollsnapchanging` events are Chromium only.
   `scrollend` is Baseline since Safari 26.2.
 - `scroll-state()` queries (`stuck`, `snapped`, `scrollable`, `scrolled`): Chrome 133/144 only.

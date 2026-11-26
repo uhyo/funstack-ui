@@ -85,6 +85,8 @@ export const routes = [
               page("/components/progress", "ProgressPage"),
               page("/components/meter", "MeterPage"),
               page("/components/separator", "SeparatorPage"),
+              page("/components/scroll-area", "ScrollAreaPage"),
+              page("/components/avatar", "AvatarPage"),
               page("/roadmap", "RoadmapPage"),
             ],
           }),

@@ -61,7 +61,9 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/number-field", label: "NumberField", group: "Forms" },
   { path: "/components/progress", label: "Progress", group: "Output" },
   { path: "/components/meter", label: "Meter", group: "Output" },
+  { path: "/components/avatar", label: "Avatar", group: "Output" },
   { path: "/components/separator", label: "Separator", group: "Layout" },
+  { path: "/components/scroll-area", label: "Scroll areas (recipe)", group: "Layout" },
 ];
 
 // Site-wide documentation navigation, rendered by the sidebar and the mobile menu.
