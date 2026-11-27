@@ -471,3 +471,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - 2026-11-27 #188 MERGED bbafa38c (review fixes dacafdcd; 4.4 amended b152f88e). #172/#188 closed. Menubar + NavMenu devs still running.
 - 2026-11-27 NavigationMenu MERGED 2b24cda4 (fixes c540d893). #189 router report (human). Menubar fixes in progress (+ disabled-trigger hold, arch c2253d3f).
 - 2026-11-27 Menubar MERGED 3b399181; menubar.md warning amended 989e860d. #170 closed. alpha.22 RELEASED (npm alpha=0.1.0-alpha.22, docs deployed). WAVE 26 DONE. Note: gh run list has no --commit flag (watcher hung). Open: dependabot dev-deps PR CI failing (run 45923835911); #189 router report (human).
+- 2026-11-27 WAVE 27 (follow-ups) start: dev-185 (#185 form reset + #184 fieldset, feat/185-form-reset), dev-177 (fix/177-dialog-escape), dev-deps (PRs 173/174 → chore/deps-update), arch-fu (#175, #183 design). Deferred: #178 (Chromium 160, 2027-01-05), #181 research (later).
