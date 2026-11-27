@@ -15546,3 +15546,87 @@ with a coming open: Escape closes the hint and the coming open never opens (the 
 case, with fake timers past `delay`); the same with a page `preventDefault()`: nothing is
 cancelled and nothing closes; `escape-key.test.ts`: a cancel runs although a global layer
 consumes, and runs before it.
+
+## 2026-11-27, #181: text-field.md, the design (proposed)
+
+Architect, for the product owner and the user. New document: `design/components/text-field.md`
+(**proposed**, not implemented). Also changed: field-form.md 4.3 and 12, one pointer each to
+the proposal. No conventions rule changes until the user decides; what acceptance would change
+is listed at the end. Notes: `memo/architect/text-field-notes.md`.
+
+What it proposes: a single-element `TextField` (`<input>`, or `<textarea>` through `render`)
+whose `value` is the saved text and whose typed text is an urgent internal draft, committed on
+blur or Enter through `valueCommitAction`, with `data-pending`, NumberField's rollback, Escape
+reverting the draft under conventions 15, one form control (OTPField's shape) and the usual
+Field registration. It ends with four "Decisions for the user".
+
+Prior art (2026-11-27; how each was checked is in the notes):
+
+- **Ark UI `Editable`** (docs page and the Zag machine's connect file). Nine parts: Root,
+  Label, Area, Input, Preview, Control, Edit / Submit / Cancel triggers. The Preview is a
+  focusable `span` (`tabindex="0"`, `aria-label` "edit", no role) swapped with the Input by
+  `hidden`; `activationMode` `focus` by default. `submitMode` `both` by default (Enter and
+  blur); Escape cancels and is prevented; a textarea commits on Cmd or Ctrl+Enter;
+  composition is guarded. `onValueChange` / `onValueCommit` / `onValueRevert` are plain
+  callbacks: no pending state, nothing awaited, no rule for a save that fails.
+- **Atlassian `InlineEdit`**: read view and edit view, Enter saves, Escape cancels, visible
+  confirm / cancel buttons, saved when the user moves away; for larger text it recommends
+  keeping the edit view open on blur so that unfinished work is neither saved nor discarded
+  by accident; "don't use inside a form". Nothing on what a screen reader is told.
+- **React Aria, Base UI, Radix**: no inline-edit component found (search and memory; not
+  checked against each library's component list).
+- **HTML.** The `change` event is the platform's commit (blur after an edit, Enter in an
+  input); it has no pending, no revert and no Escape, and React's `onChange` is `input`.
+  `contenteditable="plaintext-only"` is in all three engines (Chrome 51, Firefox 136, Safari
+  5) and flows like text, but is no form control. `field-sizing: content` (Chrome 123,
+  Firefox 152, Safari 26.2) lets an input size like text, which is what makes a separate read
+  view unnecessary for plain text.
+- **Accessibility guidance** specific to inline edit: none authoritative found. The comparison
+  in text-field.md 8 is reasoned from the markup above and from WCAG 4.1.3 (status
+  messages); it is not a screen-reader test.
+
+Reasoning worth keeping:
+
+- **Why the draft is React state and not the browser's.** My #169 sketch had an uncontrolled
+  input and the native `change` event. NumberField's `useState` draft was taken instead: a
+  rollback, an Escape and a controlled change from outside are then renders, `state.text`
+  exists, and the two components share one model. The native `change` event is not used.
+- **Why "keep the refused text" is not the rule.** An uncaught rejection replaces the field
+  (the boundary), so the case only shows with a parent that does not adopt, and the library
+  cannot tell that from a parent that adopted a trimmed text. The conventions already let the
+  action choose: adopt and flag (keep), or do not adopt (roll back). text-field.md 5 writes
+  both as recipes; decision 2 asks whether that is enough.
+- **Why no `autocomplete="off"` default**, unlike NumberField and OTPField: the text may be a
+  name or an address. A browser's form-state restoration therefore reaches mount
+  reconciliation and is dispatched as a `"platform"` commit, as conventions 3.5 has it for a
+  restored checkbox. OTPField's exception (no completion at mount) is about verifying a stale
+  one-time code and does not carry over.
+- **Why the commit ignores validity**: NumberField commits a number outside `min` / `max`
+  (5.6). A gate would be a second rule for the same question; listed in text-field.md 13.
+
+Not verified (no probe was run for this proposal):
+
+1. The order of `focusout` and the end of an IME composition when a field is blurred mid
+   composition. If the composed text arrives after the blur, a draft reopens on an unfocused
+   field. NumberField has the same exposure. The test plan has the row that decides it.
+2. `type="search"`: the engines' own Escape (clears the field) next to the revert.
+3. That a controlled write drops the undo history in all three engines (stated in 4.3).
+4. `text-overflow: ellipsis` on an unfocused input in all three engines (the CSS of section 9).
+5. Whether `useNativeGroupReconciliation` fits one text input as it stands.
+6. The absence of an inline-edit component in React Aria, Base UI and Radix.
+
+Owed on acceptance, in the commit that accepts (none of it is done now):
+
+- conventions 2.1: the `<state>CommitAction` row gains "a text control's only action
+  (TextField): once per edit"; 3.1 names the exception to the triple (if decision 4 is (a)).
+- conventions 2.6: TextField's draft joins the list of internal urgent states; 3.2's table
+  row for NumberField's draft names it too; 3.5's mount-reconciliation sentence.
+- conventions 4.1: `pending` and `invalid` rows; 15 rule 2's examples ("an input that reverts
+  its draft").
+- testing.md 10.1: "Inside a Field" and "Platform path" name the component; the action-naming
+  list gains `TextFieldProps`.
+- internal-hooks.md 3.8: the users of `useFormReset` / `useResetTarget`, `useFieldControl`
+  and `useFieldValueChange`.
+- field-form.md 4.3, 7.2 (a row) and 12.
+- number-field.md 13, if Escape parity is taken.
+- text-field.md itself: status, and its "Decisions for the user" section moves here.

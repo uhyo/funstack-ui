@@ -732,7 +732,8 @@ submission, which `Form.Root` already runs. So:
   code (`useDeferredValue`, or Combobox when the result is a list of options).
 - **No commit action in this part.** "Save this text when the user is done with it" (blur or
   Enter, `data-pending` on the input, a rule for a rejected save) is a component of its own
-  with NumberField's draft-and-commit model, not a prop of `Field.Control`. Section 12.
+  with NumberField's draft-and-commit model, not a prop of `Field.Control`. Section 12; the
+  proposal is `design/components/text-field.md` (#181).
 
 **`Field.Control` outside a `Field.Root`** (#169) renders the plain control instead of
 throwing. Every FUNSTACK form control works both inside and outside a Field (`useFieldControl`
@@ -1473,7 +1474,8 @@ const deferredQuery = useDeferredValue(query);
 - A `Fieldset` / `Legend` part (7.4) and `Input` / `Textarea` parts (4.3): the native elements.
 - A text field with a **commit action** (save on blur or Enter, with `data-pending` and a rule
   for a rejected save; Ark UI's `Editable` is the nearest prior art): a separate component if it
-  is built, with NumberField's draft-and-commit model. Not a prop of `Field.Control`.
+  is built, with NumberField's draft-and-commit model. Not a prop of `Field.Control`. Proposed
+  as `TextField` in `design/components/text-field.md` (#181), not accepted yet.
 - Async or debounced `validate` (Base UI's `validationDebounceTime`): a v2 question once a demo
   needs a uniqueness check before submit; the sync slot and the server channel cover it today.
 - `Field.Root invalid` / `error` overrides (Base UI's `invalid`, React Aria's `isInvalid` +
