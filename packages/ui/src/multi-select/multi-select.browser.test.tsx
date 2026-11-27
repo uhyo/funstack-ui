@@ -112,8 +112,9 @@ describe("MultiSelect (browser)", () => {
     });
     await flushFor();
     expect(trigger().matches(":disabled")).toBe(true);
-    // An engine that blurs the disabled Trigger may close the listbox on the focus loss; one
-    // that keeps focus on it (the HTML focus-fixup rule fires no blur) still shows it.
+    // Chromium, Firefox and WebKit all blur the disabled Trigger (focus goes to <body>) and the
+    // listbox closes, so the click branch is a guard: an engine that kept focus on it (the HTML
+    // focus-fixup rule fires no blur) would still show the listbox, and the option is clicked.
     if (isOpen()) await user.click(option("olive"));
     await settle(() => expect(isOpen()).toBe(false));
     expect(valueChangeAction).not.toHaveBeenCalled();

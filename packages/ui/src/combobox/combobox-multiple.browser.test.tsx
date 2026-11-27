@@ -129,8 +129,9 @@ describe("Combobox multiple (browser)", () => {
     });
     await flushFor();
     expect(input().matches(":disabled")).toBe(true);
-    // Chromium and Firefox blur the disabled input and the listbox closes; an engine that keeps
-    // focus on it still shows the listbox, and the option is clicked.
+    // Chromium, Firefox and WebKit all blur the disabled input (focus goes to <body>) and the
+    // listbox closes, so the click branch is a guard: an engine that kept focus on it (the HTML
+    // focus-fixup rule fires no blur) would still show the listbox, and the option is clicked.
     if (isOpen()) await user.click(screen.getByTestId("opt-jp"));
     await settle(() => expect(isOpen()).toBe(false));
     expect(action).not.toHaveBeenCalled();

@@ -14711,3 +14711,42 @@ arrive later) looks exactly like an empty bar, and a warning there would be fals
 the library is built for. A test row pins that such a bar stays silent. Not taken: warning
 after a delay or on the first key press (a guess about timing, for a mistake that is visible
 at once anyway: an empty bar).
+
+## 2026-11-27, #185 and #184: a real reset button; option clicks after a fieldset is disabled
+
+Developer (`memo/developer/issue-185-184.md`).
+
+- **#185, `combobox.md` 11.1 amended.** The text's reset microtask dispatched the input's
+  `.value`. After a click on a `<button type="reset">` the `reset` event is dispatched from a
+  task, so a microtask checkpoint follows each listener and `useFormReset`'s `onReset` runs
+  *before* the reset algorithm: the input still held the typed text, and the commit that
+  followed rewrote `defaultValue` back to it (Chromium and Firefox; the text stayed `xyz`, a pick
+  stayed selected). 11.1 now says the listener dispatches the computed text target (conventions
+  3.8 rule 6 already said "never a DOM read" for a controlled value input; the Combobox text was
+  the one place that did not follow it). The `useFormReset` doc comment states the contract for
+  every caller.
+- **Every other control checked** with a real click made outside `act`
+  (`packages/ui/src/__tests__/form-reset-button.browser.test.tsx`, all three engines): Combobox
+  single (uncontrolled, after a pick, a controlled parent that adopts and one that refuses) and
+  `multiple`, NumberField (a draft and a stepped value), Slider, Select with `<selectedcontent>`,
+  Checkbox, Switch, CheckboxGroup with a Parent (after a change and with nothing changed),
+  MultiSelect. Only Combobox was affected; the others compute their target or read
+  `defaultChecked` / `defaultValue`, which hold the target before and after the algorithm.
+  OTPField was fixed in #171 and RadioGroup already had a real-button row.
+- **Proposed, not applied (architect): `internal-hooks.md` 3.8 rule 5** says the hook "waits a
+  microtask; by then, for React's own reset, the re-apply effect has already put the optimistic
+  value back into `checked`", which reads as if the microtask always follows the algorithm. It
+  holds for a script `form.reset()` only. Proposed rule 5: "**Reset never reads the reset
+  result.** The `reset` event precedes the reset algorithm and the hook calls back in a
+  microtask. After a script `form.reset()` (React's own reset included) that microtask runs
+  after the algorithm; after a click on a `<button type="reset">` a microtask checkpoint follows
+  each listener, so it runs before the algorithm, while `checked` and `value` still hold the
+  user's state. A callback therefore reads `defaultChecked`, which is the value the browser
+  resets to in every case (a group's `readDefault()` returns the value of the radio whose
+  `defaultChecked` is true, or `null`), or dispatches a target computed in JS (rule 6)."
+- **#184: does not reproduce.** Setting an ancestor `<fieldset disabled>` while the listbox is
+  shown blurs the Combobox Input or the MultiSelect Trigger in Chromium, Firefox and WebKit
+  (focus goes to `<body>`), and the focus-leaving close hides the listbox before any option can
+  be clicked. No `:disabled` bail was added to `acceptSingle` / `acceptMultiple` / MultiSelect's
+  `toggle`. Three guard rows (Combobox single, `multiple`, MultiSelect) click the option only
+  if the listbox is still shown, and assert it closes with no dispatch.

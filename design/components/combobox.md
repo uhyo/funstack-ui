@@ -1215,7 +1215,10 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
   event**, before the reset algorithm runs (`useFormReset`'s third argument, `onResetEvent`):
   react-dom syncs a text input's `defaultValue` attribute to its value after every keystroke, so
   a mirror written in a layout effect does not survive. The algorithm then restores the text
-  the browser way and the microtask listener reads it.
+  the browser way. The microtask listener dispatches the **computed** text target, never the
+  input's `.value`: after a click on a `<button type="reset">` that microtask runs before the
+  algorithm (a microtask checkpoint follows each `reset` listener of an event dispatched from a
+  task), when the input still holds the typed text (#185).
 - `required` is the Input's native attribute: empty text is `valueMissing`, the browser's
   localised message appears on submit, `:user-invalid` matches after interaction. "The text must
   be one of the options" needs no constraint: without `allowCustomValue` the text is always a
