@@ -7,7 +7,7 @@
 // Engine branches (src/__tests__/engine.ts): the accessibility tree is read through CDP, so the
 // node assertions run on Chromium only; Firefox's tree was read by hand through Marionette
 // (memo/developer/probes/170-menubar-ax). axe and the DOM assertions run on all three engines.
-import { act, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import axe from "axe-core";
 import { hydrateRoot } from "react-dom/client";
 import type { Root } from "react-dom/client";
@@ -17,7 +17,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { axProperty, getAXNodes } from "../__tests__/ax-tree.js";
 import type { AXNode } from "../__tests__/ax-tree.js";
-import { addStyle, flushFor, onCleanup, settle } from "../__tests__/browser-helpers.js";
+import {
+  addStyle,
+  flushFor,
+  leaveActEnvironment,
+  onCleanup,
+  settle,
+} from "../__tests__/browser-helpers.js";
 import { user } from "../__tests__/browser-user.js";
 import { browserName } from "../__tests__/engine.js";
 import { Menu } from "../menu/index.js";
@@ -309,12 +315,11 @@ describe("Menubar (browser)", () => {
       expect(filePopup.matches(":popover-open")).toBe(false);
       expect(editPopup.querySelector('[role="menuitem"]')).toBeNull();
 
-      let root!: Root;
-      await act(async () => {
-        root = hydrateRoot(container, <Bar />);
-      });
+      // Hydration and the mount reconciliation's dispatch land outside any act scope.
+      leaveActEnvironment();
+      const root: Root = hydrateRoot(container, <Bar />);
       onCleanup(() => root.unmount());
-      await settle(() => expect(editPopup.querySelector('[data-testid="undo"]')).not.toBeNull());
+      await expect.poll(() => editPopup.querySelector('[data-testid="undo"]')).not.toBeNull();
       expect(editPopup.matches(":popover-open")).toBe(true);
       expect(file).toHaveAttribute("tabindex", "0");
       expect(edit).toHaveAttribute("tabindex", "-1");
