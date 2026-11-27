@@ -14498,3 +14498,41 @@ Implementation details within the design:
     open "is requested" and stopped; it now says when it commits. Not measured: a first open
     held by suspended content alone (no async action), where nothing should entangle once the
     open is superseded.
+
+## 2026-11-27, #170: `Menubar`, menu mode is kept across a disabled Trigger (review nits 8 and 5)
+
+Architect, after the review (`memo/reviewer/review-170-bar.md`).
+
+- **2.2 step 3, 2.3, 3: a switch onto a disabled Trigger keeps the bar in menu mode.** Before,
+  menu mode was only ever derived ("some menu has an open intended"), so it ended on a disabled
+  Trigger, which opens nothing: File → (disabled) Edit → the next arrow only moved focus.
+  Native menubars keep the mode, and the user's priority is expected behaviour. Now the bar
+  holds, in a ref, the disabled Trigger a switch landed on together with that switch's focus
+  cause; an arrow, Home or End from it is a switch with the held cause, and a `pointermove` on
+  another Trigger counts it as menu mode. The hold ends when that Trigger loses focus any other
+  way and on Escape. Not taken: skipping disabled Triggers in the switch (the APG keeps
+  disabled items focusable, and the bar's own arrows stop on them when closed), and mirroring
+  menu mode into React state.
+- **6: a disabled Trigger renders `aria-expanded="false"` and no `popovertarget`**, the
+  exception to "no `aria-expanded`". As built; the text had no exception.
+- Also from the review: the case this document's previous entry called not measured (a first
+  open held by suspended content alone, then a second switch) was probed by the reviewer:
+  nothing waits. The developer adds the row.
+
+Code owed for the first item (`Menubar` only; no change to Menu parts or the context's shape
+beyond what `otherIntended` returns):
+
+- A ref `held: { trigger, focus } | null`.
+- `switchTo`: clear `held` on entry; in step 3, when the target is disabled, set
+  `held = { trigger: target, focus }`.
+- The bar's `onKeyDown`: read `held` before the engine runs; menu mode is `menu.intended()` or
+  `held.trigger === event.target`; the switch that follows the engine's move uses
+  `held.focus` in the second case, `"none"` in the first. Escape on the held Trigger clears
+  `held` (the event is not prevented).
+- The bar's `onBlur`: clear `held` when `event.target` is the held Trigger (the keydown
+  handler has read it already, so an arrow move still switches).
+- `otherIntended(trigger)`: also true when `held` names another Trigger.
+- Rows: item → ArrowRight → disabled → ArrowRight opens the next menu with its first item
+  focused; the same from the bar (`"none"`, focus on the Trigger); two disabled Triggers in a
+  row; Escape, Tab and a click elsewhere end the hold (the next arrow only moves focus);
+  `pointermove` onto an enabled Trigger while a disabled one holds the mode opens it.
