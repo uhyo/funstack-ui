@@ -14850,3 +14850,177 @@ Code owed:
   stylesheet gets a pending style on the Cancel); `skills/funstack-ui-knowledge`; the
   Roadmap's behaviour-change notes (Close parts gain `data-pending` without `action`;
   `Menu.Item` without `action` loses the pending `aria-disabled`).
+
+## 2026-11-27, #177: a non-modal Dialog's Escape waits for the inner layers' JS listeners
+
+Developer, from review-166 (finding 2). dialog.md 2.6 put the non-modal dialog's Escape
+`keydown` listener on the dialog element, so it ran before the document listeners of HoverCard
+and Tooltip, and its inner-layer check skipped `manual` popovers (no close watcher). Escape with
+a `manual` card or tooltip shown inside a non-modal Dialog or Drawer closed the dialog and left
+the card `:popover-open` inside it, against "innermost first" (hover-card.md 2.6, tooltip.md
+2.2). A `hint` tooltip or card in Safari 27.0 (mapped to `manual`) had the same gap.
+
+Amended (dialog.md 2.6 and the nested-layer row of section 9; one sentence each in
+hover-card.md 2.6 and the Tooltip listener table): the listener is on the **window**, so it runs
+after every element and document listener, and it leaves an already prevented Escape alone. A
+`manual` HoverCard or Tooltip prevents the Escape it closes on, so it closes first and the
+next Escape closes the dialog: the platform rule for a modal dialog's close watcher (a canceled
+`keydown` is no close request) now holds for the JS path too. The inner-layer check reads the
+event path (`composedPath()`), not `target.closest()`, because the target is retargeted by the
+time the event reaches the window. Side effect, intended: a consumer handler inside the dialog
+that prevents Escape (an input that clears itself) keeps a non-modal dialog open, as it already
+keeps a modal one open.
+
+Not taken: counting every open popover inside the dialog as an inner layer (HoverCard's own
+stand-down rule). A consumer's `manual` popover that does not handle Escape would then make
+Escape dead in the dialog; with the prevented-event rule it still closes the dialog, as the
+existing jsdom row pins. Modal Dialog, AlertDialog and modal Drawer needed no change: their
+Escape is the platform's close watcher, which already respects the prevented keydown; Popover
+and Menu are `auto` popovers and were already covered by the close-watcher check. No change to
+the conventions (overlay-open-state.md states no layering rule for Escape).
+
+Rows: jsdom (dialog.test.tsx) for a HoverCard and a Tooltip (focus on its trigger) inside a
+non-modal Dialog, a HoverCard inside a non-modal Drawer, and a prevented Escape from a handler
+inside; browser (dialog.browser.test.tsx) for HoverCard and Tooltip, `manual` and
+`experimental_hint` (branching on `supportsPopoverHint`), in a modal and a non-modal Dialog.
+
+## 2026-11-27, #177: a non-modal Dialog's Escape: `preventDefault()` cancels, `stopPropagation()` does not
+
+Architect, after the review (`memo/reviewer/review-177.md`) and on the product owner's
+preference (the user's alignment principle: a non-modal dialog behaves as a modal dialog's
+close watcher and the `auto` overlays do). Replaces the mechanism of the entry above (a
+standing bubble listener on the window); its goal and its rows stand. Changed: dialog.md 2.6
+and section 9 (two rows added), hover-card.md 2.6, tooltip.md's listener table.
+
+- **Two problems with the window listener.** (a) At the window `composedPath()` hides the
+  nodes of a closed shadow root, so a dialog portalled into one never closed. (b) Any
+  `stopPropagation()` between the target and the window cancelled the dismissal, a React
+  `onKeyDown` on an ancestor outside the dialog included (React stops the native event at its
+  root container). A close watcher ignores it.
+- **The mechanism: record at the dialog, decide last.** A capture listener on the dialog
+  records the Escape and the inner-layer snapshot, where the path is complete in any shadow
+  mode and before any close watcher has closed a layer. The decision runs in a window bubble
+  listener added for that event only, or in a `setTimeout(0)` task when propagation was
+  stopped; first one wins.
+- **Why not one listener.** No position is both last and unstoppable. The decision has to see
+  every listener's `preventDefault()` (the inner `manual` HoverCard and Tooltip are on the
+  document), and it has to prevent the event itself while it is still being dispatched, or an
+  enclosing modal dialog's or `auto` popover's close watcher closes on the same Escape. Only a
+  bubble listener on the window does both, and `stopPropagation()` can keep the event from
+  it. Hence the task as a second path, which gives up the second property only.
+- **Why not a microtask.** For a key the user pressed, a microtask checkpoint follows every
+  listener, so a microtask queued at the dialog runs before the document listeners (the
+  timing of internal-hooks.md 3.8 rule 5). **Why not a task alone:** the decision could never
+  prevent the event, and a non-modal dialog inside a modal one would close both.
+- **The snapshot is taken at record time** because an `auto` / `hint` popover inside is closed
+  by its close watcher after the dispatch: a task would find it closed and close the dialog
+  too.
+- **Limits, stated in 2.6.** On the task path an enclosing close-watcher layer closes on the
+  same Escape. A capture-phase `stopPropagation()` above the dialog hides the event from the
+  record step. Not taken for that: recording at the window in capture with membership read
+  from `getRootNode().activeElement` (it needs the target to be the focused element, and the
+  inner-layer path would be walked by hand).
+- **hover-card.md 2.6**: the card also stands down for an open non-modal dialog inside it that
+  the Escape came from. With the element listener the dialog ran before the card's document
+  listener and prevented the event; now it decides after, so the card has to see it. A
+  non-modal dialog inside the card that the Escape did not come from does not count, or
+  Escape would do nothing.
+- **Fixed by the same rule, now a row:** a Combobox chip prevents Escape "so that the close
+  request of an enclosing Dialog or Popover is not run"; a non-modal Dialog closed anyway
+  before, because its element listener ran before React's root listener.
+- Not in this change (review nit 10, issues to file): the Escape path does not skip
+  `isComposing`; Tooltip's document Escape listener does not check `defaultPrevented`.
+
+Code owed (`packages/ui/src/dialog/dialog-dismiss.ts`, non-modal only; `modal` and the
+`closedby` path unchanged):
+
+- Remove the standing window listener. `escapeBelongsToInnerLayer(dialog, event)`: from
+  `event.composedPath()` read **at the dialog**, the nodes before `dialog`: an open
+  `HTMLDialogElement`, or `isOpenLightPopover`; then the `querySelectorAll("[popover]")`
+  check. No "index < 0" branch: the listener is on the dialog.
+- `dialog.addEventListener("keydown", record, true)`. `record`: return unless
+  `key === "Escape"` and `dialog.open`; if a record for this event exists, return; store
+  `{ event, inner }`; `win.addEventListener("keydown", onWindow)` (bubble) and
+  `timer = setTimeout(decideLate, 0)`.
+- `onWindow(e)`: ignore an event that is not the recorded one; otherwise `settle(true)`.
+  `decideLate`: `settle(false)`.
+- `settle(canPrevent)`: take and clear the record, remove the window listener, clear the
+  timer; return if `event.defaultPrevented`, `inner`, `!dialog.open` or `!dialog.isConnected`;
+  `if (canPrevent) event.preventDefault()`; `dialog.requestClose()`.
+- A new Escape recorded while one is pending settles nothing early: replace the record after
+  clearing the old listener and timer (the old event's dispatch is over).
+- Cleanup (the function `listenDialogDismiss` returns): remove the capture listener, the
+  window listener and the timer. This is nit 7: nothing on the window outside one Escape's
+  dispatch.
+- `packages/ui/src/hover-card/use-hover-card-interest.ts`: `containsOpenLayer(popup, event)`
+  also returns `true` for an open non-modal `<dialog>` inside the popup that contains
+  `event.target`.
+
+Rows owed (jsdom unless said; a real key press in the browser rows):
+
+- Shadow roots: a non-modal Dialog portalled into an open and into a closed shadow root:
+  Escape from inside closes it; with a `manual` HoverCard shown inside, the card first.
+- Nested non-modal in non-modal: Escape in the inner closes the inner only, the next closes
+  the outer. Sibling non-modal dialogs: Escape closes the one that has the target only.
+- A non-modal Dialog inside a modal one, browser row: Escape closes the inner only.
+- `stopPropagation()`: (1) a native listener on an element inside the dialog, (2) a React
+  `onKeyDown` on an ancestor outside it: the dialog closes after a task, `onOpenChange(false,
+  { reason: "dismiss" })` once. (3) the same with `preventDefault()` as well: stays open.
+  (4) `stopPropagation()` with an open `auto` Popover inside: the dialog stays open (the
+  snapshot), browser row.
+- `preventDefault()` from a listener on the document and from one on the window (registered
+  before the Escape): stays open.
+- A Combobox with chips inside a non-modal Dialog: Escape on a chip does what the chip does
+  and the dialog stays open; the next Escape, from the input with the list closed, closes it.
+- A non-modal Dialog inside a HoverCard, Escape from inside the dialog: the dialog closes,
+  the card stays; from the card outside the dialog: the card closes.
+- No listener leak: after an Escape that closed the dialog, after one that was prevented and
+  after unmount during a pending record, `window` has no `keydown` listener of the dialog (spy
+  on `addEventListener` / `removeEventListener`), and a closed or never-opened dialog adds
+  none.
+- The existing rows of the entry above stay (HoverCard, Tooltip, Drawer, the "toast" manual
+  popover that leaves Escape to the dialog).
+
+Docs owed: DialogPage's keyboard table (the row the developer added, plus "`stopPropagation()`
+does not keep it open"); the Drawer page if it repeats the Escape row; memo/developer/issue-177.md
+side-effect note is superseded.
+
+## 2026-11-27, #177: the Escape fallback uses `afterDispatch`, shared with form reset (#185)
+
+Architect. Adjusts the entry above in one point: the fallback of the decide step is not a
+bare `setTimeout(0)` but `afterDispatch(event, callback)`, the helper `useFormReset` uses for
+the same need ("after this event has been fully dispatched", internal-hooks.md 3.8 rule 5 on
+`review/185`): a microtask, and a task when the event is still being dispatched at that
+microtask (`event.eventPhase !== Event.NONE`). For a key the user pressed that is the task
+described above; for a scripted `keydown` (jsdom rows, `dispatchEvent`) the microtask already
+follows the whole dispatch, so the dialog closes without a timer. Changed: dialog.md 2.6
+(step 2, and "task path" is now "late path").
+
+Code owed, replacing the timer lines of the entry above:
+
+- `packages/ui/src/internal/after-dispatch.ts`, directive-free, the same file on both
+  branches (whichever merges second takes the other's):
+  `afterDispatch(event: Event, callback: () => void): () => void`. `queueMicrotask`: if
+  cancelled, return; if `event.eventPhase === Event.NONE`, `callback()`; else
+  `timer = setTimeout(callback, 0)`. Returns a cancel function.
+- `dialog-dismiss.ts`: `record` stores `cancelLate = afterDispatch(event, () =>
+  settle(false))` instead of the timer; `settle` and the cleanup call `cancelLate()`.
+- Rows: the `stopPropagation()` rows in jsdom settle in a microtask (`await` once, no fake
+  timers); the browser `stopPropagation()` rows (a real key) cover the task.
+
+## 2026-11-27, #177: record at the dialog, decide last, implemented
+
+Developer. The checklists of the two architect entries above, as written:
+`internal/after-dispatch.ts` (the API and body of the `afterDispatch` entry), the capture
+`record` / per-event window `onWindow` / `settle(canPrevent)` in `dialog-dismiss.ts`, and
+`containsOpenLayer(popup, event)` in HoverCard. No deviation. Rows: `dialog-escape.test.tsx`
+(jsdom: open and closed shadow roots with and without a HoverCard inside, nested and sibling
+non-modal dialogs, `stopPropagation()` from a native listener and from a React ancestor with and
+without `preventDefault()`, prevention from document and window listeners, a Combobox chip, a
+non-modal Dialog inside a HoverCard, and the window-listener leak rows) and
+`dialog.browser.test.tsx` (a non-modal Dialog inside a modal one, `stopPropagation()` on a real
+key press closing through the task, and `stopPropagation()` with an `auto` popover open inside).
+Two test notes: a window-listener count must replay adds and removes in call order (`record`
+removes before it adds), and a scripted Escape has settled by the time `act()` returns, so the
+"unmount while pending" row unmounts from a listener inside the dispatch. The `directives.test.ts`
+row for `internal/after-dispatch.mjs` is left to #185, which adds the same file.

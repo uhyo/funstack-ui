@@ -40,7 +40,11 @@ import {
   flushTasks,
   silenceErrors,
 } from "../__tests__/helpers.js";
+import { Drawer } from "../drawer/index.js";
+import { HoverCard } from "../hover-card/index.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { Menu } from "../menu/index.js";
+import { Tooltip } from "../tooltip/index.js";
 import { DialogContext } from "./dialog-context.js";
 import { Dialog } from "./index.js";
 import type {
@@ -400,6 +404,130 @@ describe("Dialog", () => {
       act(() => screen.getByTestId("toast").showPopover());
       expect(fireEvent.keyDown(screen.getByTestId("toast-button"), { key: "Escape" })).toBe(false);
       expect(popup().open).toBe(false);
+    });
+
+    // #177: a `manual` HoverCard or Tooltip closes on Escape from a document listener, which
+    // runs after the dialog's element listeners; the dialog's Escape listener is on the window
+    // and leaves a prevented Escape alone, so the innermost layer closes first.
+    it("non-modal: Escape closes an open HoverCard inside first, then the dialog (#177)", async () => {
+      const user = setupUser();
+      const fact = vi.fn<ActionFn>();
+      render(
+        <Harness
+          mode="uncontrolled"
+          modal={false}
+          fact={fact}
+          content={
+            <HoverCard.Root defaultOpen>
+              <HoverCard.Trigger href="/u/ada" data-testid="card-trigger">
+                @ada
+              </HoverCard.Trigger>
+              <HoverCard.Popup data-testid="card">
+                <button type="button" data-testid="follow">
+                  Follow
+                </button>
+              </HoverCard.Popup>
+            </HoverCard.Root>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      await flushTasks(2);
+      const card = screen.getByTestId("card");
+      expect(isPopoverOpen(card)).toBe(true);
+      // Focus inside the card: the card's Escape, prevented; the dialog stays open.
+      screen.getByTestId("follow").focus();
+      expect(fireEvent.keyDown(screen.getByTestId("follow"), { key: "Escape" })).toBe(false);
+      expect(isPopoverOpen(card)).toBe(false);
+      expect(popup().open).toBe(true);
+      expect(fact).not.toHaveBeenCalledWith(false, expect.anything());
+      // The next Escape is the dialog's.
+      expect(fireEvent.keyDown(screen.getByTestId("card-trigger"), { key: "Escape" })).toBe(false);
+      expect(popup().open).toBe(false);
+      await flushTasks(2);
+      expect(fact.mock.calls.at(-1)![1].reason).toBe("dismiss");
+    });
+
+    it("non-modal: Escape on a Tooltip's trigger hides the tooltip, not the dialog (#177)", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          mode="uncontrolled"
+          modal={false}
+          content={
+            <Tooltip.Root delay={0}>
+              <Tooltip.Trigger data-testid="tip-trigger">Save</Tooltip.Trigger>
+              <Tooltip.Popup data-testid="tip">Saves the document</Tooltip.Popup>
+            </Tooltip.Root>
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      const tipTrigger = screen.getByTestId("tip-trigger");
+      act(() => {
+        tipTrigger.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+      });
+      await flushTasks(2);
+      const tip = screen.getByTestId("tip");
+      expect(isPopoverOpen(tip)).toBe(true);
+      // Focus on the Tooltip's trigger, outside the tooltip: still the tooltip's Escape.
+      act(() => tipTrigger.focus());
+      expect(fireEvent.keyDown(tipTrigger, { key: "Escape" })).toBe(false);
+      expect(isPopoverOpen(tip)).toBe(false);
+      expect(popup().open).toBe(true);
+      expect(fireEvent.keyDown(tipTrigger, { key: "Escape" })).toBe(false);
+      expect(popup().open).toBe(false);
+    });
+
+    it("non-modal: an Escape a handler inside prevented is not the dialog's", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          mode="uncontrolled"
+          modal={false}
+          content={
+            <input
+              data-testid="field"
+              onKeyDown={(event) => {
+                if (event.key === "Escape") event.preventDefault();
+              }}
+            />
+          }
+        />,
+      );
+      await openThroughTrigger(user);
+      // React's listener on the root container runs before the dialog's window listener: a
+      // prevented keydown is no close request, as for a modal dialog's close watcher.
+      expect(fireEvent.keyDown(screen.getByTestId("field"), { key: "Escape" })).toBe(false);
+      expect(popup().open).toBe(true);
+    });
+
+    it("non-modal Drawer: Escape closes an open HoverCard inside first (#177)", async () => {
+      const user = setupUser();
+      render(
+        <Drawer.Root defaultOpen={false} modal={false}>
+          <Drawer.Trigger data-testid="drawer-trigger">Filters</Drawer.Trigger>
+          <Drawer.Popup data-testid="drawer" aria-label="Filters">
+            <HoverCard.Root defaultOpen>
+              <HoverCard.Trigger href="/u/ada" data-testid="card-trigger">
+                @ada
+              </HoverCard.Trigger>
+              <HoverCard.Popup data-testid="card">Ada</HoverCard.Popup>
+            </HoverCard.Root>
+          </Drawer.Popup>
+        </Drawer.Root>,
+      );
+      await user.click(screen.getByTestId("drawer-trigger"));
+      await flushTasks(2);
+      const drawer = screen.getByTestId("drawer") as HTMLDialogElement;
+      expect(drawer.open).toBe(true);
+      const card = screen.getByTestId("card");
+      expect(isPopoverOpen(card)).toBe(true);
+      expect(fireEvent.keyDown(screen.getByTestId("card-trigger"), { key: "Escape" })).toBe(false);
+      expect(isPopoverOpen(card)).toBe(false);
+      expect(drawer.open).toBe(true);
+      expect(fireEvent.keyDown(screen.getByTestId("card-trigger"), { key: "Escape" })).toBe(false);
+      expect(drawer.open).toBe(false);
     });
   });
 

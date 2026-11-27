@@ -189,7 +189,7 @@ function attachInterest(
     if (!isShown && !env().root.intended()) return;
     // The innermost closes first (2.6): a popover or modal dialog open inside the card takes
     // this Escape; the next one closes the card.
-    if (containsOpenLayer(popup)) return;
+    if (containsOpenLayer(popup, event)) return;
     suppressed.current = true;
     dismiss(event, true);
     // This Escape was the card's: an enclosing modal dialog or `auto` popover stays open.
@@ -347,15 +347,20 @@ function attachInterest(
 }
 
 /**
- * Whether a popover or a modal dialog is open inside the card (design 2.6). Walks the elements and
- * asks each, rather than one `querySelector(":popover-open")`, which the jsdom shim cannot answer.
+ * Whether a popover or a modal dialog is open inside the card, or an open non-modal dialog inside
+ * it that `event` came from (design 2.6: that dialog decides its Escape after the document
+ * listeners, #177). Walks the elements and asks each, rather than one
+ * `querySelector(":popover-open")`, which the jsdom shim cannot answer.
  */
-function containsOpenLayer(popup: HTMLElement): boolean {
+function containsOpenLayer(popup: HTMLElement, event: Event): boolean {
   for (const element of popup.querySelectorAll("[popover]")) {
     if (isPopoverOpen(element)) return true;
   }
+  const target = event.target;
   for (const dialog of popup.querySelectorAll("dialog")) {
-    if (dialog.open && isModal(dialog)) return true;
+    if (!dialog.open) continue;
+    if (isModal(dialog)) return true;
+    if (target instanceof Node && dialog.contains(target)) return true;
   }
   return false;
 }
