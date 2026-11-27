@@ -122,7 +122,7 @@ export function NavigationMenuItem({
         const popup = popupRef.current;
         if (popup !== null && isPopoverOpen(popup)) {
           // A fact in library mode, named by this event; a DOM-level hide in JS-free mode.
-          recordCloseIntent({ reason: "dismiss", event });
+          if (mode === "library") recordCloseIntent({ reason: "dismiss", event });
           popup.hidePopover();
         } else if (mode === "library" && intended()) {
           requestClose(event, "dismiss");

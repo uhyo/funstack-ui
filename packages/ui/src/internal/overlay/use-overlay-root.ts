@@ -284,8 +284,8 @@ export function useOverlayRoot<
     isLibrary && open !== undefined && onOpenChange === undefined,
     isDev &&
       `${part}: \`open\` is set without \`onOpenChange\`. The browser can close this ${noun} ` +
-        "without asking (Escape, a click outside), and `onOpenChange` is where a controlled Root " +
-        `is told. Without it the ${noun} re-opens after every dismissal. Pass ` +
+        "without asking (Escape, a click outside), and `onOpenChange` is where a controlled " +
+        `${part} is told. Without it the ${noun} re-opens after every dismissal. Pass ` +
         "`onOpenChange={setOpen}`, or `onOpenChange={() => {}}` if re-opening is what you want.",
   );
 

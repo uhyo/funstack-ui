@@ -142,8 +142,10 @@ export function NavigationMenuPopup({
     keepMounted,
     transition: isLibrary ? transition : undefined,
     elements: POPUP_ELEMENTS,
-    // While shown, a press on a foreign invoker of the panel outside the Item moves no focus:
-    // the focus-leave close would otherwise hide the panel before the invoker's own toggle.
+    // While shown, a primary press on any `popovertarget` / `commandfor` invoker of the panel
+    // moves no focus: a foreign one outside the Item (the focus-leave close would otherwise hide
+    // the panel before the invoker's own toggle), and the panel's own Trigger as well. The latter
+    // is harmless and intended: focus is already inside the Item, and the hide returns it.
     whileShown: listenInvokerPresses,
   });
 

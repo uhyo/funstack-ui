@@ -266,7 +266,7 @@ ever called with `false`.**
 
 ```
 Dialog.Root: `open` is set without `onOpenChange`. The browser can close this dialog without
-asking (Escape, a click outside), and `onOpenChange` is where a controlled Root is told.
+asking (Escape, a click outside), and `onOpenChange` is where a controlled Dialog.Root is told.
 Without it the dialog re-opens after every dismissal. Pass `onOpenChange={setOpen}`, or
 `onOpenChange={() => {}}` if re-opening is what you want.
 ```

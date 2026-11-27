@@ -158,7 +158,9 @@ export function NavigationMenuPage() {
           <code>nav</code> mounted, and a click inside a popover is not a light dismiss, so the
           panel would otherwise stay over the new page. A Ctrl-, Cmd-, Shift- or Alt-click (new tab,
           new window, download) and a middle click leave it open, so several links can be opened
-          from one panel. <code>closeOnActivate={"{false}"}</code> opts a link out.
+          from one panel. The link's own attributes are not read: a plain click on a{" "}
+          <code>target="_blank"</code> or a <code>download</code> link closes the panel too.{" "}
+          <code>closeOnActivate={"{false}"}</code> opts a link out.
         </li>
         <li>
           <strong>The panel closes right away, not with the new page.</strong> In library mode the
@@ -447,9 +449,9 @@ export function NavigationMenuPage() {
             A Link's close and a router's navigation are two transitions that commit separately.
             Where the router adds its own transition type (FUNSTACK Router's <code>navigation</code>
             ) before it awaits the navigation, React may attach that type to the panel's close
-            commit, the next transition to commit, and the page's commit then has none. Match your
-            page animation on something the panel's commit does not change, or give the panel no{" "}
-            <code>transition</code>.
+            commit, the next transition to commit, and the page's commit then has none. If your page
+            animation matches on that type, give the panel no <code>transition</code>. The router
+            side is tracked in <a href="https://github.com/uhyo/funstack-ui/issues/189">#189</a>.
           </p>
         </Callout>
       </BehaviourSection>

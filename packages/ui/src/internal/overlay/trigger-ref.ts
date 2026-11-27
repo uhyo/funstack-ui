@@ -22,9 +22,9 @@ export function registerTrigger(
     if (!warned.has(triggerRef)) {
       warned.add(triggerRef);
       console.error(
-        `${part}: a second ${part} mounted in the same Root. A Root supports one ${part}: ` +
-          "the popup only follows the last one mounted (its anchor, focus return and, " +
-          `without an action, data-open). Render one ${part} per Root.`,
+        `${part}: a second ${part} mounted for the same popup. A popup supports one ${part}: ` +
+          "it only follows the last one mounted (its anchor, focus return and, " +
+          `without an action, data-open). Render one ${part} per popup.`,
       );
     }
   }
