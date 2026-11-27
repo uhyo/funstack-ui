@@ -251,7 +251,7 @@ packages/ui/src/internal/
   render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
   merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
   use-merged-refs.ts      # useMergedRefs(...refs): the memoised ref merge of every part with a library ref (1.4)
-  escape-key.ts           # the Escape rule of the JS handlers (section 15): isEscapeRequest(event) (no IME composition, not prevented, not consumed), consumeEscape(event), decideEscapeLast(event, decide, options?) (record, then decide after every listener or after the dispatch; global layers first, then innermost first), isComposingKey(event); directive-free
+  escape-key.ts           # the Escape rule of the JS handlers (section 15): isEscapeRequest(event) (no IME composition, not prevented, not consumed), consumeEscape(event), decideEscapeLast(event, decide, options?) (record, then decide after every listener or after the dispatch; global layers first, then innermost first), createEscapeRecord() (a listener's one-slot holder of its pending decision: record, cancel), isComposingKey(event); directive-free
   after-dispatch.ts       # afterDispatch(event, callback): after the event's dispatch and default action, a microtask or a task (section 3.8 rule 5, dialog.md 2.6, field-form.md 2.4); returns its cancel; directive-free
   use-latest.ts           # useLatest(value): a ref written in an insertion effect
   use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)

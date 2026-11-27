@@ -2316,8 +2316,9 @@ is a close request:
    nothing outside acts on it. A prevented `keydown` is also no close request for a modal
    dialog's or an `auto` popover's close watcher.
 3. **A listener that closes something shown on it, or consumes it, prevents it**
-   (`consumeEscape(event)`: `preventDefault()`, plus a mark the other layers read, for the
-   case where the dispatch is already over), so an enclosing layer stays open and a second
+   (`consumeEscape(event)`: `preventDefault()` while the event is still being dispatched,
+   plus a mark the other layers read; after the dispatch only the mark is set, and
+   `defaultPrevented` stays as the page left it), so an enclosing layer stays open and a second
    Escape reaches it (a Combobox chip consumes its Escape: it moves focus to the Input). One
    that closes nothing shown (a Trigger cancelling a coming open, a HoverCard open nobody
    sees yet, the Menubar ending menu mode) leaves it alone.
@@ -2339,7 +2340,11 @@ is a close request:
      earlier window listener), or, when a `stopPropagation()` kept the event from the
      window, after the dispatch has ended (`afterDispatch`, 3.8 rule 5). Each layer's
      `decide` is called only while the Escape is still a request (rule 2), so one Escape
-     closes one layer.
+     closes one layer. A listener keeps its pending decision in a one-slot holder
+     (`createEscapeRecord()`: `record(event, decide, options?)` and `cancel()`): the same
+     event recorded twice by one listener is one record, a new Escape replaces a record that
+     is still pending, and the listener's cleanup cancels it. When every layer of an event
+     has cancelled, the window listener and the late path are removed at once.
    - *Order.* The global layers first, in the order they were recorded (the order they
      opened); then the layers the Escape came from, **innermost first** (the reverse of the
      capture order). A hint that is showing goes before the surface under it, wherever it
@@ -2352,7 +2357,8 @@ is a close request:
    handler: it is the innermost by construction.
 
 `internal/escape-key.ts` holds all of it: `isEscapeRequest` (rules 1 and 2),
-`consumeEscape` (rule 3), `decideEscapeLast` (rule 4), and `isComposingKey` for rule 1
+`consumeEscape` (rule 3), `decideEscapeLast` and `createEscapeRecord` (rule 4), and
+`isComposingKey` for rule 1
 alone, the IME guard of the listbox and NumberField keys.
 
 Two limits, which a page cannot do better on without a close watcher. On the late path
