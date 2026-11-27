@@ -15741,3 +15741,37 @@ rule 6 (the "controlled value input" item) and the file list (`internal/form/syn
   rule 8's re-apply writes `checked` through the setter after every commit, which should cover
   them, but no row pins "check, reset, check again". Worth one row per checkable control.
 
+
+## 2026-11-27, #195: a second Escape on the late path no longer cancels the first
+
+Developer, on #195 (carried over from the #194 follow-up). Changed: conventions 15 rule 4 (the
+holder, and a new "Earlier Escapes first" step), internal-hooks.md's file list,
+`internal/escape-key.ts`.
+
+- **The defect, reproduced.** Behind a `stopPropagation()`, a second Escape dispatched before
+  the first one's task decided cancelled the first one's pending decision in every
+  `createEscapeRecord` holder: the first Escape closed nothing. A Tooltip in a non-modal
+  Dialog, two Escapes: only the tooltip closed. Rows in `escape-last.browser.test.tsx`
+  (scripted events, so the late path is a microtask: two key presses cannot be delivered
+  before a task runs) failed on Chromium before the fix.
+- **The candidate fix of the issue is not enough alone.** Letting the old decision run (the
+  holder keeps every pending decision and cancels them all on cleanup) fixes the Tooltip
+  case, whose decider reads the open state when it decides. It does not fix a non-modal
+  Dialog inside a non-modal Dialog: the outer one's stand-down snapshot for the second
+  Escape is taken at its record, while the inner dialog is still open (the first decision
+  has not run yet), so the outer one stands down and the second Escape closes nothing.
+- **The rule added.** A new Escape's first record step (`isEscapeRequest`, which every
+  record step calls before its snapshot; `decideEscapeLast` does it too) decides the earlier
+  pending Escapes whose dispatch is over (`eventPhase === NONE`), in record order, each in
+  the rule 4 order. Their tasks would have decided them the same way before any later key;
+  only the time moves, from the task to the start of the next Escape's dispatch. So each
+  Escape closes one layer and the next one's record reads the layers it closed. An Escape
+  dispatched from inside another's dispatch does not settle it (its dispatch is not over).
+  A decision reads its own event without the settle step, so one Escape's decision never
+  runs another's in the middle of its order.
+- **Rows.** Browser (three engines): a Tooltip in a non-modal Dialog, and a non-modal Dialog
+  in a non-modal Dialog (inner closes first), two scripted Escapes behind a React
+  `stopPropagation()`. jsdom (`escape-key.test.ts`): the first decides when the second is
+  recorded and each closes one layer; three Escapes on two layers leave the third a request;
+  a nested dispatch leaves the outer event pending; the holder's cancel cancels every
+  pending decision.
