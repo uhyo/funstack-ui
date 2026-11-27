@@ -40,3 +40,13 @@ the real component (Chromium tree through CDP, axe everywhere). Note: a disabled
   warning text.
 - Menu.Popup provides `MenubarContext` `null` to its content (the bar's context ends there).
 - Switch keys read the bar's direction (conventions 14.1.3: the container of the move).
+
+## Done (2026-11-27)
+
+- Component, Menu.Trigger / Menu.Popup adaptation, jsdom (48) and browser (11 x engine) tests,
+  docs page `/components/menubar` (live example `MenubarApp.tsx`), sidebar "Menubar (Menu)",
+  roadmap entry, Menu page browser note, skill entry, example demo `menubar-demo.tsx`.
+- CI is dispatched with `gh workflow run ci.yml --ref feat/170-menubar` (push to a branch does
+  not trigger it).
+- Left for the architect: menubar.md status line ("Not implemented yet"), and whether
+  conventions 7.1's list of cross-folder contexts should name `internal/menubar-context.ts`.
