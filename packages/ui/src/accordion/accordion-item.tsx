@@ -1,5 +1,5 @@
 "use client";
-import { use, useCallback, useMemo, useState } from "react";
+import { use, useCallback, useMemo, useRef, useState } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -9,7 +9,13 @@ import type {
 } from "react";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
-import { useDetailsCheck } from "../internal/details-summary.js";
+import {
+  isEcho,
+  noteOpen,
+  useCommittedOpenRecord,
+  useDetailsCheck,
+  writeOpen,
+} from "../internal/details-summary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
@@ -125,28 +131,37 @@ export function AccordionItem({
     "Accordion.Item",
     isDev && "toggle, find-in-page, exclusive groups",
   );
+  const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
       checkElement?.(element);
+      // The known value starts as the DOM value read at attach (design 2.3).
+      if (isLibrary) noteOpen(element);
+      detailsRef.current = element;
       const unregister = registerItem?.(value, element);
       return () => {
+        detailsRef.current = null;
         unregister?.();
       };
     },
-    [checkElement, registerItem, value],
+    [checkElement, registerItem, value, isLibrary],
   );
+  useCommittedOpenRecord(detailsRef, committedOpen);
 
   // Platform path (design 2.3): the Root reconciles pre-hydration clicks on mount and re-applies
   // committed state once nothing is in flight; this handler reports the browser's own flips.
   const onToggle = isLibrary
     ? (event: SyntheticEvent<HTMLDetailsElement>) => {
         const element = event.currentTarget;
-        // Read `details.open`, never `ToggleEvent.newState`: `toggle` is coalesced.
-        if (element.open === committedOpen) return; // our own commit echoing back
+        // Read `details.open`, never `ToggleEvent.newState`: `toggle` is coalesced. An echo is
+        // recognised by the known value (the library's last write or read), not by committed
+        // or intended state, which the browser can bring the DOM back to by itself.
+        if (isEcho(element)) return;
+        noteOpen(element); // a platform change: now known
         if (disabled) {
           // A disabled item cannot be opened by the browser either; close it again now or, while
           // an action is in flight, when the Root re-applies committed state.
-          if (!rootPending) element.open = committedOpen === true;
+          if (!rootPending) writeOpen(element, committedOpen === true);
           return;
         }
         root.dispatchFromDom(value, element.open, event.nativeEvent);

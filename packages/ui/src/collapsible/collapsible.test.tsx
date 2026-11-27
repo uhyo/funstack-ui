@@ -802,6 +802,116 @@ describe("Collapsible", () => {
       expectNotPending(root());
     });
 
+    describe("the known value tells the library's own write from the browser's (#175)", () => {
+      it("a re-open while a close is pending is dispatched, although the DOM is back at committed", async () => {
+        const d = deferred();
+        const action = vi.fn<ActionFn>(() => d.promise);
+        render(<Harness mode="uncontrolled" initial action={action} />);
+        await setupUser().click(trigger());
+        expect(root().open).toBe(true); // committed: still open
+        // A script closes it (equal to the intended value: nothing to dispatch) ...
+        act(() => {
+          root().removeAttribute("open");
+        });
+        await flushToggle();
+        expect(action).toHaveBeenCalledTimes(1);
+        // ... and find-in-page re-opens it in a later task.
+        act(() => {
+          root().setAttribute("open", "");
+        });
+        await flushToggle();
+        expect(action.mock.calls.map(([next, details]) => [next, details.reason])).toEqual([
+          [false, "activate"],
+          [true, "platform"],
+        ]);
+        expect(trigger()).toHaveAttribute("data-open", "");
+
+        await act(async () => {
+          d.resolve();
+        });
+        await flushToggle();
+        expect(root().open).toBe(true); // the revealed content stays
+        expect(committed()).toBe("true");
+        expect(action).toHaveBeenCalledTimes(2);
+        expectNotPending(root());
+      });
+
+      it("the mirror: a platform close while an open is pending is dispatched", async () => {
+        const d = deferred();
+        const action = vi.fn<ActionFn>(() => d.promise);
+        render(<Harness mode="uncontrolled" action={action} />);
+        await setupUser().click(trigger());
+        expect(root().open).toBe(false); // committed: still closed
+        act(() => {
+          root().setAttribute("open", "");
+        });
+        await flushToggle();
+        expect(action).toHaveBeenCalledTimes(1);
+        act(() => {
+          root().removeAttribute("open");
+        });
+        await flushToggle();
+        expect(action.mock.calls.map(([next, details]) => [next, details.reason])).toEqual([
+          [true, "activate"],
+          [false, "platform"],
+        ]);
+
+        await act(async () => {
+          d.resolve();
+        });
+        await flushToggle();
+        expect(root().open).toBe(false);
+        expect(committed()).toBe("false");
+        expect(action).toHaveBeenCalledTimes(2);
+      });
+
+      it("a click between a commit and that commit's `toggle` stands: the echo is not dispatched", async () => {
+        const d = deferred();
+        const action = vi.fn<ActionFn>(() => d.promise);
+        render(<Harness mode="uncontrolled" action={action} />);
+        await setupUser().click(trigger());
+        const second = deferred();
+        const details = root();
+        const toggles = vi.fn();
+        details.addEventListener("toggle", toggles);
+        // The click runs right after React writes `open` (a microtask of the commit's task), so
+        // the commit's `toggle` task is still queued: the click changes the intended value first.
+        let openAtClick: boolean | undefined;
+        let togglesAtClick = -1;
+        const observer = new MutationObserver(() => {
+          observer.disconnect();
+          openAtClick = details.open;
+          togglesAtClick = toggles.mock.calls.length;
+          // The click's own action stays pending, so the DOM is still open when the commit's
+          // `toggle` arrives: only the known value tells it from a platform change.
+          action.mockImplementation(() => second.promise);
+          fireEvent.click(trigger());
+        });
+        observer.observe(details, { attributeFilter: ["open"] });
+
+        await act(async () => {
+          d.resolve();
+        });
+        expect(openAtClick).toBe(true); // committed and written by React
+        expect(togglesAtClick).toBe(0); // its `toggle` was not delivered yet
+        await flushToggle();
+        expect(toggles).toHaveBeenCalled();
+        expect(action.mock.calls.map(([next, details]) => [next, details.reason])).toEqual([
+          [true, "activate"],
+          [false, "activate"],
+        ]);
+        // The echo of `open` was not dispatched as a platform re-open; the DOM is still open.
+        expect(details.open).toBe(true);
+        await act(async () => {
+          second.resolve();
+        });
+        await flushToggle();
+        expect(action).toHaveBeenCalledTimes(2);
+        expect(root().open).toBe(false);
+        expect(committed()).toBe("false");
+      });
+    });
+
     it("a disabled Collapsible is re-closed without dispatching", async () => {
       const action = vi.fn<ActionFn>();
       render(<Harness mode="uncontrolled" action={action} disabled />);

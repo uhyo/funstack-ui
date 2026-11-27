@@ -29,6 +29,23 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          A Close part (<code>Dialog.Close</code>, <code>Popover.Close</code>,{" "}
+          <code>Drawer.Close</code>, <code>AlertDialog.Cancel</code>,{" "}
+          <code>AlertDialog.Action</code>) without <code>action</code> now has{" "}
+          <code>data-pending</code> and <code>state.pending</code> from the click until the close it
+          asked for has committed, as one with <code>action</code> and a <code>Menu.Item</code>{" "}
+          already did (<a href={issue(183)}>#183</a>): a Cancel clicked while the confirm runs shows
+          the wait. A synchronous close shows it for one commit; delay a spinner in CSS. A{" "}
+          <code>Menu.Item</code> without <code>action</code> no longer renders{" "}
+          <code>aria-disabled="true"</code> while the menu&apos;s close waits.
+        </li>
+        <li>
+          Accordion and Collapsible tell their own <code>open</code> writes from the browser&apos;s
+          by the value they last wrote or read (<a href={issue(175)}>#175</a>): a{" "}
+          <code>{"<details>"}</code> re-opened by the browser while its close is pending is now
+          dispatched with <code>reason: "platform"</code> instead of being taken for an echo.
+        </li>
+        <li>
           New component <a href="/components/menubar">Menubar</a> (<a href={issue(170)}>#170</a>): a{" "}
           <code>{'<div role="menubar">'}</code> around ordinary <code>Menu.Root</code>s. A{" "}
           <code>Menu.Trigger</code> inside it renders <code>role="menuitem"</code>, and its{" "}

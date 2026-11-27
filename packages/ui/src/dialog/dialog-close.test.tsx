@@ -57,11 +57,12 @@ describe("Dialog", () => {
         const close = spyClose();
         await user.click(screen.getByTestId("close"));
         await user.click(screen.getByTestId("close"));
-        // `requestClose` is a no-op against `intended()`: one dispatch. No own run, so no
-        // pending and no aria-disabled on the Close.
+        // `requestClose` is a no-op against `intended()`: one dispatch. The Close is pending
+        // until the close commits (conventions 4.3), without aria-disabled: nothing of its own
+        // is ignored (2.5.1).
         expect(action).toHaveBeenCalledTimes(2);
         expect(screen.getByTestId("close")).not.toHaveAttribute("aria-disabled");
-        expectNotPending(screen.getByTestId("close"));
+        expectPending(screen.getByTestId("close"));
         await act(async () => closing.resolve());
         await flushTasks(2);
         expect(close).toHaveBeenCalledTimes(1);

@@ -349,6 +349,9 @@ export function AccordionPage() {
             content. The Accordion dispatches that as <code>reason: "platform"</code> with the{" "}
             <code>toggle</code> event. If a controlled parent does not adopt the change, the item is
             closed again when the action settles. Disabled items are re-closed without dispatching.
+            A reveal while the item's close is pending is dispatched too; a match in content that is
+            still open while its close is pending changes nothing the browser reports, so the close
+            commits and hides it.
           </p>
         </Callout>
       </BehaviourSection>

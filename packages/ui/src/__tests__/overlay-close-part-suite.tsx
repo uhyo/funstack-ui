@@ -2,7 +2,9 @@
 // runs its action, then the library closes the popup. By default (`whilePending="ignore"`) a
 // second activation meanwhile is ignored (Button's re-entry rules, design/components/button.md
 // 16.4); with `whilePending="run"` it runs again and the Overlap / Superseded rejection rows apply
-// (#146, conventions 2.5.1, button.md 18.5 D7 / P5). The rows are the same for both; what differs is the native close
+// (#146, conventions 2.5.1, button.md 18.5 D7 / P5). Without `action` the part is pending until
+// the Root's close commits, without aria-disabled (#183, conventions 4.3). The rows are the same
+// for every Close part (Dialog, Popover, Drawer, AlertDialog's Action and Cancel); what differs is the native close
 // (`close(value)` / `hidePopover()`), the part's value (Dialog's `returnValue`) and how a JS-free
 // popup is opened. Component-specific rows (Dialog's forms and `returnValue` leaks, Popover's
 // native invoker without `action`) stay in the components' files.
@@ -87,7 +89,7 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
     </Close>
   );
 
-  describe(`${config.name} Close part with action (shared overlay suite)`, () => {
+  describe(`${config.name} Close part (shared overlay suite)`, () => {
     renderBoth("library mode", (mode) => {
       it("the click is cancelled, data-pending while it runs, then the library closes", async () => {
         const user = setupUser();
@@ -480,6 +482,109 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         await act(async () => work.resolve());
         await flushTasks(2);
         expect(closeAction).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    // #183, conventions 4.3: without `action` the part runs the Root's close in its own
+    // transition, so it is pending until that close has committed; `whilePending` resolves to
+    // "run" (2.5.1), so no pending aria-disabled. Without `openChangeAction` the click closes
+    // at once (the shared open-state suite's part-close rows).
+    describe("without action: pending until the close commits (#183)", () => {
+      /** A Close part without `action`. */
+      const plain = (props: Omit<ClosePartProps, "data-testid"> = {}): ReactNode => (
+        <Close data-testid="part" {...props}>
+          Done
+        </Close>
+      );
+
+      renderBoth("library mode", (mode) => {
+        it("an awaited openChangeAction(false): data-pending, no aria-disabled; a second click requests nothing more", async () => {
+          const user = setupUser();
+          const action = vi.fn<Action>();
+          // `whilePending="ignore"` has no effect without `action`.
+          // keepMounted: the part is still rendered after the close, to show its pending ended.
+          render(
+            <Harness
+              mode={mode}
+              action={action}
+              popup={{ keepMounted: true }}
+              content={plain({ whilePending: "ignore" })}
+            />,
+          );
+          await openThroughTrigger(user);
+          const closing = deferred();
+          action.mockImplementation((next) => (next ? undefined : closing.promise));
+          await user.click(part());
+          expectPending(part());
+          expect(part()).not.toHaveAttribute("aria-disabled");
+          expect(isOpen()).toBe(true);
+          expect(action).toHaveBeenCalledTimes(2);
+          await user.click(part());
+          expect(action).toHaveBeenCalledTimes(2);
+          await act(async () => closing.resolve());
+          await flushTasks(2);
+          expect(isOpen()).toBe(false);
+          expectNotPending(part());
+          expect(action.mock.calls.map(([next]) => next)).toEqual([true, false]);
+        });
+
+        it("the close is requested during the click's dispatch: the synchronous prefix sees the event", async () => {
+          const user = setupUser();
+          const phases: number[] = [];
+          const action = vi.fn<Action>((next, details) => {
+            if (!next) phases.push(details.event!.eventPhase);
+          });
+          render(<Harness mode={mode} action={action} content={plain()} />);
+          await openThroughTrigger(user);
+          await user.click(part());
+          await flushTasks(2);
+          expect(phases).toHaveLength(1);
+          expect(phases[0]).not.toBe(Event.NONE);
+          expect(isOpen()).toBe(false);
+        });
+
+        it("Escape while the close waits: the fact closes the popup; the part's pending ends", async () => {
+          const user = setupUser();
+          const action = vi.fn<Action>();
+          render(
+            <Harness mode={mode} action={action} popup={{ keepMounted: true }} content={plain()} />,
+          );
+          await openThroughTrigger(user);
+          const closing = deferred();
+          action.mockImplementation((next) => (next ? undefined : closing.promise));
+          await user.click(part());
+          expectPending(part());
+          await act(async () => config.dismiss());
+          await flushTasks(2);
+          expect(isOpen()).toBe(false);
+          // The part's own transition still holds its request: pending (hidden in the
+          // keepMounted popup) until `openChangeAction(false)` settles.
+          expectPending(part());
+          await act(async () => closing.resolve());
+          await flushTasks(2);
+          expect(isOpen()).toBe(false);
+          expectNotPending(part());
+        });
+      });
+
+      it("a controlled parent that does not adopt the close: pending ends, the popup stays, the next click requests again", async () => {
+        const user = setupUser();
+        const action = vi.fn<Action>();
+        render(<Harness mode="controlled" refuseClose action={action} content={plain()} />);
+        await openThroughTrigger(user);
+        const closing = deferred();
+        action.mockImplementation((next) => (next ? undefined : closing.promise));
+        await user.click(part());
+        expectPending(part());
+        await act(async () => closing.resolve());
+        await flushTasks(2);
+        expectNotPending(part());
+        expect(isOpen()).toBe(true);
+        action.mockImplementation(() => undefined);
+        await user.click(part());
+        await flushTasks(2);
+        expect(action.mock.calls.map(([next]) => next)).toEqual([true, false, false]);
+        expect(isOpen()).toBe(true);
       });
     });
 

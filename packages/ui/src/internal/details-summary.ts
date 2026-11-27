@@ -1,14 +1,53 @@
 "use client";
-import type { MouseEvent } from "react";
+import { useLayoutEffect, useRef } from "react";
+import type { MouseEvent, RefObject } from "react";
 import { useElementCheck } from "./use-element-check.js";
 import type { ElementCheck } from "./use-element-check.js";
 
 // The `<details>` / `<summary>` pair shared by Accordion (Item and Trigger) and Collapsible (Root
 // and Trigger): the Trigger's click rule (accordion.md 2.2, collapsible.md 2.2) and the
-// development checks of the rendered elements. The state side is not shared: an Accordion owns a
-// set, a Collapsible one boolean.
+// development checks of the rendered elements, and the record of the library's own `open` writes
+// (the known value). The state side is not shared: an Accordion owns a set, a Collapsible one
+// boolean.
 
 const isDev = process.env.NODE_ENV !== "production";
+
+/**
+ * The known value of each library-mode `<details>` (accordion.md 2.3, conventions 3.5): the last
+ * `open` the library wrote to the element or read from it. A `toggle` whose `details.open` equals
+ * it is the library's own write echoing back; any other is a platform change. Neither committed
+ * nor intended state is the test: the browser can bring the DOM back to either by itself while
+ * a request is in flight.
+ */
+const knownOpen = new WeakMap<HTMLDetailsElement, boolean>();
+
+/** Records the element's current `open` as known (attach, mount reconciliation, a platform change). */
+export function noteOpen(element: HTMLDetailsElement): void {
+  knownOpen.set(element, element.open);
+}
+
+/**
+ * The library's own write of `open`: records `open` as known, then writes it if the DOM differs.
+ * The `toggle` that write fires is an echo. Also called right after React committed the `open`
+ * attribute, where it only records.
+ */
+export function writeOpen(element: HTMLDetailsElement, open: boolean): void {
+  knownOpen.set(element, open);
+  if (element.open !== open) element.open = open;
+}
+
+/**
+ * Whether a `toggle` on `element` is the library's own write: `details.open` equals the known
+ * value. An element never noted is noted now and treated as an echo.
+ */
+export function isEcho(element: HTMLDetailsElement): boolean {
+  const known = knownOpen.get(element);
+  if (known === undefined) {
+    noteOpen(element);
+    return true;
+  }
+  return element.open === known;
+}
 
 const NESTED_INTERACTIVE =
   "a[href], button, label, input, select, textarea, [contenteditable]:not([contenteditable='false'])";
@@ -84,4 +123,23 @@ export function useSummaryCheck(part: string): ElementCheck<HTMLElement> | undef
             "Only a <summary> toggles its parent <details>."
           : null),
   );
+}
+
+/**
+ * Records the committed `open` as known in the commit that changes it (React wrote the
+ * attribute; accordion.md 2.3). The mount run is skipped: there the element's attach (and the
+ * mount reconciliation) recorded the DOM value, which a click before hydration may have changed.
+ * `open` is `undefined` in JS-free mode, where nothing is recorded.
+ */
+export function useCommittedOpenRecord(
+  elementRef: RefObject<HTMLDetailsElement | null>,
+  open: boolean | undefined,
+): void {
+  const recorded = useRef(open);
+  useLayoutEffect(() => {
+    if (recorded.current === open) return;
+    recorded.current = open;
+    const element = elementRef.current;
+    if (element !== null && open !== undefined) writeOpen(element, open);
+  }, [elementRef, open]);
 }

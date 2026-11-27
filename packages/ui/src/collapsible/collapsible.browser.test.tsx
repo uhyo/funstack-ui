@@ -103,6 +103,38 @@ describe("Collapsible (browser)", () => {
     expect(action).toHaveBeenCalledTimes(1);
   });
 
+  it("a re-open while a close is pending is dispatched (#175): script close, then a reveal in a later task", async () => {
+    const d = deferred();
+    const action = vi.fn<ActionFn>(() => d.promise);
+    render(
+      <Collapsible.Root defaultOpen openChangeAction={action} data-testid="root">
+        <Collapsible.Trigger data-testid="trigger">Details</Collapsible.Trigger>
+        <Collapsible.Panel>Alpha</Collapsible.Panel>
+      </Collapsible.Root>,
+    );
+    await user.click(trigger());
+    expect(root().open).toBe(true); // the close is pending
+    act(() => {
+      root().open = false; // a script
+    });
+    await flushToggle();
+    expect(action).toHaveBeenCalledTimes(1); // equal to the intended value
+    act(() => {
+      root().open = true; // what find-in-page does
+    });
+    await flushToggle();
+    expect(action.mock.calls.map(([next, details]) => [next, details.reason])).toEqual([
+      [false, "activate"],
+      [true, "platform"],
+    ]);
+    await act(async () => {
+      d.resolve();
+    });
+    await flushToggle();
+    expect(root().open).toBe(true); // the revealed content stays
+    expect(trigger()).toHaveAttribute("data-open", "");
+  });
+
   it("`experimental_interpolateSize` sets interpolate-size on the <details> where supported", () => {
     render(
       <Collapsible.Root experimental_interpolateSize data-testid="root">

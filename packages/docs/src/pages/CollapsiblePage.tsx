@@ -311,7 +311,9 @@ export function CollapsiblePage() {
             <code>toggle</code> event; the content stays visible while the action runs. If a
             controlled parent does not adopt the change, it is closed again when the action settles;
             a rejection goes to the nearest Error Boundary. A disabled Collapsible is re-closed
-            without dispatching.
+            without dispatching. A reveal while a close is pending is dispatched too; a match in
+            content that is still open while its close is pending changes nothing the browser
+            reports, so the close commits and hides it.
           </p>
         </Callout>
       </BehaviourSection>

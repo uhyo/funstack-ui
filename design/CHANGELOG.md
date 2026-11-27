@@ -15024,3 +15024,21 @@ Two test notes: a window-listener count must replay adds and removes in call ord
 removes before it adds), and a scripted Escape has settled by the time `act()` returns, so the
 "unmount while pending" row unmounts from a listener inside the dispatch. The `directives.test.ts`
 row for `internal/after-dispatch.mjs` is left to #185, which adds the same file.
+
+## 2026-11-27, #183 follow-up: `Menu.Item` without `action` requests the close in the click
+
+Developer, on the coordinator's instruction after review-175-183 N2 (the user's priority is
+consistency). Changed: conventions 4.3 (the synchronous-request sentence), menu.md (the
+`whilePending` list, the Item without `action`). Amends the #183 entry's "`Menu.Item` keeps
+making it in the continuation, as built".
+
+- **The problem.** A Close part without `action` makes the Root's close request synchronously
+  in the click, inside its own transition, so `openChangeAction(false)`'s synchronous prefix
+  runs during the event dispatch (2.3 item 3). A `Menu.Item` without `action` made the same
+  request in the continuation of an empty run, after a microtask, outside the dispatch.
+- **The rule.** A closing `Menu.Item` without `action` runs `requestClose` as the work of its
+  own run (`trigger.run(() => requestClose(event, "activate"))`), as `useOverlayClose` does.
+  An Item with `action` still requests in the continuation, after its action; a
+  `closeOnActivate={false}` Item without `action` requests nothing.
+- **Code.** `menu/menu-item.tsx`. Test: `menu.test.tsx` "without action: the close is requested
+  during the click's dispatch (#183)" (`details.event.eventPhase !== Event.NONE`).

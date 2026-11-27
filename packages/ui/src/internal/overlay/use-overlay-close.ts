@@ -11,7 +11,11 @@ const isDev = process.env.NODE_ENV !== "production";
 
 /** The state of Popover.Close and Dialog.Close. */
 export interface OverlayCloseState {
-  /** The `action` is in flight. */
+  /**
+   * From the click until the close this part asked for has committed: the `action` in flight,
+   * then the Root's close (an awaited `openChangeAction(false)`, or an async action the close is
+   * entangled with), with or without `action` (conventions 4.3).
+   */
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -27,7 +31,10 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
   readonly command: "hide-popover" | "request-close";
   readonly openGeneration: () => number;
   readonly action: Action<[details: Details]> | undefined;
-  /** The part's `whilePending` prop; `"ignore"` when omitted (conventions 2.5.1). */
+  /**
+   * The part's `whilePending` prop; `"ignore"` when omitted, and `"run"` whatever it says
+   * without `action` (conventions 2.5.1).
+   */
   readonly whilePending: WhilePending | undefined;
   /** The `action`'s details, built at the click. */
   readonly details: (event: Event) => Details;
@@ -48,10 +55,13 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
  * dialog.md 3.4): `<button type="button" commandfor command>` without `action`, a plain
  * `<button type="button">` with one (#182). In JS-free mode without `action`
  * the browser runs the command. Otherwise the click is cancelled, refused while disabled, and
- * `close` runs, after the `action` when there is one, inside this part's own transition; a
- * second click meanwhile starts nothing (`whilePending`, default `"ignore"`) or runs the action
- * again (`"run"`; the close happens once, after the last run and only if the latest one
- * resolved), and a close whose open was superseded by a
+ * `close` runs, after the `action` when there is one, inside this part's own transition, so the
+ * part is pending until that close has committed (conventions 4.3). Without `action` the close
+ * is requested synchronously in the click and a second click requests it again (`whilePending`
+ * resolves to `"run"`: no pending `aria-disabled`). With one, a second click meanwhile starts
+ * nothing (`whilePending`, default `"ignore"`) or runs the action again (`"run"`; the close
+ * happens once, after the last run and only if the latest one resolved), and a close whose open
+ * was superseded by a
  * newer one (dismissed and re-opened meanwhile) is dropped (the open-generation guard).
  */
 export function useOverlayClose<Details extends ActionDetails>(
@@ -63,8 +73,9 @@ export function useOverlayClose<Details extends ActionDetails>(
   // click handler is the only thing that closes it.
   const nativeCommand = action === undefined;
   // The library owns the close, so a Close ignores clicks while pending by default (2.5.1).
+  // Without `action` there is no run of its own to guard: `"run"`, no pending `aria-disabled`.
   const trigger = usePureTrigger({
-    whilePending: options.whilePending,
+    whilePending: action === undefined ? "run" : options.whilePending,
     defaultWhilePending: "ignore",
     openGeneration: options.openGeneration,
   });
@@ -90,7 +101,10 @@ export function useOverlayClose<Details extends ActionDetails>(
     if (disabled) return;
     const native = event.nativeEvent;
     if (action === undefined) {
-      options.close(native);
+      // In the part's own transition, so it shows `data-pending` until the close commits
+      // (conventions 4.3). The request is made synchronously in the click: the synchronous
+      // prefix of `openChangeAction` still runs during the event dispatch (2.3 item 3).
+      trigger.run(() => options.close(native));
       return;
     }
     const details = options.details(native);

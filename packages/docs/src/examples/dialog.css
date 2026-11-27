@@ -146,6 +146,13 @@ html:has(.demo-dialog:modal) {
   cursor: progress;
 }
 
+/* A Cancel clicked while the confirm runs: pending until its close commits (the close waits for
+   the confirm). The delay keeps a close that commits at once from flashing. */
+.demo-cancel[data-pending] {
+  opacity: 0.6;
+  transition: opacity 0s 150ms;
+}
+
 ul.demo-list {
   margin: 0 0 12px;
   padding: 0;

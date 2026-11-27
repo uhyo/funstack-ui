@@ -380,7 +380,8 @@ export function PopoverPage() {
                 <code>commandfor</code> / <code>command</code>, so a click before hydration does
                 nothing (rather than hiding the popover without running the action). Without{" "}
                 <code>action</code> in JS-free mode the button is a native{" "}
-                <code>command="hide-popover"</code> invoker.
+                <code>command="hide-popover"</code> invoker; in library mode it asks the Root and is
+                pending until that close has committed.
               </>
             ),
           },
@@ -389,7 +390,7 @@ export function PopoverPage() {
             type: '"run" | "ignore"',
             default: '"ignore"',
             description:
-              'What a click, Enter or Space does while this part\'s `action` is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); the popover closes once the last run has settled, and only if the latest run resolved: a rejection leaves it open in both modes. No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+              'What a click, Enter or Space does while this part\'s `action` is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); the popover closes once the last run has settled, and only if the latest run resolved: a rejection leaves it open in both modes. No effect without `action`: the part then shows `data-pending` while the Root\'s close waits, never `aria-disabled`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
           {
             name: "disabled",
@@ -403,7 +404,9 @@ export function PopoverPage() {
         ]}
       />
       <PartFacts
-        state={"`PopoverCloseState` is `{ pending, disabled }`."}
+        state={
+          "`PopoverCloseState` is `{ pending, disabled }`; `pending` runs from the click until the close this part asked for has committed, with or without `action` (library mode)."
+        }
         owned={
           "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
         }
@@ -461,11 +464,15 @@ export function PopoverPage() {
             "Trigger",
             "An open or a part-initiated close is in flight (library mode only). A dismissal never pends, but a request still running when a dismissal superseded it keeps it until that request settles.",
           ],
-          ["`data-pending`", "Close", "Its `action` is in flight."],
+          [
+            "`data-pending`",
+            "Close",
+            "From the click until the close it asked for has committed: its `action`, then the Root's close (library mode, also without `action`).",
+          ],
           [
             "`aria-disabled`",
             "Close",
-            '`"true"` while `data-pending` with `whilePending="ignore"` (the default): a second click is ignored meanwhile.',
+            '`"true"` with `action`, while `data-pending` with `whilePending="ignore"` (the default): a second click is ignored meanwhile.',
           ],
           ["`data-disabled`", "Trigger, Close", "The `disabled` prop (both modes)."],
         ]}
@@ -576,7 +583,7 @@ export function PopoverPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open or a part's close is in flight. A dismissal is a fact: the popup, `data-open`, the committed `open` and the expanded state assistive technology hears all change at once, and nothing is pending. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger)."
+          "Library mode: the Trigger shows the optimistic open state (`data-open`) and `data-pending` while an open or a part's close is in flight. A dismissal is a fact: the popup, `data-open`, the committed `open` and the expanded state assistive technology hears all change at once, and nothing is pending. The Popup's content renders from the committed `open`. A Close with an `action` is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger). Every Close shows `data-pending` from the click until the close it asked for has committed; without `action` it is never `aria-disabled`."
         }
       >
         <h4>Walkthrough (library mode)</h4>

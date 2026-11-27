@@ -121,10 +121,12 @@ export function AlertDialogPage() {
         Dismissing a pending confirmation hides it; it does not abort it. Escape closes the dialog
         while the action runs, and the action finishes in the background. In library mode a Cancel
         click meanwhile is a close request that React entangles with the running action: it is held
-        until the action settles, and nothing near the Cancel shows it (the Trigger's{" "}
-        <code>data-pending</code> is under the backdrop), so the click looks ignored. When the work
-        can take more than a moment, disable Cancel while it runs with your own optimistic state:
-        see <a href="#cancel-while-pending">Cancel unavailable while the confirm runs</a>.
+        until the action settles, and the Cancel has <code>data-pending</code> until then (without{" "}
+        <code>aria-disabled</code>), so style it to show the click was taken:{" "}
+        <code>{".cancel[data-pending] { opacity: 0.6; transition: opacity 0s 150ms; }"}</code>, or
+        dim the whole dialog with <code>{".alert:has([data-pending])"}</code>. When the work can
+        take more than a moment, disable Cancel while it runs with your own optimistic state: see{" "}
+        <a href="#cancel-while-pending">Cancel unavailable while the confirm runs</a>.
       </Callout>
 
       <h3 id="props">Props</h3>
@@ -253,14 +255,17 @@ export function AlertDialogPage() {
             name: "whilePending",
             type: '"run" | "ignore"',
             default: '"ignore"',
-            description: "As on `Dialog.Close`. No effect without `action`.",
+            description:
+              "As on `Dialog.Close`. No effect without `action`: the Cancel then shows `data-pending` while its close waits, never `aria-disabled`.",
           },
           ...functionProps("AlertDialogCancelState"),
           renderProp("button", "AlertDialogCancelState"),
         ]}
       />
       <PartFacts
-        state={"`AlertDialogCancelState` is `{ pending, disabled }`."}
+        state={
+          "`AlertDialogCancelState` is `{ pending, disabled }`; `pending` runs from the click until the close it asked for has committed (library mode), for example while the close waits for a confirm that is still running."
+        }
         owned={
           "`Dialog.Close`'s (`type`, `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` in library mode or with `action`, `data-pending`, `data-disabled`), and `autoFocus` in the server and hydration render while it is the focus target in JS-free mode (a Cancel mounted on the client into an open dialog carries the attribute but takes no focus)."
         }
@@ -350,11 +355,15 @@ export function AlertDialogPage() {
           ['`[role="alertdialog"]`', "Popup", "Always."],
           ["`data-modal`", "Popup", "Always present."],
           ["`data-open`, `data-pending`", "Trigger", "Library mode, as on a Dialog."],
-          ["`data-pending`", "Cancel, Action", "Its `action` is in flight."],
+          [
+            "`data-pending`",
+            "Cancel, Action",
+            "From the click until the close it asked for has committed: its `action`, then the Root's close (library mode, also without `action`; a Cancel clicked while the confirm runs).",
+          ],
           [
             "`aria-disabled`",
             "Cancel, Action",
-            '`"true"` while `data-pending` with `whilePending="ignore"` (the default).',
+            '`"true"` with `action`, while `data-pending` with `whilePending="ignore"` (the default).',
           ],
           ["`data-disabled`", "Trigger, Cancel, Action", "The `disabled` prop."],
         ]}
@@ -411,7 +420,7 @@ export function AlertDialogPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The Action is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` and `state.pending` from the click until the close commits, `aria-disabled` while it ignores a second click (the default). From the moment its action resolves the close is the Root's: the Trigger shows `data-pending` too. The Cancel stays active while the Action is pending."
+          "The Action is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` and `state.pending` from the click until the close commits, `aria-disabled` while it ignores a second click (the default). From the moment its action resolves the close is the Root's: the Trigger shows `data-pending` too. The Cancel stays active while the Action is pending; clicked meanwhile, it shows `data-pending` (no `aria-disabled`) until its close commits, when the action settles."
         }
       >
         <h4>Walkthrough (library mode)</h4>

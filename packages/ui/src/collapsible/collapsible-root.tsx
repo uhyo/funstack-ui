@@ -13,7 +13,13 @@ import {
   useControllableAction,
 } from "../internal/action/use-controllable-action.js";
 import { dataAttr } from "../internal/data-attr.js";
-import { useDetailsCheck } from "../internal/details-summary.js";
+import {
+  isEcho,
+  noteOpen,
+  useCommittedOpenRecord,
+  useDetailsCheck,
+  writeOpen,
+} from "../internal/details-summary.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
@@ -129,11 +135,6 @@ export interface CollapsibleRootProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"details">, CollapsibleRootState>;
 }
 
-/** Writes `open` to the DOM; it fires `toggle`, whose handler sees DOM === committed and returns. */
-function applyOpen(element: HTMLDetailsElement, open: boolean): void {
-  if (element.open !== open) element.open = open;
-}
-
 /**
  * One disclosure: the `<details>` element, which owns the open state and the transition. In
  * library mode its `open` attribute follows committed state and `data-open` / `data-pending`
@@ -193,12 +194,14 @@ export function CollapsibleRoot({
   const libraryRef = useCallback(
     (element: HTMLDetailsElement) => {
       checkElement?.(element);
+      // The known value starts as the DOM value read at attach (design 2.2).
+      if (isLibrary) noteOpen(element);
       detailsRef.current = element;
       return () => {
         detailsRef.current = null;
       };
     },
-    [checkElement],
+    [checkElement, isLibrary],
   );
 
   const dispatchActivate = useCallback<CollapsibleContextValue["dispatch"]>(
@@ -222,12 +225,15 @@ export function CollapsibleRoot({
   const onToggle = isLibrary
     ? (event: SyntheticEvent<HTMLDetailsElement>) => {
         const element = event.currentTarget;
-        // Read `details.open`, never `ToggleEvent.newState`: `toggle` is coalesced.
-        if (element.open === committed) return; // our own commit echoing back
+        // Read `details.open`, never `ToggleEvent.newState`: `toggle` is coalesced. An echo is
+        // recognised by the known value (the library's last write or read), not by committed
+        // or intended state, which the browser can bring the DOM back to by itself.
+        if (isEcho(element)) return;
+        noteOpen(element); // a platform change: now known
         if (disabled) {
           // A disabled Collapsible cannot be opened by the browser either; close it again now or,
           // while an action is in flight, when the re-apply effect below runs.
-          if (!pending) applyOpen(element, committed);
+          if (!pending) writeOpen(element, committed);
           return;
         }
         dispatchFromDom(element.open, event.nativeEvent);
@@ -240,20 +246,26 @@ export function CollapsibleRoot({
   // StrictMode re-run is deduplicated against the dispatch just made (intended value).
   const reconcileOnMount = useEffectEvent(() => {
     const element = detailsRef.current;
-    if (element === null || element.open === committed) return;
-    if (disabled) applyOpen(element, committed);
+    if (element === null) return;
+    // The value read becomes the known value (design 2.2), at mount and at an Activity re-show.
+    noteOpen(element);
+    if (element.open === committed) return;
+    if (disabled) writeOpen(element, committed);
     else dispatchFromDom(element.open, undefined);
   });
   useLayoutEffect(() => {
     if (isLibrary) reconcileOnMount();
   }, [isLibrary]);
 
+  // The commit that changes `open` records it as the known value (design 2.2).
+  useCommittedOpenRecord(detailsRef, isLibrary ? committed : undefined);
+
   // Re-apply committed state to the DOM once nothing is in flight: closes what find-in-page
   // revealed and the parent refused, or what a rejected action left open.
   useLayoutEffect(() => {
     if (!isLibrary || pending || latestInFlight() !== null) return;
     const element = detailsRef.current;
-    if (element !== null) applyOpen(element, committed);
+    if (element !== null) writeOpen(element, committed);
   }, [isLibrary, pending, committed, latestInFlight]);
 
   const committedOpen = isLibrary ? committed : undefined;
