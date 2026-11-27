@@ -129,11 +129,14 @@ describe("Combobox multiple (browser)", () => {
     });
     await flushFor();
     expect(input().matches(":disabled")).toBe(true);
-    // Chromium, Firefox and WebKit all blur the disabled input (focus goes to <body>) and the
-    // listbox closes, so the click branch is a guard: an engine that kept focus on it (the HTML
-    // focus-fixup rule fires no blur) would still show the listbox, and the option is clicked.
-    if (isOpen()) await user.click(screen.getByTestId("opt-jp"));
-    await settle(() => expect(isOpen()).toBe(false));
+    // The premise: Chromium, Firefox and WebKit all blur the disabled input (focus goes to
+    // <body>) and the listbox closes, so no option can be clicked. An engine that kept focus
+    // on it (the HTML focus-fixup rule fires no blur) fails here: then #184's `:disabled` bail
+    // in acceptMultiple is owed, with a row that clicks the option.
+    await settle(() => {
+      expect(document.activeElement).toBe(document.body);
+      expect(isOpen()).toBe(false);
+    });
     expect(action).not.toHaveBeenCalled();
     expect(chipTexts()).toEqual([]);
   });

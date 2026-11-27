@@ -2,26 +2,23 @@
 import { useState } from "react";
 import type { RefObject } from "react";
 import { useFormOwnerEvent } from "./use-form-owner-event.js";
-import type { FormAssociatedElement } from "./use-form-owner-event.js";
+import { afterDispatch } from "../after-dispatch.js";
 import { useLatest } from "../use-latest.js";
 
 /**
  * Stable `reset` subscription on the form owner of `ref.current` (conventions 3.8).
  *
  * - Built on `useFormOwnerEvent`, with its owner-following rules (rule 4).
- * - The `reset` event fires before the reset algorithm, so `onReset` is called in a microtask,
- *   and only if no listener cancelled the reset (rule 7). **The inputs may still hold the
- *   user's values then**: after a script `form.reset()` (React's own reset included) the
- *   microtask runs after the algorithm, but after a click on a `<button type="reset">` the event
- *   is dispatched from a task and a microtask checkpoint follows each listener, so the microtask
- *   (and a synchronous React commit it causes) runs *before* the algorithm (#185). `onReset`
- *   therefore never reads a reset result from `.value` / `.checked`: it dispatches a target
- *   computed in JS (rule 6) or read from `defaultChecked` / `defaultValue` (rule 5), which hold
- *   the target before and after the algorithm alike.
+ * - `onReset` runs after every `reset` listener and after the reset algorithm, in both orders
+ *   (rule 5): through `afterDispatch`, a microtask after a script `form.reset()` (React's own
+ *   reset included), a task after a click on a `<button type="reset">`, whose microtask
+ *   checkpoints run mid-dispatch. So it may read the DOM's reset state (validity, `FormData`,
+ *   the selected option), and it is skipped when any listener cancelled the reset (rule 7).
  * - `onReset` always sees the latest committed render's values.
  */
 export function useFormReset(
-  ref: RefObject<FormAssociatedElement | null>,
+  /** A form-associated element (or one whose `form` the owner hook reads, as Field's control). */
+  ref: RefObject<Element | null>,
   onReset: (event: Event) => void,
   /**
    * Called synchronously from the `reset` event, before the reset algorithm runs: the last
@@ -30,12 +27,12 @@ export function useFormReset(
    */
   onResetEvent?: (event: Event) => void,
 ): void {
-  // Read in the microtask, after the commit that may have run the reset (React's own reset runs
-  // in a commit's mutation phase): the latest committed `onReset`.
+  // Read when the callback is due, after the commit that may have run the reset (React's own
+  // reset runs in a commit's mutation phase): the latest committed `onReset`.
   const latestOnReset = useLatest(onReset);
   useFormOwnerEvent(ref, "reset", (event) => {
     onResetEvent?.(event);
-    queueMicrotask(() => {
+    afterDispatch(event, () => {
       if (event.defaultPrevented) return;
       latestOnReset.current(event);
     });

@@ -179,8 +179,9 @@ export function CheckboxGroupParent({
   // A form reset sets the Parent's DOM `checked` to its `defaultChecked`, which in controlled
   // mode is React's mount-time value and can be stale (its `values` changed, it mounted after the
   // Items with another value). The Parent re-renders only if the Root dispatches; otherwise put
-  // the derivation back (the Root's own microtask, queued after this one, may still dispatch,
-  // and the re-render re-applies `checked`).
+  // the derivation back once the reset algorithm has run (`useFormReset`, conventions 3.8 rule 5;
+  // the Root's own callback, due after this one, may still dispatch, and the re-render
+  // re-applies `checked`).
   const node = useRef<HTMLInputElement | null>(null);
   const ref = useCallback(
     (el: HTMLInputElement) => {

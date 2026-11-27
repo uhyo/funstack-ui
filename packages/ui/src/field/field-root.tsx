@@ -22,6 +22,7 @@ import { collectInvalid } from "../internal/form/focus-first-invalid.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFormOwnerEvent } from "../internal/form/use-form-owner-event.js";
+import { useFormReset } from "../internal/form/use-form-reset.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import { useServerErrorVisibility } from "./use-server-error-visibility.js";
@@ -397,12 +398,8 @@ export function FieldRoot({
   useFormOwnerEvent(ownerRef, "submit", () => {
     setSuppressNext(false);
   });
-  useFormOwnerEvent(ownerRef, "reset", (event) => {
-    queueMicrotask(() => {
-      if (event.defaultPrevented) return;
-      refresh({ reset: true });
-    });
-  });
+  // After every listener and the reset algorithm, unless cancelled (conventions 3.8 rules 5, 7).
+  useFormReset(ownerRef, () => refresh({ reset: true }));
 
   // Registration with the Form, for the first-error focus after a settle (design 3.5) and the
   // refresh of the other Fields on a change no DOM event carried.

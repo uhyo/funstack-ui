@@ -1715,12 +1715,14 @@ describe("Combobox (browser)", () => {
     });
     await flushFor();
     expect(input().matches(":disabled")).toBe(true);
-    // Chromium, Firefox and WebKit all blur the input that became disabled (focus goes to
-    // <body>), and the focus-leaving close of 5.4 hides the listbox: nothing is left to click.
-    // The click branch is a guard: an engine that kept focus on it (the HTML focus-fixup rule
-    // fires no blur) would still show the listbox, and the option is clicked.
-    if (isOpen()) await user.click(option("jp"));
-    await settle(() => expect(isOpen()).toBe(false));
+    // The premise: Chromium, Firefox and WebKit all blur the input that became disabled (focus
+    // goes to <body>), and the focus-leaving close of 5.4 hides the listbox: no option can be
+    // clicked. An engine that kept focus on it (the HTML focus-fixup rule fires no blur) fails
+    // here: then #184's `:disabled` bail in acceptSingle is owed, with a row that clicks.
+    await settle(() => {
+      expect(document.activeElement).toBe(document.body);
+      expect(isOpen()).toBe(false);
+    });
     expect(valueAction).not.toHaveBeenCalled();
   });
 

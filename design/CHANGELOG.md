@@ -14842,3 +14842,39 @@ Code owed:
 - The review's nits on the #184 guard rows and on `settle` / `quietPeriod` are the
   developer's.
 - Docs site: nothing public changes. The Field page's reset sentence, if it says "microtask".
+
+## 2026-11-27, #185: `afterDispatch` implemented; my "only Combobox was affected" corrected
+
+Developer (`memo/developer/issue-185-184.md`). Implements the architect's entry above.
+
+- **Correction to my entry "#185 and #184"** (not edited, this one supersedes it): "Only
+  Combobox was affected" was wrong. Field.Root's reset refresh and rule 7 (a reset cancelled by
+  a later listener) were affected too, for every control; my audit skipped Field (not a
+  `useFormReset` caller then) and did not test a cancelled reset. My proposed rule 5 wording
+  ("never reads the reset result") is replaced by the architect's guarantee.
+- **Code**: `packages/ui/src/internal/after-dispatch.ts` as specified (microtask; `eventPhase
+  === Event.NONE` runs there, else `setTimeout(callback, 0)`; the cancel sets a flag and clears
+  the timer). `useFormReset` calls back through it and reads `defaultPrevented` then; its `ref`
+  parameter is widened to `RefObject<Element | null>` (what `useFormOwnerEvent` takes), so
+  `Field.Root` passes its control-following owner ref unchanged. Field.Root's own microtask is
+  gone. Comments in `checkbox-group-parent.tsx` and `select-value.tsx` follow; no behaviour
+  change there.
+- **Rows**: jsdom `internal/after-dispatch.test.ts` (script dispatch runs in the microtask after
+  a later ancestor listener; cancel before the microtask; the task branch and a cancel between
+  microtask and task with an event whose phase is not NONE) and
+  `src/__tests__/form-reset-cancelled.test.tsx` (React `onReset` cancel, Checkbox and
+  NumberField, script order). Browser, all three engines, in
+  `form-reset-button.browser.test.tsx`: cancelled in React `onReset` and in a `document`
+  listener over eight controls (no dispatch, DOM kept) plus a script-order control row; Field
+  with a shown `validate` error (error, `aria-invalid`, `validationMessage` cleared, next submit
+  not blocked) with a script-order control row; Combobox in a Field; controlled Checkbox and
+  controlled CheckboxGroup with a Parent refusing the reset; `afterDispatch` on a real click
+  (order: form listener, mid-dispatch microtask, document listener, callback seeing the reset
+  value) and a cancel from a later listener between the microtask and the task. Follow-up
+  assertions after a click are in `settle`; fixed waits are `quietPeriod`.
+- **Deviation in the Combobox-in-Field row**: the Field's error comes from a cross-field
+  `validate` (another input), not from the Combobox's own text, because of an unrelated
+  Chromium bug found on the way: the keystroke that flips a Field's validity in a Combobox
+  Input is lost (memo). Reported to the coordinator for an issue.
+- **#184 guard rows** assert their premise (focus on `<body>`, listbox closed, via `settle`)
+  instead of a conditional click.
