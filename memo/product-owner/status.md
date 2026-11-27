@@ -475,3 +475,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - 2026-11-27 wave 27: deps MERGED 360c47af (playwright held, #190); #177 MERGED 4888b11f; #175/#183 MERGED faf4664d. Filed #189(router, human) #190(chromium crash, human) #191 #192. Remaining: #185 (afterDispatch reset fix, dev-185).
 - 2026-11-27 #185/#184 MERGED 56247a58. WAVE 27 DONE. alpha.23 RELEASED. Filed #193 (Combobox-in-Field keystroke, Chromium). Open: #178 (Chromium 160), #181 research, #189/#190 human, #191 #192 #193, useFormReset cancel-on-unmount nit.
 - 2026-11-27 WAVE 28 start: dev-escape (#191+#192, fix/191-192-escape), dev-193 (fix/193-combobox-field).
+- 2026-11-27 WAVE 28 DONE: #191/#192 MERGED bbb2c306, #193 MERGED 051e7135. alpha.24 RELEASED. Filed #194 (HoverCard/Tooltip stopPropagation, needs architect). Lesson: gates don't catch conflict markers in .md — grep for them after resolving. Open: #178 (Chromium 160), #181 research, #189/#190 human, #194.
