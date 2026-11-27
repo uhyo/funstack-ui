@@ -15,9 +15,9 @@
     "format:check": "oxfmt --check ."
   },
   "devDependencies": {
-    "oxfmt": "^0.73.0",
-    "oxlint": "^1.88.0",
-    "turbo": "^2.11.8"
+    "oxfmt": "^0.80.0",
+    "oxlint": "^1.95.0",
+    "turbo": "^2.11.13"
   },
   "packageManager": "pnpm@10.30.1"
 }
