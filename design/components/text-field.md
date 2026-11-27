@@ -1,8 +1,8 @@
 # TextField
 
-Status: **accepted** and implemented (#181, user decision 2026-11-27). The textarea's commit
-key of section 4.2 and the `search` warning text of section 1 (#196, #197, user decision
-2026-11-28) are accepted and not implemented yet. The prior-art research, the options that
+Status: **accepted** and implemented (#181, user decision 2026-11-27; the textarea's commit
+key of section 4.2 and the `search` warning text of section 1: #196, #197, user decision
+2026-11-28). The prior-art research, the options that
 were not taken and the decisions are in `design/CHANGELOG.md`, entries "#181" and "#196,
 #197". Follows `design/conventions.md`; where this document and the conventions
 disagree, the conventions win.

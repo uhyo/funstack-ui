@@ -15880,3 +15880,18 @@ as Chromium and Firefox in probe 3); the library-written clear of (b) in a real 
 Owed with the code: the docs site page and the `funstack-ui-knowledge` skill (the
 textarea's key, the form handler, `role="searchbox"`), the `search` warning text, the rows of
 text-field.md 14.
+
+## 2026-11-28, #196, #197: implemented
+
+Developer. The entry "#196, #197: a textarea's commit key; `type="search"` stays out of
+TextField" is implemented as written, with no deviation. `text-field.tsx`: the Enter branch
+checks `isComposingKey` first (any modifier), then commits an `<input>` unprevented as before;
+in a `<textarea>` it returns for Enter without Ctrl or Cmd, and otherwise calls
+`preventDefault()` and then the same commit as a blur. The `search` warning names
+`type="text"`, `role="searchbox"` and `enterKeyHint="search"`. The rows of text-field.md 14
+are in `text-field.test.tsx` ("commit key, textarea", the search warning row, the two form
+rows) and `text-field.browser.test.tsx` ("the textarea's commit key": real Control+Enter and
+Meta+Enter, no line, caret and focus kept, no `submit` in a form; a real Enter adds a line);
+run locally on Chromium and Firefox. The docs page and the `funstack-ui-knowledge` skill are
+updated; the form-level handler of section 7 is a docs section of its own ("Submit a form
+from a textarea").
