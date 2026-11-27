@@ -15776,3 +15776,101 @@ holder, and a new "Earlier Escapes first" step), internal-hooks.md's file list,
   early run and the next layers close; three Escapes on two layers leave the third a request;
   a nested dispatch leaves the outer event pending; the holder's cancel cancels every
   pending decision.
+
+## 2026-11-28, #196, #197: a textarea's commit key; `type="search"` stays out of TextField (proposed)
+
+Architect, for the product owner and the user. **Proposed**, not accepted: a draft on the branch
+`design/196-197`. Changed: text-field.md decision 4, 1 (the `search` paragraph), 4.2, 6
+(walkthrough 10), 7, 8, 13, 14; conventions 2.1 (the commit row names the commit key). Probe:
+`memo/architect/probes-196-197/` (a browser test run locally on Chromium and Firefox and in CI
+on WebKit, run 46024498242).
+
+Probed (Playwright builds on Linux; Safari on macOS was not available):
+
+1. **Modifier+Enter in a `<textarea>`.** Ctrl+Enter, Cmd+Enter and Alt+Enter insert nothing and
+   fire no `input` in Chromium, Firefox and WebKit; Shift+Enter inserts a line break, as Enter
+   does. None is `defaultPrevented`.
+2. **Modifier+Enter in an `<input>` inside a form with a submit button.** Firefox submits the
+   form with Ctrl or Cmd held; Chromium and WebKit do not. A textarea submits in none.
+3. **Escape in a native search field with text, not edited.** Chromium and Firefox empty it
+   (an `input` event; Chromium also `search`), and the `keydown` is not `defaultPrevented`.
+   **Inside a modal `<dialog>` and inside an `auto` popover the layer stays open on that
+   Escape** and closes on the next one, when the field is empty; an empty search field closes
+   the layer on the first. So the worry of #197 (the clear and the close on one key) does not
+   happen in the two engines that clear. WebKit under Playwright does not clear and closes the
+   layer at once, as a text field does.
+4. **Refusing the clear.** A controlled React search input whose `onChange` ignores the text
+   change that an Escape's default action makes shows the saved text again (Chromium,
+   Firefox), and **the enclosing dialog still stays open**, on every Escape: the engine took
+   the key for a clear nobody sees.
+
+### #196: Ctrl+Enter or Cmd+Enter commits a textarea
+
+The rule (text-field.md 4.2): in a `<textarea>`, Enter with `ctrlKey` or `metaKey` is the
+commit key. It runs the same commit as a blur, is `preventDefault()`ed, and does nothing else.
+Enter alone, with Shift or with Alt, is a new line. An `<input>` is unchanged.
+
+- **Both modifiers on every platform.** Not taken: Cmd on Apple platforms and Ctrl elsewhere
+  (Ark UI: `isApple() ? metaKey : ctrlKey`). The library has no platform detection, and its
+  other keys already read `ctrlKey || metaKey` as one modifier. Cost: on macOS Ctrl+Return is
+  a text-system key that some applications use for a line break; in a TextField textarea it
+  commits. Not verified on macOS.
+- **Prevented, unlike an `<input>`'s Enter.** The input's Enter is left alone because the
+  form's implicit submission is its default. The textarea's key has no default worth keeping
+  (probe 1: nothing is inserted), and preventing it makes the rule independent of an engine
+  or platform that does insert a line, which would open a new draft right after the commit.
+- **No form submission.** Not taken: `form.requestSubmit()` after the commit when the textarea
+  has a form owner. HTML has no implicit submission from a textarea, `Form.Root` adds none,
+  and a `Field.Control` textarea in the same form would not submit on the key: the behaviour
+  would depend on which component rendered the textarea. A form that wants the key says so
+  on the form, for all its textareas (text-field.md 7, six lines). If the library should
+  offer it, it is a `Form.Root` feature and its own issue, not a TextField one.
+- **An `<input>` with Ctrl or Cmd held** commits as before ("with or without modifiers",
+  NumberField's rule) and is not prevented. Whether the form is then submitted is the engine's
+  (probe 2). Not taken: making the input ignore the modifier, which would change NumberField
+  and gain nothing.
+- **IME**: `isComposingKey`, the guard every commit key has.
+- **No `aria-keyshortcuts`, no prop.** The attribute is for a shortcut that activates or
+  focuses the element. A hint in visible text is the consumer's (text-field.md 8).
+
+### #197: `type="search"` is not a supported type
+
+The rule (text-field.md 1): unchanged from v1, now a decision and no longer a question for
+later. The warning stays and names `type="text"` with `role="searchbox"`; the item leaves
+"Not in v1".
+
+Why. The engine's Escape clear of a search field already takes the Escape for itself (probe
+3), and it cannot be switched off while leaving the key to the enclosing layer: cancelling the
+`keydown` stops the clear and the close request together, and undoing the clear afterwards
+leaves a key that does nothing and a dialog that Escape never closes from that field (probe
+4). So in a search field Escape has two candidates, the engine's "empty the field" and the
+component's "back to the saved text", and a TextField that supports the type must order them
+with a rule no other type has. The candidates:
+
+- **(b) Escape is the clear; a search field has no revert.** An Escape request on a search
+  field with text empties it (a draft `""`, written by the library and consumed with
+  `consumeEscape`, so the three engines and the library's JS layers agree); with no text it
+  is not the field's. Two Escapes close a dialog, as in a native search field. The cleared
+  text is a draft like any other: a blur or Enter commits `""`. Cost: one component, two
+  meanings of Escape by `type`; no key puts the saved text back in a search field.
+- **(c) Revert first, then clear.** An edited, non-empty draft is reverted; otherwise text is
+  cleared; an empty field is not the field's. Three Escapes can be needed to close a dialog,
+  and an empty draft must be exempt from the revert, or clear and revert alternate for ever
+  and the dialog never closes.
+- Leaving the engine alone (no code for the type) is not a candidate: Escape would clear in
+  Chromium and Firefox and do nothing in WebKit under Playwright, the next Escape would
+  revert the clear by 4.3 and the one after would clear again, and a non-modal Dialog, which
+  reads `defaultPrevented`, would close on the Escape that clears.
+
+What the type would add over `type="text"` with `role="searchbox"` and `enterKeyHint="search"`
+is the engine's clear button (Chromium and WebKit) and the search look of the field. Against
+that, one Escape rule for every TextField and for NumberField. If the user prefers the type,
+(b) is the candidate to take: it is the platform's behaviour made uniform.
+
+Still not verified: Safari on macOS for any of the above (WebKit's source clears a search
+field on Escape with a `change` event and marks the key handled, which would make it behave
+as Chromium and Firefox in probe 3); the library-written clear of (b) in a real engine.
+
+Owed if accepted, with the code: the docs site page and the `funstack-ui-knowledge` skill (the
+textarea's key, the form handler, `role="searchbox"`), the `search` warning text, the rows of
+text-field.md 14.

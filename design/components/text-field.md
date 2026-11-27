@@ -29,7 +29,7 @@ state and stays the native element or `Field.Control` (field-form.md 4.3).
 | 1 | Shape | A single-element component, `TextField`, from `@funstack/ui/text-field`. Renders `<input type="text">`; `render={<textarea />}` for several lines. No Root, no Label, no Preview, no trigger parts (section 1). |
 | 2 | State | `value` / `defaultValue` (`string`, `""` is empty) are the **saved** text. The text being edited is the **draft**: urgent, internal, never an action (NumberField decision 3). |
 | 3 | Action | One: `valueCommitAction(next, details)`, once per edit, awaited in the component's transition (`useControllableAction`). No per-keystroke prop of any kind (section 2.1). |
-| 4 | Commit | **Blur** and **Enter** (an `<input>`; in a `<textarea>` Enter is a new line and blur commits). A draft equal to the shown value commits nothing. Never while composing with an IME (section 4). |
+| 4 | Commit | **Blur** and the **commit key**: Enter in an `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`, where Enter alone is a new line. A draft equal to the shown value commits nothing. Never while composing with an IME. The key commits and nothing else: submitting a form from a textarea is the consumer's (sections 4.2, 7). |
 | 5 | Revert | **Escape** with an edited draft puts the saved text back and consumes the key (conventions 15), so an enclosing dialog stays open; a second Escape is not the field's (section 4.3). |
 | 6 | Rejected save | NumberField's rule, unchanged: the value is written when the action resolves, so a rejected or refused save shows the saved text again. A draft the user has opened meanwhile stays. Keeping the text after a failure is the consumer's choice, made in the action (section 5). |
 | 7 | Exposure | `data-pending`, `data-disabled`, `data-invalid` (in a Field) on the element. `state.value` is the shown value (optimistic), `state.text` the shown text (the draft while one is open). No `data-dirty`, no `data-editing` (`:focus`). |
@@ -48,7 +48,7 @@ import { TextField } from "@funstack/ui/text-field";
 // A document title: saved on blur or Enter, back to the saved title if the save throws.
 <TextField aria-label="Title" defaultValue={doc.title} valueCommitAction={renameDocument} />
 
-// Notes, several lines, saved when the user leaves the field.
+// Notes, several lines: saved when the user leaves the field, or presses Ctrl+Enter / Cmd+Enter.
 <TextField render={<textarea rows={4} />} aria-label="Notes" defaultValue={notes} valueCommitAction={saveNotes} />
 
 // In a Field: the label, the description and validation are the Field's.
@@ -102,12 +102,28 @@ Why this shape:
 Element constraints for `render`: an `<input>` whose `type` is `text`, `tel`, `url`, `email` or
 `password`, or a `<textarea>`. Any other `type`, given as a prop or on the `render` element, is
 a development warning and is otherwise rendered as given, unsupported: `number`, `date` and the
-like have a value the browser sanitises (and NumberField exists), and **`search` is not
-supported in v1**, because the engines give Escape a meaning of their own there and disagree
-(section 13). A search-looking field that saves itself is `type="text"`, with
-`inputMode="search"` or `enterKeyHint="search"` if the keyboard matters.
+like have a value the browser sanitises (and NumberField exists), and **`search` is not a
+supported type** (below).
 Library-controlled attributes (`value`, `data-*`, and inside a Field `id`, `aria-invalid`,
 the `aria-describedby` tokens) land on whichever element renders (owned keys, conventions 1.2).
+
+**Why not `type="search"`.** In a search field Escape is the engine's own key: it empties the
+field. That clear takes the Escape, as the revert of section 4.3 does: a modal dialog or an
+`auto` popover around the field stays open on it and closes on the next one (Chromium and
+Firefox, probed; the keydown is not `defaultPrevented`, so the library's own layers would not
+see it as consumed). It cannot be turned off and still leave the key to the enclosing layer:
+cancelling the keydown stops the clear and the close request alike, and writing the saved text
+back after the clear leaves the dialog open on every Escape. So a search field would give
+Escape two meanings, "empty the field" and "back to the saved text", and every order of the
+two is a rule only this type has (the candidates are in the changelog, "#196, #197"). The
+component keeps one Escape rule instead.
+
+A search field that saves itself is `type="text"` with `role="searchbox"`, which is the role
+`type="search"` gives, and `enterKeyHint="search"` where the on-screen keyboard matters. The
+development warning for `search` says so. What is not carried over is the engine's clear
+button; a consumer who wants one renders a button next to the field. A search box that needs
+the engine's Escape, and no save of its own, is a native `<input type="search">` or
+`Field.Control`.
 
 ---
 
@@ -139,7 +155,7 @@ The text of an input is a fact, not a request (vision, principle 3; conventions 
 keystroke cannot be held, and nothing the library does reports one. What the user asks for is
 "keep this text", once, when they are done. That is the commit of conventions 2.1,
 `<state>CommitAction`: once per gesture, awaited in the owner's transition, the state owner's
-dispatch. The gesture here is one edit, from the first keystroke to the blur or the Enter.
+dispatch. The gesture here is one edit, from the first keystroke to the blur or the commit key.
 
 - **`valueCommitAction` only.** NumberField has a second action, `valueChangeAction`, for the
   steps of a gesture (each tick of a held button). A text edit has no steps a consumer could
@@ -160,7 +176,7 @@ dispatch. The gesture here is one edit, from the first keystroke to the blur or 
 
 ```ts
 export interface TextFieldValueChangeDetails extends ActionDetails {
-  /** `"activate"`: the user committed an edit (blur, Enter). `"platform"`: a form reset, or text adopted at mount. */
+  /** `"activate"`: the user committed an edit (blur, the commit key). `"platform"`: a form reset, or text adopted at mount. */
   readonly reason: ChangeReason;
 }
 
@@ -185,7 +201,7 @@ export interface TextFieldProps
   value?: string;
   /** Initial saved text in uncontrolled mode, and its form-reset target (latest). Default `""`. */
   defaultValue?: string;
-  /** Once per edit (blur or Enter), and for a platform change. Commits uncontrolled state when it resolves. */
+  /** Once per edit (blur or the commit key), and for a platform change. Commits uncontrolled state when it resolves. */
   valueCommitAction?: ChangeAction<string, TextFieldValueChangeDetails>;
   /** Native `name`; defaults to the Field's `name` inside a `Field.Root`. */
   name?: string;
@@ -218,8 +234,8 @@ export interface TextFieldProps
   particular **no `autocomplete="off"`**: unlike a number or a one-time code, this text may be
   a name or an address the browser should offer to fill.
 - `transition` is not a prop. `id` passes through outside a Field and is owned inside one.
-- `details.event` is the `focusout` or the Enter `keydown` for `"activate"`, the `reset` event
-  for a reset, `undefined` for text adopted at mount.
+- `details.event` is the `focusout` or the commit key's `keydown` for `"activate"`, the `reset`
+  event for a reset, `undefined` for text adopted at mount.
 
 Subpath `@funstack/ui/text-field`; the root entry re-exports `TextField` and the three types.
 
@@ -233,16 +249,39 @@ Every `input` event (typing, cut, paste, composition, autofill, a spelling corre
 the draft with the input's DOM value. Nothing is dispatched. The caret, the selection and the
 undo history are the browser's.
 
-### 4.2 The commit: blur and Enter
+### 4.2 The commit: blur and the commit key
 
 - **Blur** (`focusout`): the user left the field, by Tab, by a click elsewhere, or because the
-  window lost focus. This is the trigger a `<textarea>` relies on.
-- **Enter** (`keydown`) in an `<input>`, with or without modifiers, as in NumberField. It is
-  **not** `preventDefault()`ed: inside a form the implicit submission follows and posts the
-  same text (section 7). Outside a form Enter does nothing else, and focus stays in the field.
-- **Enter in a `<textarea>`** is a new line and commits nothing.
+  window lost focus.
+- **The commit key** (`keydown`): the key that says "done" without leaving the field.
+
+  | Element | Commit key | Enter alone | After the commit |
+  | --- | --- | --- | --- |
+  | `<input>` | Enter, with or without modifiers (NumberField's rule) | commits | Not `preventDefault()`ed: inside a form the implicit submission follows and posts the same text (section 7). |
+  | `<textarea>` | Enter with **Ctrl or Cmd** held (`ctrlKey` or `metaKey`), on every platform | a new line, as with Shift or Alt | `preventDefault()`ed: the key is the field's alone. |
+
+  In both, focus stays in the field and the caret does not move.
 - **Not during an IME composition**: an Enter that confirms a composition (`isComposing`, or
-  `keyCode === 229`; `isComposingKey`, conventions 15 rule 1) is the IME's.
+  `keyCode === 229`; `isComposingKey`, conventions 15 rule 1) is the IME's, with any modifier.
+
+The textarea's key, in detail:
+
+- **Ctrl or Cmd, not one per platform.** The library reads no platform anywhere (its other
+  keys test `ctrlKey || metaKey` too), and a page that accepts both needs no hint text per
+  operating system. Shift or Alt held as well changes nothing. Ark UI takes Cmd on Apple
+  platforms and Ctrl elsewhere.
+- **It is the same commit as a blur**, with the `keydown` as `details.event`. With no draft
+  open, a draft equal to the shown value, or a `disabled` / `readOnly` field, nothing is
+  dispatched (the list below), and the key is still prevented, so it means one thing whenever
+  the field has focus.
+- **Why it is prevented.** A textarea has no implicit submission to let through, so there is
+  nothing to keep; and a line break inserted after the commit would open a new draft. The
+  three engines insert nothing for Ctrl+Enter or Cmd+Enter (probed on Linux); macOS, where
+  Ctrl+Return is a text-system key, was not probed, and the rule does not depend on it.
+- **It does not submit a form.** HTML has no implicit submission from a textarea, in a
+  `Form.Root` or outside, and the field does not invent one: a `Field.Control` textarea next
+  to it would not have it. Section 7 has the two lines that add it for a whole form.
+- **No prop for it.** The key cannot be changed or turned off; `commitOnBlur` is section 13.
 
 What a commit does:
 
@@ -400,6 +439,11 @@ commits at once and nothing is pending.
    user's draft `Repor` is open: the draft stays. Escape shows `Plan`. A blur commits `Repor`
    over it, as it would in any last-write-wins editor; a parent that must detect the conflict
    compares in the action.
+10. **Ctrl+Enter in a textarea.** Notes, `defaultValue="a"`, the action resolves after 600 ms.
+    The user types a second line (Enter, `b`) and presses Ctrl+Enter: the `keydown` is
+    prevented, the draft is cleared, `setOptimistic("a\nb")`, `data-pending`. No line is added,
+    focus and the caret stay, and the user can keep typing, which opens the next draft. Inside
+    a form nothing is submitted. A second Ctrl+Enter with nothing typed dispatches nothing.
 
 ---
 
@@ -411,7 +455,26 @@ model" applies word for word: the text the user sees is the text the form posts)
 - **`FormData`**: `name` → the text in the input, which is the draft while one is open. A form
   submitted by a button while the field is focused posts what the user sees.
 - **Constraint validation**: the native attributes, on the one element.
-- **Implicit submission**: Enter, native. The commit is dispatched first, in the same `keydown`.
+- **Implicit submission**: Enter in an `<input>`, native. The commit is dispatched first, in the
+  same `keydown`. What a modifier does to it is the engine's: with Ctrl or Cmd held, Firefox
+  submits, Chromium and WebKit do not (probed); the commit is dispatched in all three.
+- **A textarea submits nothing**, with any key (4.2). A form that wants Ctrl+Enter / Cmd+Enter
+  to submit says so once, on the form, for every textarea in it, a TextField or not:
+
+  ```tsx
+  <Form.Root
+    action={post}
+    onKeyDown={(event) => {
+      if (!(event.target instanceof HTMLTextAreaElement) || event.nativeEvent.isComposing) return;
+      if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.currentTarget.requestSubmit();
+    }}
+  >
+  ```
+
+  The handler runs after the field's (the event bubbles to it), so a TextField in that form
+  has dispatched its commit first, the order an `<input>`'s Enter has. It must not skip a
+  `defaultPrevented` event: the field prevents its commit key. It is for textareas only: an
+  `<input>` has the native submission, and Firefox runs it with the modifier held too.
 - **Two channels** (conventions 2.7, field-form.md 7.3). The field's own action and the form's
   submission are independent, each with its own pending. A field with a `valueCommitAction`
   inside a submit form saves on its own and is also posted. "Submit when the user is done with
@@ -448,7 +511,7 @@ field (`Form.Root errors`) is dismissed by the first keystroke, as for any text 
 | | |
 | --- | --- |
 | Role, name, value | The native `textbox`, named by `<label>`, `Field.Label` or `aria-label`; the value is the text. No `aria-roledescription`. |
-| Keyboard | Tab reaches it. Enter commits (an `<input>`). Escape reverts an edited draft (4.3). Everything else is native text editing. A `<textarea>` commits when focus leaves it. |
+| Keyboard | Tab reaches it. Enter commits an `<input>`; Ctrl+Enter or Cmd+Enter commits a `<textarea>`, where Enter is a new line (4.2). Escape reverts an edited draft (4.3). Everything else is native text editing. |
 | Pending | `data-pending` only. No `aria-busy`, no native `disabled`, no announcement (conventions 3.6): the field stays editable while a save runs. |
 | Built-in strings | None (conventions 11). |
 
@@ -468,6 +531,11 @@ An `<input>` answers all three with the platform: it is in the Tab order, it is 
 an edit field with its label and value, and it is edited where it stands. The read-view look is
 CSS (section 9). The docs say to keep a visible affordance when the border is removed: a hover
 and focus style at least, since a field that looks exactly like text is not discoverable.
+
+**The textarea's key is not discoverable by itself.** Nothing on a textarea says that
+Ctrl+Enter saves, and the library adds no text (conventions 11). Blur saves as well, so the key
+is a shortcut and not the only way; a page that relies on it says so in visible text the
+field's `aria-describedby` names.
 
 **Telling the user about a save.** The library says nothing by itself; the outcome is the
 consumer's (conventions 3.6). The docs show the three cases:
@@ -546,16 +614,6 @@ A rollback carries no types.
 
 Each of these is a question for a later issue, not a decision made against it.
 
-- **Ctrl+Enter / Cmd+Enter to commit in a `<textarea>`** (Ark UI does this): the first
-  follow-up. Blur is the textarea's commit in v1.
-- **`type="search"`.** On an untouched search field Escape is the engine's: Chromium and
-  Firefox clear the text with an `input` event, WebKit's source clears with a `change` event
-  and no `input`, and WebKit 27.2 under Playwright on Linux does not clear at all. The draft
-  model hears only `input`, so the same key would open a draft in two engines and none in the
-  third, and in Chromium the clear does not consume the key (an enclosing dialog would
-  probably close on it; not probed). Supporting it needs a rule for the native clear and a
-  test on Safari itself.
-
 - **A read view as its own part** (`Preview`, with Edit / Submit / Cancel triggers): for a read
   state that is not plain text (a link, formatted or clamped text). Needs a compound anatomy,
   an edit-mode state with its own action, focus management and three built-in strings.
@@ -565,6 +623,8 @@ Each of these is a question for a later issue, not a decision made against it.
   conventions have none (an action's return value is never interpreted, 2.7).
 - **A commit that waits for validity** (do not dispatch while the element is invalid). It
   would leave an edited, unfocused draft on screen, and NumberField would have to follow.
+- **A commit key that also submits the form**, or a prop that changes or removes the key
+  (section 7 has the form-level handler).
 - **`commitOnBlur={false}`** (Atlassian's `keepEditViewOpenOnBlur`, for long text), **saving
   while the user types** (a debounced commit), **select all on focus** (`onFocus` is passed
   through).
@@ -582,15 +642,20 @@ Probed before the component was written (the results are in the changelog, "#181
 steps"): a blur during an IME composition delivers the composed text before the blur in
 Chromium (Firefox and WebKit could not be driven and are not recorded); a controlled write
 drops the field's undo history in all three engines; `text-overflow: ellipsis` shows on an
-unfocused input in all three.
+unfocused input in all three. Probed for the textarea's commit key and for `search` ("#196,
+#197" in the changelog): Ctrl+Enter and Cmd+Enter insert nothing in a textarea; with either
+held, Enter in an `<input>` submits its form in Firefox and not in Chromium or WebKit; the
+engine's Escape clear of a search field (Chromium, Firefox) keeps an enclosing modal dialog or
+`auto` popover open.
 
 jsdom, the component's test file:
 
 | Area | Rows |
 | --- | --- |
-| Roles and ARIA | Renders one `input[type=text]` with the value; `render={<textarea />}` renders a textarea; no attribute the consumer did not pass, outside a Field. `type="search"` and `type="number"`, as a prop and on the `render` element, each warn once in development and render as given; `tel`, `url`, `email`, `password` do not warn. |
+| Roles and ARIA | Renders one `input[type=text]` with the value; `render={<textarea />}` renders a textarea; no attribute the consumer did not pass, outside a Field. `type="search"` and `type="number"`, as a prop and on the `render` element, each warn once in development and render as given; the `search` warning names `type="text"` with `role="searchbox"`; `tel`, `url`, `email`, `password` do not warn. |
 | Draft | Typing shows at once and dispatches nothing; `state.text` follows the draft and `state.value` does not; a controlled `value` changed from outside shows when no draft is open and does not replace an open one. |
-| Commit (both) | Blur and Enter each dispatch once with `(next, { reason: "activate" })` and the native event; Enter is not `defaultPrevented`; a draft equal to the shown value dispatches nothing and is cleared; no draft, nothing; `disabled` / `readOnly` clear and dispatch nothing; a textarea's Enter dispatches nothing and its blur does; an Enter with `isComposing`, and one with `keyCode` 229, dispatch nothing. |
+| Commit (both) | Blur and Enter each dispatch once with `(next, { reason: "activate" })` and the native event; Enter is not `defaultPrevented`; a draft equal to the shown value dispatches nothing and is cleared; no draft, nothing; `disabled` / `readOnly` clear and dispatch nothing; an Enter with `isComposing`, and one with `keyCode` 229, dispatch nothing. |
+| Commit key, textarea (both) | Enter alone, with Shift and with Alt: nothing dispatched, not `defaultPrevented`. With `ctrlKey`, with `metaKey`, and with Shift held as well: one dispatch with `(next, { reason: "activate" })` and the `keydown`, `defaultPrevented`, the draft cleared. With no draft, an equal draft, `disabled` and `readOnly`: nothing dispatched, still `defaultPrevented`. With `isComposing` or `keyCode` 229: nothing, not prevented. A blur with a draft open commits; a blur after the key dispatches nothing more. Typing after it opens a new draft and a second key press commits it. An `<input>` with Ctrl+Enter: commits, not prevented (unchanged). |
 | Escape | With an edited draft: the text returns, nothing is dispatched, the event is `defaultPrevented` and marked consumed; with no draft, with an equal draft, when already prevented, and while composing: untouched. Inside a non-modal Dialog: the first Escape reverts and the dialog stays, the second closes it. |
 | Async action (both) | `data-pending` from the commit until the deferred resolves; the text does not change during it; the field is not disabled and typing during it opens a draft. |
 | Rejection (both) | The boundary receives it; the optimistic text reverts; the uncontrolled value is unchanged. Caught inside: resolves and commits (uncontrolled). A controlled parent that does not adopt: the saved text returns. A draft opened before the settle is kept in each case. |
@@ -598,7 +663,7 @@ jsdom, the component's test file:
 | Suspending content (both) | Content keyed on the committed value suspends: the old content stays, no fallback, `data-pending` on, the field shows the new text. |
 | Platform path (both) | Hydration with changed text, unfocused: one `"platform"` dispatch with `event === undefined`, once under StrictMode; focused: no dispatch, the text is the draft and a blur commits it. Reset through `form.reset()`, a reset button and React's reset after a form action: one dispatch with the `reset` event and the computed target; an open draft is cleared; a cancelled reset dispatches nothing; a controlled parent that refuses gets its value back in the input. |
 | Inside a Field | The Field's `id`, `name`, `aria-describedby`, `aria-invalid`, `disabled` / `required`; `Field.Label`'s `for`; `data-invalid` on the element; its `data-pending` is its own and the Field parts' is the form's; an Escape revert and a rollback re-run `validate` (no event); a server error is dismissed by the first keystroke. |
-| Form | `FormData` holds the text shown, draft included; Enter in a `Form.Root` dispatches the commit and then submits with the same text; `autoReset` after a successful submission dispatches a `"platform"` commit. |
+| Form | `FormData` holds the text shown, draft included; Enter in a `Form.Root` dispatches the commit and then submits with the same text; `autoReset` after a successful submission dispatches a `"platform"` commit. A textarea's Ctrl+Enter in a `Form.Root` commits and does not submit; with the form-level handler of section 7 the commit is dispatched before the submission, once each. |
 | Function props, `render`, post-await rule, directive | As in testing.md 10.1. |
 | Types | `valueCommitAction` is a `ChangeAction<string, TextFieldValueChangeDetails>` and joins the action-naming list; no `valueChangeAction`, no `onValueChange`, no `transition`; `onChange`, `onKeyDown` and `onBlur` are not accepted. |
 
@@ -609,6 +674,7 @@ Browser, three engines:
 | Real keys outside `act`, inside a Field with `validate` and with `required`: the keystroke that flips validity is kept (the #193 rows, for this controlled input), before and after a blur. |
 | A real click on a reset button with a draft open and a save pending (the #185 order): the reset value shows and one `"platform"` commit is dispatched. |
 | Escape with an edited draft in a **modal** Dialog and in an `auto` Popover: the layer stays open (the close watcher saw a cancelled key); the next Escape closes it. |
+| Real Ctrl+Enter and real Cmd+Enter in a textarea with a draft open: one commit, the text has no new line, focus and the caret stay; real Enter adds a line and commits nothing. In a form with a submit button: no `submit` event. |
 | Blur by a real Tab, by a click on a button (the commit is dispatched before the button's `click`), and by the window losing focus where the engine can be driven to it. |
 | IME, Chromium through CDP: Enter that confirms a composition commits nothing; a blur during a composition commits the composed text and leaves no draft on the unfocused field. |
 | `startViewTransition` is not called by a commit or a rollback. |
