@@ -14284,3 +14284,111 @@ Decided by the user, all four as the proposal recommended (the entry above).
   prior art; its sections 4, 5 and 7 state what was chosen.
 - Owed (code, tests, docs page): the `dir` default and its probe, the `locale` type on Progress
   and Meter with the formatter cache key for a list, the "Direction and locales" docs page.
+
+## 2026-11-27, #170: menubar.md and navigation-menu.md, the designs (proposed)
+
+Architect, for the product owner and the user; part of #162 (wave 26). New documents:
+`design/components/menubar.md` and `design/components/navigation-menu.md`. Not implemented, and
+no conventions rule changes. Notes: `memo/architect/menubar-navmenu-notes.md`.
+
+The two are different patterns and share no code: a Menubar is an application menu (APG
+Menubar, Menu's parts), a NavigationMenu is site navigation (APG disclosure navigation,
+Popover's open model). Each ends with a "Decisions for the user" list.
+
+What menubar.md proposes:
+
+- One new component, the single-element `Menubar` (`div[role=menubar]`) at
+  `@funstack/ui/menubar`, around ordinary `Menu.Root`s. No second namespace. `Menu.Trigger`
+  reads the bar's context, as it reads the Toolbar's, and renders `role="menuitem"` with the
+  attributes of a `Menu.SubmenuTrigger` (`aria-disabled` when disabled, no rendered
+  `tabindex`).
+- The Toolbar's roving-focus engine on the bar: one Tab stop, DOM-written `tabindex`, Left /
+  Right / Home / End between Triggers.
+- No open state on the bar. Each Root keeps its own; the platform shows one `popover="auto"`
+  at a time.
+- One switch procedure: focus the target Trigger, close the other menus of the bar at once (a
+  dismissal: `hidePopover()` when shown, `requestClose(event, "dismiss")` when still pending),
+  request the target's open. The old menu's close is a fact, the new menu's open a request.
+  Focusing the Trigger first makes the platform record it as the focus-return target.
+- Switches: ArrowRight on a non-SubmenuTrigger item at any depth (next menu, first item),
+  ArrowLeft in a top-level menu (previous menu, first item); on the bar while a menu is
+  intended open, the arrow keys and a `pointermove` onto another Trigger (focus stays on the
+  Trigger). Hover does nothing while the bar is closed.
+- One new close: focus leaving the bar hides a menu still shown (the state after a hover
+  switch, focus on the Trigger).
+- Not in v1: `orientation`, `experimental_focusgroup`, typeahead between Triggers, items
+  directly in the bar, press-drag-release, a bar-level `value`.
+
+What navigation-menu.md proposes:
+
+- `NavigationMenu.Root` (`nav`), `List` (`ul[role=list]`), `Item` (`li`, the owner of one
+  flyout), `Trigger` (`button[popovertarget]`), `Popup` (`div[popover=auto]`, no role), `Link`
+  (`a`), at `@funstack/ui/navigation-menu`. Built on the Popover hooks.
+- Open state per Item with Popover's two modes. JS-free mode is the default and the
+  recommended one for site navigation: links in the server HTML, everything but two closes
+  working without JavaScript.
+- Click opens; no hover in v1. The platform keeps panels exclusive.
+- Two closes of its own: focus leaving the Item (Menu's Tab rule on the `li`; a fact), and a
+  followed `Link` inside the Popup (primary button, no modifier; a request in library mode,
+  `hidePopover()` in JS-free mode; `closeOnActivate={false}` opts out). Both are attached with
+  `addEventListener`, so `onClick` and `onBlur` stay the consumer's.
+- Opening moves no focus; Tab enters the panel through DOM order. No arrow keys in v1.
+- The current page is the consumer's `aria-current="page"`; no `current` prop.
+- `Root` and `List` are directive-free; the other four parts are `"use client"`.
+- Not in v1: hover, arrow keys, a shared viewport / indicator, nested flyouts, a Root-level
+  `value`.
+
+Not verified (no probe was run for this proposal):
+
+- Menubar: the accessibility tree and axe result for a `menu` that is a direct DOM child of the
+  `menubar` (the APG example has a `role="none"` `li` between them).
+- NavigationMenu: that a Link's close request commits together with a router navigation that
+  runs in a transition (navigation-menu.md 9, walkthrough 3). To check with FUNSTACK Router in
+  the example app before the docs say it.
+
+Test plan outline, Menubar (jsdom unless marked):
+
+- ARIA: `role="menubar"`; Triggers `menuitem` + `aria-haspopup`, no `aria-expanded`; a disabled
+  Trigger `aria-disabled` and focusable; popups and items unchanged. Server render: no
+  `tabindex`.
+- Roving: one Tab stop after hydration; Left / Right / Home / End, `loop`, RTL; memory after
+  focus leaves; popup items are not bar items.
+- Open keys on a Trigger (Down / Up / Enter / Space) unchanged in a bar.
+- Switch from inside a menu: ArrowRight / ArrowLeft, wrap, from a submenu item (Right goes to
+  the next menu, Left only closes the submenu), SubmenuTrigger's Right still opens its submenu;
+  the old Root hears `onOpenChange(false, "dismiss")`, the new one
+  `openChangeAction(true, "activate")`; a disabled target is focused and nothing opens.
+- Menu mode on the bar: arrows and Home / End on a Trigger whose menu is open switch with focus
+  left on the Trigger; ArrowDown then enters.
+- Hover: nothing while closed; `pointermove` on another Trigger while one is open switches;
+  touch ignored; a click on the Trigger after a hover switch closes.
+- Async: target items suspend (Trigger `data-pending`, no menu shown, then first item focused);
+  a second switch supersedes a pending open; a pending item action in the old menu (its close
+  is dropped, rejection to `reportError`); controlled Roots with and without `onOpenChange`.
+- Focus leaving the bar with a menu open and focus on its Trigger hides it; window blur does
+  not.
+- Browser, three engines: one popup shown at a time; focus returns to the new menu's Trigger on
+  Escape and on item activation after a keyboard switch and after a hover switch; Tab and
+  Shift+Tab from an item; the accessibility snapshot of the bar; a pre-hydration click.
+- Function props, `render`, `ref`; the Directive row.
+
+Test plan outline, NavigationMenu:
+
+- ARIA and markup: `nav`, `ul[role=list]`, `li`, `button[popovertarget]` with no
+  `aria-expanded`, `div[popover=auto]` with no role, `aria-current` passing through. Server
+  render of JS-free mode contains the links.
+- The shared overlay open-state suite against an Item harness (both modes, requests and facts,
+  controlled / uncontrolled parity, `"platform"` at hydration).
+- Focus leaving the Item: shown (fact, both modes), pending (superseding request), null
+  `relatedTarget`, focus moving between Trigger and Popup (no close).
+- Link: primary unmodified click closes (request in library mode, `hidePopover()` in JS-free
+  mode); modified and middle clicks do not; `closeOnActivate={false}`; a Link outside a Popup;
+  a consumer `onClick` and a `render`ed router link still run.
+- Async: content that suspends holds the open with `data-pending`; tabbing away supersedes;
+  `openChangeAction` rejection.
+- Development warnings: Popup not directly after its Trigger; two Triggers; the mode change.
+- Browser, three engines: toggle, Escape and light dismiss with no library JS (static HTML);
+  one panel at a time across Items; Tab order Trigger → panel links → next entry, and the panel
+  closing behind; focus return to the Trigger after Escape (WebKit after a mouse open);
+  resolved `data-side` / `data-align`; `transition` on a library-mode Popup.
+- Function props, `render`, `ref`; the Directive rows (`Root` and `List` directive-free).
