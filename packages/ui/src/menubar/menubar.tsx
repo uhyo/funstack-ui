@@ -9,6 +9,7 @@ import type {
 } from "react";
 import { focusWithRing } from "../internal/arrow-keys.js";
 import { sortByDocumentOrder } from "../internal/dom-order.js";
+import { isEscapeRequest } from "../internal/escape-key.js";
 import { MenubarContext } from "../internal/menubar-context.js";
 import type {
   MenubarContextValue,
@@ -181,7 +182,7 @@ export function Menubar({
     const menu = registry.current.get(target);
     // Read before the engine moves focus: the blur of the held Trigger clears the hold.
     const hold = held.current !== null && held.current.trigger === target ? held.current : null;
-    if (hold !== null && event.key === "Escape") {
+    if (hold !== null && isEscapeRequest(event.nativeEvent)) {
       // Ends menu mode; focus stays, and the key is not consumed.
       held.current = null;
       return;

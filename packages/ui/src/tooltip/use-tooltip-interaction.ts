@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useEffectEvent } from "react";
+import { isEscapeRequest } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { syncPresence } from "../internal/form/sync-presence.js";
 import { createDelayedPair } from "../internal/use-delayed-pair.js";
@@ -148,7 +149,9 @@ function attachInteraction(
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== "Escape") return;
+    // Not an IME composition's Escape, nor one an inner handler or layer consumed (a Combobox
+    // chip, a HoverCard inside): innermost first (conventions 15).
+    if (!isEscapeRequest(event)) return;
     clear();
     // Escape while closed passes through untouched.
     if (!isOpen(popup)) return;
@@ -183,7 +186,7 @@ function attachInteraction(
   // itself cancels a pending open: a click or Escape before `delay` elapses must not open the
   // tooltip afterwards. Once open, the document listeners do the hiding.
   const onTriggerKeyDown = (event: KeyboardEvent) => {
-    if (event.key === "Escape") clear();
+    if (isEscapeRequest(event)) clear();
   };
 
   trigger.addEventListener("pointerenter", onTriggerEnter);

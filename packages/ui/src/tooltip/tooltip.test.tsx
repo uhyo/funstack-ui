@@ -32,6 +32,7 @@ import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { isPopoverOpen } from "../__tests__/popover-shim.js";
 import { CSPProvider } from "../csp/index.js";
 import { TOOLTIP_WARM_RULES } from "./tooltip-warm.js";
+import { Combobox } from "../combobox/index.js";
 import { Menu } from "../menu/index.js";
 import { Tabs } from "../tabs/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
@@ -141,8 +142,16 @@ function advance(ms: number): void {
   });
 }
 
-function escape(target: Element = document.activeElement ?? document.body): KeyboardEvent {
-  const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+function escape(
+  target: Element = document.activeElement ?? document.body,
+  init: KeyboardEventInit = {},
+): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", {
+    key: "Escape",
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
   act(() => {
     target.dispatchEvent(event);
   });
@@ -481,6 +490,90 @@ describe("Keyboard", () => {
     await user.keyboard("{Escape}");
     advance(1000);
     expect(showSpy).not.toHaveBeenCalled();
+  });
+
+  // Conventions 15 (#191): Escape during an IME composition cancels the composition only.
+  it.each([
+    ["isComposing", { isComposing: true }],
+    ["keyCode 229 (WebKit)", { keyCode: 229 }],
+  ] as const)("an Escape of an IME composition (%s) neither hides nor is prevented", (_, init) => {
+    setupTimers();
+    render(<Harness />);
+    pointer("pointerenter", trigger());
+    advance(250);
+    expect(isPopoverOpen(popup())).toBe(true);
+    expect(escape(trigger(), init).defaultPrevented).toBe(false);
+    expect(hideSpy).not.toHaveBeenCalled();
+    expect(isPopoverOpen(popup())).toBe(true);
+    // The Escape after the composition hides it.
+    expect(escape(trigger()).defaultPrevented).toBe(true);
+    expect(isPopoverOpen(popup())).toBe(false);
+  });
+
+  it("an Escape of an IME composition before the delay keeps the pending open", () => {
+    setupTimers();
+    render(<Harness />);
+    pointer("pointerenter", trigger());
+    advance(100);
+    escape(trigger(), { isComposing: true });
+    advance(150);
+    expect(showSpy).toHaveBeenCalledTimes(1);
+  });
+
+  // Conventions 15 (#192): innermost first, an Escape an inner handler consumed is not ours.
+  it("an Escape already prevented by an inner handler does not hide the tooltip", () => {
+    setupTimers();
+    render(<Harness />);
+    pointer("pointerenter", trigger());
+    advance(250);
+    const prevent = (event: Event) => event.preventDefault();
+    trigger().addEventListener("keydown", prevent);
+    escape(trigger());
+    expect(hideSpy).not.toHaveBeenCalled();
+    expect(isPopoverOpen(popup())).toBe(true);
+    trigger().removeEventListener("keydown", prevent);
+    expect(escape(trigger()).defaultPrevented).toBe(true);
+    expect(isPopoverOpen(popup())).toBe(false);
+  });
+
+  it("a Combobox chip's Escape is the chip's: the tooltip stays; the next Escape hides it (#192)", () => {
+    setupTimers();
+    render(
+      <>
+        <Harness />
+        <Combobox.Root multiple defaultValue={["jp", "fr"]}>
+          <Combobox.Label>Countries</Combobox.Label>
+          <Combobox.Chips>
+            {({ value }) =>
+              value.map((v) => (
+                <Combobox.Chip key={v} value={v} data-testid={`chip-${v}`}>
+                  {v}
+                </Combobox.Chip>
+              ))
+            }
+          </Combobox.Chips>
+          <Combobox.Input data-testid="input" />
+          <Combobox.Popup>
+            <Combobox.List>
+              <Combobox.Option value="jp">Japan</Combobox.Option>
+              <Combobox.Option value="fr">France</Combobox.Option>
+            </Combobox.List>
+          </Combobox.Popup>
+        </Combobox.Root>
+      </>,
+    );
+    pointer("pointerenter", trigger());
+    advance(250);
+    expect(isPopoverOpen(popup())).toBe(true);
+    const chip = screen.getByTestId("chip-fr");
+    act(() => chip.focus());
+    // The chip prevents its Escape and moves focus to the input.
+    expect(escape(chip).defaultPrevented).toBe(true);
+    expect(screen.getByTestId("input")).toHaveFocus();
+    expect(hideSpy).not.toHaveBeenCalled();
+    expect(isPopoverOpen(popup())).toBe(true);
+    expect(escape(screen.getByTestId("input")).defaultPrevented).toBe(true);
+    expect(isPopoverOpen(popup())).toBe(false);
   });
 
   it("pointer focus (a click) does not open the tooltip", async () => {

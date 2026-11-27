@@ -2300,6 +2300,31 @@ The audit, the options that were rejected and the prior art are in `design/direc
    the number of Roots that take `locale` and the cost of a provider to the directive-free
    Roots.
 
+## 15. Escape handled in JS
+
+Where the platform gives no close watcher (a non-modal dialog, a `manual` popover, the Toast
+region, a held Menubar Trigger), the library's `keydown` listener acts on an Escape only when it
+is a close request (#191, #192):
+
+1. **`key === "Escape"`, not part of an IME composition**: `isComposing` is false **and**
+   `keyCode !== 229` (WebKit fires `compositionend` before the key that ends a composition, so
+   that keydown has `isComposing === false`; NumberField's and Combobox's guard). Escape during a
+   composition cancels the composition only.
+2. **Not already prevented** (`defaultPrevented`). Innermost first: a handler or layer inside
+   that consumed the Escape (a Combobox chip, a HoverCard or Tooltip that closed on it, an input
+   that clears itself) prevented it, and nothing outside acts on it. A prevented `keydown` is
+   also no close request for a modal dialog's or an `auto` popover's close watcher.
+3. **A listener that closes something shown on it prevents it**, so an enclosing layer stays
+   open and a second Escape reaches it. One that closes nothing shown (a Trigger cancelling a
+   coming open, a HoverCard open nobody sees yet, the Menubar ending menu mode) leaves it alone.
+
+`internal/escape-key.ts` is the one check (`isEscapeRequest`; `isComposingKey` for rule 1
+alone, the IME guard of the listbox and NumberField keys). Native close watchers (a modal
+`<dialog>`, `auto` and `hint` popovers, `closedby`) are the engine's: the library does not
+second-guess them. Chromium, driven through CDP, delivers the Escape an IME takes as
+`keyCode` 229 with `isComposing` and runs no close request for it (a modal dialog and an `auto`
+popover stay open); Firefox and WebKit could not be driven with an IME and are not recorded.
+
 ## Resolved questions (2026-10-15)
 
 Moved to `design/CHANGELOG.md` (part "conventions.md: status, resolved questions, open questions"), numbers unchanged: "resolved question 44" in a design document or a source comment is entry 44 there. The rules they decided are stated in sections 1 to 13.

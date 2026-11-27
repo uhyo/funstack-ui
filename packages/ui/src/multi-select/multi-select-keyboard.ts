@@ -1,5 +1,6 @@
 "use client";
 import type { RefObject } from "react";
+import { isComposingKey } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 import { findTypeahead, isTypingAhead, pushTypeahead } from "../internal/typeahead.js";
@@ -99,7 +100,7 @@ export function createMultiSelectKeyDown({
 
   return (event: KeyboardEvent): void => {
     if (disabled || event.ctrlKey || event.metaKey) return;
-    if (event.isComposing || event.keyCode === 229) return;
+    if (isComposingKey(event)) return;
     const isOpen = isPopoverOpen(popover.popupRef.current);
     const key = event.key;
     const buffer = typeahead.current;

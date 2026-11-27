@@ -201,11 +201,11 @@ Root's effect attaches, through `addEventListener`:
 | Trigger | `focus`, when the Trigger matches `:focus-visible` | start the open timer |
 | Trigger | `pointerleave`, `blur` | start the close timer (`closeDelay`) |
 | Trigger | `pointerdown` | close now, or cancel the coming open; no open until fresh interest (2.4) |
-| Trigger | `keydown` Escape, before anything is intended | cancel the open timer |
+| Trigger | `keydown` Escape (conventions 15: not during an IME composition, not prevented), before anything is intended | cancel the open timer |
 | Popup | `pointerenter`, `focusin` | cancel the close timer |
 | Popup | `pointerleave` | start the close timer. With a button held (a text selection dragged out of the card) the timer starts at the release instead |
 | Popup | `focusout` to an element outside the Popup that is not the Trigger | start the close timer |
-| document, while the card is intended open | `keydown` Escape | close now, unless the event is already prevented or the Popup contains a shown popover or an open modal dialog (2.6); `preventDefault()` when a shown card closed (an Escape that only cancels an open nobody sees passes through) |
+| document, while the card is intended open | `keydown` Escape | close now, unless the event is already prevented or belongs to an IME composition (conventions 15), or the Popup contains a shown popover or an open modal dialog (2.6); `preventDefault()` when a shown card closed (an Escape that only cancels an open nobody sees passes through) |
 | document, capture, while the card is intended open | `pointerdown` outside the Popup | close now |
 
 "Intended open" is `intended()` of the Root: from the dispatch of the open until a close, so

@@ -223,7 +223,7 @@ the bar's.
 | ArrowRight / ArrowLeft | Trigger | focus the next / previous Trigger (wraps with `loop`; mirrored in RTL). If the Trigger's menu was intended open: a switch (2.3) | engine, bar |
 | Home / End | Trigger | first / last Trigger; same rule | engine, bar |
 | ArrowRight / ArrowLeft / Home / End | disabled Trigger holding menu mode (2.2) | focus moves as above and the Trigger reached opens its menu, with the first item focused if the user came from inside a menu | engine, bar |
-| Escape | disabled Trigger holding menu mode | ends menu mode; focus stays | bar |
+| Escape | disabled Trigger holding menu mode | ends menu mode; focus stays (not an Escape already prevented or of an IME composition, conventions 15) | bar |
 | ArrowDown, Enter, Space | Trigger | open its menu, first item focused; with the menu already shown, focus its first item | `Menu.Trigger` (unchanged) |
 | ArrowUp | Trigger | open its menu, last item focused | `Menu.Trigger` (unchanged) |
 | ArrowRight | item, not a SubmenuTrigger | next menu of the bar, first item focused | `Menu.Popup`, bar |

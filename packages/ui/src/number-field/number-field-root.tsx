@@ -3,6 +3,7 @@ import { use, useCallback, useEffect, useId, useMemo, useRef, useState } from "r
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { announce as speak } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { isComposingKey } from "../internal/escape-key.js";
 import { FieldContext } from "../internal/form/field-context.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -479,7 +480,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       const { disabled: off, readOnly: ro, bounds: b, largeStep: large } = latest.current;
       // WebKit fires `compositionend` before the confirming keydown, which then has
       // `isComposing === false` and `keyCode === 229` (Combobox's guard).
-      if (off || ro || event.isComposing || event.keyCode === 229) return;
+      if (off || ro || isComposingKey(event)) return;
       if (event.key === "Enter") {
         commitDraft(event);
         return;

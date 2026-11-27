@@ -165,8 +165,16 @@ function pointer(
   return event;
 }
 
-function escape(target: Element = document.activeElement ?? document.body): KeyboardEvent {
-  const event = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+function escape(
+  target: Element = document.activeElement ?? document.body,
+  init: KeyboardEventInit = {},
+): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", {
+    key: "Escape",
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  });
   act(() => {
     target.dispatchEvent(event);
   });
@@ -716,6 +724,29 @@ describe("Closing: every user close is a fact", () => {
     await advance(1000);
     expect(isPopoverOpen(popup())).toBe(false);
   });
+
+  // Conventions 15 (#191): Escape during an IME composition cancels the composition only.
+  it.each([
+    ["isComposing", { isComposing: true }],
+    ["keyCode 229 (WebKit)", { keyCode: 229 }],
+  ] as const)(
+    "an Escape of an IME composition (%s) neither closes nor cancels",
+    async (_, init) => {
+      await renderAsync(<Harness />);
+      // Before anything is intended: the Trigger's listener keeps the coming open.
+      keyboardFocus(trigger());
+      await advance(300);
+      escape(trigger(), init);
+      await advance(600);
+      await task();
+      expect(isPopoverOpen(popup())).toBe(true);
+      // Shown: the document listener leaves it open and does not prevent.
+      expect(escape(trigger(), init).defaultPrevented).toBe(false);
+      expect(isPopoverOpen(popup())).toBe(true);
+      expect(escape(trigger()).defaultPrevented).toBe(true);
+      expect(isPopoverOpen(popup())).toBe(false);
+    },
+  );
 
   it("Escape stands down while a popover is open inside the card, and when already prevented", async () => {
     await renderAsync(

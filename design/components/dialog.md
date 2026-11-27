@@ -465,7 +465,8 @@ Baseline JS for non-modal dialogs (both modes): Escape from inside the dialog cl
 `stopPropagation()` does not.** The dialog decides after the other listeners, in two steps:
 
 1. **Record**, a capture `keydown` listener on the dialog element: for an Escape while the
-   dialog is open it notes the event and whether it belongs to an inner layer, read from the
+   dialog is open (not one of an IME composition nor one already prevented, conventions 15) it
+   notes the event and whether it belongs to an inner layer, read from the
    event path between the target and the dialog (an open nested `<dialog>`, an open `auto` /
    `hint` popover) and from the dialog's content (any open `auto` / `hint` popover inside
    would take the close request; section 9). The record is taken here because the layers'
@@ -1417,6 +1418,7 @@ library surfaces it as `details.returnValue` (on the request and on the fact) an
 | Escape (non-modal) | closes via `requestClose()` | Popup listener (or `closedby` with the flag) |
 | Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal (2.6): the dialog **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. It also ignores a **prevented** Escape: a `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher, and one that closes on Escape from JS (HoverCard, Tooltip: document listeners) prevents the keydown, so it closes first and the dialog stays open. A `manual` popover that does not handle Escape leaves it to the dialog: Escape inside it closes the dialog | browser / Popup listener |
 | Escape that a handler prevented (`preventDefault()`) | does not close, modal or not | browser / Popup listener |
+| Escape during an IME composition (`isComposing` or `keyCode` 229) | non-modal: does not close (conventions 15); modal: the platform's close watcher decides (Chromium runs none for the Escape an IME takes) | Popup listener / browser |
 | Escape whose propagation a handler stopped (`stopPropagation()`) | closes all the same, modal or not | browser / Popup listener |
 | Enter in a form field | submits the Form: closes (`method="dialog"`) or runs the action then closes | browser / Form |
 

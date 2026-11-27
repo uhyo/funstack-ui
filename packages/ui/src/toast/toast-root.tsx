@@ -2,6 +2,7 @@
 import { Suspense, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
+import { isEscapeRequest } from "../internal/escape-key.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { exitAnimations } from "../internal/overlay/use-exit-animation.js";
 import { useLatest } from "../internal/use-latest.js";
@@ -255,7 +256,7 @@ export function ToastRoot({
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.defaultPrevented || item.ending) return;
-    if (event.key === "Escape") {
+    if (isEscapeRequest(event.nativeEvent)) {
       event.preventDefault();
       close("dismiss", event.nativeEvent);
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {

@@ -1962,6 +1962,26 @@ describe("Toast", () => {
       expect(root(ids[0]!)).toHaveFocus();
     });
 
+    // Conventions 15 (#191): Escape during an IME composition cancels the composition only.
+    it("an Escape of an IME composition in a field inside the toast does not dismiss it", async () => {
+      const list = ({ toasts }: ToastViewportState) =>
+        toasts.map((t) =>
+          renderToast(t, <input data-testid={`input-${t.id}`} aria-label="Reply" />),
+        );
+      render(<Harness manager={manager} list={list} />);
+      const id = await call(() => manager({ title: "A", duration: null }));
+      const field = screen.getByTestId(`input-${id}`);
+      act(() => field.focus());
+      for (const init of [{ isComposing: true }, { keyCode: 229 }]) {
+        expect(fireEvent.keyDown(field, { key: "Escape", ...init })).toBe(true);
+        await flushMicrotasks(2);
+        expect(queryRoot(id)).not.toBeNull();
+      }
+      expect(fireEvent.keyDown(field, { key: "Escape" })).toBe(false);
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).toBeNull();
+    });
+
     it("returns focus to the element focused before a Tab into the region, else the body", async () => {
       const user = setupUser();
       render(<Harness manager={manager} />);

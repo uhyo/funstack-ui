@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import type { RefObject } from "react";
+import { isEscapeRequest } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 import { createDelayedPair } from "../internal/use-delayed-pair.js";
@@ -184,7 +185,7 @@ function attachInterest(
   // --- Document listeners, while the card is intended open ------------------------------------
 
   const onDocumentKeyDown = (event: KeyboardEvent): void => {
-    if (event.key !== "Escape" || event.isComposing || event.defaultPrevented) return;
+    if (!isEscapeRequest(event)) return;
     const isShown = shown();
     if (!isShown && !env().root.intended()) return;
     // The innermost closes first (2.6): a popover or modal dialog open inside the card takes
@@ -277,7 +278,7 @@ function attachInterest(
     });
     // Escape before anything is intended: cancel the coming open.
     listen(trigger, "keydown", (event) => {
-      if (event.key !== "Escape" || event.isComposing) return;
+      if (!isEscapeRequest(event)) return;
       suppressed.current = true;
       timers.cancel();
     });
