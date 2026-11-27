@@ -177,6 +177,20 @@ describe("Menubar", () => {
       expect(el("plain")).not.toHaveAttribute("role");
     });
 
+    it("a Menu.Trigger outside a bar keeps the consumer's onPointerMove", () => {
+      const onPointerMove = vi.fn();
+      render(
+        <Menu.Root>
+          <Menu.Trigger data-testid="plain" onPointerMove={onPointerMove}>
+            Actions
+          </Menu.Trigger>
+          <Menu.Popup />
+        </Menu.Root>,
+      );
+      fireEvent.pointerMove(el("plain"), { pointerType: "mouse" });
+      expect(onPointerMove).toHaveBeenCalledTimes(1);
+    });
+
     it("a Trigger in a menu of the bar does not see the bar (the context ends at Menu.Popup)", async () => {
       const errors = silenceErrors();
       render(
@@ -198,16 +212,28 @@ describe("Menubar", () => {
       errors.mockRestore();
     });
 
-    it("warns in development when no menu of the bar is mounted", () => {
+    it("does not warn, also while every menu is still suspended at mount", async () => {
       const errors = silenceErrors();
-      render(<Menubar aria-label="Empty" />);
-      expect(errors).toHaveBeenCalledWith(expect.stringContaining("Menubar: no menu of the bar"));
-    });
-
-    it("does not warn with menus", () => {
-      const errors = silenceErrors();
-      render(<Bar />);
+      const suspender = createSuspender();
+      await act(async () => {
+        render(
+          <Menubar aria-label="Later">
+            <Suspense fallback={null}>
+              <suspender.Suspender value="menus" />
+              <Menu.Root>
+                <Menu.Trigger data-testid="late">Late</Menu.Trigger>
+                <Menu.Popup />
+              </Menu.Root>
+            </Suspense>
+          </Menubar>,
+        );
+      });
+      await flushTasks(2);
       expect(errors).not.toHaveBeenCalled();
+      await act(async () => suspender.resolve("menus"));
+      await flushTasks(2);
+      expect(el("late")).toHaveAttribute("role", "menuitem");
+      expect(el("late")).toHaveAttribute("tabindex", "0");
     });
   });
 
@@ -310,10 +336,17 @@ describe("Menubar", () => {
   describe("switching from inside a menu", () => {
     it("ArrowRight on an item opens the next menu with its first item focused", async () => {
       const fileFacts = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => void>();
+      const fileAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => void>();
       const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => void>();
-      render(<Bar file={{ onOpenChange: fileFacts }} edit={{ openChangeAction: editAction }} />);
+      render(
+        <Bar
+          file={{ onOpenChange: fileFacts, openChangeAction: fileAction }}
+          edit={{ openChangeAction: editAction }}
+        />,
+      );
       const user = setupUser();
       await openFile(user);
+      expect(fileAction).toHaveBeenCalledTimes(1);
       expect(el("new")).toHaveFocus();
       await user.keyboard("{ArrowRight}");
       // The target Trigger is focused first; the old menu hid at once.
@@ -329,6 +362,9 @@ describe("Menubar", () => {
       expect(editAction.mock.calls[0]![1].reason).toBe("activate");
       expect(editAction.mock.calls[0]![1].event).toBeInstanceOf(KeyboardEvent);
       expect(el("edit")).toHaveAttribute("tabindex", "0");
+      // The browser already hid File (its blur rule) when the switch closed the other menus: the
+      // fact only, no superseding request (menubar.tsx `closeMenu`).
+      expect(fileAction).toHaveBeenCalledTimes(1);
     });
 
     it("ArrowLeft in a top-level menu opens the previous menu; both wrap", async () => {
@@ -351,10 +387,15 @@ describe("Menubar", () => {
       render(<Bar bar={{ loop: false }} />);
       const user = setupUser();
       await openFile(user);
-      await user.keyboard("{ArrowLeft}");
+      // Nothing switched, so the key is not consumed.
+      expect(fireEvent.keyDown(el("new"), { key: "ArrowLeft" })).toBe(true);
       await flushTasks(2);
       expect(isOpen("file-popup")).toBe(true);
       expect(el("new")).toHaveFocus();
+      // A switch is.
+      expect(fireEvent.keyDown(el("new"), { key: "ArrowRight" })).toBe(false);
+      await flushTasks(2);
+      expect(isOpen("edit-popup")).toBe(true);
     });
 
     it("RTL: ArrowLeft goes to the next menu, ArrowRight to the previous", async () => {
@@ -472,6 +513,147 @@ describe("Menubar", () => {
     });
   });
 
+  // Menu mode held on a disabled Trigger (design 2.2 step 3, 2.3, 3). The fixture's View is
+  // disabled: File, Edit, View (disabled), wrapping back to File.
+  describe("menu mode across a disabled Trigger", () => {
+    async function holdFromEditItem(user: ReturnType<typeof setupUser>) {
+      el("edit").focus();
+      await user.keyboard("{ArrowDown}");
+      await flushTasks(2);
+      expect(el("undo")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("view")).toHaveFocus();
+      expect(isOpen("edit-popup")).toBe(false);
+      expect(isOpen("view-popup")).toBe(false);
+    }
+
+    it("from an item: ArrowRight onto the disabled Trigger, ArrowRight again opens the next menu, first item focused", async () => {
+      render(<Bar viewDisabled />);
+      const user = setupUser();
+      await holdFromEditItem(user);
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(isOpen("file-popup")).toBe(true);
+      expect(el("new")).toHaveFocus();
+    });
+
+    it("from the bar: the next menu opens with focus left on its Trigger", async () => {
+      render(<Bar viewDisabled />);
+      const user = setupUser();
+      await openFile(user);
+      fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
+      await flushTasks(2);
+      expect(el("edit")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("view")).toHaveFocus();
+      expect(isOpen("edit-popup")).toBe(false);
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(isOpen("file-popup")).toBe(true);
+      expect(el("file")).toHaveFocus();
+      // Backwards from the hold too.
+      await user.keyboard("{ArrowLeft}");
+      await flushTasks(2);
+      expect(el("view")).toHaveFocus();
+      await user.keyboard("{ArrowLeft}");
+      await flushTasks(2);
+      expect(isOpen("edit-popup")).toBe(true);
+      expect(el("edit")).toHaveFocus();
+    });
+
+    it("two disabled Triggers in a row keep the mode", async () => {
+      render(
+        <Menubar aria-label="Bar">
+          {["a", "b", "c", "d"].map((id) => (
+            <Menu.Root key={id}>
+              <Menu.Trigger data-testid={id} disabled={id === "b" || id === "c"}>
+                {id.toUpperCase()}
+              </Menu.Trigger>
+              <Menu.Popup data-testid={`${id}-popup`}>
+                <Menu.Item data-testid={`${id}-item`}>{id} item</Menu.Item>
+              </Menu.Popup>
+            </Menu.Root>
+          ))}
+        </Menubar>,
+      );
+      const user = setupUser();
+      el("a").focus();
+      await user.keyboard("{ArrowDown}");
+      await flushTasks(2);
+      expect(el("a-item")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("b")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("c")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(isOpen("d-popup")).toBe(true);
+      expect(el("d-item")).toHaveFocus();
+    });
+
+    it("Escape on the held Trigger ends the mode; focus stays and the key is not consumed", async () => {
+      render(<Bar viewDisabled />);
+      const user = setupUser();
+      await holdFromEditItem(user);
+      expect(fireEvent.keyDown(el("view"), { key: "Escape" })).toBe(true);
+      expect(el("view")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("file")).toHaveFocus();
+      expect(isOpen("file-popup")).toBe(false);
+    });
+
+    it("Tab away ends the mode", async () => {
+      render(<Bar viewDisabled />);
+      const user = setupUser();
+      await holdFromEditItem(user);
+      await user.tab();
+      expect(el("after")).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(el("view")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("file")).toHaveFocus();
+      expect(isOpen("file-popup")).toBe(false);
+    });
+
+    it("a click elsewhere ends the mode", async () => {
+      render(<Bar viewDisabled />);
+      const user = setupUser();
+      await holdFromEditItem(user);
+      await user.click(el("before"));
+      el("view").focus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("file")).toHaveFocus();
+      expect(isOpen("file-popup")).toBe(false);
+    });
+
+    it("a pointermove onto an enabled Trigger while a disabled one holds the mode opens it", async () => {
+      const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => void>();
+      render(<Bar viewDisabled edit={{ openChangeAction: editAction }} />);
+      const user = setupUser();
+      await holdFromEditItem(user);
+      editAction.mockClear();
+      fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
+      await flushTasks(2);
+      expect(isOpen("edit-popup")).toBe(true);
+      expect(el("edit")).toHaveFocus();
+      expect(editAction).toHaveBeenCalledWith(
+        true,
+        expect.objectContaining({ reason: "activate" }),
+      );
+      // The disabled Trigger itself still ignores the pointer.
+      fireEvent.pointerMove(el("view"), { pointerType: "mouse" });
+      await flushTasks(2);
+      expect(isOpen("edit-popup")).toBe(true);
+    });
+  });
+
   describe("hover", () => {
     it("does nothing while every menu is closed", async () => {
       const editAction = vi.fn();
@@ -485,10 +667,17 @@ describe("Menubar", () => {
 
     it("pointermove onto another Trigger while a menu is open switches, focus on the Trigger", async () => {
       const fileFacts = vi.fn();
+      const fileAction = vi.fn();
       const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => void>();
-      render(<Bar file={{ onOpenChange: fileFacts }} edit={{ openChangeAction: editAction }} />);
+      render(
+        <Bar
+          file={{ onOpenChange: fileFacts, openChangeAction: fileAction }}
+          edit={{ openChangeAction: editAction }}
+        />,
+      );
       const user = setupUser();
       await openFile(user);
+      expect(fileAction).toHaveBeenCalledTimes(1);
       fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
       expect(isOpen("file-popup")).toBe(false);
       await flushTasks(2);
@@ -498,6 +687,8 @@ describe("Menubar", () => {
       expect(editAction).toHaveBeenCalledTimes(1);
       expect(editAction.mock.calls[0]![1].reason).toBe("activate");
       expect(editAction.mock.calls[0]![1].event?.type).toBe("pointermove");
+      // File was hidden by the switch (focus was in it): a fact, no request.
+      expect(fileAction).toHaveBeenCalledTimes(1);
       // A move over the Trigger of the open menu does nothing more.
       fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
       await flushTasks(2);
@@ -557,6 +748,48 @@ describe("Menubar", () => {
       expect(el("undo")).toHaveFocus();
     });
 
+    it("a second switch while the first target's items suspend: the next menu opens at once", async () => {
+      const suspender = createSuspender();
+      const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => void>();
+      const editFacts = vi.fn();
+      render(
+        <Bar
+          edit={{ openChangeAction: editAction, onOpenChange: editFacts }}
+          editContent={
+            <>
+              <suspender.Suspender value="edit" />
+              <Menu.Item data-testid="undo">Undo</Menu.Item>
+            </>
+          }
+        />,
+      );
+      const user = setupUser();
+      await openFile(user);
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("edit")).toHaveFocus();
+      expectPending(el("edit"));
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      // Suspended content alone entangles nothing: View commits without waiting for Edit's data.
+      expect(el("view")).toHaveFocus();
+      expect(isOpen("view-popup")).toBe(true);
+      expect(el("zoom")).not.toHaveFocus();
+      expect(isOpen("edit-popup")).toBe(false);
+      expect(el("edit")).not.toHaveAttribute("data-open");
+      expect(editAction.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+        [true, "activate"],
+        [false, "dismiss"],
+      ]);
+      expect(editFacts).not.toHaveBeenCalled();
+      // Edit's data arriving later shows nothing.
+      await act(async () => suspender.resolve("edit"));
+      await flushTasks(2);
+      expect(isOpen("edit-popup")).toBe(false);
+      expect(isOpen("view-popup")).toBe(true);
+      expect(editFacts).not.toHaveBeenCalled();
+    });
+
     it("a second switch supersedes a pending open (never shown)", async () => {
       const open = deferred();
       const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => unknown>(
@@ -576,7 +809,7 @@ describe("Menubar", () => {
       expect(editAction).toHaveBeenCalledTimes(2);
       expect(editAction.mock.calls[1]![0]).toBe(false);
       expect(editAction.mock.calls[1]![1].reason).toBe("dismiss");
-      // View's open is entangled with Edit's pending one: optimistic until it settles.
+      // View's open is entangled with Edit's pending async action: optimistic until it settles.
       expect(el("view")).toHaveAttribute("data-open", "");
       expect(el("edit")).not.toHaveAttribute("data-open");
       await act(async () => open.resolve());

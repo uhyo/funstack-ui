@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -20,8 +20,6 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import { useRovingFocus } from "../internal/use-roving-focus.js";
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /**
  * State of `Menubar`, passed to the function forms of `className`, `style`, `children` and
@@ -109,6 +107,12 @@ export function Menubar({
   // The menus of the bar, keyed by their Trigger element (design 2.1). Order is the DOM order of
   // the Triggers, read when a key is pressed.
   const registry = useRef(new Map<HTMLElement, MenubarMenu>());
+  // Menu mode held on a disabled Trigger a switch reached (design 2.2 step 3): no menu can vouch
+  // for it, so the bar keeps it, with the switch's focus cause for the next switch. Cleared by
+  // every switch, by Escape on that Trigger and when that Trigger loses focus.
+  const held = useRef<{ readonly trigger: HTMLElement; readonly focus: MenubarOpenFocus } | null>(
+    null,
+  );
 
   const context = useMemo<MenubarContextValue>(() => {
     const menus = registry.current;
@@ -120,6 +124,7 @@ export function Menubar({
     ) => {
       const menu = menus.get(target);
       if (menu === undefined) return;
+      held.current = null;
       // 1. The Trigger first: a menu holding focus closes by its own rule, and the platform
       // records this Trigger as the focus-return target of the menu about to open.
       if (target.ownerDocument.activeElement !== target) {
@@ -130,8 +135,9 @@ export function Menubar({
       for (const [trigger, other] of menus) {
         if (trigger !== target) closeMenu(other, event);
       }
-      // 3. The target's open, unless it is disabled.
-      if (!menu.disabled()) menu.open(event, focus);
+      // 3. The target's open; a disabled target holds menu mode instead.
+      if (menu.disabled()) held.current = { trigger: target, focus };
+      else menu.open(event, focus);
     };
     return {
       register: (trigger, menu) => {
@@ -144,16 +150,18 @@ export function Menubar({
       step: (from, delta, event) => {
         const triggers = sortByDocumentOrder([...menus.keys()], (el) => el);
         const index = triggers.indexOf(from);
-        if (index < 0) return;
+        if (index < 0) return false;
         const last = triggers.length - 1;
         let next = index + delta;
         if (next > last) next = latestLoop.current ? 0 : last;
         else if (next < 0) next = latestLoop.current ? last : 0;
         const target = triggers[next];
-        if (target === undefined || target === from) return;
+        if (target === undefined || target === from) return false;
         switchTo(target, "first", event, false);
+        return true;
       },
       otherIntended: (trigger) => {
+        if (held.current !== null && held.current.trigger !== trigger) return true;
         for (const [other, menu] of menus) {
           if (other !== trigger && menu.intended() && !menu.hiddenBeforeToggle()) return true;
         }
@@ -166,26 +174,25 @@ export function Menubar({
     };
   }, [latestLoop]);
 
-  useEffect(() => {
-    if (isDev && registry.current.size === 0) {
-      console.error(
-        "Menubar: no menu of the bar after mount. Put Menu.Root elements, each with a " +
-          "Menu.Trigger, directly inside the Menubar.",
-      );
-    }
-  }, []);
-
-  // On a Trigger whose menu is intended open, the engine's move is a switch with focus left on
-  // the Trigger it moved to (design 2.3).
+  // On a Trigger whose menu is intended open, or a disabled one holding menu mode, the engine's
+  // move is a switch to the Trigger it moved to (design 2.3): focus left on it, or the held cause.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const target = event.target as HTMLElement;
     const menu = registry.current.get(target);
-    const menuMode = menu !== undefined && !event.defaultPrevented && menu.intended();
+    // Read before the engine moves focus: the blur of the held Trigger clears the hold.
+    const hold = held.current !== null && held.current.trigger === target ? held.current : null;
+    if (hold !== null && event.key === "Escape") {
+      // Ends menu mode; focus stays, and the key is not consumed.
+      held.current = null;
+      return;
+    }
+    const menuMode =
+      menu !== undefined && !event.defaultPrevented && (hold !== null || menu.intended());
     roving.onKeyDown(event);
     if (!menuMode || !event.defaultPrevented) return;
     const focused = target.ownerDocument.activeElement;
     if (focused instanceof HTMLElement && focused !== target && registry.current.has(focused)) {
-      context.switchTo(focused, "none", event.nativeEvent, false);
+      context.switchTo(focused, hold?.focus ?? "none", event.nativeEvent, false);
     }
   };
 
@@ -194,6 +201,7 @@ export function Menubar({
   // blur, a removed element) closes nothing.
   const onBlur = (event: FocusEvent<HTMLElement>) => {
     roving.onBlur(event);
+    if (held.current !== null && event.target === held.current.trigger) held.current = null;
     const next = event.relatedTarget;
     if (!(next instanceof Node) || event.currentTarget.contains(next)) return;
     for (const menu of registry.current.values()) closeMenu(menu, event.nativeEvent);

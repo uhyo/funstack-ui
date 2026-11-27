@@ -240,8 +240,7 @@ export function MenuPopup({
     }
     const trigger = popover.triggerRef.current;
     if (trigger === null) return;
-    event.preventDefault();
-    bar.step(trigger, delta, event.nativeEvent);
+    if (bar.step(trigger, delta, event.nativeEvent)) event.preventDefault();
   };
 
   const { setElement, visible, renderContent, reshow } = usePopoverPopup(popover, {

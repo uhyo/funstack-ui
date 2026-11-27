@@ -51,9 +51,11 @@ export interface MenubarContextValue {
   ) => void;
   /**
    * From inside the menu whose Trigger is `from`: switch to the next (`1`) or previous (`-1`)
-   * menu of the bar, first item focused. Wraps with the bar's `loop`.
+   * menu of the bar, first item focused. Wraps with the bar's `loop`. Returns whether it
+   * switched (`false` at an end without `loop`, in a one-menu bar, or from a menu that is not
+   * one of the bar's), so the caller consumes the key only then.
    */
-  readonly step: (from: HTMLElement, delta: 1 | -1, event: Event) => void;
+  readonly step: (from: HTMLElement, delta: 1 | -1, event: Event) => boolean;
   /** Some menu of the bar other than `trigger`'s is intended open (menu mode, 2.1). */
   readonly otherIntended: (trigger: HTMLElement) => boolean;
   /** The bar's computed `direction` is `rtl`, read at the event (conventions 14.1). */

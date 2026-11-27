@@ -129,8 +129,9 @@ function openFromBar(menu: MenuContextValue, event: Event, focus: MenubarOpenFoc
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
  * (link or component `render`, and in a Menubar), `popoverTarget`, `aria-haspopup`,
  * `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`,
- * `data-disabled`, and in a Menubar `role` and `onPointerMove`; `commandfor`, `command` and
- * `popoverTargetAction` (never written; omitted from the props type).
+ * `data-disabled`, and in a Menubar `role`; `commandfor`, `command` and `popoverTargetAction`
+ * (never written; omitted from the props type). In a Menubar the hover switch is an
+ * `onPointerMove` handler merged with the consumer's (theirs runs first).
  *
  * @see https://ui.funstack.work/components/menu
  */
@@ -213,7 +214,8 @@ export function MenuTrigger({
     alwaysFocusable: inBar,
     handlers: {
       onKeyDown,
-      onPointerMove,
+      // Only in a bar: an `undefined` key in the owned layer would remove the consumer's handler.
+      ...(onPointerMove !== undefined && { onPointerMove }),
       onMouseDown: (event: ReactMouseEvent<HTMLButtonElement>) => {
         // A press on the Trigger of an open menu must not move focus out of the popup: the Popup's
         // focusout would hide the menu before the click's library-owned close (design 2.2).
