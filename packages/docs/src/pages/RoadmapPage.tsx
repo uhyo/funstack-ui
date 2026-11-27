@@ -29,6 +29,13 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/menubar">Menubar</a> (<a href={issue(170)}>#170</a>): a{" "}
+          <code>{'<div role="menubar">'}</code> around ordinary <code>Menu.Root</code>s. A{" "}
+          <code>Menu.Trigger</code> inside it renders <code>role="menuitem"</code>, and its{" "}
+          <code>disabled</code> renders <code>aria-disabled</code> (it stays focusable); outside a
+          bar nothing changes.
+        </li>
+        <li>
           New component <a href="/components/drawer">Drawer</a> (<a href={issue(168)}>#168</a>): a
           Dialog attached to an edge (<code>side</code>, rendered as <code>data-side</code>) that
           the user can swipe back to it with mouse, pen or touch. The swipe writes{" "}

@@ -49,6 +49,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/drawer", label: "Drawer", group: "Overlays" },
   { path: "/components/menu", label: "Menu", group: "Overlays" },
   { path: "/components/context-menu", label: "Context menu (Menu)", group: "Overlays" },
+  { path: "/components/menubar", label: "Menubar (Menu)", group: "Overlays" },
   { path: "/components/toast", label: "Toast", group: "Overlays" },
   { path: "/components/field", label: "Field and Form", group: "Forms" },
   { path: "/components/checkbox", label: "Checkbox", group: "Forms" },

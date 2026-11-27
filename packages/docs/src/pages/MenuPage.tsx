@@ -822,7 +822,10 @@ export function MenuPage() {
           302008). If a submenu hits it, give its Popup <code>side={"{null}"}</code> and place it in
           CSS.
         </li>
-        <li>Menubars are not part of Menu.</li>
+        <li>
+          A row of menus with arrow keys between them is a <a href="/components/menubar">Menubar</a>
+          , around ordinary <code>Menu.Root</code>s.
+        </li>
       </ul>
     </DocPage>
   );
