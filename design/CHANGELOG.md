@@ -14392,3 +14392,52 @@ Test plan outline, NavigationMenu:
   closing behind; focus return to the Trigger after Escape (WebKit after a mouse open);
   resolved `data-side` / `data-align`; `transition` on a library-mode Popup.
 - Function props, `render`, `ref`; the Directive rows (`Root` and `List` directive-free).
+
+## 2026-11-27, #170: Menubar and NavigationMenu accepted
+
+The user accepted every recommendation of the two proposals (the product owner's message of
+2026-11-27). `design/components/menubar.md` and `design/components/navigation-menu.md` are
+**accepted**; their "Decisions for the user" sections are removed and recorded here. Not
+implemented yet. No rule of either document changed.
+
+Menubar, decided (and the options not taken):
+
+1. **API shape: a single `Menubar` element around ordinary `Menu.Root`s; `Menu.Trigger` adapts
+   through context.** Not taken: `Menubar.Root`, to leave room for bar-only parts later (it
+   costs `Menubar.Root` next to `Menu.Root` at every call site for parts that may never come);
+   a full `Menubar.*` namespace mirroring Menu, as Radix (familiar, doubles the surface).
+2. **The old menu closes at once during a switch**; the new Trigger is focused and shows
+   `data-pending` until its menu is ready. Not taken: the old menu stays shown, with focus in
+   it, until the new one commits and the browser swaps them (nicer for slow menus, but it needs
+   a focus-return fix, since the platform would record the old menu's item as the return
+   target, and keys keep going to a menu the user has left).
+3. **Hover switches menus only while one is open.** Not taken: never switching on hover
+   (keyboard and clicks only); also opening on hover while the bar is closed, after a delay
+   (it moves focus when the pointer crosses the page header).
+4. **v1 is horizontal only, with no `experimental_focusgroup`, no typeahead between Triggers
+   and no items directly in the bar.** Not taken: including `orientation` now for parity with
+   `Toolbar.Root` (the cheapest of the four; still listed in menubar.md 10).
+
+NavigationMenu, decided (and the options not taken):
+
+1. **Click only.** Not taken: also opening on hover after a delay (`delay` / `closeDelay` on
+   Root, HoverCard's JS interest tracking, a click pinning the panel), which needs library mode
+   for every Item and a hover-then-click guard and gives up the JS-free default; and the same
+   later behind a Root prop, which stays possible (navigation-menu.md 10; a sketch is in
+   `memo/architect/menubar-navmenu-notes.md`).
+2. **Open state per Item, Popover's props and both modes.** Not taken: `value` /
+   `defaultValue` / `valueChangeAction` on Root, as Radix and Base UI (one place to control,
+   and a switch between panels becomes one commit a view transition can morph; always library
+   mode, so no JS-free navigation, and a new owner hook).
+3. **A `Link` part that closes its panel when followed; the current page is the native
+   `aria-current="page"`.** Not taken: an added `current` prop rendering `aria-current` and
+   `data-current` (a second spelling of a native attribute); no Link part, the Popup closing on
+   a followed `a[href]` by event delegation (nothing to forget, but less explicit than every
+   other closing part and it needs a per-popup opt-out).
+4. **No arrow keys; Tab only.** Not taken: ArrowLeft / ArrowRight / Home / End between
+   top-level entries on `List` (the APG's optional enhancement).
+
+Test plans: each document's section 11 now carries the unverified point of the proposal as its
+**first step** (Menubar: the accessibility tree and axe result for a `menu` that is a direct
+child of the `menubar`; NavigationMenu: a Link's close committing together with a router
+transition). The outlines in the proposal entry above are the rest.

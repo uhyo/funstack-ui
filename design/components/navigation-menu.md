@@ -1,6 +1,6 @@
 # NavigationMenu
 
-Status: **proposed** (#170, part of #162). Not implemented. History and the test plan:
+Status: **accepted** (#170, part of #162; the user's decisions of 2026-11-27). Not implemented yet. History and the test plan:
 `design/CHANGELOG.md`, the #170 entries. Follows `design/conventions.md`; where this document
 and the conventions disagree, the conventions win. **Read `design/components/popover.md`
 first**: a NavigationMenu flyout is the Popover's two-mode model (JS-free mode, library mode,
@@ -113,7 +113,7 @@ Why these parts:
   panel is its own top-layer element anchored to its own Trigger, and per-Item state is exactly
   Popover's, so the open props, the two modes and the requests-and-facts table need no new
   rules. Cost: no single prop says "which panel is open", and no one-commit switch between
-  panels to animate (section 9). Decision 2 in section 11.
+  panels to animate (section 9).
 - **`Root` and `List` add only structure.** They are kept because the structure is the
   accessibility of this pattern (`nav` > list > items), because `List` fixes a real engine quirk,
   and because the features left for later (arrow keys, hover with a shared delay) need them as
@@ -175,7 +175,7 @@ keeps them exclusive either way.
 A click on the Trigger (Enter and Space are the native click). Nothing else opens a panel in v1:
 no hover, no focus, no arrow key.
 
-Why not hover (decision 1 in section 11): the APG disclosure pattern is click-only; touch has no
+Why not hover: the APG disclosure pattern is click-only; touch has no
 hover, so every panel must open on a press anyway; a button that opens on hover **and** toggles
 on click closes the panel under a user who hovers and then clicks (the libraries that do both
 add a timed "ignore the click" window); and HTML's guidance for interest invokers is that one
@@ -279,7 +279,7 @@ A controlled Item needs `onOpenChange`, as every controlled overlay (conventions
   WebKit, where a clicked button was never focused.
 - **No arrow keys.** The APG example adds optional arrow-key movement between the top-level
   buttons; v1 leaves it out so that the keyboard behaviour is identical before and after
-  hydration. Decision 4 in section 11.
+  hydration.
 
 ---
 
@@ -428,36 +428,17 @@ different component around the same links (a Drawer or a Collapsible); the docs 
 
 ---
 
-## 11. Decisions for the user
+## 11. Test plan
 
-1. **Hover.**
-   - (a) Click only. **Recommended**: the APG pattern, identical on touch and with a keyboard,
-     and the only choice that works without JavaScript.
-   - (b) Also open on hover after a delay (`delay` / `closeDelay` on Root, HoverCard's JS
-     interest tracking), with a click pinning the panel open. What many marketing sites do;
-     needs library mode for every Item, the hover-then-click guard, and gives up the JS-free
-     default.
-   - (c) (a) now, (b) later behind a prop on Root if users ask. Compatible with (a).
-2. **Where the open state lives.**
-   - (a) Per Item, Popover's props and both modes unchanged; the platform keeps panels
-     exclusive. **Recommended**: no new state model, JS-free by default.
-   - (b) On Root as `value` / `defaultValue` / `valueChangeAction` (Radix, Base UI). One place
-     to control, and a switch between panels becomes one commit that a view transition can
-     morph. Always library mode, so no JS-free navigation, and a new owner hook instead of the
-     Popover's.
-3. **Links.**
-   - (a) A `Link` part that closes its panel when followed; the current page is the native
-     `aria-current="page"`, passed through. **Recommended.**
-   - (b) (a) plus a `current` prop on Link that renders `aria-current="page"` and
-     `data-current`. Familiar from Radix (`active`); a second spelling of a native attribute.
-   - (c) No Link part: the Popup closes on a followed `a[href]` inside it by event delegation.
-     Nothing to learn and nothing to forget, but less explicit than every other closing part in
-     the library, and it needs a per-popup opt-out.
-4. **Arrow keys.**
-   - (a) None; Tab only. **Recommended** for v1: the same keyboard before and after hydration.
-   - (b) ArrowLeft / ArrowRight / Home / End between top-level entries on `List` (the APG's
-     optional enhancement), Tab unchanged.
+The first step, before any other row, because section 9 (walkthrough 3) states it as an
+expectation and no probe was run:
 
-## 12. Test plan
+1. **A Link's close committing together with a router transition.** In the example app, with
+   FUNSTACK Router: a library-mode Item, a `NavigationMenu.Link` rendered as the router's link
+   to a route whose content suspends. Follow the Link and record whether the panel stays shown
+   until the new route commits and leaves in that same commit (and, with `transition` set, in
+   the same view transition), or closes on its own before it. Either result is acceptable
+   behaviour; the step decides what walkthrough 3 and the docs page say. Report the result to
+   the architect, who amends section 9.
 
-Moved to `design/CHANGELOG.md` (the #170 entry). Not part of the contract.
+The rest of the plan is in `design/CHANGELOG.md` (the #170 entries). Not part of the contract.

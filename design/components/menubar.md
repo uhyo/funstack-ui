@@ -1,6 +1,6 @@
 # Menubar
 
-Status: **proposed** (#170, part of #162). Not implemented. History and the test plan:
+Status: **accepted** (#170, part of #162; the user's decisions of 2026-11-27). Not implemented yet. History and the test plan:
 `design/CHANGELOG.md`, the #170 entries. Follows `design/conventions.md`; where this document
 and the conventions disagree, the conventions win. **Read `design/components/menu.md` first**:
 a Menubar is a row of ordinary `Menu.Root`s, and every rule of a menu (items and their actions,
@@ -166,7 +166,8 @@ describes the move in this order ("moves focus to the next item in the menubar, 
 submenu"). The alternative (leave the old menu shown with focus in it until the new one commits,
 then let the platform swap them) reads better when a menu's items load slowly, but focus would
 sit in a menu the user has left, and the platform would record that menu's item as the return
-target. Decision 2 in section 11.
+target. The options not taken are in
+`design/CHANGELOG.md`.
 
 ### 2.3 What triggers a switch
 
@@ -382,34 +383,17 @@ runs, and a user sweeping across the bar switches several times a second.
 
 ---
 
-## 11. Decisions for the user
+## 11. Test plan
 
-1. **Shape of the API.**
-   - (a) A single `Menubar` element around ordinary `Menu.Root`s; `Menu.Trigger` adapts through
-     context. **Recommended**: one new name, every Menu rule and type reused, the Toolbar
-     precedent.
-   - (b) `Menubar.Root`, to leave room for bar-only parts later (a Separator, a direct item).
-     Costs `Menubar.Root` next to `Menu.Root` at every call site for parts that may never come.
-   - (c) A full `Menubar.*` namespace mirroring Menu (Radix). Most familiar to Radix users;
-     doubles the surface.
-2. **What happens to the old menu during a switch.**
-   - (a) It closes at once; the new Trigger is focused and shows `data-pending` until its menu
-     is ready. **Recommended**: no new close path, correct focus return for free, the APG's
-     order.
-   - (b) It stays shown, with focus in it, until the new menu commits, and the browser swaps
-     them. Nicer for slow menus ("the old UI stays until the new one is ready"), but needs a
-     focus-return fix and leaves keys going to a menu the user has left.
-3. **Hover.**
-   - (a) Hover switches menus only while one is open; a closed bar needs a click or a key.
-     **Recommended**: what desktop menubars do.
-   - (b) Never switch on hover (keyboard and clicks only). Simplest, but a bar that ignores the
-     pointer between open menus feels broken.
-   - (c) Also open on hover while closed, after a delay (some web menubars). Moves focus by
-     mousing across the page header.
-4. **Scope of v1.** Recommended: horizontal only, no `experimental_focusgroup`, no typeahead on
-   the bar, no direct items (section 10). The alternative is to include `orientation` now, the
-   cheapest of the four, for parity with `Toolbar.Root`.
+The first step, before any other row, because the design assumes it and no probe was run:
 
-## 12. Test plan
+1. **The accessibility tree and the axe result for a `menu` that is a direct DOM child of the
+   `menubar`**, in the three engines (a browser row with an accessibility snapshot of a bar with
+   one open menu, and axe on the same markup). The APG example has a `role="none"` `li` between
+   the two; here the popup sits in the bar next to its Trigger. Expected: the Triggers are
+   exposed as `menuitem`s of the bar with their expanded state, the open `menu` is named by its
+   Trigger, and axe reports no `aria-required-children` or `aria-required-parent` violation. If
+   it fails, stop and report to the architect: the anatomy (where `Menu.Popup` renders) is
+   what would change.
 
-Moved to `design/CHANGELOG.md` (the #170 entry). Not part of the contract.
+The rest of the plan is in `design/CHANGELOG.md` (the #170 entries). Not part of the contract.
