@@ -15681,3 +15681,41 @@ Changed with the acceptance:
   `TextFieldProps` in the commit that exports it; the docs site page and the
   `funstack-ui-knowledge` skill; the Roadmap line above.
 
+## 2026-11-27, #181: the first steps; `type="search"` leaves TextField v1
+
+Architect, on the developer's probes (`memo/developer/text-field.md` on
+`feat/181-text-field`, d6729d57) and the product owner's call. Changed: text-field.md 1 (the
+supported types), 8 (the role row), 13 (a `search` item), 14 (the first-steps table is replaced
+by its results; the `search` browser row is gone, a warning row is added).
+
+The five first steps of text-field.md 14, as found:
+
+1. Blur during an IME composition: in Chromium `compositionend` arrives before the blur every
+   time, as expected. Firefox and WebKit were not driven. 4.2 stands.
+2. `type="search"`: **differs**, below.
+3. Undo history after a controlled write: gone in all three engines, as expected.
+4. `text-overflow: ellipsis` on an unfocused input: works in all three, as expected.
+5. `useNativeGroupReconciliation` fits as it stands, wired as NumberField wires it. From
+   reading the code; the mount and reset rows had not run yet.
+
+`type="search"`. With an edited draft the prevented `keydown` stops the native clear in all
+three engines (expected). On an untouched field Chromium and Firefox clear natively with an
+`input` event, so a draft `""` opens (expected for Chromium; Firefox clearing was not
+expected). WebKit 27.2 under Playwright on Linux does not clear; WebKit's source clears on
+Escape and fires `change`, not `input`; Safari on macOS was not tested. Also, not probed: in
+Chromium the native clear does not consume the key, so in a dialog the first Escape on an
+untouched search field probably closes the dialog as well.
+
+Decision (product owner; the architect agrees): **`search` is not a supported type in v1**,
+the second of the two ways out the first step named. A sentence in 4.3 would have had to
+describe three engine behaviours, one of them unverified on the real browser, for a type the
+component does not need: `type="text"` with `inputMode` / `enterKeyHint` gives the same field.
+The other free-text types (`tel`, `url`, `email`, `password`) stay: no engine gives a key a
+meaning of its own there, and they carry native validation and autofill that `text` does not.
+An unsupported type warns in development and is rendered as given; it is not coerced to
+`text` (NumberField coerces because a number input would bring a second parser; here the
+cost of the wrong type is a quirk, and silently changing a consumer's `type` hides it).
+
+Follow-up issue owed: `type="search"` in TextField (a rule for the native clear, a test on
+Safari itself, the dialog case in Chromium).
+
