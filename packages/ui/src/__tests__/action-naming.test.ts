@@ -181,6 +181,12 @@ type PublicProps = {
   MultiSelectStatusProps: UI.MultiSelectStatusProps;
   MultiSelectTriggerProps: UI.MultiSelectTriggerProps;
   MultiSelectValueProps: UI.MultiSelectValueProps;
+  NavigationMenuItemProps: UI.NavigationMenuItemProps;
+  NavigationMenuLinkProps: UI.NavigationMenuLinkProps;
+  NavigationMenuListProps: UI.NavigationMenuListProps;
+  NavigationMenuPopupProps: UI.NavigationMenuPopupProps;
+  NavigationMenuRootProps: UI.NavigationMenuRootProps;
+  NavigationMenuTriggerProps: UI.NavigationMenuTriggerProps;
   NumberFieldDecrementProps: UI.NumberFieldDecrementProps;
   NumberFieldIncrementProps: UI.NumberFieldIncrementProps;
   NumberFieldInputProps: UI.NumberFieldInputProps;
@@ -339,6 +345,12 @@ const listedKeys = {
   MultiSelectStatusProps: true,
   MultiSelectTriggerProps: true,
   MultiSelectValueProps: true,
+  NavigationMenuItemProps: true,
+  NavigationMenuLinkProps: true,
+  NavigationMenuListProps: true,
+  NavigationMenuPopupProps: true,
+  NavigationMenuRootProps: true,
+  NavigationMenuTriggerProps: true,
   NumberFieldDecrementProps: true,
   NumberFieldIncrementProps: true,
   NumberFieldInputProps: true,
@@ -468,6 +480,7 @@ describe("action naming (conventions 10.1)", () => {
       | "HoverCardRootProps"
       | "MenuRootProps"
       | "MultiSelectRootProps"
+      | "NavigationMenuItemProps"
       | "PopoverRootProps"
     >();
     expectTypeOf<UI.PopoverRootProps["onOpenChange"]>().toEqualTypeOf<
@@ -493,6 +506,9 @@ describe("action naming (conventions 10.1)", () => {
     >();
     expectTypeOf<UI.MultiSelectRootProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.MultiSelectOpenChangeDetails> | undefined
+    >();
+    expectTypeOf<UI.NavigationMenuItemProps["onOpenChange"]>().toEqualTypeOf<
+      UI.UrgentChangeHandler<boolean, UI.NavigationMenuOpenChangeDetails> | undefined
     >();
   });
 

@@ -50,6 +50,7 @@
     "./menu": "./dist/menu/index.mjs",
     "./meter": "./dist/meter/index.mjs",
     "./multi-select": "./dist/multi-select/index.mjs",
+    "./navigation-menu": "./dist/navigation-menu/index.mjs",
     "./number-field": "./dist/number-field/index.mjs",
     "./otp-field": "./dist/otp-field/index.mjs",
     "./popover": "./dist/popover/index.mjs",

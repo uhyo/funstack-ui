@@ -237,6 +237,11 @@ interface CloseIntents {
 export interface OverlayOpenStateConfig<D extends OverlayDetailsLike> {
   /** The describe block's name (`"Dialog"`). */
   readonly name: string;
+  /**
+   * The component part of its transition types (`fsui-<component>-open`), when it is not the
+   * lower-cased `name` (`"navigation-menu"`).
+   */
+  readonly component?: string;
   readonly Harness: ComponentType<OverlaySuiteHarnessProps<D>>;
   /** Whether the popup is shown (`dialog.open`, `:popover-open`). */
   readonly isOpen: () => boolean;
@@ -346,7 +351,7 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
   const partName = (part: PartClose) => (partCloses.length > 1 ? ` [${part.name}]` : "");
   const hasReturnValue = config.detailsKeys.includes("returnValue");
   /** The transition type of the component's open (`fsui-popover-open`). */
-  const openType = `fsui-${config.name.toLowerCase()}-open`;
+  const openType = `fsui-${config.component ?? config.name.toLowerCase()}-open`;
   type Action = OpenChangeFn<D>;
 
   const trigger = () => screen.getByTestId("trigger");
