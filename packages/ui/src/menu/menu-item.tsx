@@ -128,6 +128,13 @@ export function MenuItem({
       // When ignoring, a second activation while this item's own run is in flight starts
       // nothing and is cancelled (the hook's guard): a link does not navigate, a composed
       // command does not run. Enter / Space reach here through the element's click, their keydown is cancelled.
+      if (action === undefined && closeOnActivate) {
+        // As a Close part without `action` (use-overlay-close.ts): the request is made
+        // synchronously in the activation, inside the item's own transition, so the
+        // synchronous prefix of `openChangeAction(false)` runs during the event dispatch.
+        trigger.runActivation(event, () => menu.root.popover.requestClose(event, "activate"));
+        return;
+      }
       trigger.runActivation(
         event,
         () => action?.(details),

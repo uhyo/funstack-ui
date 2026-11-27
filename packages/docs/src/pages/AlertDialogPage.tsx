@@ -363,7 +363,7 @@ export function AlertDialogPage() {
           [
             "`aria-disabled`",
             "Cancel, Action",
-            '`"true"` while `data-pending` with `whilePending="ignore"` (the default).',
+            '`"true"` with `action`, while `data-pending` with `whilePending="ignore"` (the default).',
           ],
           ["`data-disabled`", "Trigger, Cancel, Action", "The `disabled` prop."],
         ]}

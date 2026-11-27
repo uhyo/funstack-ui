@@ -345,8 +345,11 @@ still an enabled item for the open focus.
   open-generation guard as before), so a rejection keeps the menu open in both modes; an older
   run's rejection goes to `reportError`, the latest one's to the boundary above the item
   (conventions 2.4, #145; `menu.test.tsx` "whilePending (#146)").
-- An Item without `action` only closes. It runs through the item's transition all the same, so
-  it shows `data-pending` while the close it asked for waits (a Root `openChangeAction(false)`
+- An Item without `action` only closes. It runs through the item's transition all the same,
+  making the close request synchronously in the activation, inside that transition (as a Close
+  part without `action`, conventions 4.3), so the synchronous prefix of
+  `openChangeAction(false)` runs during the event dispatch; an Item with `action` requests in
+  the continuation, after the action. It shows `data-pending` while the close it asked for waits (a Root `openChangeAction(false)`
   that is awaited, or another pending action the close is entangled with; conventions 4.3).
   The prop has no effect and the item renders no `aria-disabled` from pending: nothing of its
   own is in flight to ignore, and a second activation is a no-op (conventions 2.3 item 8).

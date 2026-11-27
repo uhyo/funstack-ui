@@ -870,6 +870,7 @@ describe("Collapsible", () => {
         const action = vi.fn<ActionFn>(() => d.promise);
         render(<Harness mode="uncontrolled" action={action} />);
         await setupUser().click(trigger());
+        const second = deferred();
         const details = root();
         const toggles = vi.fn();
         details.addEventListener("toggle", toggles);
@@ -881,6 +882,9 @@ describe("Collapsible", () => {
           observer.disconnect();
           openAtClick = details.open;
           togglesAtClick = toggles.mock.calls.length;
+          // The click's own action stays pending, so the DOM is still open when the commit's
+          // `toggle` arrives: only the known value tells it from a platform change.
+          action.mockImplementation(() => second.promise);
           fireEvent.click(trigger());
         });
         observer.observe(details, { attributeFilter: ["open"] });
@@ -896,7 +900,13 @@ describe("Collapsible", () => {
           [true, "activate"],
           [false, "activate"],
         ]);
+        // The echo of `open` was not dispatched as a platform re-open; the DOM is still open.
+        expect(details.open).toBe(true);
+        await act(async () => {
+          second.resolve();
+        });
         await flushToggle();
+        expect(action).toHaveBeenCalledTimes(2);
         expect(root().open).toBe(false);
         expect(committed()).toBe("false");
       });

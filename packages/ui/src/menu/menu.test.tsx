@@ -1306,6 +1306,28 @@ describe("Menu.Item actions", () => {
       expect(isOpen()).toBe(false);
     });
 
+    it("without action: the close is requested during the click's dispatch (#183)", async () => {
+      const user = setupUser();
+      const phases: number[] = [];
+      const openChange = vi.fn<OpenAction>((next, details) => {
+        if (!next) phases.push(details.event!.eventPhase);
+      });
+      render(
+        <Harness
+          root={{ openChangeAction: openChange }}
+          content={<Menu.Item data-testid="plain">Plain</Menu.Item>}
+        />,
+      );
+      await openMenu(user);
+      await user.click(item("plain"));
+      await flushTasks(2);
+      // The synchronous prefix of `openChangeAction(false)` ran inside the event dispatch, as
+      // for a Close part without `action`.
+      expect(phases).toHaveLength(1);
+      expect(phases[0]).not.toBe(Event.NONE);
+      expect(isOpen()).toBe(false);
+    });
+
     it("an explicit whilePending wins over the closeOnActivate default", async () => {
       const user = setupUser();
       const work = deferred();

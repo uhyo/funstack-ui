@@ -1488,7 +1488,8 @@ alternative.
   transition (`useActionTrigger`, 3.4) and the Root's request is made inside it, so the part's
   `pending` covers its `action`, the Root's awaited `openChangeAction(false)`, and any pending
   async action the close is entangled with (2.3 item 5: a Cancel clicked while a confirm
-  runs). A Close part without `action` makes the request synchronously in the click, so
+  runs). A Close part without `action`, and a closing `Menu.Item` without `action`, makes
+  the request synchronously in the click, so
   `openChangeAction`'s synchronous prefix still runs during the event dispatch (2.3 item 3). A
   close that ends up not happening (a controlled parent that does not adopt it, a fact that
   superseded it, 3.9.5) ends the part's `pending` when the request settles. JS-free mode

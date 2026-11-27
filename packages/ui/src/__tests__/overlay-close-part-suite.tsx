@@ -557,6 +557,9 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
           await act(async () => config.dismiss());
           await flushTasks(2);
           expect(isOpen()).toBe(false);
+          // The part's own transition still holds its request: pending (hidden in the
+          // keepMounted popup) until `openChangeAction(false)` settles.
+          expectPending(part());
           await act(async () => closing.resolve());
           await flushTasks(2);
           expect(isOpen()).toBe(false);

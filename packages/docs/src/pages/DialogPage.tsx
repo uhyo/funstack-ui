@@ -508,7 +508,7 @@ export function DialogPage() {
           [
             "`aria-disabled`",
             "Close",
-            '`"true"` while `data-pending` with `whilePending="ignore"` (the default): a second click is ignored meanwhile.',
+            '`"true"` with `action`, while `data-pending` with `whilePending="ignore"` (the default): a second click is ignored meanwhile.',
           ],
           ["`data-disabled`", "Trigger, Close", "The `disabled` prop (both modes)."],
         ]}
