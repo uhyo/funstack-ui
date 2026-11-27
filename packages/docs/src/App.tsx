@@ -62,6 +62,7 @@ export const routes = [
               page("/components/tabs", "TabsPage"),
               page("/components/accordion", "AccordionPage"),
               page("/components/collapsible", "CollapsiblePage"),
+              page("/components/navigation-menu", "NavigationMenuPage"),
               page("/components/tooltip", "TooltipPage"),
               page("/components/hover-card", "HoverCardPage"),
               page("/components/dialog", "DialogPage"),

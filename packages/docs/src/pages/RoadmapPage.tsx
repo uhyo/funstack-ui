@@ -29,6 +29,15 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/navigation-menu">NavigationMenu</a> (
+          <a href={issue(170)}>#170</a>): a site's main navigation as the disclosure pattern, each
+          panel a <code>popover="auto"</code> next to its <code>popovertarget</code> button. It
+          needs no JavaScript by default; after hydration focus leaving a panel and a followed{" "}
+          <code>NavigationMenu.Link</code> close it. A panel whose content loads on open opts into
+          library mode (<code>openChangeAction</code>, transition types{" "}
+          <code>fsui-navigation-menu*</code>). Hover opening and arrow keys are not in this version.
+        </li>
+        <li>
           New component <a href="/components/drawer">Drawer</a> (<a href={issue(168)}>#168</a>): a
           Dialog attached to an edge (<code>side</code>, rendered as <code>data-side</code>) that
           the user can swipe back to it with mouse, pen or touch. The swipe writes{" "}
