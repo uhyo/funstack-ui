@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
-import { useFormStatus } from "react-dom";
+import { flushSync, useFormStatus } from "react-dom";
 import { FieldContext, fieldDataAttributes, FormContext } from "../internal/form/field-context.js";
 import type {
   FieldContextValue,
@@ -361,11 +361,17 @@ export function FieldRoot({
       writeSlot({ dismiss: applyEdit !== null });
       cancelEditRefresh.current?.();
       const cancel = afterDispatch(event, () => {
+        // Defence in depth: the next edit cancels this call, but only the latest write may run.
         if (cancelEditRefresh.current !== cancel) return;
         cancelEditRefresh.current = null;
         pendingEdit.current = null;
-        applyEdit?.();
-        refresh({ dismiss: applyEdit !== null });
+        // Committed at once, as the listener's own write used to be: outside any event React
+        // would give these writes the default lane and a paint could show the old error state.
+        // The dispatch is over, so a synchronous commit can no longer clobber the keystroke.
+        flushSync(() => {
+          applyEdit?.();
+          refresh({ dismiss: applyEdit !== null });
+        });
       });
       cancelEditRefresh.current = cancel;
     },
@@ -472,7 +478,8 @@ export function FieldRoot({
     if (registerField === undefined) return;
     const registration: FormFieldRegistration = {
       getFocusTarget: () => focusTargetOf(controlRef.current?.element ?? null),
-      showsServerError: () => latest.current.serverShown,
+      // An edit whose dismissal is not written yet already counts (design 2.4).
+      showsServerError: () => latest.current.serverShown && pendingEdit.current === null,
       serverMessages: () => latest.current.serverMessages,
       refresh: () => {
         refresh();

@@ -10,7 +10,7 @@
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { leaveActEnvironment, settle } from "../__tests__/browser-helpers.js";
 import { Combobox } from "../combobox/index.js";
@@ -122,7 +122,7 @@ function ControlledNativeSelect() {
 /** Text scripts for a control that starts with "Jap" (validate rejects "bad"). */
 const TEXT: Record<Mode, Script> = {
   validate: [
-    { keys: "{Control>}a{/Control}b", value: "b", valid: true },
+    { keys: "{ControlOrMeta>}a{/ControlOrMeta}b", value: "b", valid: true },
     { keys: "a", value: "ba", valid: true },
     { keys: "d", value: "bad", valid: false },
     { keys: "{Backspace}", value: "ba", valid: true },
@@ -131,7 +131,7 @@ const TEXT: Record<Mode, Script> = {
     { keys: "{Backspace}", value: "ba", valid: true },
   ],
   required: [
-    { keys: "{Control>}a{/Control}{Backspace}", value: "", valid: false },
+    { keys: "{ControlOrMeta>}a{/ControlOrMeta}{Backspace}", value: "", valid: false },
     { keys: "x", value: "x", valid: true },
     BLUR,
     { keys: "{End}{Backspace}", value: "", valid: false },
@@ -270,14 +270,14 @@ describe("an edit that changes the Field's validity keeps the keystroke (#193)",
         await run(
           mode === "validate"
             ? [
-                { keys: "{Control>}a{/Control}13", value: "13", valid: true },
+                { keys: "{ControlOrMeta>}a{/ControlOrMeta}13", value: "13", valid: true },
                 BLUR,
-                { keys: "{Control>}a{/Control}12{Enter}", value: "12", valid: true },
-                { keys: "{Control>}a{/Control}13{Enter}", value: "13", valid: false },
+                { keys: "{ControlOrMeta>}a{/ControlOrMeta}12{Enter}", value: "12", valid: true },
+                { keys: "{ControlOrMeta>}a{/ControlOrMeta}13{Enter}", value: "13", valid: false },
                 { keys: "{Backspace}2{Enter}", value: "12", valid: true },
               ]
             : [
-                { keys: "{Control>}a{/Control}{Backspace}", value: "", valid: true },
+                { keys: "{ControlOrMeta>}a{/ControlOrMeta}{Backspace}", value: "", valid: true },
                 BLUR,
                 { keys: "{Enter}", value: "", valid: false },
                 { keys: "5{Enter}", value: "5", valid: true },
@@ -287,6 +287,44 @@ describe("an edit that changes the Field's validity keeps the keystroke (#193)",
       });
     });
   }
+
+  // An Enter in the task after the keystroke may run before the deferred state write (Chromium:
+  // a `setTimeout`): the slot written in the listener is what the submission is checked against.
+  it("Enter right after the keystroke that makes the field invalid: blocked, the text kept", async () => {
+    const submitted = vi.fn((e: SubmitEvent) => e.preventDefault());
+    render(
+      <Harness mode="validate">
+        <ControlledText initial="ba" />
+      </Harness>,
+    );
+    screen.getByTestId("form").addEventListener("submit", submitted);
+    await act(async () => control().focus());
+    await outside(() => userEvent.keyboard("{End}d{Enter}"));
+    await settle(() => expect(control()).toHaveAttribute("aria-invalid", "true"));
+    expect(control().value).toBe("bad");
+    expect(submitted).not.toHaveBeenCalled();
+  });
+
+  it("Enter right after the keystroke that dismisses a server error: the new text is submitted", async () => {
+    const action = vi.fn((_data: FormData) => {});
+    render(
+      <Form.Root action={action} errors={{ f: "Taken." }} data-testid="form">
+        <Field.Root name="f">
+          <Field.Label>Field</Field.Label>
+          <ControlledText initial="a" />
+          <Field.Error data-testid="error" />
+        </Field.Root>
+      </Form.Root>,
+    );
+    await settle(() => expect(screen.getByTestId("error")).toHaveTextContent("Taken."));
+    await act(async () => control().focus());
+    await outside(() => userEvent.keyboard("{End}b{Enter}"));
+    await settle(() => expect(action).toHaveBeenCalledTimes(1));
+    expect(action.mock.calls[0]![0].get("f")).toBe("ab");
+    expect(control().value).toBe("ab");
+    // The settle re-arms the errors (the same `errors` prop answers the new submission).
+    await settle(() => expect(screen.getByTestId("error")).toHaveTextContent("Taken."));
+  });
 
   it("the keystroke that dismisses a shown server error is kept", async () => {
     render(

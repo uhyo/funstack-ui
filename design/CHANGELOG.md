@@ -15259,3 +15259,17 @@ internal-hooks.md's file list.
   text leaves the slot valid). All fail on the old code.
 - **Corrects** the #185 developer entry's description of this bug as "in a Combobox Input": it
   is any controlled control in a Field.
+
+## 2026-11-27, #193 review: the deferred writes commit with `flushSync`
+
+Developer, after the review (`memo/reviewer/review-193.md`). Corrects the previous entry's
+2.4 sentence ("still the urgent lane ... in the same microtask as before"), which was wrong:
+written from a microtask or a task with no event, the deferred writes got React's default lane
+and committed in a later Scheduler task, so a frame could paint the old `aria-invalid` /
+`Field.Error`. Changed: field-form.md 2.4 (that sentence). The deferred dismissal and refresh
+now run inside `flushSync`; the dispatch is over then, so the synchronous commit cannot clobber
+the keystroke. `showsServerError` (the Form's settle focus) also treats a pending edit as a
+dismissal, like the slot. New browser rows: Enter right after the keystroke that makes the
+field invalid (blocked, text kept); Enter right after the keystroke that dismisses a server
+error (the new text is submitted, the errors re-show after the settle). Select-all in the rows
+is `{ControlOrMeta>}a`, so they also hold on macOS.

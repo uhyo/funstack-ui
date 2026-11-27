@@ -4,7 +4,11 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 export interface ServerErrorVisibility {
   /** The server's messages for this field are shown. */
   readonly serverShown: boolean;
-  /** Stable. The user edited the control: hide the server error until the next settle. */
+  /**
+   * Stable. The user edited the control: hide the server error until the next settle. The
+   * synchronous form of `recordEdit()()`, for a caller that is already past the edit's event
+   * (a FUNSTACK control's `notifyChange(true)` after its commit).
+   */
   readonly dismiss: () => void;
   /**
    * Stable. Records an edit now and returns the state write that applies it, for a caller that

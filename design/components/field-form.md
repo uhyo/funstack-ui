@@ -275,8 +275,11 @@ and Chromium runs a microtask checkpoint after each listener of an `input` or `c
 caused (Firefox only after the whole dispatch). A state write in the Field's listener committed in that checkpoint, before React had
 seen the event, and the commit wrote a controlled control's previous `value` back over the
 keystroke (#193: a Combobox's text, a controlled `Field.Control`, a `Select`, OTPField). It is
-still the urgent lane, not a transition: one task later where the engine is still dispatching,
-in the same microtask as before where it is not (a script dispatch, Firefox's `input`).
+still urgent, not a transition: the deferred writes are committed synchronously (`flushSync`; the
+dispatch is over, so nothing can be clobbered any more), in a task after the event where the
+engine is still dispatching at the first microtask checkpoint (Chromium), else in that
+microtask (a script dispatch, Firefox's `input`). Without `flushSync` a write made outside any
+event would get React's default lane and could let a frame paint the previous error state.
 `invalid`, `focusout` and the reset keep their timing: no user edit is in flight in them. Until
 the edit's state write, the edit already counts for the slot: a refresh in between (a blur, a
 submission attempt) leaves a server message the user edited away out of it.

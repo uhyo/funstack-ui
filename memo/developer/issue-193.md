@@ -46,3 +46,14 @@ Probe files deleted; WebKit not installed locally (CI covers it).
 - browser `field/field-edit.browser.test.tsx`: 7 controls x {validate, required}, both
   directions, before/after a blur (aria-invalid live), plus the server-error row. 11 of 15
   failed in Chromium on the old code (uncontrolled and NumberField are guards).
+
+## Review follow-up (memo/reviewer/review-193.md)
+
+- Deferred writes wrapped in `flushSync` (default lane otherwise; a frame could paint stale
+  state). 2.4 sentence corrected; CHANGELOG entry.
+- `showsServerError` respects `pendingEdit`; comment on the cancel guard; `dismiss` doc.
+- Browser rows: `{End}d{Enter}` blocked; `{End}b{Enter}` with a server error submits "ab" and
+  re-shows. The second row passes even without the `pendingEdit` slot guard (no refresh runs
+  between the keystroke and the implicit submission of a valid field); the guard is covered by
+  the jsdom row only.
+- `{ControlOrMeta>}` works with the Playwright provider.
