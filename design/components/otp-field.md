@@ -5,8 +5,8 @@ amendments, the probe results and the device checks still owed are in the 2026-1
 entries of `design/CHANGELOG.md`. Follows `design/conventions.md`; where this document and the
 conventions disagree, the conventions win. **Provisional until the device checks are done**: the
 Input's inline style list (section 6) and the composition rule (section 4.1). The Root's
-`dir="ltr"` default (section 4.4, #172) is decided; its three-engine probe and implementation
-are owed.
+`dir="ltr"` default (section 4.4, #172) is decided and implemented; its three-engine probe is
+the 2026-11-27 #188 entry of `design/CHANGELOG.md`.
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.6, 3.6, 4.1,
 5, 8, 11), `design/components/field-form.md` (4.3: text is a fact; 7.1: `useFieldControl`,

@@ -273,6 +273,93 @@ describe("rendering", () => {
   });
 });
 
+// --- Direction (design 4.4, conventions 14.1 rule 8) ---------------------------------------------
+
+describe("direction", () => {
+  it('the Root renders dir="ltr" by default; the Input and Slots carry none of their own', () => {
+    render(<Code />);
+    expect(root()).toHaveAttribute("dir", "ltr");
+    expect(input()).not.toHaveAttribute("dir");
+    expect(slot(0)).not.toHaveAttribute("dir");
+  });
+
+  it.each(["rtl", "auto", "ltr"] as const)("the consumer's dir=%s wins", (dir) => {
+    render(
+      <div dir="rtl">
+        <Code dir={dir} />
+      </div>,
+    );
+    expect(root()).toHaveAttribute("dir", dir);
+  });
+
+  it("is a plain attribute in the server HTML", () => {
+    const html = renderToString(
+      <div dir="rtl">
+        <Code length={4} />
+      </div>,
+    );
+    const container = document.createElement("div");
+    container.innerHTML = html;
+    expect(container.querySelector("[data-testid=root]")).toHaveAttribute("dir", "ltr");
+    expect(container.firstElementChild).toHaveAttribute("dir", "rtl");
+  });
+
+  it("a render element receives the default; its own dir and the Root's dir prop win", () => {
+    const { unmount } = render(
+      <OTPField.Root length={1} render={<section data-testid="root" />}>
+        <OTPField.Input aria-label="Code" />
+        <OTPField.Slot index={0} />
+      </OTPField.Root>,
+    );
+    expect(root().tagName).toBe("SECTION");
+    expect(root()).toHaveAttribute("dir", "ltr");
+    unmount();
+
+    const second = render(
+      <OTPField.Root length={1} render={<section data-testid="root" dir="rtl" />}>
+        <OTPField.Input aria-label="Code" />
+        <OTPField.Slot index={0} />
+      </OTPField.Root>,
+    );
+    expect(root()).toHaveAttribute("dir", "rtl");
+    second.unmount();
+
+    const seen: unknown[] = [];
+    render(
+      <OTPField.Root
+        length={1}
+        dir="rtl"
+        render={(props) => {
+          seen.push(props.dir);
+          return <section {...props} data-testid="root" />;
+        }}
+      >
+        <OTPField.Input aria-label="Code" />
+        <OTPField.Slot index={0} />
+      </OTPField.Root>,
+    );
+    expect(seen.at(-1)).toBe("rtl");
+    expect(root()).toHaveAttribute("dir", "rtl");
+  });
+
+  it("the function form of render receives the default", () => {
+    const seen: unknown[] = [];
+    render(
+      <OTPField.Root
+        length={1}
+        render={(props) => {
+          seen.push(props.dir);
+          return <div {...props} data-testid="root" />;
+        }}
+      >
+        <OTPField.Input aria-label="Code" />
+        <OTPField.Slot index={0} />
+      </OTPField.Root>,
+    );
+    expect(seen.at(-1)).toBe("ltr");
+  });
+});
+
 // --- Editing (design 4.1) ------------------------------------------------------------------------
 
 renderBoth("editing", (mode) => {

@@ -155,6 +155,15 @@ export interface OTPFieldRootProps extends Omit<
    */
   readOnly?: boolean;
   /**
+   * The native attribute, with a library default: a code is read left to right in every locale,
+   * so the Slots, the Input's text and its caret keys stay left to right inside an RTL page.
+   * Pass `"rtl"` for a code that is read right to left (the attribute has no value meaning
+   * "inherit"). A `dir` on a `render` element wins as well.
+   *
+   * @defaultValue `"ltr"`
+   */
+  dir?: ComponentPropsWithRef<"div">["dir"];
+  /**
    * Ask the browser for the code of an origin-bound SMS (WebOTP, `navigator.credentials.get({
    * otp })`) while the Input is mounted. Chromium and Safari; nothing happens where the API is
    * missing (Firefox).
@@ -248,6 +257,9 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     required: requiredProp = false,
     disabled: disabledProp = false,
     readOnly = false,
+    // design/components/otp-field.md 4.4, conventions 14.1 rule 8: a pass-through prop with a
+    // default, so a `render` element's own `dir` wins over it (conventions 1.2).
+    dir = "ltr",
     experimental_webOTP: experimentalWebOTP = false,
     className,
     style,
@@ -694,7 +706,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     // style places the Root itself.
     style: (s) => ({ position: "relative", ...resolveStateValue(style, s) }),
     children,
-    props: rest,
+    props: { ...rest, dir },
     libraryProps,
   });
 

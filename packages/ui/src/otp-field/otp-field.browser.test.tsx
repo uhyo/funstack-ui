@@ -207,6 +207,100 @@ describe("OTPField (browser)", () => {
     });
   });
 
+  // design/components/otp-field.md 4.4, conventions 14.1 rule 8; the three-engine probe is the
+  // #188 entry of design/CHANGELOG.md.
+  describe("direction: inside an RTL page", () => {
+    function RtlPage(props: Partial<OTPFieldRootProps>) {
+      return (
+        <div dir="rtl">
+          <label data-testid="label" htmlFor="rtl-code">
+            رمز التحقق
+          </label>
+          <OTPField.Root className="otp" data-testid="root" length={6} {...props}>
+            <OTPField.Input id="rtl-code" data-testid="input" />
+            {Array.from({ length: 6 }, (_, i) => (
+              <OTPField.Slot key={i} index={i} className="otp-slot" data-testid={`slot-${i}`} />
+            ))}
+          </OTPField.Root>
+        </div>
+      );
+    }
+
+    async function caretAfter(from: number, key: string): Promise<number | null> {
+      await act(async () => input().setSelectionRange(from, from));
+      await user.keyboard(key);
+      return input().selectionStart;
+    }
+
+    const lefts = () => Array.from({ length: 6 }, (_, i) => slot(i).getBoundingClientRect().left);
+
+    it("the Root is ltr, Slot 0 is left of Slot 1; the label outside stays rtl", () => {
+      styled();
+      render(<RtlPage />);
+      expect(getComputedStyle(root()).direction).toBe("ltr");
+      expect(getComputedStyle(input()).direction).toBe("ltr");
+      expect(getComputedStyle(screen.getByTestId("label")).direction).toBe("rtl");
+      const x = lefts();
+      for (let i = 1; i < 6; i++) expect(x[i - 1]).toBeLessThan(x[i]!);
+    });
+
+    it.each(["numeric", "alphanumeric"] as const)(
+      "%s: ArrowLeft moves to the lower index, ArrowRight to the higher, Home / End to the ends",
+      async (charset) => {
+        styled();
+        render(
+          <RtlPage charset={charset} defaultValue={charset === "numeric" ? "1234" : "ab12"} />,
+        );
+        await focusInput();
+        expect(await caretAfter(2, "{ArrowLeft}")).toBe(1);
+        await eventually(() => expect(active()).toEqual([1]));
+        expect(await caretAfter(2, "{ArrowRight}")).toBe(3);
+        expect(await caretAfter(0, "{ArrowLeft}")).toBe(0);
+        expect(await caretAfter(4, "{ArrowRight}")).toBe(4);
+        expect(await caretAfter(2, "{Home}")).toBe(0);
+        expect(await caretAfter(2, "{End}")).toBe(4);
+      },
+    );
+
+    it("a click on a Slot puts the caret there", async () => {
+      styled();
+      render(<RtlPage defaultValue="1234" />);
+      const at = centre(slot(1));
+      await mouse.click(at.x, at.y);
+      await eventually(() => expect(input().selectionStart).toBe(1));
+      await eventually(() => expect(active()).toEqual([1]));
+      await user.keyboard("9");
+      expect(input().value).toBe("1934");
+    });
+
+    // What the #188 probe found without the default: the Slots mirror, and the native caret
+    // keys disagree between engines (Chromium moves ArrowLeft forward, Firefox and WebKit
+    // backward in the digit run; WebKit jumps at the run's edges). Home / End stay logical.
+    it('dir="rtl" on the Root: the Slots read right to left and the arrows follow each engine', async () => {
+      styled();
+      render(<RtlPage dir="rtl" defaultValue="1234" />);
+      expect(root()).toHaveAttribute("dir", "rtl");
+      expect(getComputedStyle(input()).direction).toBe("rtl");
+      const x = lefts();
+      for (let i = 1; i < 6; i++) expect(x[i - 1]).toBeGreaterThan(x[i]!);
+      await focusInput();
+      const arrows = [
+        await caretAfter(2, "{ArrowLeft}"),
+        await caretAfter(2, "{ArrowRight}"),
+        await caretAfter(0, "{ArrowLeft}"),
+        await caretAfter(4, "{ArrowRight}"),
+      ];
+      const expected = {
+        chromium: [3, 1, 1, 3],
+        firefox: [1, 3, 0, 4],
+        webkit: [1, 3, 3, 1],
+      }[browserName];
+      expect(arrows).toEqual(expected);
+      expect(await caretAfter(2, "{Home}")).toBe(0);
+      expect(await caretAfter(2, "{End}")).toBe(4);
+    });
+  });
+
   describe("paste", () => {
     it("a real clipboard paste of a formatted code replaces a half-typed one", async () => {
       styled();
