@@ -467,3 +467,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - OTPField MERGED 109b67e1 (4852e40f + review + dup-comment fix). #171 closed. Remaining wave 25: Drawer (#168, dev running).
 - Drawer MERGED b8c215fd (5695efc4; subagent report lost but work pushed + CI green). WAVE 25 DONE. #187 Drawer touch checks (human). CLAUDE.md: strictInputTiming note. Next: wave 26 (#170 Menubar/NavigationMenu), #172 decision.
 - 2026-11-27 alpha.21 RELEASED (Drawer, Avatar, OTPField, Scroll areas recipe). Wave 26 start: arch-170 (Menubar/NavigationMenu), arch-172 (direction/locale proposal) running.
+- 2026-11-27 #172 DECIDED (all rec.; fb84f6c4) → impl #188 (dev-188, feat/188-direction-locale). #170 ACCEPTED (all rec.; de1ccd4d) → dev-menubar (feat/170-menubar), dev-navmenu (feat/170-navigation-menu). Then reviewers, merge, alpha.22.
