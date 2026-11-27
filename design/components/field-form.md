@@ -189,7 +189,7 @@ other field changes), after a commit in which a FUNSTACK control inside **any** 
 checking its Items, a controlled change, a rolled-back optimistic value; the control's
 `useFieldValueChange` tells its Field, and the Field asks the Form to refresh the others, 7.1),
 on blur and on a submission attempt (the mirror's reads recompute the slot too), after a `reset`
-(microtask, when the values are the reset values), and after a commit in which the `validate`
+(`useFormReset`, when the values are the reset values), and after a commit in which the `validate`
 prop changed (by identity: keep it stable with `useCallback` or a module-level function, see the
 note under 4.1). `value` is `formData.get(name)` when it is a string, else `""`; `formData` is
 `new FormData(form)` (or an empty `FormData` for a field with no form owner). `validate` is
@@ -205,7 +205,7 @@ with no event (a Combobox pick, 7.1).
 ### 2.2 When an error is shown
 
 ```
-userInvalid = control.matches(":user-invalid")      // read on: input, change, focusout, invalid, reset (microtask)
+userInvalid = control.matches(":user-invalid")      // read on: input, change, focusout, invalid, after reset
 serverShown = serverMessages.length > 0 && !dismissed && !suppressed   // section 3.4
 invalid     = userInvalid || serverShown
 ```
@@ -222,8 +222,8 @@ the platform's single answer is the one every native form on the web already use
 The read happens in the Field's own listeners on the registered control (capture, so the events
 of a group's members are seen on the group's `<fieldset>`): `input`, `change`, `focusout`,
 `invalid`; plus `reset` on the form owner through `useFormReset` (a reset clears the
-user-validity flag, so the Field re-reads in the microtask after the reset, when the DOM holds
-the reset values). The `invalid` listener is the one that fires for a submission attempt: it
+user-validity flag, so the Field re-reads after the reset algorithm, when the DOM holds the
+reset values: conventions 3.8 rule 5, also after a click on a reset button). The `invalid` listener is the one that fires for a submission attempt: it
 fires once per invalid control, synchronously, before `submit` would (which never comes).
 
 Where `:user-invalid` is not supported by the environment (jsdom), the Field falls back to

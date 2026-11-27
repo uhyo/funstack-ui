@@ -14771,3 +14771,74 @@ for `form.reset()` called from script; the reset algorithm follows the dispatch 
   get the library's reset dispatch for a reset the browser does not perform. To be probed in
   a browser row and filed as an issue if it reproduces.
 - radio-group.md's citation of rule 5 follows.
+
+## 2026-11-27, #185: `onReset` runs after the reset in both orders (`afterDispatch`); Field included
+
+Architect, after the review (`memo/reviewer/review-185.md`). Corrects two entries above: the
+developer's "Only Combobox was affected", and my rule 5 ("Reset never reads the reset result
+... holds for every caller of `useFormReset`"). Changed: internal-hooks.md 3.8 rules 5 and 7,
+the hooks table, the file list; conventions 3.5; field-form.md 2.2; one sentence each in
+switch.md, otp-field.md, combobox.md 11.1, checkbox-group.md, radio-group.md.
+
+- **What the review's probes found** (real clicks, Chromium and Firefox). (1) `Field.Root`'s
+  reset refresh, a microtask of its own, ran before the algorithm: a shown error,
+  `aria-invalid` and a stale custom validity from `validate` survived the reset, for every
+  control in a Field. (2) Rule 7's gap is real: with `<form onReset={(e) =>
+  e.preventDefault()}>` a Checkbox still dispatched `[false, "platform"]`. (3) "Every caller"
+  was false: `CheckboxGroup.Parent` writes `el.checked` and `Select.Value` re-clones
+  `<selectedcontent>` in their callbacks.
+- **Decision: fix the timing once, in the hook.** `useFormReset` calls back through
+  `afterDispatch(event, callback)`: a microtask, and when the event is still being dispatched
+  at that point, a task. Rule 5 becomes a guarantee ("after every listener and after the
+  algorithm") instead of a restriction on callbacks, rule 7 reads a final `defaultPrevented`,
+  and Field's refresh goes through `useFormReset` (field-form.md 2.2 already said so; the
+  code had its own microtask).
+- **The test is `event.eventPhase !== Event.NONE`, not `window.event === event`** (the
+  review's suggestion). `window.event` is not set for a listener whose target is in a shadow
+  tree, and a form may be in one; `eventPhase` is reset to `NONE` only when the dispatch
+  ends, is standard, and needs no global.
+- **Why not always a task.** A script reset (React's own after a form action is one) is
+  followed by the library's dispatch in the same task today, before a paint. A task for
+  every reset would open a frame between the reset DOM and the library's state for the common
+  case to fix the rare one. The cost stays on the real-click path only.
+- **Why not "callbacks never read the DOM"** (the previous rule 5). Field has to read
+  validity and `FormData` after the reset; there is no computed target for it.
+- **Kept:** the checkable inputs read `defaultChecked` (React's own reset: the re-apply effect
+  has rewritten `checked`); Combobox's and OTPField's computed targets (rule 6, order-free).
+- **One helper with #177.** A non-modal Dialog's Escape needs the same "after the dispatch"
+  point for its fallback path (dialog.md 2.6, on `review/177`). `afterDispatch` lives in
+  `internal/after-dispatch.ts`, a flat module, and both branches describe the same file;
+  whichever merges second takes the first one's copy.
+
+Code owed:
+
+- `packages/ui/src/internal/after-dispatch.ts`, directive-free:
+  `afterDispatch(event: Event, callback: () => void): () => void`. `queueMicrotask`: if
+  cancelled, return; if `event.eventPhase === Event.NONE`, `callback()`; else
+  `timer = setTimeout(callback, 0)`. Returns a cancel function (sets the flag, clears the
+  timer). Unit rows (jsdom): a script-dispatched event: the callback runs in the microtask,
+  after a listener registered later on an ancestor; cancel before the microtask. The task
+  branch needs a dispatch that is still running at a microtask checkpoint, which only a real
+  click gives: it is covered by the browser rows below, plus one row that cancels between
+  the microtask and the task.
+- `use-form-reset.ts`: the listener calls `onResetEvent?.(event)` and then
+  `afterDispatch(event, () => { if (event.defaultPrevented) return; latestOnReset.current(event); })`.
+  Doc comment: rule 5's guarantee; drop the "never reads a reset result" paragraph.
+- `field/field-root.tsx`: replace the `useFormOwnerEvent(ownerRef, "reset", ...)` microtask
+  with `useFormReset(ownerRef, () => refresh({ reset: true }))`.
+- Comments in `checkbox-group-parent.tsx` and `select-value.tsx` ("in a microtask") follow.
+  No behaviour change there, and none in Combobox (b15cee2e stays).
+- Browser rows in `src/__tests__/form-reset-button.browser.test.tsx` (real click outside
+  `act`, three engines): a Field with a shown `required` error: after reset no Field.Error,
+  no `aria-invalid`; a Field with `validate`: `validationMessage` is `""` after reset and the
+  next submit is not blocked; `<form onReset={(e) => e.preventDefault()}>` with a checked
+  Checkbox: no dispatch, still checked (and the same with a `document` listener); a Combobox
+  inside a Field with a shown error; a controlled CheckboxGroup with a Parent and a controlled
+  Checkbox whose parent refuses the reset; Select with `<selectedcontent>` shows the reset
+  option's content. The existing rows stay; rows that assert right after the click need
+  `settle`.
+- jsdom: a cancelled reset from React's `onReset` on the form (script order) dispatches
+  nothing, for one checkable and one value control.
+- The review's nits on the #184 guard rows and on `settle` / `quietPeriod` are the
+  developer's.
+- Docs site: nothing public changes. The Field page's reset sentence, if it says "microtask".

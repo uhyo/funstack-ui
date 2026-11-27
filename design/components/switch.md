@@ -521,8 +521,9 @@ its own automatic reset after a successful `<form action>` (`requestFormReset`, 
 mutation phase). Without handling, DOM and library state desync (research probe 07).
 
 The shared hook (section 7) listens to `reset` on the input's form owner. The listener fires
-**before** the reset algorithm; the hook defers to a microtask, after the reset (and after the
-commit, when the reset is React's), and then:
+**before** the reset algorithm; the hook calls back after the reset (and after the commit, when
+the reset is React's): a microtask, or a task after a click on a reset button (conventions 3.8
+rule 5), and then:
 
 ```
 reset event (listener runs; DOM not yet reset)
