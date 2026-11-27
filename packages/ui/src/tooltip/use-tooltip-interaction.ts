@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useEffectEvent } from "react";
-import { isEscapeRequest } from "../internal/escape-key.js";
+import { consumeEscape, createEscapeRecord, isEscapeRequest } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { syncPresence } from "../internal/form/sync-presence.js";
 import { createDelayedPair } from "../internal/use-delayed-pair.js";
@@ -21,7 +21,7 @@ export interface TooltipInteractionOptions {
  * whole interaction and nothing is attached.
  *
  * Open state is browser-owned (conventions 3.5): every decision reads
- * `popup.matches(":popover-open")`, never a copy. The document listeners are attached right after
+ * `popup.matches(":popover-open")`, never a copy. The window Escape and document pointerdown listeners are attached right after
  * `showPopover()` (the `toggle` event is queued as a task, so waiting for it would leave a window
  * in which an Escape or pointerdown does nothing) and detached when `toggle` reports a close,
  * including closes the library did not perform (native light dismiss of `popover="hint"`).
@@ -108,6 +108,7 @@ function attachInteraction(
   }
 
   const doc = trigger.ownerDocument;
+  const win = doc.defaultView;
   // One pending open or close at a time (the timer helper shared with Menu's hover intent).
   const timers = createDelayedPair();
   const clear = timers.cancel;
@@ -148,24 +149,35 @@ function attachInteraction(
     if (isOpen(other)) other.hidePopover();
   };
 
+  // Escape while open: recorded on the window in capture, as a global layer, and decided last
+  // (conventions 15 rule 4), so a `stopPropagation()` anywhere does not keep the tooltip open.
+  const windowEscape = createEscapeRecord();
   const onKeyDown = (event: KeyboardEvent) => {
-    // Not an IME composition's Escape, nor one a handler below consumed (a Combobox chip):
-    // innermost first (conventions 15).
+    // Not an IME composition's Escape, nor one a handler consumed (a Combobox chip): innermost
+    // first (conventions 15).
     if (!isEscapeRequest(event)) return;
-    clear();
-    // Escape while closed passes through untouched.
-    if (!isOpen(popup)) return;
-    hide();
-    // This Escape was the tooltip's: an enclosing modal `<dialog>` or `popover="auto"` menu
-    // stays open (the close request sees a canceled keydown). A second Escape reaches them.
-    event.preventDefault();
+    windowEscape.record(
+      event,
+      () => {
+        clear();
+        // Closed in the meantime: the Escape passes through untouched.
+        if (!isOpen(popup)) return;
+        hide();
+        // This Escape was the tooltip's: an enclosing modal `<dialog>`, `popover="auto"` menu,
+        // non-modal Dialog or toast stays open (a close request sees a canceled keydown). A
+        // second Escape reaches them.
+        consumeEscape(event);
+      },
+      { global: true },
+    );
   };
   function listenDocument(listen: boolean) {
     if (listen) {
-      doc.addEventListener("keydown", onKeyDown);
+      win?.addEventListener("keydown", onKeyDown, true);
       doc.addEventListener("pointerdown", hideNow, true);
     } else {
-      doc.removeEventListener("keydown", onKeyDown);
+      win?.removeEventListener("keydown", onKeyDown, true);
+      windowEscape.cancel();
       doc.removeEventListener("pointerdown", hideNow, true);
     }
   }
@@ -182,17 +194,20 @@ function attachInteraction(
     // Pointer focus (a click) does not open; keyboard focus does (design 5.2).
     if (trigger.matches(":focus-visible")) showSoon();
   };
-  // The document listeners exist only while the popup is open, so before that the trigger
+  // The window and document listeners exist only while the popup is open, so before that the trigger
   // itself cancels a pending open: a click or Escape before `delay` elapses must not open the
-  // tooltip afterwards. Once open, the document listeners do the hiding.
+  // tooltip afterwards. Once open, the window listener does the hiding. The trigger's Escape is
+  // recorded in capture and decided last (conventions 15 rule 4), so a listener inside that
+  // stops the event does not keep the timer running; the event is left alone.
+  const triggerEscape = createEscapeRecord();
   const onTriggerKeyDown = (event: KeyboardEvent) => {
-    if (isEscapeRequest(event)) clear();
+    if (isEscapeRequest(event)) triggerEscape.record(event, clear);
   };
 
   trigger.addEventListener("pointerenter", onTriggerEnter);
   trigger.addEventListener("pointerleave", hideLater);
   trigger.addEventListener("pointerdown", clear);
-  trigger.addEventListener("keydown", onTriggerKeyDown);
+  trigger.addEventListener("keydown", onTriggerKeyDown, true);
   trigger.addEventListener("focus", onTriggerFocus);
   trigger.addEventListener("blur", hideLater);
   popup.addEventListener("pointerenter", clear);
@@ -205,7 +220,8 @@ function attachInteraction(
     trigger.removeEventListener("pointerenter", onTriggerEnter);
     trigger.removeEventListener("pointerleave", hideLater);
     trigger.removeEventListener("pointerdown", clear);
-    trigger.removeEventListener("keydown", onTriggerKeyDown);
+    trigger.removeEventListener("keydown", onTriggerKeyDown, true);
+    triggerEscape.cancel();
     trigger.removeEventListener("focus", onTriggerFocus);
     trigger.removeEventListener("blur", hideLater);
     popup.removeEventListener("pointerenter", clear);

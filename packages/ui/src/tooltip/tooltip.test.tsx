@@ -589,6 +589,98 @@ describe("Keyboard", () => {
     expect(isPopoverOpen(popup())).toBe(false);
   });
 
+  // Conventions 15 rule 4 (#194): recorded on the window in capture, decided last, so the
+  // signal is `preventDefault()`, never `stopPropagation()`.
+  describe("stopPropagation() does not keep it open; preventDefault() does (#194)", () => {
+    /** Lets the late path (a microtask after a scripted dispatch) run. */
+    const settle = () => act(async () => {});
+    const stop = (event: Event) => event.stopPropagation();
+    const stopAndPrevent = (event: Event) => {
+      event.stopPropagation();
+      event.preventDefault();
+    };
+
+    it("a native listener on the focused element stops it: closes, after the dispatch", async () => {
+      setupTimers();
+      render(<Harness />);
+      pointer("pointerenter", trigger());
+      advance(250);
+      trigger().addEventListener("keydown", stop);
+      escape(trigger());
+      await settle();
+      expect(hideSpy).toHaveBeenCalledTimes(1);
+      expect(isPopoverOpen(popup())).toBe(false);
+    });
+
+    it("a React onKeyDown on an ancestor stops it: closes", async () => {
+      setupTimers();
+      render(
+        <div onKeyDown={(event) => event.stopPropagation()}>
+          <Harness />
+        </div>,
+      );
+      pointer("pointerenter", trigger());
+      advance(250);
+      escape(trigger());
+      await settle();
+      expect(isPopoverOpen(popup())).toBe(false);
+    });
+
+    it("with preventDefault() as well (native and React): stays", async () => {
+      setupTimers();
+      render(
+        <div
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+          }}
+        >
+          <Harness />
+        </div>,
+      );
+      pointer("pointerenter", trigger());
+      advance(250);
+      escape(trigger());
+      await settle();
+      expect(isPopoverOpen(popup())).toBe(true);
+      trigger().addEventListener("keydown", stopAndPrevent);
+      escape(trigger());
+      await settle();
+      expect(hideSpy).not.toHaveBeenCalled();
+      expect(isPopoverOpen(popup())).toBe(true);
+    });
+
+    it("the Trigger's cancel: a child of the trigger stops it, the open is cancelled", async () => {
+      setupTimers();
+      render(<Harness trigger={{ children: <span data-testid="label">Save</span> }} />);
+      pointer("pointerenter", trigger());
+      advance(100);
+      const label = screen.getByTestId("label");
+      label.addEventListener("keydown", stop);
+      onTestFinished(() => label.removeEventListener("keydown", stop));
+      const key = escape(label);
+      await settle();
+      advance(1000);
+      expect(showSpy).not.toHaveBeenCalled();
+      // A cancel closes nothing shown: the event is left alone.
+      expect(key.defaultPrevented).toBe(false);
+    });
+
+    it("the Trigger's cancel: a prevented Escape from a child does not cancel", async () => {
+      setupTimers();
+      render(<Harness trigger={{ children: <span data-testid="label">Save</span> }} />);
+      pointer("pointerenter", trigger());
+      advance(100);
+      const label = screen.getByTestId("label");
+      label.addEventListener("keydown", stopAndPrevent);
+      onTestFinished(() => label.removeEventListener("keydown", stopAndPrevent));
+      escape(label);
+      await settle();
+      advance(150);
+      expect(showSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it("pointer focus (a click) does not open the tooltip", async () => {
     const user = setupTimers();
     render(<Harness />);
@@ -724,13 +816,16 @@ describe("Hover", () => {
     await user.hover(trigger());
     advance(250);
     const removeSpy = vi.spyOn(document, "removeEventListener");
+    const removeWindowSpy = vi.spyOn(window, "removeEventListener");
     // The browser closes a `hint` popover itself on light dismiss.
     act(() => popup().hidePopover());
     expect(hideSpy).toHaveBeenCalledTimes(1);
-    // `toggle` is a queued task: the document listeners go when it runs.
+    // `toggle` is a queued task: the document and window listeners go when it runs.
     expect(removeSpy).not.toHaveBeenCalled();
+    expect(removeWindowSpy).not.toHaveBeenCalled();
     advance(0);
-    expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
+    // Escape is recorded on the window in capture (conventions 15 rule 4).
+    expect(removeWindowSpy).toHaveBeenCalledWith("keydown", expect.any(Function), true);
     expect(removeSpy).toHaveBeenCalledWith("pointerdown", expect.any(Function), true);
     // Escape and pointerdown call nothing more.
     await user.keyboard("{Escape}");
@@ -794,8 +889,9 @@ describe("Hover", () => {
     await user.hover(trigger());
     advance(250);
     const removeSpy = vi.spyOn(document, "removeEventListener");
+    const removeWindowSpy = vi.spyOn(window, "removeEventListener");
     unmount();
-    expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
+    expect(removeWindowSpy).toHaveBeenCalledWith("keydown", expect.any(Function), true);
     expect(removeSpy).toHaveBeenCalledWith("pointerdown", expect.any(Function), true);
     advance(1000);
     expect(() => {

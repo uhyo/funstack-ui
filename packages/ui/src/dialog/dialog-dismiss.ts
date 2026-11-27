@@ -1,14 +1,13 @@
 // Dialog's JS baseline for what the platform gives only behind `closedby`: Escape on a
 // non-modal dialog and light dismiss (design/components/dialog.md 2.6). No "use client"
 // directive: DOM listeners only (conventions 7.1).
-import { afterDispatch } from "../internal/after-dispatch.js";
-import { isEscapeRequest } from "../internal/escape-key.js";
+import { consumeEscape, createEscapeRecord, isEscapeRequest } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 
 /**
  * An open popover that takes Escape before the dialog: `auto` or `hint` (they have a close
  * watcher). A `manual` popover, or `hint` where the engine maps it to `manual`, does not; one
- * that closes on Escape from JS (HoverCard, Tooltip) prevents the `keydown` instead.
+ * that closes on Escape from JS (HoverCard, Tooltip) consumes the `keydown` instead.
  */
 function isOpenLightPopover(element: Element): boolean {
   if (!element.hasAttribute("popover")) return false;
@@ -75,46 +74,23 @@ export function listenDialogDismiss(
   const listeners: [string, EventListener][] = [];
 
   // Non-modal dialogs get no close watcher Escape from the platform (design 2.6). Record at the
-  // dialog, decide last (#177): a capture listener on the dialog records the Escape and the
-  // inner-layer snapshot (the path is complete there in any shadow mode, and no close watcher
-  // has closed a layer yet). The decision runs in a window bubble listener added for that event
-  // only, after every element and document listener, so an inner layer that closed on Escape
-  // from JS (a `manual` HoverCard or Tooltip) has prevented it by then: a prevented `keydown` is
-  // no close request, as for a modal dialog's close watcher. `stopPropagation()` does not keep
-  // the dialog open: when the event never reaches the window, the late path (`afterDispatch`)
-  // decides instead, without preventing (the dispatch is over). The first of the two wins.
-  const win = doc.defaultView;
-  let pending: { readonly event: KeyboardEvent; readonly inner: boolean } | null = null;
-  let cancelLate: (() => void) | null = null;
-  const clearPending = () => {
-    pending = null;
-    win?.removeEventListener("keydown", onWindow);
-    cancelLate?.();
-    cancelLate = null;
-  };
-  const settle = (canPrevent: boolean) => {
-    const record = pending;
-    clearPending();
-    if (record === null) return;
-    const { event, inner } = record;
-    if (event.defaultPrevented || inner || !dialog.open || !dialog.isConnected) return;
-    if (canPrevent) event.preventDefault();
-    dialog.requestClose();
-  };
-  function onWindow(event: Event): void {
-    if (pending === null || event !== pending.event) return;
-    settle(true);
-  }
+  // dialog, decide last (#177, conventions 15 rule 4): a capture listener on the dialog records
+  // the Escape and the inner-layer snapshot (the path is complete there in any shadow mode, and
+  // no close watcher has closed a layer yet); `decideEscapeLast` decides after every element and
+  // document listener, or after the dispatch when propagation was stopped, with the global
+  // layers (a `manual` HoverCard or Tooltip) first, so one that closed on this Escape has
+  // consumed it by then.
+  const escape = createEscapeRecord();
   const record = (event: Event) => {
     const keyboardEvent = event as KeyboardEvent;
     // Not an Escape of an IME composition, nor one already consumed (conventions 15).
     if (!isEscapeRequest(keyboardEvent) || !dialog.open) return;
-    if (pending?.event === keyboardEvent) return;
-    // A new Escape while one is pending: the old event's dispatch is over; replace it.
-    clearPending();
-    pending = { event: keyboardEvent, inner: escapeBelongsToInnerLayer(dialog, keyboardEvent) };
-    win?.addEventListener("keydown", onWindow);
-    cancelLate = afterDispatch(keyboardEvent, () => settle(false));
+    const inner = escapeBelongsToInnerLayer(dialog, keyboardEvent);
+    escape.record(keyboardEvent, () => {
+      if (inner || !dialog.open || !dialog.isConnected) return;
+      consumeEscape(keyboardEvent);
+      dialog.requestClose();
+    });
   };
   if (!modal) dialog.addEventListener("keydown", record, true);
 
@@ -184,7 +160,7 @@ export function listenDialogDismiss(
   return () => {
     for (const [type, listener] of listeners) dialog.removeEventListener(type, listener);
     if (!modal) dialog.removeEventListener("keydown", record, true);
-    clearPending();
+    escape.cancel();
     if (outsideAttached) {
       doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
       doc.removeEventListener("click", onOutsideClick, true);

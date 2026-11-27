@@ -29,6 +29,7 @@ import {
 } from "../__tests__/helpers.js";
 import { gainInterest, dispatchLoseInterest } from "../__tests__/interest-shim.js";
 import { isPopoverOpen, popoverSource } from "../__tests__/popover-shim.js";
+import { Tooltip } from "../tooltip/index.js";
 import { HoverCard } from "./index.js";
 import type {
   HoverCardOpenChangeDetails,
@@ -54,7 +55,7 @@ function Harness({ root, trigger, popup, content }: HarnessProps) {
       <button type="button">Before</button>
       <HoverCard.Root {...root}>
         <HoverCard.Trigger href="/u/ada" {...trigger}>
-          @ada
+          {trigger?.children ?? "@ada"}
         </HoverCard.Trigger>
         <HoverCard.Popup data-testid="popup" {...popup}>
           {content ?? (
@@ -790,6 +791,91 @@ describe("Closing: every user close is a fact", () => {
     expect(isPopoverOpen(popup())).toBe(false);
   });
 
+  // Conventions 15 rule 4 (#194): recorded on the window in capture, decided last, so the
+  // signal is `preventDefault()`, never `stopPropagation()`.
+  describe("stopPropagation() does not keep it open; preventDefault() does (#194)", () => {
+    const stop = (event: Event) => event.stopPropagation();
+    const stopAndPrevent = (event: Event) => {
+      event.stopPropagation();
+      event.preventDefault();
+    };
+
+    it("a native listener on the focused element stops it: closes, after the dispatch", async () => {
+      await renderAsync(<Harness />);
+      await hoverOpen();
+      const button = follow();
+      act(() => button.focus());
+      button.addEventListener("keydown", stop);
+      escape(button);
+      expect(isPopoverOpen(popup())).toBe(true);
+      await flush();
+      expect(isPopoverOpen(popup())).toBe(false);
+      // Focus was inside: it returns to the Trigger.
+      expect(document.activeElement).toBe(trigger());
+    });
+
+    it("a React onKeyDown on an ancestor stops it: closes", async () => {
+      await renderAsync(
+        <div onKeyDown={(event) => event.stopPropagation()}>
+          <Harness />
+        </div>,
+      );
+      await hoverOpen();
+      escape(trigger());
+      await flush();
+      expect(isPopoverOpen(popup())).toBe(false);
+    });
+
+    it("with preventDefault() as well (native and React): stays", async () => {
+      await renderAsync(
+        <div
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+          }}
+        >
+          <Harness />
+        </div>,
+      );
+      await hoverOpen();
+      escape(trigger());
+      await flush();
+      expect(isPopoverOpen(popup())).toBe(true);
+      const button = follow();
+      button.addEventListener("keydown", stopAndPrevent);
+      escape(button);
+      await flush();
+      expect(isPopoverOpen(popup())).toBe(true);
+    });
+
+    it("the Trigger's cancel: a child of the Trigger stops it, the open is cancelled", async () => {
+      await renderAsync(<Harness trigger={{ children: <span data-testid="label">@ada</span> }} />);
+      keyboardFocus(trigger());
+      await advance(300);
+      const label = screen.getByTestId("label");
+      label.addEventListener("keydown", stop);
+      const key = escape(label);
+      await flush();
+      await advance(1000);
+      await task();
+      expect(isPopoverOpen(popup())).toBe(false);
+      expect(key.defaultPrevented).toBe(false);
+    });
+
+    it("the Trigger's cancel: a prevented Escape from a child does not cancel", async () => {
+      await renderAsync(<Harness trigger={{ children: <span data-testid="label">@ada</span> }} />);
+      keyboardFocus(trigger());
+      await advance(300);
+      const label = screen.getByTestId("label");
+      label.addEventListener("keydown", stopAndPrevent);
+      escape(label);
+      await flush();
+      await advance(600);
+      await task();
+      expect(isPopoverOpen(popup())).toBe(true);
+    });
+  });
+
   it("a press outside closes now, with the pointerdown; a press inside does not", async () => {
     const onOpenChange = vi.fn<(next: boolean, details: Details) => void>();
     await renderAsync(<Harness root={{ onOpenChange }} />);
@@ -874,6 +960,110 @@ describe("Closing: every user close is a fact", () => {
     act(() => popup().hidePopover());
     await task();
     expect(onOpenChange.mock.calls[0]?.[1].event?.type).toBe("toggle");
+  });
+});
+
+// Conventions 15 rule 4 (#194): HoverCard and Tooltip are global layers, decided in the order
+// they opened; a layer inside the card is taken first (the card's stand-down snapshot).
+describe("Escape with other layers: one Escape closes one layer (#194)", () => {
+  const tip = () => screen.getByTestId("tip");
+  const tipTrigger = () => screen.getByRole("button", { name: "Info", hidden: true });
+  const tooltip = (
+    <Tooltip.Root delay={0}>
+      <Tooltip.Trigger>Info</Tooltip.Trigger>
+      <Tooltip.Popup data-testid="tip">More</Tooltip.Popup>
+    </Tooltip.Root>
+  );
+  async function showTooltip(): Promise<void> {
+    pointer("pointerenter", tipTrigger());
+    await advance(1);
+    expect(isPopoverOpen(tip())).toBe(true);
+  }
+  /** An Escape at `target`; with `stop`, a native listener there stops its propagation. */
+  async function escapeAt(target: Element, stop: boolean): Promise<void> {
+    const listener = (event: Event) => event.stopPropagation();
+    if (stop) target.addEventListener("keydown", listener);
+    escape(target);
+    target.removeEventListener("keydown", listener);
+    await flush();
+  }
+
+  it.each([
+    ["the card opened first", "card", false],
+    ["the tooltip opened first", "tooltip", false],
+    ["the card opened first, propagation stopped", "card", true],
+    ["the tooltip opened first, propagation stopped", "tooltip", true],
+  ] as const)(
+    "a Tooltip and a HoverCard showing apart: %s closes first",
+    async (_, first, stop) => {
+      await renderAsync(
+        <>
+          <Harness />
+          {tooltip}
+        </>,
+      );
+      if (first === "card") {
+        await hoverOpen();
+        await showTooltip();
+      } else {
+        await showTooltip();
+        await hoverOpen();
+      }
+      expect(isPopoverOpen(popup())).toBe(true);
+      const outside = screen.getByRole("button", { name: "After" });
+      await escapeAt(outside, stop);
+      expect(isPopoverOpen(popup())).toBe(first !== "card");
+      expect(isPopoverOpen(tip())).toBe(first === "card");
+      await task();
+      await escapeAt(outside, stop);
+      expect(isPopoverOpen(popup())).toBe(false);
+      expect(isPopoverOpen(tip())).toBe(false);
+    },
+  );
+
+  it.each([false, true])(
+    "a Tooltip inside the card: the tooltip, then the card (propagation stopped: %s)",
+    async (stop) => {
+      await renderAsync(<Harness content={tooltip} />);
+      await hoverOpen();
+      await showTooltip();
+      await escapeAt(tipTrigger(), stop);
+      expect(isPopoverOpen(tip())).toBe(false);
+      expect(isPopoverOpen(popup())).toBe(true);
+      await task();
+      await escapeAt(tipTrigger(), stop);
+      expect(isPopoverOpen(popup())).toBe(false);
+    },
+  );
+
+  it("an auto popover inside the card, propagation stopped: the card stays (the snapshot)", async () => {
+    await renderAsync(
+      <Harness
+        content={
+          <div popover="auto" data-testid="inner">
+            <button type="button">In popover</button>
+          </div>
+        }
+      />,
+    );
+    await hoverOpen();
+    const inner = screen.getByTestId("inner");
+    act(() => inner.showPopover());
+    const button = screen.getByRole("button", { name: "In popover", hidden: true });
+    // Stands in for the popover's close watcher, which closes it after the dispatch, before
+    // the card decides on the late path: the decision must not find it closed.
+    const watcher = (event: Event) => {
+      event.stopPropagation();
+      inner.hidePopover();
+    };
+    button.addEventListener("keydown", watcher);
+    escape(button);
+    button.removeEventListener("keydown", watcher);
+    await flush();
+    expect(isPopoverOpen(inner)).toBe(false);
+    expect(isPopoverOpen(popup())).toBe(true);
+    await escapeAt(button, true);
+    expect(isPopoverOpen(popup())).toBe(false);
   });
 });
 

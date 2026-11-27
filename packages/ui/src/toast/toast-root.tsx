@@ -2,7 +2,7 @@
 import { Suspense, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
-import { isEscapeRequest } from "../internal/escape-key.js";
+import { consumeEscape, createEscapeRecord, isEscapeRequest } from "../internal/escape-key.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { containsOpenLayer } from "../internal/overlay/open-layer.js";
 import { exitAnimations } from "../internal/overlay/use-exit-animation.js";
@@ -215,16 +215,35 @@ export function ToastRoot({
     ],
   );
 
+  // Escape (design 7, conventions 15 rule 4): recorded on the Root in capture, with the
+  // stand-down snapshot, and decided last, so a `stopPropagation()` inside the toast does not
+  // keep it and a `preventDefault()` does. A Tooltip or HoverCard that is showing decides first
+  // (a global layer); a popover with a close watcher or a dialog open inside takes this Escape
+  // (read now: the watcher closes it after the dispatch); the next one dismisses the toast.
+  const endingRef = useLatest(item.ending);
   const rootRef = useCallback(
     (element: HTMLElement) => {
       elementRef.current = element;
       viewport.registerRoot(id, element);
+      const escape = createEscapeRecord();
+      const onEscape = (event: globalThis.KeyboardEvent): void => {
+        if (!isEscapeRequest(event) || endingRef.current) return;
+        const standDown = containsOpenLayer(element, event);
+        escape.record(event, () => {
+          if (standDown || endingRef.current) return;
+          consumeEscape(event);
+          close("dismiss", event);
+        });
+      };
+      element.addEventListener("keydown", onEscape, true);
       return () => {
+        element.removeEventListener("keydown", onEscape, true);
+        escape.cancel();
         if (elementRef.current === element) elementRef.current = null;
         viewport.registerRoot(id, null);
       };
     },
-    [viewport, id],
+    [viewport, id, endingRef, close],
   );
 
   // A layout effect, so toasts announce in queue order (before the Viewport's own effect
@@ -257,14 +276,7 @@ export function ToastRoot({
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.defaultPrevented || item.ending) return;
-    if (isEscapeRequest(event.nativeEvent)) {
-      // Innermost first (conventions 15): this React listener runs before the document ones, so
-      // a Tooltip, HoverCard, popover or dialog open inside the toast takes this Escape; the
-      // next one dismisses the toast.
-      if (containsOpenLayer(event.currentTarget, event.nativeEvent)) return;
-      event.preventDefault();
-      close("dismiss", event.nativeEvent);
-    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       // A text field, select or slider inside the toast keeps its arrows (the roving rule,
       // toggle-group.md 6.3).
       if (ownsArrows(event.target as Element)) return;

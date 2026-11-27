@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import type { RefObject } from "react";
-import { isEscapeRequest } from "../internal/escape-key.js";
+import { consumeEscape, createEscapeRecord, isEscapeRequest } from "../internal/escape-key.js";
 import { containsOpenLayer } from "../internal/overlay/open-layer.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
@@ -30,7 +30,7 @@ type Root = Pick<
 
 /** What the effect's attached listeners expose to the second effect. */
 interface InterestController {
-  /** Attach (`true`) or detach the document Escape and outside-press listeners. */
+  /** Attach (`true`) or detach the window Escape and document outside-press listeners. */
   readonly listenDocument: (listen: boolean) => void;
 }
 
@@ -99,7 +99,7 @@ export function useHoverCardInterest(
 /** What the Root passes on to its parts. */
 export interface HoverCardInterest {
   /**
-   * Attach the document Escape and outside-press listeners now: an open routed at the Popup's
+   * Attach the window Escape and document outside-press listeners now: an open routed at the Popup's
    * `beforetoggle` (the flagged path's interest show), before its optimistic commit. Stable.
    */
   readonly listenDocumentNow: () => void;
@@ -142,6 +142,7 @@ function attachInterest(
   { disabled, interestForRequested, suppressed, env }: AttachOptions,
 ): Attached {
   const doc = popup.ownerDocument;
+  const win = doc.defaultView;
   const timers = createDelayedPair();
   // A text selection dragged out of the card: the close timer starts at the release (2.2).
   let watchingRelease = false;
@@ -185,17 +186,29 @@ function attachInterest(
 
   // --- Document listeners, while the card is intended open ------------------------------------
 
-  const onDocumentKeyDown = (event: KeyboardEvent): void => {
+  // Escape: recorded on the window in capture, as a global layer, and decided last (conventions
+  // 15 rule 4), so a `stopPropagation()` anywhere does not keep the card open.
+  const windowEscape = createEscapeRecord();
+  const onWindowKeyDown = (event: KeyboardEvent): void => {
     if (!isEscapeRequest(event)) return;
-    const isShown = shown();
-    if (!isShown && !env().root.intended()) return;
-    // The innermost closes first (2.6): a popover or modal dialog open inside the card takes
-    // this Escape; the next one closes the card.
-    if (containsOpenLayer(popup, event)) return;
-    suppressed.current = true;
-    dismiss(event, true);
-    // This Escape was the card's: an enclosing modal dialog or `auto` popover stays open.
-    if (isShown) event.preventDefault();
+    if (!shown() && !env().root.intended()) return;
+    // The innermost closes first (2.6): a popover or dialog open inside the card takes this
+    // Escape; the next one closes the card. Read now: an `auto` popover's close watcher closes
+    // it after the dispatch.
+    const standDown = containsOpenLayer(popup, event);
+    windowEscape.record(
+      event,
+      () => {
+        const isShown = shown();
+        if (standDown || (!isShown && !env().root.intended())) return;
+        suppressed.current = true;
+        dismiss(event, true);
+        // This Escape was the card's: an enclosing modal dialog or `auto` popover, a non-modal
+        // Dialog or a toast stays open.
+        if (isShown) consumeEscape(event);
+      },
+      { global: true },
+    );
   };
   // The presses the document listener handled; the Trigger's own listener sees them next.
   const handled = new WeakSet<Event>();
@@ -212,10 +225,11 @@ function attachInterest(
     if (listen === listening) return;
     listening = listen;
     if (listen) {
-      doc.addEventListener("keydown", onDocumentKeyDown);
+      win?.addEventListener("keydown", onWindowKeyDown, true);
       doc.addEventListener("pointerdown", onDocumentPointerDown, true);
     } else {
-      doc.removeEventListener("keydown", onDocumentKeyDown);
+      win?.removeEventListener("keydown", onWindowKeyDown, true);
+      windowEscape.cancel();
       doc.removeEventListener("pointerdown", onDocumentPointerDown, true);
     }
   };
@@ -277,11 +291,21 @@ function attachInterest(
       if (handled.has(event)) timers.cancel();
       else dismiss(event, false);
     });
-    // Escape before anything is intended: cancel the coming open.
-    listen(trigger, "keydown", (event) => {
+    // Escape before anything is intended: cancel the coming open. Recorded in capture and
+    // decided last (conventions 15 rule 4), so a listener inside that stops the event does not
+    // keep the timer running; the event is left alone.
+    const triggerEscape = createEscapeRecord();
+    const onTriggerKeyDown = (event: KeyboardEvent): void => {
       if (!isEscapeRequest(event)) return;
-      suppressed.current = true;
-      timers.cancel();
+      triggerEscape.record(event, () => {
+        suppressed.current = true;
+        timers.cancel();
+      });
+    };
+    trigger.addEventListener("keydown", onTriggerKeyDown, true);
+    cleanups.push(() => {
+      trigger.removeEventListener("keydown", onTriggerKeyDown, true);
+      triggerEscape.cancel();
     });
     // Fresh interest: the pointer comes back, or focus leaves (and later returns).
     const freshInterest = () => {

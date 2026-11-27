@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Combobox } from "../combobox/index.js";
 import { HoverCard } from "../hover-card/index.js";
+import { Tooltip } from "../tooltip/index.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { flushTasks, setupUser } from "../__tests__/helpers.js";
 import { Harness, openThroughTrigger, popup } from "../__tests__/dialog-harness.js";
@@ -288,6 +289,56 @@ describe("non-modal Dialog Escape (#177)", () => {
         escape(screen.getByTestId("content"));
         await flushTasks(2);
         expect(popup().open).toBe(true);
+      },
+    );
+  });
+
+  // Conventions 15 rule 4 (#194): a Tooltip or HoverCard inside decides before the dialog and
+  // consumes the Escape, also on the late path, where it can no longer prevent it.
+  describe("a global layer inside, propagation stopped on the focused element (#194)", () => {
+    it.each(["tooltip", "card"] as const)(
+      "the %s closes, the dialog stays; the next Escape closes the dialog",
+      async (layer) => {
+        render(
+          <NonModal name="d" defaultOpen>
+            {layer === "tooltip" ? (
+              <Tooltip.Root delay={0}>
+                <Tooltip.Trigger data-testid="layer-trigger">Info</Tooltip.Trigger>
+                <Tooltip.Popup data-testid="layer">More</Tooltip.Popup>
+              </Tooltip.Root>
+            ) : (
+              <HoverCard.Root defaultOpen>
+                <HoverCard.Trigger href="/u/ada" data-testid="layer-trigger">
+                  @ada
+                </HoverCard.Trigger>
+                <HoverCard.Popup data-testid="layer">Ada</HoverCard.Popup>
+              </HoverCard.Root>
+            )}
+          </NonModal>,
+        );
+        await flushTasks(2);
+        const focused = screen.getByTestId("layer-trigger");
+        if (layer === "tooltip") {
+          act(() => {
+            focused.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+          });
+          await flushTasks(2);
+        }
+        const inner = screen.getByTestId("layer");
+        expect(isPopoverOpen(inner)).toBe(true);
+        expect(dialogOf("d").open).toBe(true);
+        act(() => focused.focus());
+        const stop = (event: Event) => event.stopPropagation();
+        focused.addEventListener("keydown", stop);
+        cleanups.push(() => focused.removeEventListener("keydown", stop));
+        escape(focused);
+        await Promise.resolve();
+        expect(isPopoverOpen(inner)).toBe(false);
+        await flushTasks(2);
+        expect(dialogOf("d").open).toBe(true);
+        escape(focused);
+        await flushTasks(2);
+        expect(dialogOf("d").open).toBe(false);
       },
     );
   });

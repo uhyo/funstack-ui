@@ -32,6 +32,7 @@ import {
 } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { HoverCard } from "../hover-card/index.js";
+import { Menu } from "../menu/index.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { Tooltip } from "../tooltip/index.js";
 import { createToastManager, Toast, toast } from "./index.js";
@@ -1986,8 +1987,8 @@ describe("Toast", () => {
       expect(queryRoot(id)).toBeNull();
     });
 
-    // Conventions 15, innermost first: the toast's React listener runs before the document
-    // listeners of a Tooltip or HoverCard inside it, so it stands down while one is shown.
+    // Conventions 15, innermost first: a Tooltip or HoverCard shown inside the toast is a global
+    // layer, decided before the toast (rule 4), and the toast stands down while one is shown.
     it("a Tooltip shown inside the toast hides on the first Escape; the next dismisses the toast", async () => {
       const list = ({ toasts }: ToastViewportState) =>
         toasts.map((t) =>
@@ -2045,6 +2046,121 @@ describe("Toast", () => {
       expect(fireEvent.keyDown(trigger, { key: "Escape" })).toBe(false);
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
+    });
+
+    // Conventions 15 rule 4 (#194): the toast records its Escape on the Root in capture and
+    // decides last, after the global layers (Tooltip, HoverCard).
+    describe("Escape decided last (#194)", () => {
+      const withField = ({ toasts }: ToastViewportState) =>
+        toasts.map((t) =>
+          renderToast(t, <input data-testid={`input-${t.id}`} aria-label="Reply" />),
+        );
+
+      it("a stopPropagation() in a field inside the toast: dismissed, after the dispatch", async () => {
+        render(<Harness manager={manager} list={withField} />);
+        const id = await call(() => manager({ title: "A", duration: null }));
+        const field = screen.getByTestId(`input-${id}`);
+        act(() => field.focus());
+        field.addEventListener("keydown", (event) => event.stopPropagation());
+        fireEvent.keyDown(field, { key: "Escape" });
+        expect(queryRoot(id)).not.toBeNull();
+        await flushMicrotasks(2);
+        expect(queryRoot(id)).toBeNull();
+      });
+
+      it("a preventDefault() in a field inside the toast: kept", async () => {
+        render(<Harness manager={manager} list={withField} />);
+        const id = await call(() => manager({ title: "A", duration: null }));
+        const field = screen.getByTestId(`input-${id}`);
+        act(() => field.focus());
+        field.addEventListener("keydown", (event) => {
+          event.stopPropagation();
+          event.preventDefault();
+        });
+        fireEvent.keyDown(field, { key: "Escape" });
+        await flushTasks(2);
+        expect(queryRoot(id)).not.toBeNull();
+      });
+
+      it("a Tooltip shown elsewhere hides on the first Escape; the next dismisses the toast", async () => {
+        const before = (
+          <Tooltip.Root delay={0}>
+            <Tooltip.Trigger data-testid="tip-trigger">Info</Tooltip.Trigger>
+            <Tooltip.Popup data-testid="tip">More</Tooltip.Popup>
+          </Tooltip.Root>
+        );
+        render(<Harness manager={manager} list={withField} before={before} />);
+        const id = await call(() => manager({ title: "A", duration: null }));
+        const tip = screen.getByTestId("tip");
+        act(() => {
+          screen
+            .getByTestId("tip-trigger")
+            .dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+        });
+        await flushTasks(2);
+        expect(isPopoverOpen(tip)).toBe(true);
+        const field = screen.getByTestId(`input-${id}`);
+        act(() => field.focus());
+        expect(fireEvent.keyDown(field, { key: "Escape" })).toBe(false);
+        expect(isPopoverOpen(tip)).toBe(false);
+        await flushTasks(2);
+        expect(queryRoot(id)).not.toBeNull();
+        expect(fireEvent.keyDown(field, { key: "Escape" })).toBe(false);
+        await flushMicrotasks(2);
+        expect(queryRoot(id)).toBeNull();
+      });
+
+      it("a Menu open inside the toast: the toast stands down (its snapshot)", async () => {
+        const list = ({ toasts }: ToastViewportState) =>
+          toasts.map((t) =>
+            renderToast(
+              t,
+              <Menu.Root defaultOpen>
+                <Menu.Trigger data-testid={`menu-trigger-${t.id}`}>Actions</Menu.Trigger>
+                <Menu.Popup data-testid={`menu-${t.id}`}>
+                  <Menu.Item>Rename</Menu.Item>
+                </Menu.Popup>
+              </Menu.Root>,
+            ),
+          );
+        render(<Harness manager={manager} list={list} />);
+        const id = await call(() => manager({ title: "A", duration: null }));
+        await flushTasks(2);
+        const menu = screen.getByTestId(`menu-${id}`);
+        expect(isPopoverOpen(menu)).toBe(true);
+        const trigger = screen.getByTestId(`menu-trigger-${id}`);
+        // Propagation stopped as well: the snapshot was taken at the record.
+        trigger.addEventListener("keydown", (event) => event.stopPropagation());
+        fireEvent.keyDown(trigger, { key: "Escape" });
+        await flushTasks(2);
+        expect(queryRoot(id)).not.toBeNull();
+      });
+
+      it("a toast whose Viewport is inside a non-modal Dialog: the toast, then the dialog", async () => {
+        render(
+          <Dialog.Root defaultOpen modal={false}>
+            <Dialog.Popup data-testid="dialog" aria-label="Panel">
+              <button type="button" data-testid="in-dialog">
+                Inside
+              </button>
+              <Harness manager={manager} list={withField} />
+            </Dialog.Popup>
+          </Dialog.Root>,
+        );
+        await flushTasks(2);
+        const dialog = screen.getByTestId("dialog") as HTMLDialogElement;
+        expect(dialog.open).toBe(true);
+        const id = await call(() => manager({ title: "A", duration: null }));
+        const field = screen.getByTestId(`input-${id}`);
+        act(() => field.focus());
+        expect(fireEvent.keyDown(field, { key: "Escape" })).toBe(false);
+        await flushTasks(2);
+        expect(queryRoot(id)).toBeNull();
+        expect(dialog.open).toBe(true);
+        expect(fireEvent.keyDown(screen.getByTestId("in-dialog"), { key: "Escape" })).toBe(false);
+        await flushTasks(2);
+        expect(dialog.open).toBe(false);
+      });
     });
 
     it("returns focus to the element focused before a Tab into the region, else the body", async () => {
