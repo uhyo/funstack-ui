@@ -29,6 +29,16 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          Escape on a Tooltip, HoverCard or toast is no longer lost to a{" "}
+          <code>stopPropagation()</code> (<a href={issue(194)}>#194</a>). A handler that stops the
+          Escape, a React <code>onKeyDown</code> anywhere around the focus included, used to leave a
+          shown tooltip or card open, keep a toast, and let a tooltip&apos;s or card&apos;s coming
+          open go ahead; they now close (or cancel) all the same, as a non-modal Dialog already did.
+          Keep one open with <code>preventDefault()</code>. One order change: with focus in a toast
+          and a tooltip or card showing elsewhere, the first Escape now closes the tooltip or card
+          and the next one the toast (before, the toast went first).
+        </li>
+        <li>
           A Close part (<code>Dialog.Close</code>, <code>Popover.Close</code>,{" "}
           <code>Drawer.Close</code>, <code>AlertDialog.Cancel</code>,{" "}
           <code>AlertDialog.Action</code>) without <code>action</code> now has{" "}

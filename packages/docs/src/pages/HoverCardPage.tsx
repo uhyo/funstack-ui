@@ -370,7 +370,7 @@ export function HoverCardPage() {
           ["Tab before `delay` has passed", "The open is cancelled; focus moves on"],
           [
             "Escape",
-            "Closes the card (or cancels the coming one). With focus inside the card, focus returns to the link and the card does not re-open. Inside a modal Dialog only the card closes; a popover open inside the card closes first",
+            "Closes the card (or cancels the coming one). With focus inside the card, focus returns to the link and the card does not re-open. Inside a Dialog or a toast only the card closes; a popover or tooltip open inside the card closes first. With a tooltip showing elsewhere too, the one that opened first closes. A `preventDefault()` on the Escape keeps the card open; `stopPropagation()` does not",
           ],
           ["Enter on the link", "The link's own activation; the library does nothing"],
         ]}

@@ -382,7 +382,10 @@ export function TooltipPage() {
             "Opens after `delay`, or at once while another tooltip is showing (focus from a click does not open).",
           ],
           ["Blur", "Closes after `closeDelay`."],
-          ["Escape", "Closes; focus stays on the trigger."],
+          [
+            "Escape",
+            "Closes, wherever focus is; focus stays on the trigger. Only this tooltip closes: an enclosing Dialog, Menu or toast stays open for the next Escape. A `preventDefault()` on the Escape keeps it open; `stopPropagation()` does not. Before the tooltip shows, Escape on the trigger cancels the coming open.",
+          ],
           [
             "Any pointerdown",
             "Closes (outside, on the trigger, on the popup). It reopens only after the pointer leaves and re-enters, or focus leaves and returns.",

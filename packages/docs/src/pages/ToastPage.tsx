@@ -532,7 +532,11 @@ toast({ title: "Link copied" });`}</CodeBlock>
             "a toast",
             "Next / previous toast, no wrap. Elements inside that use the arrow keys themselves keep them: text, number, date, range and radio inputs, `textarea`, `select`, contenteditable, and the `textbox`, `combobox`, `spinbutton` and `slider` roles",
           ],
-          ["Escape", "a toast", "Dismiss it"],
+          [
+            "Escape",
+            "a toast",
+            "Dismiss it. A `preventDefault()` on the Escape keeps it; `stopPropagation()` does not",
+          ],
           ["Enter / Space", "Action, Close", "Native button activation"],
         ]}
       />
@@ -543,6 +547,12 @@ toast({ title: "Link copied" });`}</CodeBlock>
         </li>
         <li>
           F8, not F6: F6 is the browsers' pane-cycling key. Change it with <code>hotkey</code>.
+        </li>
+        <li>
+          <strong>One Escape closes one layer.</strong> A Tooltip or HoverCard that is showing,
+          inside the toast or anywhere else on the page, closes first; so does a Menu, Popover or
+          dialog open inside the toast. The next Escape dismisses the toast. A non-modal Dialog
+          around the region stays open until the Escape after that.
         </li>
         <li>
           <strong>Announcements</strong> go through <code>document.ariaNotify()</code>, never a live
