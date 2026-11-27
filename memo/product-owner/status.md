@@ -469,3 +469,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - 2026-11-27 alpha.21 RELEASED (Drawer, Avatar, OTPField, Scroll areas recipe). Wave 26 start: arch-170 (Menubar/NavigationMenu), arch-172 (direction/locale proposal) running.
 - 2026-11-27 #172 DECIDED (all rec.; fb84f6c4) → impl #188 (dev-188, feat/188-direction-locale). #170 ACCEPTED (all rec.; de1ccd4d) → dev-menubar (feat/170-menubar), dev-navmenu (feat/170-navigation-menu). Then reviewers, merge, alpha.22.
 - 2026-11-27 #188 MERGED bbafa38c (review fixes dacafdcd; 4.4 amended b152f88e). #172/#188 closed. Menubar + NavMenu devs still running.
+- 2026-11-27 NavigationMenu MERGED 2b24cda4 (fixes c540d893). #189 router report (human). Menubar fixes in progress (+ disabled-trigger hold, arch c2253d3f).
