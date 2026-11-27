@@ -14441,3 +14441,46 @@ Test plans: each document's section 11 now carries the unverified point of the p
 **first step** (Menubar: the accessibility tree and axe result for a `menu` that is a direct
 child of the `menubar`; NavigationMenu: a Link's close committing together with a router
 transition). The outlines in the proposal entry above are the rest.
+
+## 2026-11-27, #188: direction and locale implemented, the OTPField RTL probe
+
+Implementation of the #172 decisions (the entry above); no rule changed.
+
+- **Probe (owed by decision 3).** An `OTPField` with six Slots in `<div dir="rtl">`, with no
+  `dir` on the Root (the code before the default), `charset` `"numeric"` with `1234` and
+  `"alphanumeric"` with `ab12` and `AB34`; Chromium and Firefox locally, WebKit in CI. The
+  charset made no difference in any engine. The caret was set with `setSelectionRange` and one
+  real key pressed; `a->b` is `selectionStart` before and after.
+
+  | | Chromium | Firefox | WebKit |
+  | --- | --- | --- | --- |
+  | the Input's computed direction | `rtl` | `rtl` | `rtl` |
+  | Slots from left to right | 5 4 3 2 1 0 | 5 4 3 2 1 0 | 5 4 3 2 1 0 |
+  | ArrowLeft at 2, 0, 4 | 3, 1, 4 | 1, 0, 3 | 1, 3, 4 |
+  | ArrowRight at 2, 0, 4 | 1, 0, 3 | 3, 1, 4 | 3, 0, 1 |
+  | Home, End at 2 | 0, 4 | 0, 4 | 0, 4 |
+
+  So the Slots mirror in every engine, as 4.4 expects, but the caret keys do not agree:
+  Chromium moves ArrowLeft forward in the text (to the higher index, the box to its left in the
+  mirrored row), Firefox backward (visual movement in the left-to-right digit run, the box to its
+  right), and WebKit backward inside the run with jumps at its edges (ArrowLeft at 0 goes to 3,
+  ArrowRight at 4 to 1). Home and End are logical everywhere. 4.4's "ArrowLeft would move the
+  active box to the right" holds for Firefox and WebKit, not for Chromium; the rule itself is
+  confirmed (without the attribute the field differs per engine and, in Firefox and WebKit, the
+  keys move against the boxes). With `dir="ltr"` on the Root inside the same RTL container all
+  three engines lay out Slot 0 at the left, move ArrowLeft to the lower index (2 to 1, 0 stays),
+  ArrowRight to the higher, Home to 0 and End to the text's end. `dir="rtl"` on the Root behaves
+  as no `dir` in the RTL container. The 4.4 sentence is left for the architect.
+- **Code.** `OTPField.Root` defaults `dir` to `"ltr"` as a pass-through prop, so a `render`
+  element's own `dir` and the consumer's prop win and the function form of `render` receives it
+  (`otp-field-root.tsx`). `locale` on `Progress.Root` and `Meter.Root` is
+  `string | readonly string[]`; `internal/range-value.ts` keys its formatter cache with
+  `JSON.stringify([locale, options])` and copies a list before `Intl.NumberFormat`.
+- **Tests.** jsdom: the default, a consumer's `dir`, the server HTML, both forms of `render`
+  (`otp-field.test.tsx`); a list in `range-value.test.ts`, one row each in `progress.test.tsx`
+  and `meter.test.tsx`, the type in `progress.types.test.tsx`. Browser, three engines
+  (`otp-field.browser.test.tsx`, "direction: inside an RTL page"): computed `ltr`, Slot order,
+  ArrowLeft / ArrowRight / Home / End for both charsets, a click on a Slot, the label outside
+  stays `rtl`, and a `dir="rtl"` row asserting the per-engine arrow results above.
+- **Docs.** A "Direction and locales" guide page; the OTPField, Progress, Meter, RadioGroup,
+  Slider, NumberField and Roadmap pages updated.

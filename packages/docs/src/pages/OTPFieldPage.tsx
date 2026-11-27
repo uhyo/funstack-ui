@@ -223,6 +223,13 @@ import { Separator } from "@funstack/ui/separator";
             description: "Native `readonly` on the Input: no edits and no completion.",
           },
           {
+            name: "dir",
+            type: "string",
+            default: '"ltr"',
+            description:
+              "The native attribute, with a library default: a code is read left to right in every locale, so the Slots, the text and the caret keys stay left to right inside an RTL page. Your value (`rtl`, `auto`) wins, on the Root or on a `render` element. See [Right-to-left pages](#right-to-left-pages).",
+          },
+          {
             name: "experimental_webOTP",
             type: "boolean",
             default: "false",
@@ -238,7 +245,7 @@ import { Separator } from "@funstack/ui/separator";
           "`OTPFieldState` is `{ value, length, complete, pending, disabled, readOnly, invalid }`: `value` is the filtered text, `complete` is `value.length === length`, `pending` is a `completeAction` in flight, `invalid` an error shown by an enclosing Field (`false` outside one)."
         }
         owned={
-          "`data-complete`, `data-pending`, `data-disabled`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it."
+          '`data-complete`, `data-pending`, `data-disabled`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it. `dir` defaults to `"ltr"`; yours wins.'
         }
         note={
           'Both details objects are `{ reason, event }`. `onValueChange`: `"activate"` for an edit (`event` is the `input` event, or the `compositionend` that ended a composition), `"platform"` for a form reset (the `reset` event), text found at hydration and a WebOTP fill (`undefined`). `completeAction`: `"activate"` for an edit, `"platform"` for a WebOTP fill. Serialisable: a Server Function receives `{ reason }`.'
@@ -388,6 +395,24 @@ import { Separator } from "@funstack/ui/separator";
         </li>
         <li>A programmatic write clears the browser's undo history for the input.</li>
       </ul>
+
+      <h4 id="right-to-left-pages">Right-to-left pages</h4>
+      <p>
+        A one-time code is read left to right in Arabic and Hebrew too, so{" "}
+        <code>OTPField.Root</code> renders <code>dir="ltr"</code> unless you pass <code>dir</code>.
+        Inside a <code>dir="rtl"</code> page Slot 0 stays the leftmost box, ArrowLeft moves to the
+        previous character, and your logical CSS (<code>margin-inline-start</code>, a separator
+        between groups) inside the Root resolves as left to right. The label, the description and
+        the error message are outside the Root and follow the page. The attribute is in the server
+        HTML, so it holds before hydration.
+      </p>
+      <p>
+        Without it the boxes would mirror (Slot 0 at the right) while the one input's text stays a
+        left-to-right run, and the engines disagree on which way the arrow keys then move the caret.
+        Pass <code>dir="rtl"</code> only for a code that really is read right to left; there is no
+        value meaning "follow the page". More in{" "}
+        <a href="/concepts/direction-and-locales">Direction and locales</a>.
+      </p>
 
       <BehaviourSection
         id="transition-types"

@@ -394,7 +394,9 @@ export function SliderPage() {
           follows the APG (Right increases). Under RTL (the input's computed <code>direction</code>)
           the track is mirrored, so ArrowLeft increases; Chromium and Firefox mirror a native range,
           Safari does not, so the library handles these two keys there as well. Left-to-right
-          horizontal keys stay native.
+          horizontal keys stay native. Set the direction with <code>dir</code> on the page, a
+          container or the Root; there is no provider (
+          <a href="/concepts/direction-and-locales">Direction and locales</a>).
         </li>
         <li>
           No <code>aria-valuemin</code>, <code>aria-valuemax</code>, <code>aria-valuenow</code> or{" "}

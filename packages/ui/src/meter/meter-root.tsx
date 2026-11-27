@@ -101,11 +101,12 @@ export interface MeterRootProps extends Omit<
    */
   format?: Intl.NumberFormatOptions;
   /**
-   * BCP 47 tag for `Intl.NumberFormat`. Pass it when a client tree is server-rendered.
+   * BCP 47 tag, or a preference list of tags, for `Intl.NumberFormat`. Pass it when a client
+   * tree is server-rendered.
    *
    * @defaultValue the runtime's locale
    */
-  locale?: string;
+  locale?: string | readonly string[];
   /**
    * The `aria-valuetext` to render instead of `formattedValue`. Called with the clamped value
    * and the state as it would be without this prop. Return `null` to render no

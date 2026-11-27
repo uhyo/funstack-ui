@@ -33,6 +33,7 @@ Requirements: `react` and `react-dom` `>=19.3.0` (peer dependencies). ESM only. 
 9. **Server Components**: parts are `"use client"` modules, so a Server Component can render them, but it can only pass serialisable props. A Server Function (`"use server"`) can be passed directly to any action prop; a plain function cannot.
 10. **Panels never get `data-pending`.** To style content while the next one loads, select through the Root (`.tabs[data-pending] .panel { opacity: .6 }`). Dialog and Popover Roots render no element: use the Trigger's `data-pending` instead.
 11. **Toasts need a viewport.** Render `<Toast.Viewport>` once (its `children` is a function of `{ toasts }`), then call `toast({ title })` anywhere on the client.
+12. **No `DirectionProvider`, no `LocaleProvider`.** Right-to-left is the native `dir` attribute (on `<html>`, a container or a part); components read the computed CSS `direction`, and only ArrowLeft / ArrowRight of a horizontal orientation mirror. `OTPField.Root` renders `dir="ltr"` unless you pass `dir`. `locale` (`string | readonly string[]`) is a prop of `NumberField.Root`, `Progress.Root` and `Meter.Root`; pass it on server-rendered pages. Docs page: `concepts/direction-and-locales`.
 
 ## Component index
 

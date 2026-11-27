@@ -134,9 +134,10 @@ export function MeterPage() {
           },
           {
             name: "locale",
-            type: "string",
+            type: "string | readonly string[]",
             default: "the runtime's",
-            description: "BCP 47 tag for `Intl.NumberFormat`.",
+            description:
+              "BCP 47 tag, or a preference list of tags, for `Intl.NumberFormat`. Pass it when a client component is server-rendered; see [Direction and locales](/concepts/direction-and-locales).",
           },
           {
             name: "getAriaValueText",
