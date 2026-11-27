@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useEffectEvent, useRef } from "react";
 import type { RefObject } from "react";
 import { isEscapeRequest } from "../internal/escape-key.js";
+import { containsOpenLayer } from "../internal/overlay/open-layer.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 import { createDelayedPair } from "../internal/use-delayed-pair.js";
@@ -345,31 +346,4 @@ function attachInterest(
       for (const cleanup of cleanups) cleanup();
     },
   };
-}
-
-/**
- * Whether a popover or a modal dialog is open inside the card, or an open non-modal dialog inside
- * it that `event` came from (design 2.6: that dialog decides its Escape after the document
- * listeners, #177). Walks the elements and asks each, rather than one
- * `querySelector(":popover-open")`, which the jsdom shim cannot answer.
- */
-function containsOpenLayer(popup: HTMLElement, event: Event): boolean {
-  for (const element of popup.querySelectorAll("[popover]")) {
-    if (isPopoverOpen(element)) return true;
-  }
-  const target = event.target;
-  for (const dialog of popup.querySelectorAll("dialog")) {
-    if (!dialog.open) continue;
-    if (isModal(dialog)) return true;
-    if (target instanceof Node && dialog.contains(target)) return true;
-  }
-  return false;
-}
-
-function isModal(dialog: HTMLDialogElement): boolean {
-  try {
-    return dialog.matches(":modal");
-  } catch {
-    return false;
-  }
 }

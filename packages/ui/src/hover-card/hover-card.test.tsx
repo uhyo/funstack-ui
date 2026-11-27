@@ -748,6 +748,22 @@ describe("Closing: every user close is a fact", () => {
     },
   );
 
+  it("a prevented Escape before the delay keeps the coming open (the Trigger's listener)", async () => {
+    await renderAsync(<Harness />);
+    const prevent = (event: Event) => event.preventDefault();
+    document.addEventListener("keydown", prevent, true);
+    try {
+      keyboardFocus(trigger());
+      await advance(300);
+      escape(trigger());
+      await advance(600);
+      await task();
+      expect(isPopoverOpen(popup())).toBe(true);
+    } finally {
+      document.removeEventListener("keydown", prevent, true);
+    }
+  });
+
   it("Escape stands down while a popover is open inside the card, and when already prevented", async () => {
     await renderAsync(
       <Harness

@@ -26,10 +26,14 @@ import {
   expectPending,
   setupUser,
   flushMicrotasks,
+  flushTasks,
   PlainButton,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
+import { HoverCard } from "../hover-card/index.js";
+import { isPopoverOpen } from "../internal/overlay/popover-open.js";
+import { Tooltip } from "../tooltip/index.js";
 import { createToastManager, Toast, toast } from "./index.js";
 import type {
   ToastActionDetails,
@@ -1978,6 +1982,67 @@ describe("Toast", () => {
         expect(queryRoot(id)).not.toBeNull();
       }
       expect(fireEvent.keyDown(field, { key: "Escape" })).toBe(false);
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).toBeNull();
+    });
+
+    // Conventions 15, innermost first: the toast's React listener runs before the document
+    // listeners of a Tooltip or HoverCard inside it, so it stands down while one is shown.
+    it("a Tooltip shown inside the toast hides on the first Escape; the next dismisses the toast", async () => {
+      const list = ({ toasts }: ToastViewportState) =>
+        toasts.map((t) =>
+          renderToast(
+            t,
+            <Tooltip.Root delay={0}>
+              <Tooltip.Trigger data-testid={`tip-trigger-${t.id}`}>Info</Tooltip.Trigger>
+              <Tooltip.Popup data-testid={`tip-${t.id}`}>More</Tooltip.Popup>
+            </Tooltip.Root>,
+          ),
+        );
+      render(<Harness manager={manager} list={list} />);
+      const id = await call(() => manager({ title: "A", duration: null }));
+      const trigger = screen.getByTestId(`tip-trigger-${id}`);
+      const tip = screen.getByTestId(`tip-${id}`);
+      act(() => {
+        trigger.dispatchEvent(new PointerEvent("pointerenter", { pointerType: "mouse" }));
+      });
+      await flushTasks(2);
+      expect(isPopoverOpen(tip)).toBe(true);
+      act(() => trigger.focus());
+      expect(fireEvent.keyDown(trigger, { key: "Escape" })).toBe(false);
+      expect(isPopoverOpen(tip)).toBe(false);
+      await flushTasks(2);
+      expect(queryRoot(id)).not.toBeNull();
+      expect(fireEvent.keyDown(trigger, { key: "Escape" })).toBe(false);
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).toBeNull();
+    });
+
+    it("a HoverCard shown inside the toast closes on the first Escape; the next dismisses the toast", async () => {
+      const list = ({ toasts }: ToastViewportState) =>
+        toasts.map((t) =>
+          renderToast(
+            t,
+            <HoverCard.Root defaultOpen>
+              <HoverCard.Trigger href="/u/ada" data-testid={`card-trigger-${t.id}`}>
+                @ada
+              </HoverCard.Trigger>
+              <HoverCard.Popup data-testid={`card-${t.id}`}>Ada</HoverCard.Popup>
+            </HoverCard.Root>,
+          ),
+        );
+      render(<Harness manager={manager} list={list} />);
+      const id = await call(() => manager({ title: "A", duration: null }));
+      await flushTasks(2);
+      const card = screen.getByTestId(`card-${id}`);
+      const trigger = screen.getByTestId(`card-trigger-${id}`);
+      expect(isPopoverOpen(card)).toBe(true);
+      act(() => trigger.focus());
+      expect(fireEvent.keyDown(trigger, { key: "Escape" })).toBe(false);
+      expect(isPopoverOpen(card)).toBe(false);
+      await flushTasks(2);
+      expect(queryRoot(id)).not.toBeNull();
+      expect(fireEvent.keyDown(trigger, { key: "Escape" })).toBe(false);
       await flushMicrotasks(2);
       expect(queryRoot(id)).toBeNull();
     });

@@ -15271,3 +15271,29 @@ Architect, on the entry above. The three rules stand as written, and the rows in
   #177) the non-modal Dialog cannot. Aligning them would move them to the Dialog's record /
   decide shape; their order against the Dialog's window listener would need working out
   first.
+
+## 2026-11-27, #191 and #192: review fixes; Toast stands down for a layer open inside it
+
+Developer, on review-191-192 (`memo/reviewer/review-191-192.md`).
+
+- **Rule 2 amended, conventions 15**: a listener that runs before an inner layer's cannot wait
+  for it to prevent, so it stands down while a layer is open inside it. Toast's React
+  `onKeyDown` runs below the document, before a Tooltip's or HoverCard's document listener and
+  before an `auto` popover's close watcher; on this branch it prevented first, so a Tooltip or
+  HoverCard inside a toast stayed shown while the toast left (on master both closed at once;
+  an `auto` Menu inside had its close watcher cancelled on both). Toast now stands down while
+  `containsOpenLayer` (moved from HoverCard to `internal/overlay/open-layer.ts`, same logic)
+  finds a shown popover, an open modal dialog or an open non-modal dialog the event came from
+  inside its Root; the next Escape dismisses it. toast.md's Escape row says so. The review's
+  wording was "a layer that contains the event target"; I kept HoverCard's shape instead
+  (any shown popover inside), because a Tooltip's popup never contains its focused trigger.
+- **Rule 3 amended**: "or consumes it" (the Combobox chip prevents while closing nothing).
+- tooltip.md 2.2 and the Tooltip comment no longer name "a HoverCard inside" as a consumer.
+- Rows: jsdom Tooltip and HoverCard inside a Toast (fail without the stand-down); prevented
+  Escape on the HoverCard and Tooltip Trigger cancels and on the Menubar held Trigger (fail
+  with `defaultPrevented` dropped from `isEscapeRequest`). Browser: the native row is now
+  Chromium-asserting for a modal dialog **and an `auto` popover** (backing the claim in
+  section 15), and elsewhere checks only that the library leaves both composing shapes
+  unprevented; the header says the Firefox / WebKit rows replay synthetic events and assert
+  that the engine's `KeyboardEvent` init honours `isComposing` and `keyCode`; the HoverCard IME
+  row notes it also passes on master in Chromium.

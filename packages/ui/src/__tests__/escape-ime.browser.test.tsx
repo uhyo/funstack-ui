@@ -2,10 +2,13 @@
 // library's JS Escape handlers in a real engine (design/conventions.md 15, #191, #192). Chromium
 // drives a real composition through CDP (`Input.imeSetComposition`, then an Escape the IME takes:
 // `windowsVirtualKeyCode` 229, which Chromium delivers as `key: "Escape"`, `keyCode: 229`,
-// `isComposing: true`). Firefox and WebKit have no IME driver: there the rows dispatch the two
-// composing keydown shapes the rule reads (`isComposing`, `keyCode` 229) as untrusted events.
-// The rows of every handler with synthetic events are in jsdom (dialog-escape, tooltip,
-// hover-card, toast, menubar, drawer tests).
+// `isComposing: true`). Firefox and WebKit have no IME driver: there the rows only **replay the
+// synthetic keydowns of the jsdom rows** (the two composing shapes the rule reads, `isComposing`
+// and `keyCode` 229, as untrusted events). They add no IME coverage of those engines; what they
+// do check is that the engine's `KeyboardEvent` constructor honours both init fields (the
+// premise asserts in `imeEscape`), which the jsdom rows take for granted. The rows of every
+// handler with synthetic events are in jsdom (dialog-escape, tooltip, hover-card, toast,
+// menubar, drawer tests).
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cdp, userEvent } from "vitest/browser";
@@ -68,11 +71,18 @@ async function imeEscape(input: HTMLInputElement): Promise<KeyboardEvent[]> {
   } finally {
     input.removeEventListener("keydown", record);
   }
-  // The premise: composing Escapes arrived, none of them prevented by the library.
+  // The premise: composing Escapes arrived in the shape the rule reads.
   expect(seen.length).toBeGreaterThan(0);
   for (const event of seen) {
     expect(event.key).toBe("Escape");
     expect(event.isComposing || event.keyCode === 229).toBe(true);
+  }
+  if (browserName !== "chromium") {
+    // The engine's constructor honours each init field on its own (WebKit included).
+    expect(seen.map((event) => [event.isComposing, event.keyCode])).toEqual([
+      [true, 0],
+      [false, 229],
+    ]);
   }
   return seen;
 }
@@ -100,20 +110,37 @@ describe("Escape during an IME composition (#191)", () => {
     await settle(() => expect(dialog.open).toBe(false));
   });
 
-  // The platform's close watchers are the engine's business (conventions 15). Recorded here for
-  // Chromium, where an IME can be driven: the Escape the IME takes is no close request.
-  it("Chromium: a modal Dialog's close watcher ignores the Escape the IME takes", async () => {
+  // The platform's close watchers are the engine's business (conventions 15): recorded, not
+  // driven. Only Chromium can prove anything here (an IME driven through CDP, trusted key
+  // events): the Escape the IME takes is no close request, for a modal dialog and an `auto`
+  // popover. Elsewhere untrusted keydowns never run a close watcher, so the row checks the one
+  // thing it can: the library's listeners leave both composing shapes unprevented, so a real
+  // close watcher would decide alone.
+  it("native close watchers: a modal Dialog and an auto popover stay open on the Escape the IME takes (Chromium)", async () => {
     render(
       <Dialog.Root defaultOpen>
         <Dialog.Popup data-testid="popup" aria-label="Notes">
           <input data-testid="text" aria-label="Note" />
+          <div popover="auto" data-testid="menu">
+            <input data-testid="menu-text" aria-label="Filter" />
+          </div>
         </Dialog.Popup>
       </Dialog.Root>,
     );
     const dialog = screen.getByTestId("popup") as HTMLDialogElement;
+    const menu = screen.getByTestId("menu");
     await settle(() => expect(dialog.open).toBe(true));
+    act(() => menu.showPopover());
+    const inMenu = await imeEscape(screen.getByTestId("menu-text") as HTMLInputElement);
+    if (browserName !== "chromium") {
+      expect(inMenu.some((event) => event.defaultPrevented)).toBe(false);
+      return;
+    }
+    await quietPeriod(100, "the composition's Escape must not close the auto popover");
+    expect(menu.matches(":popover-open")).toBe(true);
+    expect(dialog.open).toBe(true);
+    act(() => menu.hidePopover());
     await imeEscape(screen.getByTestId("text") as HTMLInputElement);
-    // Elsewhere the untrusted keydowns run no close watcher either.
     await quietPeriod(100, "the composition's Escape must not close the modal dialog");
     expect(dialog.open).toBe(true);
     await user.keyboard("{Escape}");
@@ -140,6 +167,9 @@ describe("Escape during an IME composition (#191)", () => {
     await settle(() => expect(tip.matches(":popover-open")).toBe(false));
   });
 
+  // In Chromium this row passes on master too: the CDP keydown has `isComposing`, which
+  // HoverCard's document listener already read. What is new there is only the `keyCode` 229
+  // shape, which the synthetic replay covers elsewhere.
   it("a shown HoverCard stays; the Escape after the composition closes it", async () => {
     render(
       <HoverCard.Root defaultOpen>

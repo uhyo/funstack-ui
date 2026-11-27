@@ -520,6 +520,19 @@ describe("Keyboard", () => {
     expect(showSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("a prevented Escape before the delay keeps the pending open", () => {
+    setupTimers();
+    render(<Harness />);
+    const prevent = (event: Event) => event.preventDefault();
+    document.addEventListener("keydown", prevent, true);
+    onTestFinished(() => document.removeEventListener("keydown", prevent, true));
+    pointer("pointerenter", trigger());
+    advance(100);
+    escape(trigger());
+    advance(150);
+    expect(showSpy).toHaveBeenCalledTimes(1);
+  });
+
   // Conventions 15 (#192): innermost first, an Escape an inner handler consumed is not ours.
   it("an Escape already prevented by an inner handler does not hide the tooltip", () => {
     setupTimers();

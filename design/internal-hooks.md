@@ -318,6 +318,7 @@ packages/ui/src/internal/
     content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
     use-exit-animation.ts # held content while an exit animates (popover.md 4.4)
     popover-open.ts       # isPopoverOpen(element); directive-free
+    open-layer.ts         # containsOpenLayer(container, event): a layer open inside that takes Escape first (conventions 15 rule 2; HoverCard, Toast); directive-free
     invokers.ts           # eventSource, closedByPopoverTarget, isPopoverInvoker, listenInvokerPresses (popover.md 2.3, menu.md 2.2); directive-free
     focus-visible.ts      # QuietFocusTarget, supportsFocusVisibleOption, resetFocusVisibleOption (popover.md 6.1); directive-free
     anchor-position.ts    # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free

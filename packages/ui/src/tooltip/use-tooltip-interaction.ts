@@ -149,8 +149,8 @@ function attachInteraction(
   };
 
   const onKeyDown = (event: KeyboardEvent) => {
-    // Not an IME composition's Escape, nor one an inner handler or layer consumed (a Combobox
-    // chip, a HoverCard inside): innermost first (conventions 15).
+    // Not an IME composition's Escape, nor one a handler below consumed (a Combobox chip):
+    // innermost first (conventions 15).
     if (!isEscapeRequest(event)) return;
     clear();
     // Escape while closed passes through untouched.

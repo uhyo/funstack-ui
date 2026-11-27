@@ -2313,9 +2313,16 @@ is a close request (#191, #192):
 2. **Not already prevented** (`defaultPrevented`). Innermost first: a handler or layer inside
    that consumed the Escape (a Combobox chip, a HoverCard or Tooltip that closed on it, an input
    that clears itself) prevented it, and nothing outside acts on it. A prevented `keydown` is
-   also no close request for a modal dialog's or an `auto` popover's close watcher.
-3. **A listener that closes something shown on it prevents it**, so an enclosing layer stays
-   open and a second Escape reaches it. One that closes nothing shown (a Trigger cancelling a
+   also no close request for a modal dialog's or an `auto` popover's close watcher. A listener
+   that runs **before** an inner layer's (Toast's React `onKeyDown`, below the document where
+   a Tooltip, a HoverCard and the `auto` close watchers act) cannot wait for that layer to
+   prevent: it stands down while a layer is open inside it (`internal/overlay/open-layer.ts`
+   `containsOpenLayer`: a shown popover, an open modal dialog, an open non-modal dialog the
+   event came from), as HoverCard does (`design/components/hover-card.md` 2.6). The inner layer
+   closes; the next Escape reaches the outer one.
+3. **A listener that closes something shown on it, or consumes it, prevents it**, so an
+   enclosing layer stays open and a second Escape reaches it (a Combobox chip consumes its
+   Escape: it moves focus to the Input). One that closes nothing shown (a Trigger cancelling a
    coming open, a HoverCard open nobody sees yet, the Menubar ending menu mode) leaves it alone.
 
 `internal/escape-key.ts` is the one check (`isEscapeRequest`; `isComposingKey` for rule 1

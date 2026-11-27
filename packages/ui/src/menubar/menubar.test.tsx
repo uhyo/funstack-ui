@@ -619,6 +619,19 @@ describe("Menubar", () => {
       expect(isOpen("file-popup")).toBe(true);
     });
 
+    it("a prevented Escape on the held Trigger keeps the mode", async () => {
+      render(<Bar viewDisabled />);
+      const user = setupUser();
+      await holdFromEditItem(user);
+      const prevent = (event: Event) => event.preventDefault();
+      document.addEventListener("keydown", prevent, true);
+      fireEvent.keyDown(el("view"), { key: "Escape" });
+      document.removeEventListener("keydown", prevent, true);
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(isOpen("file-popup")).toBe(true);
+    });
+
     it("Tab away ends the mode", async () => {
       render(<Bar viewDisabled />);
       const user = setupUser();

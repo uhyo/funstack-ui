@@ -4,6 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } f
 import { dataAttr } from "../internal/data-attr.js";
 import { isEscapeRequest } from "../internal/escape-key.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { containsOpenLayer } from "../internal/overlay/open-layer.js";
 import { exitAnimations } from "../internal/overlay/use-exit-animation.js";
 import { useLatest } from "../internal/use-latest.js";
 import { ownsArrows } from "../internal/use-roving-focus.js";
@@ -257,6 +258,10 @@ export function ToastRoot({
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
     if (event.defaultPrevented || item.ending) return;
     if (isEscapeRequest(event.nativeEvent)) {
+      // Innermost first (conventions 15): this React listener runs before the document ones, so
+      // a Tooltip, HoverCard, popover or dialog open inside the toast takes this Escape; the
+      // next one dismisses the toast.
+      if (containsOpenLayer(event.currentTarget, event.nativeEvent)) return;
       event.preventDefault();
       close("dismiss", event.nativeEvent);
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
