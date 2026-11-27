@@ -253,11 +253,38 @@ Handling, in `Item`:
   open={committedOpen}
   onToggle={(event) => {
     const el = event.currentTarget;
-    if (el.open === committedOpen) return;                 // our own commit echoing back
+    if (isEcho(el)) return;                                // `open` is the value the library last wrote or saw
+    noteOpen(el);                                          // a platform change: now known
     root.dispatchFromDom({ event: event.nativeEvent, reason: "platform", item: value, open: el.open });
   }}
 />
 ```
+
+**Telling the library's own write from the browser's.** Writing `open` fires `toggle` too, so
+the handler must drop the library's own writes. They are recognised by their source
+(conventions 3.5): for each `<details>` the library keeps the **known value**, the last `open`
+it wrote to the element or read from it, and a `toggle` whose `details.open` equals the known
+value is an echo. The known value is set:
+
+- when the element is attached and at mount reconciliation: the DOM value read then;
+- in the commit that changes the item's committed `open` (React wrote the attribute): the
+  committed value, in a layout effect;
+- by the re-apply write below and by the write that puts a disabled item back: the value
+  written;
+- by every `toggle` that is not an echo: `details.open`.
+
+"`details.open` equals committed" is not the test. While a close is pending, a script that
+closes the element and a find-in-page that re-opens it bring the DOM back to the committed
+value in two events; the second is a platform change that the pending close would hide, and it
+is dispatched (it differs from the intended value). "Equals the intended value" is not the
+test either: a click handled in the task between the library's commit and that commit's
+`toggle` changes the intended value, and the echo would be dispatched as a platform change
+that undoes the click. The helpers (`isEcho`, `noteOpen`, the recording write) are in
+`internal/details-summary.ts`, shared with Collapsible.
+
+One case stays invisible: a find-in-page match inside content that is **still open** while its
+close is pending changes nothing in the DOM and fires no event, so the close commits and hides
+the match. A pending close is a request that was made before the search.
 
 `dispatchFromDom` computes `next` from the **optimistic (last-dispatched) set**, not from DOM
 state: the DOM lacks pending optimistic opens, so reading it would silently drop an in-flight
@@ -278,7 +305,7 @@ re-applies committed state once the Root is no longer pending:
 ```ts
 useLayoutEffect(() => {
   if (!root.pending && ref.current && ref.current.open !== committedOpen) {
-    ref.current.open = committedOpen;     // fires `toggle`; handler sees DOM === committed, no-op
+    writeOpen(ref.current, committedOpen);   // records the known value; the `toggle` is an echo
   }
 }, [committedOpen, root.pending]);
 ```

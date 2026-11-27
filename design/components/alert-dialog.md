@@ -195,6 +195,9 @@ Everything `dialog.md` 3.4 says of `Dialog.Close` holds: a native `request-close
 JS-free mode, a library-owned close through the Root in library mode (`openChangeAction(false,
 { reason: "activate", returnValue })` awaited, view transition if set, a controlled veto). It
 keeps `action` and `whilePending` because it is the same part; a Cancel rarely needs them.
+Like every Close part it shows `data-pending` (`state.pending`) from the click until its close
+has committed, without an `action` too (conventions 4.3): that is the feedback for a Cancel
+whose close waits behind a pending Action (7.4).
 
 Its `value` defaults to `""`, which is also what Escape leaves in `returnValue`: by default
 "the user pressed Cancel" and "the user pressed Escape" read the same, and both mean that
@@ -473,15 +476,16 @@ Library mode, uncontrolled, unless stated. `C` committed open, `O` optimistic op
    library mode the dialog stays open, the Trigger pending, until the **action** settles; then
    the close commits and the Action's own close is a no-op. A rejection still reaches the
    boundary above the Action, and the dialog closes. In JS-free mode the Cancel is the browser's
-   command and closes the dialog at once, as Escape does in both modes. **Nothing near the
-   Cancel shows that its click was taken**: the Cancel without an `action` has no pending state
-   of its own, and the Trigger's `data-pending` sits under the modal backdrop, so to the user
-   the click looks ignored for as long as the action runs. Pending feedback on the Cancel (or
-   the Popup) while its held close waits is a separate issue, not built. The library
+   command and closes the dialog at once, as Escape does in both modes. **The Cancel shows
+   that its click was taken**: it has `data-pending` from the click until the close commits
+   (every Close part runs in its own transition, conventions 4.3), without `aria-disabled`,
+   so a stylesheet can show a spinner on it or dim the dialog
+   (`.alert:has([data-pending])`); the Trigger's `data-pending` is under the modal backdrop
+   and shows nothing here. The dialog still stays open until the action settles. The library
    does not disable the Cancel while an Action is pending: Escape cannot be held either, so
    "the dialog can leave while the work runs" is true whatever the Cancel does, and one rule
-   covers both. A dialog whose work takes long should make the Cancel visibly unavailable
-   meanwhile with its own optimistic state (section 9.3); the docs page recommends it.
+   covers both. A dialog whose work takes long may instead make the Cancel unavailable
+   meanwhile with its own optimistic state (section 9.3).
 5. **Two clicks on the confirm.** Default `"ignore"`: the second is cancelled, one run, one
    close. `whilePending="run"`: two runs, one close after the last.
 6. **Open with content that suspends.** `dialog.md` 11.1: the Trigger is pending, the dialog

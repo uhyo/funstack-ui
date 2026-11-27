@@ -714,7 +714,7 @@ alert dialog must not have. `tabIndex` passes through for the rare
 
 ```ts
 export interface DialogCloseState {
-  /** The `action` is in flight. */
+  /** From the click until the close this part asked for has committed (conventions 4.3). */
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -739,7 +739,8 @@ export interface DialogCloseProps
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the dialog
-   * still closes once. No effect without `action`. Conventions 2.5.1 (#146).
+   * still closes once. No effect without `action` (no `aria-disabled` either; the part still
+   * shows `data-pending` while its close waits). Conventions 2.5.1 (#146).
    * Default `"ignore"`.
    */
   whilePending?: WhilePending;
@@ -762,10 +763,23 @@ export interface DialogCloseDetails extends ActionDetails {
 Owned keys: `type`, `commandfor`, `command` (neither rendered with `action`), `value`,
 `disabled`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled` (`disabled` is owned on every part that takes
 the prop, conventions 1.2). In library mode the click is always `preventDefault()`ed (which
-cancels the `request-close` command) and the close goes through the Root (2.3): without
-`action`, `requestClose(event, "activate", value ?? "")` at once; with `action`, the part runs
-the action through the shared `useActionTrigger` (conventions 3.4), its own transition, and
-`requestClose` in its continuation: `run(() => action(details), () => requestClose(...))`. With
+cancels the `request-close` command) and the close goes through the Root (2.3), always from
+inside the part's own transition (the shared `useActionTrigger`, conventions 3.4): without
+`action`, `run(() => requestClose(event, "activate", value ?? ""))`, the request made
+synchronously in the click; with `action`, `requestClose` in the continuation:
+`run(() => action(details), () => requestClose(...))`.
+
+**Pending (conventions 4.3).** `state.pending` and `data-pending` last from the click until
+the close the part asked for has committed, with or without `action`: they cover the part's
+`action`, the Root's awaited `openChangeAction(false)`, and a pending async action elsewhere
+that React entangles the close with (a Cancel clicked while an `AlertDialog.Action` runs,
+`alert-dialog.md` 7.4). A modal dialog's Trigger is under the backdrop, so the Close is where
+the user sees that the click was taken. Without `action` the part resolves `whilePending` to
+`"run"`: no `aria-disabled` from pending, and a repeated click is a no-op because `false` is
+already intended. A close that does not happen (a controlled veto, a dismissal that
+superseded it) ends the pending state when the request settles. With a synchronous close
+nothing waits and the attribute is there for one commit at most; a spinner keyed on it should
+have a CSS delay, as on any trigger. With
 `action` the button renders no `commandfor` / `command` in either mode (#182, conventions 7.3):
 a pre-hydration click does nothing, instead of closing the dialog without running the action;
 without `action` the markup is the same in both modes and a pre-hydration click closes
@@ -1564,8 +1578,8 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
    `O=false`, `P=true` (Trigger `data-pending`), `openChangeAction(false, { reason: "activate",
    returnValue: "save" })` awaited → resolves → `C=false` commits (children unmounted inside the
    view transition if `transition` is set, else held, 4.4) → apply effect `close("save")` →
-   `dialog.returnValue === "save"`, focus back on the Trigger (platform) → `close` event: `false`
-   intended → echo, no dispatch. `P=false`.
+   `dialog.returnValue === "save"`, focus back on the Trigger (platform) → `close` event: the
+   `libraryClose` marker → echo, no dispatch. `P=false`.
 8. **Overlap: part-initiated close pending, user dismisses, then re-opens.** A slow
    `openChangeAction(false)` from a Close (`O=false`, `P=true`, `C=true`, dialog open). Escape:
    the fact supersedes the close (13). Click Trigger: `O=false`, so it is a real dispatch:
@@ -1617,7 +1631,7 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
     `old`, unmounts the children, runs the apply effect's `close("cancel")` inside the update
     callback (`beforetoggle` sets `awaitingClose`; the platform restores focus to the Trigger),
     the `new` snapshot has no box → the exit plays in every engine. `close` event (a task
-    later): `awaitingClose` cleared; `false` intended → echo, no dispatch; animation read
+    later): `awaitingClose` cleared; the `libraryClose` marker → echo, no dispatch; animation read
     skipped (`transition` set). `P=false`. Firefox shows the same exit, which no CSS can give it.
 12. **Same, `transition` absent, Chromium.** As 11 until `C=false`: the render sees committed
     `true → false` and sets `held`, so the children stay; apply effect `close("cancel")`; the

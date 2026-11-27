@@ -172,16 +172,21 @@ actions have settled.
 `details.open` without a click the library intercepted in three cases: find-in-page or a text
 fragment matching closed content, a click before hydration, and a consumer's DOM write.
 
-- The Root listens to `toggle`. If `details.open` equals the committed value it is the
-  library's own commit echoing back. If it equals the intended (last dispatched) value nothing
-  is dispatched. Otherwise the Root dispatches `details.open` with `reason: "platform"` and the
-  `toggle` event. Read `details.open`, never `ToggleEvent.newState` (`toggle` is coalesced).
+- The Root listens to `toggle`. If `details.open` equals the **known value** (the last `open`
+  the library wrote to the element or read from it; Accordion 2.3, conventions 3.5) it is the
+  library's own write echoing back. Otherwise it is a platform change: the Root records it as
+  the known value and, unless it equals the intended (last dispatched) value, dispatches
+  `details.open` with `reason: "platform"` and the `toggle` event. So a browser re-open while a
+  close is pending (the element was closed by a script, then revealed by find-in-page) is
+  dispatched, although the DOM is back at the committed value. Read `details.open`, never
+  `ToggleEvent.newState` (`toggle` is coalesced).
 - **Mount reconciliation**: a Root layout effect at mount, and again when an `<Activity>`
   re-shows the Root, compares `details.open` with the committed value and, if they differ,
-  dispatches once with `reason: "platform"` and `event: undefined`. The `<details>` carries
+  dispatches once with `reason: "platform"` and `event: undefined`. The value read becomes the
+  known value. The `<details>` carries
   `suppressHydrationWarning` in both modes.
 - Once the Root is no longer pending, a layout effect re-applies the committed value to
-  `details.open`. So the content the browser revealed stays visible while the action runs; a
+  `details.open` (a recorded write). So the content the browser revealed stays visible while the action runs; a
   controlled parent that does not adopt it closes it again when the transition ends. A rejection
   of the latest dispatch goes to the Error Boundary (which replaces the Root); a superseded
   rejection goes to `reportError` and the DOM follows the later dispatch.

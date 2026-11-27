@@ -769,11 +769,11 @@ changes, 2.5).
 | `Button` with `action` | runs the consumer's `action` | user | `"run"` |
 | `Button` with a function `formAction` | React submits the form with the consumer's function | user (React runs it) | `"run"` |
 | `Button` with neither (plain, URL `formAction`, `command`, link) | the native default action | – | nothing is ever pending: the prop has no effect |
-| `Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` without `action` | the library closes the overlay | library | nothing pends in the part (the close is the Root's dispatch, and a repeat is a no-op, 2.3 item 8): the prop has no effect |
+| `Dialog.Close`, `Popover.Close`, `Drawer.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` without `action` | the library closes the overlay | library | the prop has no effect: there is no run of the part's own to guard, and a repeated click is a no-op (2.3 item 8). The part still shows `data-pending` while the close it asked for waits (4.3), without `aria-disabled` |
 | `Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` |
 | `Menu.Item` with `action`, `closeOnActivate` (default `true`) | the consumer's `action`, then the library closes the menu | mixed | `"ignore"` |
 | `Menu.Item` with `action`, `closeOnActivate={false}` | the consumer's `action`; the menu stays | user | `"run"` |
-| `Menu.Item` without `action` | the library closes the menu, synchronously | library | nothing pends: no effect |
+| `Menu.Item` without `action` | the library closes the menu | library | no effect, as a Close part without `action`: `data-pending` while the close waits, no `aria-disabled` |
 | `Toast.Action`, `closeOnSettle` (default `true`) | the consumer's `action` (the part's or the toast's), then the library closes the toast; the timer is paused meanwhile | mixed | `"ignore"` |
 | `Toast.Action`, `closeOnSettle={false}` | the consumer's `action`; the toast stays | user | `"run"` |
 | `Menu.CheckboxItem`, `Menu.RadioItem` | a state change (`useControllableAction`) | state owner | no prop: latest intent wins |
@@ -791,7 +791,9 @@ the behaviour props live on the part, so the consumer sets it on `<Toast.Action>
 **The effective value** is `whilePending ?? <the part's default>`, read when the activation
 arrives (a change while a run is in flight applies to the next activation; the rendered
 `aria-disabled` follows the current render). At runtime only the string `"ignore"` ignores; any
-other value runs. No development warning for a part on which the prop has no effect.
+other value runs. No development warning for a part on which the prop has no effect. A closing
+part without an `action` of its own resolves to `"run"` whatever the prop says: nothing of its
+own is in flight to ignore, so it never renders the pending `aria-disabled`.
 
 **`"ignore"`.** While the part's own run is in flight, a click, Enter or Space:
 
@@ -1180,6 +1182,14 @@ dispatching the change with `details.reason: "platform"` (2.2; user dispatches u
 `"activate"`) and `event` set to the platform event, or `undefined` at mount, then re-applying
 committed state to the DOM after the action settles. The paths (the hooks are in 3.8):
 
+**The library's own write is recognised by its source, never by comparing state.** Where a
+platform event also fires for a write the library made (`toggle` on a `<details>`, as on a
+popover or dialog, 3.9.2), the library records the write and the listener consumes the record;
+"the DOM equals committed" or "equals what is intended" is not the test, because the browser
+can bring the DOM back to either value by itself while a request is in flight. For
+`<details>` the record is the last `open` value the library wrote to or read from the element
+(`design/components/accordion.md` 2.3).
+
 - **Find-in-page** revealing `<details>` or `hidden="until-found"`.
 - **Mount reconciliation**, one dispatch per component or group: pre-hydration clicks on
   `<summary>` or a native input, and Firefox's form-state restoration of `checked` across
@@ -1469,7 +1479,23 @@ alternative.
   and on the trigger part only.
 - The **trigger the user acted on**: while the owner is pending and this trigger is the optimistic
   target (for Tabs: `optimistic === tab.value`; for Toggle: always the element).
-- **Panels** do not get `data-pending`; a panel is either committed-visible or not. Consumers who
+- **A part that asks the owner for a change and is not its trigger** (an overlay's Close
+  part: `Dialog.Close`, `Popover.Close`, `Drawer.Close`, `AlertDialog.Cancel`,
+  `AlertDialog.Action`; a closing `Menu.Item`): from the activation until the close it asked
+  for has committed, with or without an `action` of its own. The part is the element the user
+  acted on, and the Trigger, which shows the owner's `data-pending`, may be out of sight
+  (under a modal dialog's backdrop). Mechanism: every activation runs in the part's own
+  transition (`useActionTrigger`, 3.4) and the Root's request is made inside it, so the part's
+  `pending` covers its `action`, the Root's awaited `openChangeAction(false)`, and any pending
+  async action the close is entangled with (2.3 item 5: a Cancel clicked while a confirm
+  runs). A Close part without `action` makes the request synchronously in the click, so
+  `openChangeAction`'s synchronous prefix still runs during the event dispatch (2.3 item 3). A
+  close that ends up not happening (a controlled parent that does not adopt it, a fact that
+  superseded it, 3.9.5) ends the part's `pending` when the request settles. JS-free mode
+  without `action` has no pending state: the browser closes at once.
+- **Panels** do not get `data-pending`; a panel is either committed-visible or not, and an
+  overlay's Popup is a panel: a stylesheet that wants the whole popup to react selects on
+  the part inside it (`.dialog:has([data-pending])`). Consumers who
   want to dim the old panel while the next one loads select on the root:
   `.root[data-pending] .panel { opacity: .6 }`.
 - **A fact never produces `data-pending`**: an overlay's dismissal is adopted urgently and

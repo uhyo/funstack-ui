@@ -14711,3 +14711,142 @@ arrive later) looks exactly like an empty bar, and a warning there would be fals
 the library is built for. A test row pins that such a bar stays silent. Not taken: warning
 after a delay or on the first key press (a guess about timing, for a mistake that is visible
 at once anyway: an empty bar).
+
+## 2026-11-27, #175: `<details>` echo is recognised by the library's own write, not by state
+
+Architect. Changed: conventions 3.5 (residual browser paths), accordion.md 2.3, collapsible.md
+2.2. Code owed: Accordion and Collapsible (`internal/details-summary.ts`).
+
+- **The bug.** The `toggle` handler took `details.open === committed` for the library's own
+  commit echoing back. While a close is pending (committed `true`, intended `false`), a script
+  that closes the element and a find-in-page that re-opens it produce two events; the second
+  equals committed, was dropped, and the pending close then hid what the user had just found.
+  The mirror case exists for a pending open. In library mode nothing but a script closes a
+  `<details>` (no `name`, clicks are intercepted, find-in-page only opens), so this needs a
+  consumer DOM write, which 2.3 lists as "unsupported but handled the same way".
+- **The rule.** The library keeps, per element, the last `open` value it wrote or read (the
+  known value). A `toggle` whose `details.open` equals it is an echo; any other is a platform
+  change, recorded and then dispatched unless it equals the intended value. This is the
+  overlay rule (3.9.2: the library's hide is recognised by a marker, "not by `false` is
+  already intended") in the shape a two-way, coalesced event needs.
+- **Not taken: the rule proposed in the issue** ("equal to committed is an echo only when it
+  also equals the intended value or nothing is in flight"). It reduces to "compare with the
+  intended value only", and that misreads a real echo: the library commits `open`, the user's
+  next click is handled before that commit's `toggle` task (likely exactly when a long commit
+  let a click queue up), the intended value is now the opposite, and the echo would be
+  dispatched as a platform change that undoes the click. That is a regression on a supported
+  path to fix an unsupported one. Dialog went through the same correction (dialog.md 2.7,
+  "recognising the echo by `!intended()`").
+- **Not taken: a marker plus the committed compare.** Works, but React's write of the `open`
+  prop fires no `toggle` when the DOM already had the value, which leaves a stale marker to
+  reason about. The known value has no such state.
+- **Not fixable, now stated in accordion.md 2.3:** a find-in-page match inside content that is
+  still open while its close is pending fires no event, so the close commits and hides it.
+- **Other components checked.** Popover / Menu / Combobox / HoverCard `toggle` and Dialog /
+  Drawer `close` already use the source marker (`overlay-show.ts`). Native inputs fire no
+  `change` for a programmatic write, so they have no echo. Four walkthrough lines in menu.md
+  and dialog.md still said "`false` intended → echo" and menu.md 12 called an Escape and a
+  Tab-out during a pending close echoes; they now say what 3.9.2 and 3.9.5 say (marker;
+  facts).
+
+Code owed:
+
+- `internal/details-summary.ts`: a `WeakMap<HTMLDetailsElement, boolean>` (module level, or
+  one per Root) with `noteOpen(element)` (known = `element.open`), `writeOpen(element, open)`
+  (known = `open`, then the DOM write if it differs; replaces both `applyOpen` copies and the
+  disabled put-back in `accordion-item.tsx`), `isEcho(element)` (`element.open === known`; an
+  element never noted is noted and treated as an echo).
+- Accordion `Item` and Collapsible `Root`: `noteOpen` in the ref callback (attach) and for
+  every element read by mount reconciliation (the Activity re-show included); a layout effect
+  keyed on the committed `open` that sets known to it (skipping the mount run); the `toggle`
+  handler as in accordion.md 2.3 (the disabled branch after `noteOpen`).
+- jsdom rows, for both components (jsdom fires `toggle` for `open` writes; if a row needs real
+  coalescing, a browser row): (1) close pending, `el.open = false`, then `el.open = true` in a
+  later task: one `"platform"` dispatch of the open, and the content stays after everything
+  settles (uncontrolled) ; (2) the mirror: open pending, `el.open = true`, then `false`:
+  a `"platform"` dispatch of the close; (3) the race the issue's rule would break: an action
+  resolves and commits `open`, a click is dispatched before the commit's `toggle` is delivered:
+  no `"platform"` dispatch, the click's intent stands; (4) the existing echo, find-in-page,
+  disabled and mount-reconciliation rows unchanged.
+- Docs: no public prop or attribute changes. One sentence on the Accordion and Collapsible
+  pages where find-in-page is described: a reveal while a close is pending is dispatched; a
+  match in content that is still open is not seen.
+
+## 2026-11-27, #183: a Close part is pending until its close has committed
+
+Architect. Changed: conventions 2.5.1 (table, effective value), 4.3; dialog.md 3.4; popover.md
+3.4; alert-dialog.md 3.1, 7.4; menu.md (the `whilePending` list). Code owed:
+`internal/overlay/use-overlay-close.ts`, `menu/menu-item.tsx`.
+
+- **The problem.** A Close part without `action` called the Root's `requestClose` outside any
+  transition of its own, so nothing on the part showed that the click was taken while the
+  close waited: behind an `AlertDialog.Action`'s pending action (review-167 M1), and equally
+  behind any Root whose `openChangeAction(false)` is awaited. The Trigger shows the Root's
+  `data-pending`, but a modal dialog's Trigger is under the backdrop.
+- **The rule (4.3).** A part that asks the owner for a close shows `data-pending` /
+  `state.pending` from the activation until that close has committed, with or without an
+  `action`. One rule for `Dialog.Close`, `Popover.Close`, `Drawer.Close`, `AlertDialog.Cancel`,
+  `AlertDialog.Action` (all `useOverlayClose`) and a closing `Menu.Item`.
+- **Why this shape.** `Menu.Item` already did it: it runs every activation through
+  `useActionTrigger`, with or without `action`, and a probe
+  (`memo/architect/probes-183/close-part-pending.probe.test.tsx`) shows the item with
+  `data-pending` while the Root's `openChangeAction(false)` is awaited. menu.md and the 2.5.1
+  table said "nothing pends"; they were wrong about the code. The Close parts now do the same,
+  so the amendment aligns five parts with a sixth and adds no mechanism. The same probe shows
+  a part transition that makes the Root's dispatch stays pending while another part's async
+  action holds the commit, and clears in the commit of the close.
+- **`aria-disabled`.** A part without `action` resolves `whilePending` to `"run"`: no pending
+  `aria-disabled`. The attribute means "an activation is ignored", and nothing is: the guard
+  counts the part's own runs, and a run without an action ends in a microtask. This changes
+  `Menu.Item` without `action`, which rendered `aria-disabled="true"` while the close waited
+  (default `"ignore"`) although a second activation was not ignored by the guard.
+- **Timing.** A Close part without `action` makes the request synchronously in the click,
+  inside the transition, so the synchronous prefix of `openChangeAction` stays in the event
+  dispatch (2.3 item 3). `Menu.Item` keeps making it in the continuation, as built.
+- **Not taken.** `data-pending` on the Popup: a Popup is a panel (4.3), and
+  `:has([data-pending])` gives the same hook. A pending state derived in the Root ("the latest
+  request is this part's close"): exact, but a second mechanism next to the part transition
+  that Menu.Item and every Close with `action` already use. Review-167's options (c) a
+  platform close, (d) closing from the optimistic value, (e) disabling the Cancel: as argued
+  there.
+- **Left as it is: `Dialog.Form` / `AlertDialog.Form`.** A `method="dialog"` form whose close
+  waits shows nothing on its submit button. The button is the consumer's and the form is the
+  form channel (2.7), whose pending is `useFormStatus`; folding the Root's pending into
+  `DialogFormState.pending` would give that field two meanings. The Root's `children`
+  function has `pending`.
+- **Visible cost.** With a synchronous close the Close part has `data-pending` for one commit
+  before it closes, as a Trigger does. A spinner keyed on it wants a CSS delay.
+
+Code owed:
+
+- `use-overlay-close.ts`: in `onClick`, without `action`, `trigger.run(() =>
+  options.close(native))` instead of `options.close(native)`; pass
+  `whilePending: action === undefined ? "run" : options.whilePending` to `usePureTrigger`.
+  `OverlayCloseState.pending` doc: "from the click until the close this part asked for has
+  committed". JS-free mode without `action` installs no handler: unchanged.
+- `menu-item.tsx`: the same `whilePending` resolution when `action` is `undefined`. Nothing
+  else.
+- JSDoc of `DialogCloseState.pending`, `PopoverCloseState.pending`, the `whilePending` props
+  (Dialog, Popover, AlertDialog re-exports, Menu.Item) and the 2.5.1 comment in
+  `use-pure-trigger.ts`.
+- Rows in `src/__tests__/overlay-close-part-suite.tsx` (runs for every Close part), library
+  mode, no `action`: (1) Root `openChangeAction` awaited on `false`: after the click the part
+  has `data-pending`, no `aria-disabled`, `state.pending` true; a second click calls
+  `openChangeAction` no more; resolve: closed. (2) the action's synchronous prefix sees
+  `details.event` during the dispatch (`eventPhase !== 0`, or `preventDefault()` observed by
+  the test's own listener). (3) a controlled parent that does not adopt: `data-pending` gone
+  after the request settles, popup open, the next click requests again. (4) Escape while it
+  waits: the fact, popup closed (existing 3.9.5 rows still pass). (5) no `openChangeAction`:
+  the click closes as today (existing rows). Edit the row that asserts "the Root's pending is
+  for `openChangeAction` only" if it asserts the Close has no `data-pending`.
+- `alert-dialog` tests: walkthrough 7.4 as a row: Action pending, click Cancel: Cancel has
+  `data-pending` and no `aria-disabled`, the dialog is open; the action resolves: closed, one
+  `openChangeAction(false)`.
+- `menu.test.tsx`: Item without `action`, Root `openChangeAction(false)` awaited:
+  `data-pending`, no `aria-disabled` (this second half is the behaviour change).
+- Docs site: Dialog, Popover, Drawer, AlertDialog and Menu pages (the Close / Cancel / Item
+  `pending` state rows and `data-pending` rows; the AlertDialog callout that says the Cancel
+  click shows nothing, replaced by the `[data-pending]` styling; the AlertDialog example's
+  stylesheet gets a pending style on the Cancel); `skills/funstack-ui-knowledge`; the
+  Roadmap's behaviour-change notes (Close parts gain `data-pending` without `action`;
+  `Menu.Item` without `action` loses the pending `aria-disabled`).
