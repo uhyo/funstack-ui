@@ -4,8 +4,8 @@ import { Button } from "@funstack/ui/button";
 import { TextField } from "@funstack/ui/text-field";
 import { sleep } from "./fake-api.js";
 
-// Keep the text: write some notes and leave the field (a textarea commits on blur; Enter is a new
-// line). With "Make the save fail" on, the notes stay as typed, marked "Not saved", with a retry.
+// Keep the text: write some notes and leave the field or press Ctrl+Enter / Cmd+Enter (Enter is a
+// new line). With "Make the save fail" on, the notes stay as typed, marked "Not saved", with a retry.
 export function TextFieldNotes() {
   const [fail, setFail] = useState(false);
   const [notes, setNotes] = useState("Call the printer about the cover.");

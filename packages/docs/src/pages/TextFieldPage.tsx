@@ -12,15 +12,15 @@ export function TextFieldPage() {
   return (
     <DocPage
       title="TextField"
-      description="A text field that saves itself: one input (or textarea) whose typed text is a draft, committed on blur or Enter through valueCommitAction with data-pending, rolled back when the save is refused, and put back by Escape."
+      description="A text field that saves itself: one input (or textarea) whose typed text is a draft, committed on blur, Enter (an input) or Ctrl+Enter / Cmd+Enter (a textarea) through valueCommitAction with data-pending, rolled back when the save is refused, and put back by Escape."
     >
       <p className="page-intro">
         A text field that <strong>saves itself</strong>. The user types freely; when they are done
-        (they leave the field, or press Enter) the field asks for the new text through{" "}
-        <code>valueCommitAction</code>, shows <code>data-pending</code> while the save runs, and
-        goes back to the saved text if the save is refused. Escape puts the saved text back. It is
-        one <code>&lt;input&gt;</code>, or a <code>&lt;textarea&gt;</code> through{" "}
-        <code>render</code>.
+        (they leave the field, or press Enter; Ctrl+Enter or Cmd+Enter in a textarea) the field asks
+        for the new text through <code>valueCommitAction</code>, shows <code>data-pending</code>{" "}
+        while the save runs, and goes back to the saved text if the save is refused. Escape puts the
+        saved text back. It is one <code>&lt;input&gt;</code>, or a <code>&lt;textarea&gt;</code>{" "}
+        through <code>render</code>.
       </p>
       <p>
         It is not the library's text input: a text control with no save of its own is the native
@@ -49,7 +49,7 @@ export function TextFieldPage() {
 // A document title: saved on blur or Enter, back to the saved title if the save throws.
 <TextField aria-label="Title" defaultValue={doc.title} valueCommitAction={renameDocument} />
 
-// Notes, several lines, saved when the user leaves the field.
+// Notes, several lines: saved when the user leaves the field, or presses Ctrl+Enter / Cmd+Enter.
 <TextField render={<textarea rows={4} />} aria-label="Notes" defaultValue={notes} valueCommitAction={saveNotes} />
 
 // In a Field: the label, the description and validation are the Field's.
@@ -73,12 +73,20 @@ export function TextFieldPage() {
       </ul>
       <Callout kind="warning" title='type="search" is not supported'>
         <p>
-          The engines give Escape a meaning of their own in a search field (Chromium and Firefox
-          clear it, WebKit differs), so the revert would behave differently per browser. For a
-          search-looking field that saves itself, use <code>type="text"</code> and ask for the
-          keyboard you want:
+          In a search field Escape is the browser's own key: it empties the field, and that clear
+          already keeps an enclosing dialog or popover open. It cannot be turned off while leaving
+          Escape to the dialog, so a search field would give Escape two meanings ("empty the field"
+          and "back to the saved text"). TextField keeps one Escape rule instead. For a search box
+          that saves itself, use <code>type="text"</code> with <code>role="searchbox"</code> (the
+          role <code>type="search"</code> gives) and <code>enterKeyHint="search"</code> for the
+          on-screen keyboard:
         </p>
-        <CodeBlock>{`<TextField type="text" inputMode="search" enterKeyHint="search" aria-label="Saved search" … />`}</CodeBlock>
+        <CodeBlock>{`<TextField type="text" role="searchbox" enterKeyHint="search" aria-label="Saved search" … />`}</CodeBlock>
+        <p>
+          The browser's clear button is not carried over: render a button next to the field if you
+          want one. A search box with no save of its own that wants the browser's Escape is a native{" "}
+          <code>&lt;input type="search"&gt;</code> or <code>Field.Control</code>.
+        </p>
       </Callout>
 
       <h3 id="how-it-works">How it works</h3>
@@ -91,8 +99,8 @@ export function TextFieldPage() {
             "Each `input` event (typing, paste, autofill, an IME) writes the draft. Shown at once; nothing is dispatched. The caret, selection and undo are the browser's.",
           ],
           [
-            "Blur, Enter",
-            "The commit: the draft is cleared and `valueCommitAction(next, { reason: \"activate\" })` runs in the field's transition, with `data-pending`. Enter is not prevented, so a form's implicit submission follows with the same text. In a `<textarea>` Enter is a new line and only the blur commits. An Enter that confirms an IME composition commits nothing.",
+            "Blur, the commit key",
+            "The commit: the draft is cleared and `valueCommitAction(next, { reason: \"activate\" })` runs in the field's transition, with `data-pending`. The commit key is Enter in an `<input>`: not prevented, so a form's implicit submission follows with the same text. In a `<textarea>` it is Ctrl+Enter or Cmd+Enter (either, on every platform): always prevented, so no line is added, and it submits no form. Enter alone, with Shift or with Alt is a new line there. An Enter that confirms an IME composition commits nothing.",
           ],
           [
             "No change",
@@ -134,7 +142,7 @@ export function TextFieldPage() {
         </li>
         <li>
           A draft the user opened while the save ran stays on screen; it commits at their next blur
-          or Enter.
+          or commit key.
         </li>
         <li>
           A second commit while the first runs replaces it (latest wins); <code>data-pending</code>{" "}
@@ -162,7 +170,7 @@ export function TextFieldPage() {
             name: "valueCommitAction",
             type: "ChangeAction<string, TextFieldValueChangeDetails>",
             description:
-              "Once per edit (blur, or Enter in an input), and for a form reset or text adopted at mount. Runs in the field's transition and is awaited, with `data-pending`. Uncontrolled state is committed when it resolves. May be a Server Function.",
+              "Once per edit (blur, Enter in an input, Ctrl+Enter or Cmd+Enter in a textarea), and for a form reset or text adopted at mount. Runs in the field's transition and is awaited, with `data-pending`. Uncontrolled state is committed when it resolves. May be a Server Function.",
           },
           {
             name: "name",
@@ -192,7 +200,7 @@ export function TextFieldPage() {
             type: "string",
             default: '"text" on the default element',
             description:
-              '`text`, `tel`, `url`, `email` or `password`. Others warn in development (`search` is not supported). The library sets `type="text"` only on its default `<input>`: a `render` element keeps its own `type` (a `<textarea>` gets none, an `<input>` without one is a text input).',
+              '`text`, `tel`, `url`, `email` or `password`. Others warn in development (`search` is not supported: use `type="text"` with `role="searchbox"` and `enterKeyHint="search"`). The library sets `type="text"` only on its default `<input>`: a `render` element keeps its own `type` (a `<textarea>` gets none, an `<input>` without one is a text input).',
           },
           {
             name: "placeholder, maxLength, minLength, pattern, autoComplete, inputMode, enterKeyHint, spellCheck, form, id, aria-*",
@@ -212,7 +220,7 @@ export function TextFieldPage() {
           "`value` (the shown text), `onChange`, `onKeyDown`, `onBlur` (not in the props type; `onInput`, `onFocus`, `onKeyUp` and the rest pass through), `data-pending`, `data-disabled`; inside a Field also `id`, `name`, `disabled`, `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`."
         }
         note={
-          '`TextFieldValueChangeDetails` is `{ reason, event }`: `"activate"` for a commit (`event` is the `focusout` or the Enter `keydown`), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`). Serialisable: a Server Function receives `{ reason }`.'
+          '`TextFieldValueChangeDetails` is `{ reason, event }`: `"activate"` for a commit (`event` is the `focusout` or the `keydown` of the commit key), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`). Serialisable: a Server Function receives `{ reason }`.'
         }
       />
 
@@ -250,7 +258,11 @@ export function TextFieldPage() {
             "Enter (an input)",
             "Commits. Not prevented: inside a form the implicit submission follows.",
           ],
-          ["Enter (a textarea)", "A new line. The textarea commits when focus leaves it."],
+          [
+            "Ctrl+Enter, Cmd+Enter (a textarea)",
+            "Commits, as a blur does. Always prevented, even when there is nothing to commit, so no line is added; focus and the caret stay. Submits no form.",
+          ],
+          ["Enter, Shift+Enter, Alt+Enter (a textarea)", "A new line. Nothing is committed."],
           [
             "Escape",
             "With an edited draft: reverts it and is consumed. Otherwise not handled (an enclosing dialog closes).",
@@ -259,6 +271,11 @@ export function TextFieldPage() {
         ]}
       />
       <ul>
+        <li>
+          Nothing on a textarea says that Ctrl+Enter saves, and the library adds no text. Blur saves
+          as well, so the key is a shortcut; a page that relies on it says so in visible text the
+          field's <code>aria-describedby</code> names.
+        </li>
         <li>
           A native <code>textbox</code> with its label and value, always present and always in the
           Tab order. There is no read view that turns into an input, so focus never moves and there
@@ -325,7 +342,7 @@ export function TextFieldPage() {
       <BehaviourSection
         id="before-hydration"
         summary={
-          "The server HTML is the input with its value. Text typed before hydration is adopted at mount: still focused, it becomes the draft and the user's blur or Enter commits it; otherwise it is one `\"platform\"` commit with no event (a browser's form-state restoration after a reload takes the same path). **Nothing is saved without JavaScript.** The JS-free way to save one text is a form, which Enter submits natively."
+          "The server HTML is the input with its value. Text typed before hydration is adopted at mount: still focused, it becomes the draft and the user's blur or commit key commits it; otherwise it is one `\"platform\"` commit with no event (a browser's form-state restoration after a reload takes the same path). **Nothing is saved without JavaScript.** The JS-free way to save one text is a form, which Enter submits natively."
         }
       >
         <CodeBlock>{`<form action={rename}><input name="title" defaultValue={title} /></form>`}</CodeBlock>
@@ -352,10 +369,29 @@ export function TextFieldPage() {
           <code>validate</code>.
         </li>
         <li>
+          A textarea submits nothing, with any key: its Ctrl+Enter / Cmd+Enter only commits (
+          <a href="#submit-from-a-textarea">below</a>).
+        </li>
+        <li>
           "Submit when the user is done with this field" is{" "}
           <code>{"valueCommitAction={() => formRef.current?.requestSubmit()}"}</code>.
         </li>
       </ul>
+      <h4 id="submit-from-a-textarea">Submit a form from a textarea</h4>
+      <p>
+        A form that wants Ctrl+Enter / Cmd+Enter to submit says so once, on the form, for every
+        textarea in it (a TextField or not). The handler runs after the field's, as the event
+        bubbles, so a TextField has dispatched its commit first, the order an input's Enter has. Do
+        not skip a prevented event: the field prevents its key. An <code>&lt;input&gt;</code> needs
+        nothing, it has the native submission.
+      </p>
+      <CodeBlock>{`<Form.Root
+  action={post}
+  onKeyDown={(event) => {
+    if (!(event.target instanceof HTMLTextAreaElement) || event.nativeEvent.isComposing) return;
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.currentTarget.requestSubmit();
+  }}
+>`}</CodeBlock>
 
       <h3 id="recipes">Recipes</h3>
       <h4 id="roll-back">Roll back and say why</h4>

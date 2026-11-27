@@ -29,6 +29,14 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          <a href="/components/text-field">TextField</a> in a textarea: Ctrl+Enter or Cmd+Enter
+          commits, as a blur does, and is always prevented; it submits no form, and Enter is still a
+          new line (<a href={issue(196)}>#196</a>). <code>type="search"</code> stays unsupported;
+          the development warning now points to <code>type="text"</code> with{" "}
+          <code>role="searchbox"</code> and <code>enterKeyHint="search"</code> (
+          <a href={issue(197)}>#197</a>).
+        </li>
+        <li>
           New component <a href="/components/text-field">TextField</a> (
           <a href={issue(181)}>#181</a>): a text field that saves itself. The typed text is a draft;
           blur or Enter commits it through <code>valueCommitAction</code> with{" "}
