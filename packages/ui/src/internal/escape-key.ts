@@ -21,8 +21,18 @@ export function isComposingKey(event: KeyLike): boolean {
  * Whether a `keydown` is an Escape the library may act on (conventions 15): `key === "Escape"`,
  * not part of an IME composition (there Escape cancels the composition), and not consumed
  * already (innermost first: an inner handler prevented it, or a layer took it, `consumeEscape`).
+ * An Escape first settles the earlier ones (`settleEarlierEscapes`, #195), so what its record
+ * step reads (a layer's open state, the stand-down snapshot) follows their decisions. So call
+ * it only while `event` is being dispatched: on an event already decided it would decide the
+ * Escapes pending after it, out of turn.
  */
 export function isEscapeRequest(event: KeyLike & Pick<Event, "defaultPrevented">): boolean {
+  if (event.key === "Escape") settleEarlierEscapes(event);
+  return isRequest(event);
+}
+
+/** `isEscapeRequest` without the settle step: what a decision reads of its own event. */
+function isRequest(event: KeyLike & Pick<Event, "defaultPrevented">): boolean {
   return (
     event.key === "Escape" &&
     !event.defaultPrevented &&
@@ -55,9 +65,28 @@ interface Entry {
   readonly deciders: Decider[];
   /** Removes the window listener and cancels the late path, without deciding. */
   readonly dispose: () => void;
+  /** Decides now, once: what the window listener or the late path does. */
+  readonly run: () => void;
 }
 
 const entries = new WeakMap<Event, Entry>();
+
+/** The events whose decision is pending, in the order they were first recorded. */
+const pendingEvents = new Set<Event>();
+
+/**
+ * Decides now the pending Escapes recorded before `event` whose dispatch is over (conventions 15
+ * rule 4, #195): only on the late path, a second key press dispatched before the first one's
+ * task. They run in record order, each in the order of rule 4, as their tasks would have run
+ * them, so each Escape still closes one layer and a later one reads the layers the earlier ones
+ * closed. An Escape dispatched inside another's dispatch leaves that one pending.
+ */
+function settleEarlierEscapes(event: object): void {
+  for (const earlier of pendingEvents) {
+    if (earlier === event) return;
+    if (earlier.eventPhase === Event.NONE) entries.get(earlier)?.run();
+  }
+}
 
 /**
  * The window an event target belongs to: a window (read back through its document, which jsdom
@@ -95,6 +124,7 @@ function createEntry(event: KeyboardEvent): Entry {
     win?.removeEventListener("keydown", onWindow);
     cancelLate();
     entries.delete(event);
+    pendingEvents.delete(event);
   };
   const run = (): void => {
     if (entries.get(event) !== entry) return;
@@ -105,15 +135,17 @@ function createEntry(event: KeyboardEvent): Entry {
       ...deciders.filter((decider) => !decider.cancelOnly && !decider.global).reverse(),
     ];
     for (const decider of ordered) {
-      if (!isEscapeRequest(event)) return;
+      if (!isRequest(event)) return;
       if (!decider.cancelled) decider.decide();
     }
   };
   function onWindow(windowEvent: Event): void {
     if (windowEvent === event) run();
   }
-  const entry: Entry = { deciders, dispose };
+  settleEarlierEscapes(event);
+  const entry: Entry = { deciders, dispose, run };
   entries.set(event, entry);
+  pendingEvents.add(event);
   win?.addEventListener("keydown", onWindow);
   cancelLate = afterDispatch(event, run);
   return entry;
@@ -158,41 +190,42 @@ export function decideEscapeLast(
   };
 }
 
-/** One layer listener's pending decision (`createEscapeRecord`). */
+/** One layer listener's pending decisions (`createEscapeRecord`). */
 export interface EscapeRecord {
   /**
    * `decideEscapeLast(event, decide, options)`, keeping its cancel. The same event recorded
-   * again is ignored; a new event cancels the decision of the previous one, whose dispatch is
-   * over.
+   * again is ignored; a new event keeps the pending decision of an earlier one, which decides
+   * first (`settleEarlierEscapes`, #195), and does not cancel it.
    */
   readonly record: (
     event: KeyboardEvent,
     decide: () => void,
     options?: DecideEscapeLastOptions,
   ) => void;
-  /** Cancels the pending decision: the listener's cleanup (conventions 15 rule 4). */
+  /** Cancels the pending decisions: the listener's cleanup (conventions 15 rule 4). */
   readonly cancel: () => void;
 }
 
-/** The slot a layer's Escape listener keeps its pending decision in, for its cleanup. */
+/** The holder a layer's Escape listener keeps its pending decisions in, for its cleanup. */
 export function createEscapeRecord(): EscapeRecord {
-  let pending: { readonly event: KeyboardEvent; readonly cancel: () => void } | null = null;
+  const pending = new Map<KeyboardEvent, () => void>();
   const cancel = (): void => {
-    pending?.cancel();
-    pending = null;
+    for (const cancelDecision of pending.values()) cancelDecision();
+    pending.clear();
   };
   const record: EscapeRecord["record"] = (event, decide, options) => {
-    if (pending?.event === event) return;
-    cancel();
+    if (pending.has(event)) return;
+    // Forgets the events already decided: a decider skipped after a consume is never called.
+    for (const earlier of pending.keys()) if (!entries.has(earlier)) pending.delete(earlier);
     const cancelDecision = decideEscapeLast(
       event,
       () => {
-        if (pending?.event === event) pending = null;
+        pending.delete(event);
         decide();
       },
       options,
     );
-    pending = { event, cancel: cancelDecision };
+    pending.set(event, cancelDecision);
   };
   return { record, cancel };
 }

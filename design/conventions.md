@@ -2350,11 +2350,20 @@ is a close request:
      earlier window listener), or, when a `stopPropagation()` kept the event from the
      window, after the dispatch has ended (`afterDispatch`, 3.8 rule 5). Each layer's
      `decide` is called only while the Escape is still a request (rule 2), so one Escape
-     closes one layer. A listener keeps its pending decision in a one-slot holder
+     closes one layer. A listener keeps its pending decisions in a holder
      (`createEscapeRecord()`: `record(event, decide, options?)` and `cancel()`): the same
-     event recorded twice by one listener is one record, a new Escape replaces a record that
-     is still pending, and the listener's cleanup cancels it. When every layer of an event
-     has cancelled, the window listener and the late path are removed at once.
+     event recorded twice by one listener is one record, a new Escape does not cancel a
+     record that is still pending, and the listener's cleanup cancels them all. When every
+     layer of an event has cancelled, the window listener and the late path are removed at
+     once.
+   - *Earlier Escapes first.* On the late path a second Escape can be dispatched before the
+     first one's task has decided. The first `isEscapeRequest` call on the new Escape (a
+     layer's record step, or a part that acts on itself: TextField, NumberField, the
+     Menubar) then decides the earlier pending Escapes whose dispatch is over, in the order they were recorded,
+     each in the order below, as their tasks would have. So each Escape closes one layer,
+     and the second one's record step (a layer's open state, its stand-down snapshot) reads
+     the layers the first one closed: two quick Escapes close two layers, innermost first.
+     An Escape dispatched from inside another's dispatch leaves that one pending.
    - *Order.* Three groups. First the **cancels**: a decider that closes nothing shown and
      never consumes (a Trigger cancelling its coming open), recorded with `{ cancel: true }`.
      Then the global layers, in the order they were recorded (the order they opened). Then

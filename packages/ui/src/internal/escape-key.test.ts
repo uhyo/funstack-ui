@@ -1,7 +1,13 @@
 // The Escape rule of conventions 15: isEscapeRequest, isComposingKey, consumeEscape and
 // decideEscapeLast (rule 4, #194).
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { consumeEscape, decideEscapeLast, isComposingKey, isEscapeRequest } from "./escape-key.js";
+import {
+  consumeEscape,
+  createEscapeRecord,
+  decideEscapeLast,
+  isComposingKey,
+  isEscapeRequest,
+} from "./escape-key.js";
 
 function keydown(init: KeyboardEventInit, prevent = false): KeyboardEvent {
   const event = new KeyboardEvent("keydown", { cancelable: true, ...init });
@@ -282,6 +288,135 @@ describe("decideEscapeLast", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(log).toEqual([]);
       expect(spy.added()).toBe(1);
+    });
+  });
+
+  // #195: a second Escape dispatched before the first one decided on the late path.
+  describe("an Escape while an earlier one's decision is pending", () => {
+    /**
+     * A layer that closes on Escape, through `createEscapeRecord`: it records while open,
+     * stands down while one of `inside` is open (its snapshot, taken at the record), and closes
+     * and consumes when it decides.
+     */
+    function closingLayer(target: EventTarget, name: string, log: string[], inside: Layer[] = []) {
+      const escape = createEscapeRecord();
+      const self: Layer = { open: true, cancel: escape.cancel };
+      on(
+        target,
+        (event) => {
+          if (!isEscapeRequest(event) || !self.open) return;
+          const standDown = inside.some((layer) => layer.open);
+          escape.record(event, () => {
+            if (standDown || !self.open) return;
+            self.open = false;
+            log.push(name);
+            consumeEscape(event);
+          });
+        },
+        true,
+      );
+      return self;
+    }
+    interface Layer {
+      open: boolean;
+      readonly cancel: () => void;
+    }
+
+    function twoLayers(log: string[]) {
+      const { outer, inner } = tree();
+      const innerLayer = closingLayer(inner, "inner", log);
+      const outerLayer = closingLayer(outer, "outer", log, [innerLayer]);
+      on(inner, (event) => event.stopPropagation(), false);
+      return { inner, innerLayer, outerLayer };
+    }
+
+    it("the earlier one decides first; each closes one layer, innermost first", async () => {
+      const log: string[] = [];
+      const { inner } = twoLayers(log);
+      escape(inner);
+      expect(log).toEqual([]);
+      // Recording the second one settles the first, so its snapshot sees the inner layer closed.
+      escape(inner);
+      expect(log).toEqual(["inner"]);
+      await Promise.resolve();
+      expect(log).toEqual(["inner", "outer"]);
+    });
+
+    it("a layer unmounted between the two: the early run skips it, the next layers close", async () => {
+      const log: string[] = [];
+      const { outer, middle, inner } = tree();
+      const innerLayer = closingLayer(inner, "inner", log);
+      const middleLayer = closingLayer(middle, "middle", log);
+      closingLayer(outer, "outer", log, [middleLayer]);
+      on(inner, (event) => event.stopPropagation(), false);
+      escape(inner);
+      // The inner layer unmounts: its cleanup cancels its decision, and it records no more.
+      innerLayer.cancel();
+      innerLayer.open = false;
+      escape(inner);
+      // The first Escape decided without the inner layer: the middle one closed on it, and the
+      // outer layer's snapshot for the second saw that.
+      expect(log).toEqual(["middle"]);
+      await Promise.resolve();
+      expect(log).toEqual(["middle", "outer"]);
+    });
+
+    it("three Escapes on two layers: the third closes nothing", async () => {
+      const log: string[] = [];
+      const { inner } = twoLayers(log);
+      const events = [escape(inner), escape(inner), escape(inner)];
+      await Promise.resolve();
+      expect(log).toEqual(["inner", "outer"]);
+      expect(events.map((event) => isEscapeRequest(event))).toEqual([false, false, true]);
+    });
+
+    it("an Escape dispatched inside the dispatch of another leaves that one pending", async () => {
+      const log: string[] = [];
+      const { inner } = twoLayers(log);
+      /** Dispatches a second Escape from the first one's bubble listener, after its records. */
+      const nestOnce = () => {
+        let nested = false;
+        let logAtNested: string[] | null = null;
+        on(
+          inner,
+          () => {
+            if (nested) return;
+            nested = true;
+            escape(inner);
+            logAtNested = [...log];
+          },
+          false,
+        );
+        return () => logAtNested;
+      };
+      const logAtNested = nestOnce();
+      escape(inner);
+      // The first one's dispatch was not over: the second one's record did not settle it, and
+      // the outer layer's snapshot for the second saw the inner layer open.
+      expect(logAtNested()).toEqual([]);
+      await Promise.resolve();
+      expect(log).toEqual(["inner"]);
+    });
+
+    it("the holder's cancel cancels every pending decision", async () => {
+      const log: string[] = [];
+      const { inner, innerLayer, outerLayer } = twoLayers(log);
+      let nested = false;
+      on(
+        inner,
+        () => {
+          if (nested) return;
+          nested = true;
+          // A second Escape inside the first one's dispatch: both stay pending.
+          escape(inner);
+        },
+        false,
+      );
+      escape(inner);
+      innerLayer.cancel();
+      outerLayer.cancel();
+      await Promise.resolve();
+      expect(log).toEqual([]);
     });
   });
 });

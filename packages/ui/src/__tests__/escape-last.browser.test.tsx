@@ -134,6 +134,82 @@ describe("Escape decided last with a real key (#194)", () => {
     await settle(() => expect(dialog.open).toBe(false));
   });
 
+  // #195: two Escapes behind a `stopPropagation()`, the second dispatched before the first one's
+  // decision ran (both decide on the late path). Each closes one layer, innermost first. The
+  // events are scripted (two key presses cannot be delivered before a task runs), so the late
+  // path is a microtask; for a real key it is a task, with the same order.
+  describe("two Escapes on the late path, the second before the first decided (#195)", () => {
+    const escapeTwice = (target: Element) => {
+      act(() => {
+        for (let i = 0; i < 2; i++) {
+          target.dispatchEvent(
+            new globalThis.KeyboardEvent("keydown", {
+              key: "Escape",
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+        }
+      });
+    };
+
+    it("a Tooltip inside a non-modal Dialog: both close", async () => {
+      render(
+        <Dialog.Root defaultOpen modal={false}>
+          <Dialog.Popup data-testid="dialog" aria-label="Panel">
+            <Stopper stopping>
+              <TooltipPart />
+            </Stopper>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      const dialog = screen.getByTestId("dialog") as HTMLDialogElement;
+      await settle(() => expect(dialog.open).toBe(true));
+      await openTooltip();
+      escapeTwice(screen.getByTestId("tip-trigger"));
+      await settle(() => {
+        expect(tipOpen()).toBe(false);
+        expect(dialog.open).toBe(false);
+      });
+    });
+
+    it("a non-modal Dialog inside a non-modal Dialog: both close, the inner one first", async () => {
+      const closed: string[] = [];
+      render(
+        <Dialog.Root defaultOpen modal={false}>
+          <Dialog.Popup data-testid="outer" aria-label="Outer">
+            <Dialog.Root defaultOpen modal={false}>
+              <Dialog.Popup data-testid="inner" aria-label="Inner">
+                <Stopper stopping>
+                  <button type="button" data-testid="in-inner">
+                    Apply
+                  </button>
+                </Stopper>
+              </Dialog.Popup>
+            </Dialog.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      const outer = screen.getByTestId("outer") as HTMLDialogElement;
+      const inner = screen.getByTestId("inner") as HTMLDialogElement;
+      await settle(() => {
+        expect(outer.open).toBe(true);
+        expect(inner.open).toBe(true);
+      });
+      // The close events, in the order the dialogs closed (each is queued when it closes).
+      outer.addEventListener("close", () => closed.push("outer"));
+      inner.addEventListener("close", () => closed.push("inner"));
+      const button = screen.getByTestId("in-inner");
+      act(() => button.focus());
+      escapeTwice(button);
+      await settle(() => {
+        expect(inner.open).toBe(false);
+        expect(outer.open).toBe(false);
+      });
+      expect(closed).toEqual(["inner", "outer"]);
+    });
+  });
+
   describe("a Tooltip inside a modal Dialog", () => {
     function renderInModal(stopping: boolean) {
       render(
