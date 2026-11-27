@@ -14224,3 +14224,29 @@ decision on gap 4:
   during the wait (`drawer-swipe-lifecycle.test.tsx`), the side-drawer list warning, and a
   browser row for reduced motion (`transition: none`: the release closes in its own task, a short
   drag snaps back in the same frame).
+
+## 2026-11-27, #172: direction and locale, proposal
+
+`design/direction-locale.md` added with status **proposed**; no rule changes and no code changes
+until the user decides its section 7. Written by the architect for the P2 item of #162 ("4/6
+libraries ship a direction/locale provider").
+
+- **Audit.** Every direction-dependent behaviour already reads the computed CSS `direction` of
+  its own element at the event (Tabs, ToggleGroup / Toolbar roving focus, Slider keys and
+  pointer, Menu submenu keys and point placement, Combobox chips, Drawer swipe); placement is
+  CSS `self-*` keywords. No component mirrors its keys wrongly for lack of a provider.
+- **Gaps found.** RadioGroup's native arrows do not mirror under RTL in WebKit, left as is while
+  Slider normalises the same engine difference; OTPField under RTL is neither designed nor
+  probed; a hydration mismatch when `locale` is omitted under SSR (only NumberField warns);
+  `locale` is `string | readonly string[]` on NumberField and `string` on Progress and Meter;
+  no written rule for which element's direction is read and when; no docs page; Toast's
+  reserved `swipeDirection` is physical only. The Firefox direction-island bug (placement 13.3)
+  is unchanged.
+- **Recommended.** Direction: CSS `direction` only, written as a convention; no
+  `DirectionProvider` (a second source of truth next to `dir`, default `"ltr"` in Radix and
+  Base UI) and no library `dir` prop (the native attribute passes through already). Locale: the
+  `locale` prop on the Root, no `LocaleProvider` now, because the directive-free `Progress.Root`
+  and `Meter.Root` could not read a context when a Server Component renders them; reopen at the
+  first date component.
+- **For the user.** Four decisions: the direction source, RadioGroup's WebKit arrows under RTL,
+  OTPField's direction, the locale input.
