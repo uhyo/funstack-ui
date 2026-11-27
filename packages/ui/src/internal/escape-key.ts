@@ -22,7 +22,9 @@ export function isComposingKey(event: KeyLike): boolean {
  * not part of an IME composition (there Escape cancels the composition), and not consumed
  * already (innermost first: an inner handler prevented it, or a layer took it, `consumeEscape`).
  * An Escape first settles the earlier ones (`settleEarlierEscapes`, #195), so what its record
- * step reads (a layer's open state, the stand-down snapshot) follows their decisions.
+ * step reads (a layer's open state, the stand-down snapshot) follows their decisions. So call
+ * it only while `event` is being dispatched: on an event already decided it would decide the
+ * Escapes pending after it, out of turn.
  */
 export function isEscapeRequest(event: KeyLike & Pick<Event, "defaultPrevented">): boolean {
   if (event.key === "Escape") settleEarlierEscapes(event);

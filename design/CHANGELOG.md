@@ -15741,7 +15741,6 @@ rule 6 (the "controlled value input" item) and the file list (`internal/form/syn
   rule 8's re-apply writes `checked` through the setter after every commit, which should cover
   them, but no row pins "check, reset, check again". Worth one row per checkable control.
 
-
 ## 2026-11-27, #195: a second Escape on the late path no longer cancels the first
 
 Developer, on #195 (carried over from the #194 follow-up). Changed: conventions 15 rule 4 (the
@@ -15760,8 +15759,9 @@ holder, and a new "Earlier Escapes first" step), internal-hooks.md's file list,
   Dialog inside a non-modal Dialog: the outer one's stand-down snapshot for the second
   Escape is taken at its record, while the inner dialog is still open (the first decision
   has not run yet), so the outer one stands down and the second Escape closes nothing.
-- **The rule added.** A new Escape's first record step (`isEscapeRequest`, which every
-  record step calls before its snapshot; `decideEscapeLast` does it too) decides the earlier
+- **The rule added.** The first `isEscapeRequest` call on a new Escape (every record step
+  calls it before its snapshot, and the parts that act on themselves call it too;
+  `decideEscapeLast` does it as well) decides the earlier
   pending Escapes whose dispatch is over (`eventPhase === NONE`), in record order, each in
   the rule 4 order. Their tasks would have decided them the same way before any later key;
   only the time moves, from the task to the start of the next Escape's dispatch. So each
@@ -15772,6 +15772,7 @@ holder, and a new "Earlier Escapes first" step), internal-hooks.md's file list,
 - **Rows.** Browser (three engines): a Tooltip in a non-modal Dialog, and a non-modal Dialog
   in a non-modal Dialog (inner closes first), two scripted Escapes behind a React
   `stopPropagation()`. jsdom (`escape-key.test.ts`): the first decides when the second is
-  recorded and each closes one layer; three Escapes on two layers leave the third a request;
+  recorded and each closes one layer; a layer unmounted between the two is skipped by the
+  early run and the next layers close; three Escapes on two layers leave the third a request;
   a nested dispatch leaves the outer event pending; the holder's cancel cancels every
   pending decision.

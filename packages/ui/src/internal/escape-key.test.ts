@@ -342,6 +342,25 @@ describe("decideEscapeLast", () => {
       expect(log).toEqual(["inner", "outer"]);
     });
 
+    it("a layer unmounted between the two: the early run skips it, the next layers close", async () => {
+      const log: string[] = [];
+      const { outer, middle, inner } = tree();
+      const innerLayer = closingLayer(inner, "inner", log);
+      const middleLayer = closingLayer(middle, "middle", log);
+      closingLayer(outer, "outer", log, [middleLayer]);
+      on(inner, (event) => event.stopPropagation(), false);
+      escape(inner);
+      // The inner layer unmounts: its cleanup cancels its decision, and it records no more.
+      innerLayer.cancel();
+      innerLayer.open = false;
+      escape(inner);
+      // The first Escape decided without the inner layer: the middle one closed on it, and the
+      // outer layer's snapshot for the second saw that.
+      expect(log).toEqual(["middle"]);
+      await Promise.resolve();
+      expect(log).toEqual(["middle", "outer"]);
+    });
+
     it("three Escapes on two layers: the third closes nothing", async () => {
       const log: string[] = [];
       const { inner } = twoLayers(log);

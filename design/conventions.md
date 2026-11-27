@@ -2357,8 +2357,9 @@ is a close request:
      layer of an event has cancelled, the window listener and the late path are removed at
      once.
    - *Earlier Escapes first.* On the late path a second Escape can be dispatched before the
-     first one's task has decided. Its first record step (`isEscapeRequest`) then decides
-     the earlier pending Escapes whose dispatch is over, in the order they were recorded,
+     first one's task has decided. The first `isEscapeRequest` call on the new Escape (a
+     layer's record step, or a part that acts on itself: TextField, NumberField, the
+     Menubar) then decides the earlier pending Escapes whose dispatch is over, in the order they were recorded,
      each in the order below, as their tasks would have. So each Escape closes one layer,
      and the second one's record step (a layer's open state, its stand-down snapshot) reads
      the layers the first one closed: two quick Escapes close two layers, innermost first.
