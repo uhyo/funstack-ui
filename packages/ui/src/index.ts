@@ -425,6 +425,13 @@ export type {
   NumberFieldButtonState,
 } from "./number-field/index.js";
 
+export { TextField } from "./text-field/index.js";
+export type {
+  TextFieldProps,
+  TextFieldState,
+  TextFieldValueChangeDetails,
+} from "./text-field/index.js";
+
 export { Field } from "./field/index.js";
 export type {
   FieldRootProps,

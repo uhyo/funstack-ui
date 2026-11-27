@@ -62,6 +62,7 @@
     "./slider": "./dist/slider/index.mjs",
     "./switch": "./dist/switch/index.mjs",
     "./tabs": "./dist/tabs/index.mjs",
+    "./text-field": "./dist/text-field/index.mjs",
     "./toast": "./dist/toast/index.mjs",
     "./toggle": "./dist/toggle/index.mjs",
     "./toggle-group": "./dist/toggle-group/index.mjs",
