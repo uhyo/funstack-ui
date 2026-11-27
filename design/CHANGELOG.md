@@ -14712,6 +14712,319 @@ the library is built for. A test row pins that such a bar stays silent. Not take
 after a delay or on the first key press (a guess about timing, for a mistake that is visible
 at once anyway: an empty bar).
 
+## 2026-11-27, #175: `<details>` echo is recognised by the library's own write, not by state
+
+Architect. Changed: conventions 3.5 (residual browser paths), accordion.md 2.3, collapsible.md
+2.2. Code owed: Accordion and Collapsible (`internal/details-summary.ts`).
+
+- **The bug.** The `toggle` handler took `details.open === committed` for the library's own
+  commit echoing back. While a close is pending (committed `true`, intended `false`), a script
+  that closes the element and a find-in-page that re-opens it produce two events; the second
+  equals committed, was dropped, and the pending close then hid what the user had just found.
+  The mirror case exists for a pending open. In library mode nothing but a script closes a
+  `<details>` (no `name`, clicks are intercepted, find-in-page only opens), so this needs a
+  consumer DOM write, which 2.3 lists as "unsupported but handled the same way".
+- **The rule.** The library keeps, per element, the last `open` value it wrote or read (the
+  known value). A `toggle` whose `details.open` equals it is an echo; any other is a platform
+  change, recorded and then dispatched unless it equals the intended value. This is the
+  overlay rule (3.9.2: the library's hide is recognised by a marker, "not by `false` is
+  already intended") in the shape a two-way, coalesced event needs.
+- **Not taken: the rule proposed in the issue** ("equal to committed is an echo only when it
+  also equals the intended value or nothing is in flight"). It reduces to "compare with the
+  intended value only", and that misreads a real echo: the library commits `open`, the user's
+  next click is handled before that commit's `toggle` task (likely exactly when a long commit
+  let a click queue up), the intended value is now the opposite, and the echo would be
+  dispatched as a platform change that undoes the click. That is a regression on a supported
+  path to fix an unsupported one. Dialog went through the same correction (dialog.md 2.7,
+  "recognising the echo by `!intended()`").
+- **Not taken: a marker plus the committed compare.** Works, but React's write of the `open`
+  prop fires no `toggle` when the DOM already had the value, which leaves a stale marker to
+  reason about. The known value has no such state.
+- **Not fixable, now stated in accordion.md 2.3:** a find-in-page match inside content that is
+  still open while its close is pending fires no event, so the close commits and hides it.
+- **Other components checked.** Popover / Menu / Combobox / HoverCard `toggle` and Dialog /
+  Drawer `close` already use the source marker (`overlay-show.ts`). Native inputs fire no
+  `change` for a programmatic write, so they have no echo. Four walkthrough lines in menu.md
+  and dialog.md still said "`false` intended → echo" and menu.md 12 called an Escape and a
+  Tab-out during a pending close echoes; they now say what 3.9.2 and 3.9.5 say (marker;
+  facts).
+
+Code owed:
+
+- `internal/details-summary.ts`: a `WeakMap<HTMLDetailsElement, boolean>` (module level, or
+  one per Root) with `noteOpen(element)` (known = `element.open`), `writeOpen(element, open)`
+  (known = `open`, then the DOM write if it differs; replaces both `applyOpen` copies and the
+  disabled put-back in `accordion-item.tsx`), `isEcho(element)` (`element.open === known`; an
+  element never noted is noted and treated as an echo).
+- Accordion `Item` and Collapsible `Root`: `noteOpen` in the ref callback (attach) and for
+  every element read by mount reconciliation (the Activity re-show included); a layout effect
+  keyed on the committed `open` that sets known to it (skipping the mount run); the `toggle`
+  handler as in accordion.md 2.3 (the disabled branch after `noteOpen`).
+- jsdom rows, for both components (jsdom fires `toggle` for `open` writes; if a row needs real
+  coalescing, a browser row): (1) close pending, `el.open = false`, then `el.open = true` in a
+  later task: one `"platform"` dispatch of the open, and the content stays after everything
+  settles (uncontrolled) ; (2) the mirror: open pending, `el.open = true`, then `false`:
+  a `"platform"` dispatch of the close; (3) the race the issue's rule would break: an action
+  resolves and commits `open`, a click is dispatched before the commit's `toggle` is delivered:
+  no `"platform"` dispatch, the click's intent stands; (4) the existing echo, find-in-page,
+  disabled and mount-reconciliation rows unchanged.
+- Docs: no public prop or attribute changes. One sentence on the Accordion and Collapsible
+  pages where find-in-page is described: a reveal while a close is pending is dispatched; a
+  match in content that is still open is not seen.
+
+## 2026-11-27, #183: a Close part is pending until its close has committed
+
+Architect. Changed: conventions 2.5.1 (table, effective value), 4.3; dialog.md 3.4; popover.md
+3.4; alert-dialog.md 3.1, 7.4; menu.md (the `whilePending` list). Code owed:
+`internal/overlay/use-overlay-close.ts`, `menu/menu-item.tsx`.
+
+- **The problem.** A Close part without `action` called the Root's `requestClose` outside any
+  transition of its own, so nothing on the part showed that the click was taken while the
+  close waited: behind an `AlertDialog.Action`'s pending action (review-167 M1), and equally
+  behind any Root whose `openChangeAction(false)` is awaited. The Trigger shows the Root's
+  `data-pending`, but a modal dialog's Trigger is under the backdrop.
+- **The rule (4.3).** A part that asks the owner for a close shows `data-pending` /
+  `state.pending` from the activation until that close has committed, with or without an
+  `action`. One rule for `Dialog.Close`, `Popover.Close`, `Drawer.Close`, `AlertDialog.Cancel`,
+  `AlertDialog.Action` (all `useOverlayClose`) and a closing `Menu.Item`.
+- **Why this shape.** `Menu.Item` already did it: it runs every activation through
+  `useActionTrigger`, with or without `action`, and a probe
+  (`memo/architect/probes-183/close-part-pending.probe.test.tsx`) shows the item with
+  `data-pending` while the Root's `openChangeAction(false)` is awaited. menu.md and the 2.5.1
+  table said "nothing pends"; they were wrong about the code. The Close parts now do the same,
+  so the amendment aligns five parts with a sixth and adds no mechanism. The same probe shows
+  a part transition that makes the Root's dispatch stays pending while another part's async
+  action holds the commit, and clears in the commit of the close.
+- **`aria-disabled`.** A part without `action` resolves `whilePending` to `"run"`: no pending
+  `aria-disabled`. The attribute means "an activation is ignored", and nothing is: the guard
+  counts the part's own runs, and a run without an action ends in a microtask. This changes
+  `Menu.Item` without `action`, which rendered `aria-disabled="true"` while the close waited
+  (default `"ignore"`) although a second activation was not ignored by the guard.
+- **Timing.** A Close part without `action` makes the request synchronously in the click,
+  inside the transition, so the synchronous prefix of `openChangeAction` stays in the event
+  dispatch (2.3 item 3). `Menu.Item` keeps making it in the continuation, as built.
+- **Not taken.** `data-pending` on the Popup: a Popup is a panel (4.3), and
+  `:has([data-pending])` gives the same hook. A pending state derived in the Root ("the latest
+  request is this part's close"): exact, but a second mechanism next to the part transition
+  that Menu.Item and every Close with `action` already use. Review-167's options (c) a
+  platform close, (d) closing from the optimistic value, (e) disabling the Cancel: as argued
+  there.
+- **Left as it is: `Dialog.Form` / `AlertDialog.Form`.** A `method="dialog"` form whose close
+  waits shows nothing on its submit button. The button is the consumer's and the form is the
+  form channel (2.7), whose pending is `useFormStatus`; folding the Root's pending into
+  `DialogFormState.pending` would give that field two meanings. The Root's `children`
+  function has `pending`.
+- **Visible cost.** With a synchronous close the Close part has `data-pending` for one commit
+  before it closes, as a Trigger does. A spinner keyed on it wants a CSS delay.
+
+Code owed:
+
+- `use-overlay-close.ts`: in `onClick`, without `action`, `trigger.run(() =>
+  options.close(native))` instead of `options.close(native)`; pass
+  `whilePending: action === undefined ? "run" : options.whilePending` to `usePureTrigger`.
+  `OverlayCloseState.pending` doc: "from the click until the close this part asked for has
+  committed". JS-free mode without `action` installs no handler: unchanged.
+- `menu-item.tsx`: the same `whilePending` resolution when `action` is `undefined`. Nothing
+  else.
+- JSDoc of `DialogCloseState.pending`, `PopoverCloseState.pending`, the `whilePending` props
+  (Dialog, Popover, AlertDialog re-exports, Menu.Item) and the 2.5.1 comment in
+  `use-pure-trigger.ts`.
+- Rows in `src/__tests__/overlay-close-part-suite.tsx` (runs for every Close part), library
+  mode, no `action`: (1) Root `openChangeAction` awaited on `false`: after the click the part
+  has `data-pending`, no `aria-disabled`, `state.pending` true; a second click calls
+  `openChangeAction` no more; resolve: closed. (2) the action's synchronous prefix sees
+  `details.event` during the dispatch (`eventPhase !== 0`, or `preventDefault()` observed by
+  the test's own listener). (3) a controlled parent that does not adopt: `data-pending` gone
+  after the request settles, popup open, the next click requests again. (4) Escape while it
+  waits: the fact, popup closed (existing 3.9.5 rows still pass). (5) no `openChangeAction`:
+  the click closes as today (existing rows). Edit the row that asserts "the Root's pending is
+  for `openChangeAction` only" if it asserts the Close has no `data-pending`.
+- `alert-dialog` tests: walkthrough 7.4 as a row: Action pending, click Cancel: Cancel has
+  `data-pending` and no `aria-disabled`, the dialog is open; the action resolves: closed, one
+  `openChangeAction(false)`.
+- `menu.test.tsx`: Item without `action`, Root `openChangeAction(false)` awaited:
+  `data-pending`, no `aria-disabled` (this second half is the behaviour change).
+- Docs site: Dialog, Popover, Drawer, AlertDialog and Menu pages (the Close / Cancel / Item
+  `pending` state rows and `data-pending` rows; the AlertDialog callout that says the Cancel
+  click shows nothing, replaced by the `[data-pending]` styling; the AlertDialog example's
+  stylesheet gets a pending style on the Cancel); `skills/funstack-ui-knowledge`; the
+  Roadmap's behaviour-change notes (Close parts gain `data-pending` without `action`;
+  `Menu.Item` without `action` loses the pending `aria-disabled`).
+
+## 2026-11-27, #177: a non-modal Dialog's Escape waits for the inner layers' JS listeners
+
+Developer, from review-166 (finding 2). dialog.md 2.6 put the non-modal dialog's Escape
+`keydown` listener on the dialog element, so it ran before the document listeners of HoverCard
+and Tooltip, and its inner-layer check skipped `manual` popovers (no close watcher). Escape with
+a `manual` card or tooltip shown inside a non-modal Dialog or Drawer closed the dialog and left
+the card `:popover-open` inside it, against "innermost first" (hover-card.md 2.6, tooltip.md
+2.2). A `hint` tooltip or card in Safari 27.0 (mapped to `manual`) had the same gap.
+
+Amended (dialog.md 2.6 and the nested-layer row of section 9; one sentence each in
+hover-card.md 2.6 and the Tooltip listener table): the listener is on the **window**, so it runs
+after every element and document listener, and it leaves an already prevented Escape alone. A
+`manual` HoverCard or Tooltip prevents the Escape it closes on, so it closes first and the
+next Escape closes the dialog: the platform rule for a modal dialog's close watcher (a canceled
+`keydown` is no close request) now holds for the JS path too. The inner-layer check reads the
+event path (`composedPath()`), not `target.closest()`, because the target is retargeted by the
+time the event reaches the window. Side effect, intended: a consumer handler inside the dialog
+that prevents Escape (an input that clears itself) keeps a non-modal dialog open, as it already
+keeps a modal one open.
+
+Not taken: counting every open popover inside the dialog as an inner layer (HoverCard's own
+stand-down rule). A consumer's `manual` popover that does not handle Escape would then make
+Escape dead in the dialog; with the prevented-event rule it still closes the dialog, as the
+existing jsdom row pins. Modal Dialog, AlertDialog and modal Drawer needed no change: their
+Escape is the platform's close watcher, which already respects the prevented keydown; Popover
+and Menu are `auto` popovers and were already covered by the close-watcher check. No change to
+the conventions (overlay-open-state.md states no layering rule for Escape).
+
+Rows: jsdom (dialog.test.tsx) for a HoverCard and a Tooltip (focus on its trigger) inside a
+non-modal Dialog, a HoverCard inside a non-modal Drawer, and a prevented Escape from a handler
+inside; browser (dialog.browser.test.tsx) for HoverCard and Tooltip, `manual` and
+`experimental_hint` (branching on `supportsPopoverHint`), in a modal and a non-modal Dialog.
+
+## 2026-11-27, #177: a non-modal Dialog's Escape: `preventDefault()` cancels, `stopPropagation()` does not
+
+Architect, after the review (`memo/reviewer/review-177.md`) and on the product owner's
+preference (the user's alignment principle: a non-modal dialog behaves as a modal dialog's
+close watcher and the `auto` overlays do). Replaces the mechanism of the entry above (a
+standing bubble listener on the window); its goal and its rows stand. Changed: dialog.md 2.6
+and section 9 (two rows added), hover-card.md 2.6, tooltip.md's listener table.
+
+- **Two problems with the window listener.** (a) At the window `composedPath()` hides the
+  nodes of a closed shadow root, so a dialog portalled into one never closed. (b) Any
+  `stopPropagation()` between the target and the window cancelled the dismissal, a React
+  `onKeyDown` on an ancestor outside the dialog included (React stops the native event at its
+  root container). A close watcher ignores it.
+- **The mechanism: record at the dialog, decide last.** A capture listener on the dialog
+  records the Escape and the inner-layer snapshot, where the path is complete in any shadow
+  mode and before any close watcher has closed a layer. The decision runs in a window bubble
+  listener added for that event only, or in a `setTimeout(0)` task when propagation was
+  stopped; first one wins.
+- **Why not one listener.** No position is both last and unstoppable. The decision has to see
+  every listener's `preventDefault()` (the inner `manual` HoverCard and Tooltip are on the
+  document), and it has to prevent the event itself while it is still being dispatched, or an
+  enclosing modal dialog's or `auto` popover's close watcher closes on the same Escape. Only a
+  bubble listener on the window does both, and `stopPropagation()` can keep the event from
+  it. Hence the task as a second path, which gives up the second property only.
+- **Why not a microtask.** For a key the user pressed, a microtask checkpoint follows every
+  listener, so a microtask queued at the dialog runs before the document listeners (the
+  timing of internal-hooks.md 3.8 rule 5). **Why not a task alone:** the decision could never
+  prevent the event, and a non-modal dialog inside a modal one would close both.
+- **The snapshot is taken at record time** because an `auto` / `hint` popover inside is closed
+  by its close watcher after the dispatch: a task would find it closed and close the dialog
+  too.
+- **Limits, stated in 2.6.** On the task path an enclosing close-watcher layer closes on the
+  same Escape. A capture-phase `stopPropagation()` above the dialog hides the event from the
+  record step. Not taken for that: recording at the window in capture with membership read
+  from `getRootNode().activeElement` (it needs the target to be the focused element, and the
+  inner-layer path would be walked by hand).
+- **hover-card.md 2.6**: the card also stands down for an open non-modal dialog inside it that
+  the Escape came from. With the element listener the dialog ran before the card's document
+  listener and prevented the event; now it decides after, so the card has to see it. A
+  non-modal dialog inside the card that the Escape did not come from does not count, or
+  Escape would do nothing.
+- **Fixed by the same rule, now a row:** a Combobox chip prevents Escape "so that the close
+  request of an enclosing Dialog or Popover is not run"; a non-modal Dialog closed anyway
+  before, because its element listener ran before React's root listener.
+- Not in this change (review nit 10, issues to file): the Escape path does not skip
+  `isComposing`; Tooltip's document Escape listener does not check `defaultPrevented`.
+
+Code owed (`packages/ui/src/dialog/dialog-dismiss.ts`, non-modal only; `modal` and the
+`closedby` path unchanged):
+
+- Remove the standing window listener. `escapeBelongsToInnerLayer(dialog, event)`: from
+  `event.composedPath()` read **at the dialog**, the nodes before `dialog`: an open
+  `HTMLDialogElement`, or `isOpenLightPopover`; then the `querySelectorAll("[popover]")`
+  check. No "index < 0" branch: the listener is on the dialog.
+- `dialog.addEventListener("keydown", record, true)`. `record`: return unless
+  `key === "Escape"` and `dialog.open`; if a record for this event exists, return; store
+  `{ event, inner }`; `win.addEventListener("keydown", onWindow)` (bubble) and
+  `timer = setTimeout(decideLate, 0)`.
+- `onWindow(e)`: ignore an event that is not the recorded one; otherwise `settle(true)`.
+  `decideLate`: `settle(false)`.
+- `settle(canPrevent)`: take and clear the record, remove the window listener, clear the
+  timer; return if `event.defaultPrevented`, `inner`, `!dialog.open` or `!dialog.isConnected`;
+  `if (canPrevent) event.preventDefault()`; `dialog.requestClose()`.
+- A new Escape recorded while one is pending settles nothing early: replace the record after
+  clearing the old listener and timer (the old event's dispatch is over).
+- Cleanup (the function `listenDialogDismiss` returns): remove the capture listener, the
+  window listener and the timer. This is nit 7: nothing on the window outside one Escape's
+  dispatch.
+- `packages/ui/src/hover-card/use-hover-card-interest.ts`: `containsOpenLayer(popup, event)`
+  also returns `true` for an open non-modal `<dialog>` inside the popup that contains
+  `event.target`.
+
+Rows owed (jsdom unless said; a real key press in the browser rows):
+
+- Shadow roots: a non-modal Dialog portalled into an open and into a closed shadow root:
+  Escape from inside closes it; with a `manual` HoverCard shown inside, the card first.
+- Nested non-modal in non-modal: Escape in the inner closes the inner only, the next closes
+  the outer. Sibling non-modal dialogs: Escape closes the one that has the target only.
+- A non-modal Dialog inside a modal one, browser row: Escape closes the inner only.
+- `stopPropagation()`: (1) a native listener on an element inside the dialog, (2) a React
+  `onKeyDown` on an ancestor outside it: the dialog closes after a task, `onOpenChange(false,
+  { reason: "dismiss" })` once. (3) the same with `preventDefault()` as well: stays open.
+  (4) `stopPropagation()` with an open `auto` Popover inside: the dialog stays open (the
+  snapshot), browser row.
+- `preventDefault()` from a listener on the document and from one on the window (registered
+  before the Escape): stays open.
+- A Combobox with chips inside a non-modal Dialog: Escape on a chip does what the chip does
+  and the dialog stays open; the next Escape, from the input with the list closed, closes it.
+- A non-modal Dialog inside a HoverCard, Escape from inside the dialog: the dialog closes,
+  the card stays; from the card outside the dialog: the card closes.
+- No listener leak: after an Escape that closed the dialog, after one that was prevented and
+  after unmount during a pending record, `window` has no `keydown` listener of the dialog (spy
+  on `addEventListener` / `removeEventListener`), and a closed or never-opened dialog adds
+  none.
+- The existing rows of the entry above stay (HoverCard, Tooltip, Drawer, the "toast" manual
+  popover that leaves Escape to the dialog).
+
+Docs owed: DialogPage's keyboard table (the row the developer added, plus "`stopPropagation()`
+does not keep it open"); the Drawer page if it repeats the Escape row; memo/developer/issue-177.md
+side-effect note is superseded.
+
+## 2026-11-27, #177: the Escape fallback uses `afterDispatch`, shared with form reset (#185)
+
+Architect. Adjusts the entry above in one point: the fallback of the decide step is not a
+bare `setTimeout(0)` but `afterDispatch(event, callback)`, the helper `useFormReset` uses for
+the same need ("after this event has been fully dispatched", internal-hooks.md 3.8 rule 5 on
+`review/185`): a microtask, and a task when the event is still being dispatched at that
+microtask (`event.eventPhase !== Event.NONE`). For a key the user pressed that is the task
+described above; for a scripted `keydown` (jsdom rows, `dispatchEvent`) the microtask already
+follows the whole dispatch, so the dialog closes without a timer. Changed: dialog.md 2.6
+(step 2, and "task path" is now "late path").
+
+Code owed, replacing the timer lines of the entry above:
+
+- `packages/ui/src/internal/after-dispatch.ts`, directive-free, the same file on both
+  branches (whichever merges second takes the other's):
+  `afterDispatch(event: Event, callback: () => void): () => void`. `queueMicrotask`: if
+  cancelled, return; if `event.eventPhase === Event.NONE`, `callback()`; else
+  `timer = setTimeout(callback, 0)`. Returns a cancel function.
+- `dialog-dismiss.ts`: `record` stores `cancelLate = afterDispatch(event, () =>
+  settle(false))` instead of the timer; `settle` and the cleanup call `cancelLate()`.
+- Rows: the `stopPropagation()` rows in jsdom settle in a microtask (`await` once, no fake
+  timers); the browser `stopPropagation()` rows (a real key) cover the task.
+
+## 2026-11-27, #177: record at the dialog, decide last, implemented
+
+Developer. The checklists of the two architect entries above, as written:
+`internal/after-dispatch.ts` (the API and body of the `afterDispatch` entry), the capture
+`record` / per-event window `onWindow` / `settle(canPrevent)` in `dialog-dismiss.ts`, and
+`containsOpenLayer(popup, event)` in HoverCard. No deviation. Rows: `dialog-escape.test.tsx`
+(jsdom: open and closed shadow roots with and without a HoverCard inside, nested and sibling
+non-modal dialogs, `stopPropagation()` from a native listener and from a React ancestor with and
+without `preventDefault()`, prevention from document and window listeners, a Combobox chip, a
+non-modal Dialog inside a HoverCard, and the window-listener leak rows) and
+`dialog.browser.test.tsx` (a non-modal Dialog inside a modal one, `stopPropagation()` on a real
+key press closing through the task, and `stopPropagation()` with an `auto` popover open inside).
+Two test notes: a window-listener count must replay adds and removes in call order (`record`
+removes before it adds), and a scripted Escape has settled by the time `act()` returns, so the
+"unmount while pending" row unmounts from a listener inside the dispatch. The `directives.test.ts`
+row for `internal/after-dispatch.mjs` is left to #185, which adds the same file.
+
 ## 2026-11-27, #185 and #184: a real reset button; option clicks after a fieldset is disabled
 
 Developer (`memo/developer/issue-185-184.md`).

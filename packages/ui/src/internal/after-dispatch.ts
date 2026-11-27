@@ -1,14 +1,10 @@
+// No directive: a scheduling helper with no React (conventions 7.1).
+
 /**
- * Calls `callback` once `event` has finished dispatching (design/internal-hooks.md 3.8 rule 5):
- * every listener has run, and so has whatever the platform does after the dispatch (a form's
- * reset algorithm). Returns a function that cancels the call.
- *
- * A microtask first. After an event dispatched from script (`form.reset()`, `dispatchEvent`)
- * the dispatch is over by then (`eventPhase` is `NONE`), so the callback runs there, in the same
- * task. After an event the browser dispatches from a task (a click on a reset button), a
- * microtask checkpoint follows each listener, so the microtask runs mid-dispatch: the callback
- * waits for a task (`setTimeout(…, 0)`). `eventPhase` rather than `window.event`, which is not
- * set for a listener in a shadow tree.
+ * Runs `callback` once `event` has been fully dispatched (internal-hooks.md 3.8 rule 5): in a
+ * microtask when the dispatch is already over by then (a scripted `dispatchEvent`), else in a
+ * task (an event the user caused, where a microtask checkpoint follows every listener). Returns
+ * a function that cancels the call.
  */
 export function afterDispatch(event: Event, callback: () => void): () => void {
   let cancelled = false;
@@ -20,6 +16,6 @@ export function afterDispatch(event: Event, callback: () => void): () => void {
   });
   return () => {
     cancelled = true;
-    if (timer !== undefined) clearTimeout(timer);
+    clearTimeout(timer);
   };
 }

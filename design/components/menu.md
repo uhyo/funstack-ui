@@ -345,7 +345,11 @@ still an enabled item for the open focus.
   open-generation guard as before), so a rejection keeps the menu open in both modes; an older
   run's rejection goes to `reportError`, the latest one's to the boundary above the item
   (conventions 2.4, #145; `menu.test.tsx` "whilePending (#146)").
-- An Item without `action` only closes, synchronously: nothing pends, the prop has no effect.
+- An Item without `action` only closes. It runs through the item's transition all the same, so
+  it shows `data-pending` while the close it asked for waits (a Root `openChangeAction(false)`
+  that is awaited, or another pending action the close is entangled with; conventions 4.3).
+  The prop has no effect and the item renders no `aria-disabled` from pending: nothing of its
+  own is in flight to ignore, and a second activation is a no-op (conventions 2.3 item 8).
 - `CheckboxItem` and `RadioItem` get **no** `whilePending`: state owners, latest intent wins.
 
 The alternative, a fixed `"ignore"` whatever `closeOnActivate` says, is one line simpler in the
@@ -991,7 +995,7 @@ Notation: `C` / `O` / `P` as in Popover. Uncontrolled root menu, `keepMounted={f
    `rootMenu.requestClose(event, "activate")`: `O=false` (Trigger loses `data-open`), root
    `openChangeAction(false)` (none here) → `C=false` commits: with `transition` set React starts
    a view transition, children unmount, apply effect `hidePopover()` → the platform returns focus
-   to the Trigger; `toggle(closed)` → `intended()` is `false` → echo. In Firefox the exit
+   to the Trigger; `toggle(closed)` → the hide carries the library's marker → echo. In Firefox the exit
    animates too. Without `transition`: `held` keeps the items through the CSS fade (Chromium /
    Safari) and they unmount after.
 3. **"Archive" rejects.** `data-pending` clears, the error reaches the boundary nearest the item
@@ -1052,10 +1056,11 @@ Notation: `C` / `O` / `P` as in Popover. Uncontrolled root menu, `keepMounted={f
     `requestClose(event, "activate")`: `O=false` (Trigger: no `data-open`, `data-pending`,
     exposed state still expanded, #121), menu still shown with "Archive" focused. Action resolves →
     `C=false` commits → apply effect `hidePopover()`: focus is inside, so the platform returns it
-    to the Trigger (the element focused at the open) → `toggle(closed)` → `intended()` is `false`
-    → echo. Rejects → menu open, focus on "Archive", the error reaches the boundary above Root.
-    Escape meanwhile → Popover 11.8 (echo, one dispatch). Tab meanwhile → `focusout` with
-    `relatedTarget` outside → immediate hide; its `toggle` finds `false` intended → echo. A press
+    to the Trigger (the element focused at the open) → `toggle(closed)` → the hide carries the
+    library's marker → echo. Rejects → menu open, focus on "Archive", the error reaches the
+    boundary above Root. Escape meanwhile → a fact (conventions 3.9.5): `onOpenChange(false)`
+    at once, the pending close is superseded. Tab meanwhile → `focusout` with `relatedTarget`
+    outside → immediate hide; its `toggle` carries no marker → a fact likewise. A press
     dragged off the Trigger → no click, menu open, "Archive" still focused.
 
 ---

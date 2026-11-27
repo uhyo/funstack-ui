@@ -723,7 +723,7 @@ The consumer's `style` is merged over the library's inline positioning (consumer
 
 ```ts
 export interface PopoverCloseState {
-  /** The `action` is in flight. */
+  /** From the click until the close this part asked for has committed (conventions 4.3). */
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -744,7 +744,8 @@ export interface PopoverCloseProps
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the popover
-   * still closes once. No effect without `action`. Conventions 2.5.1.
+   * still closes once. No effect without `action` (no `aria-disabled` either; the part still
+   * shows `data-pending` while its close waits). Conventions 2.5.1.
    * Default `"ignore"`.
    */
   whilePending?: WhilePending;
@@ -770,6 +771,13 @@ so every Close goes through the Root's transition and the apply effect; in JS-fr
 `popup.hidePopover()` directly (a browser-owned close; the `toggle` listener has no Root state to
 notify). The action runs through the shared `useActionTrigger({ openGeneration })`
 (conventions 3.4).
+
+**Pending.** `Dialog.Close`'s rule (`dialog.md` 3.4, conventions 4.3): in library mode every
+click runs in the part's own transition, without `action` too (the request is then made
+synchronously in the click), so `state.pending` and `data-pending` last from the click until
+the close the part asked for has committed, through the Root's awaited
+`openChangeAction(false)` and any pending action the close is entangled with. Without `action`
+there is no `aria-disabled` from pending.
 
 **`whilePending`** (conventions 2.5.1). `Popover.Close` is a part whose activation the library
 owns (it hides the popover with no user code), so the default is `"ignore"`, also for a Close

@@ -792,8 +792,8 @@ describe("Menubar", () => {
 
     it("a second switch supersedes a pending open (never shown)", async () => {
       const open = deferred();
-      const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => unknown>(
-        (next) => (next ? open.promise : undefined),
+      const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => unknown>((next) =>
+        next ? open.promise : undefined,
       );
       render(<Bar edit={{ openChangeAction: editAction }} />);
       const user = setupUser();
@@ -821,8 +821,8 @@ describe("Menubar", () => {
 
     it("focus leaving the bar supersedes a pending open", async () => {
       const open = deferred();
-      const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => unknown>(
-        (next) => (next ? open.promise : undefined),
+      const editAction = vi.fn<(next: boolean, details: MenuOpenChangeDetails) => unknown>((next) =>
+        next ? open.promise : undefined,
       );
       render(<Bar edit={{ openChangeAction: editAction }} />);
       const user = setupUser();

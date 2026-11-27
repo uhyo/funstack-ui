@@ -18,7 +18,14 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { mouse } from "../__tests__/browser-commands.js";
-import { browserName, pressFocusesButtons, supportsDialogClosedBy } from "../__tests__/engine.js";
+import {
+  browserName,
+  pressFocusesButtons,
+  supportsDialogClosedBy,
+  supportsPopoverHint,
+} from "../__tests__/engine.js";
+import { HoverCard } from "../hover-card/index.js";
+import { Tooltip } from "../tooltip/index.js";
 import {
   addExitStyle,
   describeOverlayInBrowser,
@@ -545,6 +552,160 @@ describe("Dialog (browser)", () => {
       screen.getByTestId("inside").focus();
       await user.keyboard("{Escape}");
       expect(popup().open).toBe(false);
+    });
+  });
+
+  // #177: innermost first (hover-card.md 2.6, tooltip.md 2.2). A `manual` HoverCard or Tooltip
+  // closes on Escape from a document listener and prevents the keydown; the non-modal dialog's
+  // JS Escape (a window listener) and a modal dialog's close watcher both leave a prevented
+  // Escape alone. With `experimental_hint`, Safari 27.0 maps `hint` to `manual`, so there the
+  // prevented keydown is what keeps the dialog open; elsewhere the `hint` close watcher is too.
+  describe.each([
+    ["non-modal", false, false],
+    ["non-modal", false, true],
+    ["modal", true, false],
+    ["modal", true, true],
+  ] as const)("Escape with a shown hover popup inside (%s, hint %s)", (_, modal, hint) => {
+    const expectedType = hint && supportsPopoverHint ? "hint" : "manual";
+
+    async function escapeTwice(inner: HTMLElement, focus: HTMLElement) {
+      await expect.poll(() => inner.matches(":popover-open")).toBe(true);
+      expect(inner.popover).toBe(expectedType);
+      focus.focus();
+      await user.keyboard("{Escape}");
+      await expect.poll(() => inner.matches(":popover-open")).toBe(false);
+      await quietPeriod(50, "the first Escape must not also close the dialog");
+      expect(popup().open).toBe(true);
+      await user.keyboard("{Escape}");
+      await settle(() => expect(popup().open).toBe(false));
+    }
+
+    it("HoverCard: the first Escape closes the card, the second the dialog", async () => {
+      render(
+        <Dialog.Root defaultOpen={false} modal={modal}>
+          <Dialog.Trigger data-testid="trigger">Profile</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Profile" style={{ width: 300 }}>
+            <HoverCard.Root delay={0} closeDelay={10_000}>
+              <HoverCard.Trigger href="#ada" data-testid="card-trigger">
+                @ada
+              </HoverCard.Trigger>
+              <HoverCard.Popup data-testid="card" experimental_hint={hint}>
+                <button type="button" data-testid="follow">
+                  Follow
+                </button>
+              </HoverCard.Popup>
+            </HoverCard.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      await user.hover(screen.getByTestId("card-trigger"));
+      // Focus inside the card.
+      await escapeTwice(screen.getByTestId("card"), screen.getByTestId("follow"));
+    });
+
+    it("Tooltip: the first Escape on its trigger hides the tooltip, the second closes the dialog", async () => {
+      render(
+        <Dialog.Root defaultOpen={false} modal={modal}>
+          <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Edit" style={{ width: 300 }}>
+            <Tooltip.Root delay={0} closeDelay={10_000}>
+              <Tooltip.Trigger data-testid="tip-trigger">Save</Tooltip.Trigger>
+              <Tooltip.Popup data-testid="tip" experimental_hint={hint}>
+                Saves the document
+              </Tooltip.Popup>
+            </Tooltip.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      await user.hover(screen.getByTestId("tip-trigger"));
+      // Focus on the Tooltip's trigger, outside the tooltip.
+      await escapeTwice(screen.getByTestId("tip"), screen.getByTestId("tip-trigger"));
+    });
+  });
+
+  // #177, decided last (dialog.md 2.6): a real key press, so the late path of a stopped event
+  // is a task (a microtask checkpoint follows every listener of a user-caused dispatch).
+  describe("non-modal Escape: record at the dialog, decide last", () => {
+    it("a non-modal Dialog inside a modal one: Escape closes the inner only", async () => {
+      render(
+        <Dialog.Root defaultOpen={false}>
+          <Dialog.Trigger data-testid="trigger">Settings</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Settings" style={{ width: 400 }}>
+            <Dialog.Root defaultOpen={false} modal={false}>
+              <Dialog.Trigger data-testid="inner-trigger">Help</Dialog.Trigger>
+              <Dialog.Popup data-testid="inner" aria-label="Help">
+                <button type="button" data-testid="inner-inside">
+                  Inside
+                </button>
+              </Dialog.Popup>
+            </Dialog.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      expect(isModal()).toBe(true);
+      await user.click(screen.getByTestId("inner-trigger"));
+      const inner = screen.getByTestId("inner") as HTMLDialogElement;
+      await settle(() => expect(inner.open).toBe(true));
+      screen.getByTestId("inner-inside").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(inner.open).toBe(false));
+      await quietPeriod(50, "the inner dialog's Escape must not also close the modal one");
+      expect(popup().open).toBe(true);
+      screen.getByTestId("inner-trigger").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(popup().open).toBe(false));
+    });
+
+    it("stopPropagation() inside: a non-modal dialog still closes (the late path), one fact", async () => {
+      const fact = vi.fn<ActionFn>();
+      render(
+        <Dialog.Root defaultOpen={false} modal={false} onOpenChange={fact}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Help">
+            <input data-testid="field" onKeyDown={(event) => event.stopPropagation()} />
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      screen.getByTestId("field").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(popup().open).toBe(false));
+      await quietPeriod(50, "one fact only");
+      const closes = fact.mock.calls.filter(([next]) => !next);
+      expect(closes).toHaveLength(1);
+      expect(closes[0]![1].reason).toBe("dismiss");
+    });
+
+    it("stopPropagation() with an auto Popover open inside: the popover closes, the dialog stays", async () => {
+      render(
+        <Dialog.Root defaultOpen={false} modal={false}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Help">
+            <div onKeyDown={(event) => event.stopPropagation()}>
+              <button type="button" data-testid="inside">
+                Inside
+              </button>
+              <div popover="auto" data-testid="menu">
+                <button type="button" data-testid="item">
+                  Item
+                </button>
+              </div>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      const menu = screen.getByTestId("menu");
+      act(() => menu.showPopover());
+      screen.getByTestId("item").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(menu.matches(":popover-open")).toBe(false));
+      // The snapshot at the record step saw the open popover; the late path must not close.
+      await quietPeriod(100, "the late path must not close the dialog too");
+      expect(popup().open).toBe(true);
     });
   });
 

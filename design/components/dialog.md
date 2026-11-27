@@ -459,11 +459,39 @@ in JS-free mode the Trigger records `dialog.open` at `pointerdown` and skips `sh
 click if it was open, so the outcome is "closed" on every path (a keyboard click has no press
 and stays a no-op).
 
-Baseline JS for non-modal dialogs (both modes): a `keydown` listener on the dialog closes it on
-Escape with `requestClose()`, leaving the event alone while it belongs to an inner layer (the
-target is inside an open nested `<dialog>` or an open `auto` / `hint` popover, or any open
-`auto` / `hint` popover inside the dialog would take the close request; section 9), so the APG
-expectation holds; with `lightDismiss`, document `pointerdown` and `click` listeners (capture)
+Baseline JS for non-modal dialogs (both modes): Escape from inside the dialog closes it with
+`requestClose()`, by the rule of a modal dialog's close watcher and of the `auto` overlays:
+**`preventDefault()` on the `keydown`, by any listener, cancels the dismissal;
+`stopPropagation()` does not.** The dialog decides after the other listeners, in two steps:
+
+1. **Record**, a capture `keydown` listener on the dialog element: for an Escape while the
+   dialog is open it notes the event and whether it belongs to an inner layer, read from the
+   event path between the target and the dialog (an open nested `<dialog>`, an open `auto` /
+   `hint` popover) and from the dialog's content (any open `auto` / `hint` popover inside
+   would take the close request; section 9). The record is taken here because the layers'
+   close watchers run after the dispatch and because the path is complete at the dialog: at
+   the window the nodes of a closed shadow root are hidden, and a dialog may live in one.
+2. **Decide**, once per recorded event: in a bubble `keydown` listener the record step adds
+   to the window for this event only, so after every element, document and earlier window
+   listener; or, when a `stopPropagation()` kept the event from reaching the window, after
+   the dispatch has ended (the record step calls the internal `afterDispatch`, conventions
+   3.8 rule 5: a task for a key the user pressed, a microtask for a scripted event). The
+   dialog closes unless the event is
+   prevented, belonged to an inner layer, or the dialog is no longer open. When it closes
+   from the window listener it prevents the event first, so an enclosing layer (a modal
+   dialog's or an `auto` popover's close watcher, an outer non-modal dialog, a HoverCard)
+   stays open.
+
+So an inner layer that closes on Escape from JS (a `manual` HoverCard or Tooltip, on the
+document) closes first because it prevents the event, and a handler inside that consumes
+Escape (a Combobox chip, an input that clears itself) keeps the dialog open, as it keeps a
+modal one open. No listener stays on the window or the document for Escape. Two limits, both
+outside what a page can do better without a close watcher: on the late path the event can no
+longer be prevented, so an enclosing layer with a close watcher closes on the same Escape; and
+a **capture-phase** `stopPropagation()` above the dialog hides the event from the record step,
+as it hides it from everything inside the dialog.
+
+With `lightDismiss`, document `pointerdown` and `click` listeners (capture)
 close it when both the press and the click land outside the dialog, **the Trigger included**,
 as native `closedby="any"` does (#116; the click does not re-open the dialog: in library mode
 it arrives while the dialog is still optimistically open, in JS-free mode the Trigger saw it
@@ -714,7 +742,7 @@ alert dialog must not have. `tabIndex` passes through for the rare
 
 ```ts
 export interface DialogCloseState {
-  /** The `action` is in flight. */
+  /** From the click until the close this part asked for has committed (conventions 4.3). */
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -739,7 +767,8 @@ export interface DialogCloseProps
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the dialog
-   * still closes once. No effect without `action`. Conventions 2.5.1 (#146).
+   * still closes once. No effect without `action` (no `aria-disabled` either; the part still
+   * shows `data-pending` while its close waits). Conventions 2.5.1 (#146).
    * Default `"ignore"`.
    */
   whilePending?: WhilePending;
@@ -762,10 +791,23 @@ export interface DialogCloseDetails extends ActionDetails {
 Owned keys: `type`, `commandfor`, `command` (neither rendered with `action`), `value`,
 `disabled`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled` (`disabled` is owned on every part that takes
 the prop, conventions 1.2). In library mode the click is always `preventDefault()`ed (which
-cancels the `request-close` command) and the close goes through the Root (2.3): without
-`action`, `requestClose(event, "activate", value ?? "")` at once; with `action`, the part runs
-the action through the shared `useActionTrigger` (conventions 3.4), its own transition, and
-`requestClose` in its continuation: `run(() => action(details), () => requestClose(...))`. With
+cancels the `request-close` command) and the close goes through the Root (2.3), always from
+inside the part's own transition (the shared `useActionTrigger`, conventions 3.4): without
+`action`, `run(() => requestClose(event, "activate", value ?? ""))`, the request made
+synchronously in the click; with `action`, `requestClose` in the continuation:
+`run(() => action(details), () => requestClose(...))`.
+
+**Pending (conventions 4.3).** `state.pending` and `data-pending` last from the click until
+the close the part asked for has committed, with or without `action`: they cover the part's
+`action`, the Root's awaited `openChangeAction(false)`, and a pending async action elsewhere
+that React entangles the close with (a Cancel clicked while an `AlertDialog.Action` runs,
+`alert-dialog.md` 7.4). A modal dialog's Trigger is under the backdrop, so the Close is where
+the user sees that the click was taken. Without `action` the part resolves `whilePending` to
+`"run"`: no `aria-disabled` from pending, and a repeated click is a no-op because `false` is
+already intended. A close that does not happen (a controlled veto, a dismissal that
+superseded it) ends the pending state when the request settles. With a synchronous close
+nothing waits and the attribute is there for one commit at most; a spinner keyed on it should
+have a CSS delay, as on any trigger. With
 `action` the button renders no `commandfor` / `command` in either mode (#182, conventions 7.3):
 a pre-hydration click does nothing, instead of closing the dialog without running the action;
 without `action` the markup is the same in both modes and a pre-hydration click closes
@@ -1173,7 +1215,7 @@ Menu opened from inside the dialog renders inside its subtree and the top layer 
 
 | Close request | Modal, baseline | Modal, `experimental_closedBy` | Non-modal, baseline | Non-modal, `experimental_closedBy` |
 | --- | --- | --- | --- | --- |
-| Escape, Android back, AT dismiss | platform | platform (`closedby="closerequest"`) | JS `keydown` on the dialog → `requestClose()` | platform where `closedBy` exists, else JS |
+| Escape, Android back, AT dismiss | platform | platform (`closedby="closerequest"`) | JS `keydown` baseline (2.6) → `requestClose()` | platform where `closedBy` exists, else JS |
 | Backdrop / outside click | nothing; with `lightDismiss`: JS `pointerdown` + `click` on the dialog, target is the dialog and both points are outside its border box → `requestClose()` | with `lightDismiss`: platform (`closedby="any"`) | nothing; with `lightDismiss`: document `pointerdown` + `click` (capture), both outside the dialog → `requestClose()`; **the Trigger counts as outside** (#116: native `closedby="any"` has no invoker exemption, so a Trigger click on an open non-modal dialog is a dismissal on every path and engine; it does not re-open: in library mode the click arrives while the dialog is still optimistically open, in JS-free mode the Trigger saw it open at `pointerdown` and skips `show()`) | with `lightDismiss`: platform where `closedBy` exists, else JS |
 | Close part, Form submit | platform (`request-close` / `method="dialog"`) | same | same | same |
 
@@ -1373,7 +1415,9 @@ library surfaces it as `details.returnValue` (on the request and on the fact) an
 | Tab / Shift+Tab inside a modal dialog | cycles through the dialog's focusable content and the browser UI; the page is inert | browser |
 | Escape (modal) | closes via a close request; focus returns to the opener; `onOpenChange(false, { reason: "dismiss" })` | browser |
 | Escape (non-modal) | closes via `requestClose()` | Popup listener (or `closedby` with the flag) |
-| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal: the dialog's JS `keydown` listener **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. A `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher and does not take Escape: Escape inside it closes the dialog | browser / Popup listener |
+| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal (2.6): the dialog **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. It also ignores a **prevented** Escape: a `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher, and one that closes on Escape from JS (HoverCard, Tooltip: document listeners) prevents the keydown, so it closes first and the dialog stays open. A `manual` popover that does not handle Escape leaves it to the dialog: Escape inside it closes the dialog | browser / Popup listener |
+| Escape that a handler prevented (`preventDefault()`) | does not close, modal or not | browser / Popup listener |
+| Escape whose propagation a handler stopped (`stopPropagation()`) | closes all the same, modal or not | browser / Popup listener |
 | Enter in a form field | submits the Form: closes (`method="dialog"`) or runs the action then closes | browser / Form |
 
 | Part | ARIA |
@@ -1564,8 +1608,8 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
    `O=false`, `P=true` (Trigger `data-pending`), `openChangeAction(false, { reason: "activate",
    returnValue: "save" })` awaited → resolves → `C=false` commits (children unmounted inside the
    view transition if `transition` is set, else held, 4.4) → apply effect `close("save")` →
-   `dialog.returnValue === "save"`, focus back on the Trigger (platform) → `close` event: `false`
-   intended → echo, no dispatch. `P=false`.
+   `dialog.returnValue === "save"`, focus back on the Trigger (platform) → `close` event: the
+   `libraryClose` marker → echo, no dispatch. `P=false`.
 8. **Overlap: part-initiated close pending, user dismisses, then re-opens.** A slow
    `openChangeAction(false)` from a Close (`O=false`, `P=true`, `C=true`, dialog open). Escape:
    the fact supersedes the close (13). Click Trigger: `O=false`, so it is a real dispatch:
@@ -1617,7 +1661,7 @@ uncontrolled, `defaultOpen={false}`, modal, `keepMounted={false}`.
     `old`, unmounts the children, runs the apply effect's `close("cancel")` inside the update
     callback (`beforetoggle` sets `awaitingClose`; the platform restores focus to the Trigger),
     the `new` snapshot has no box → the exit plays in every engine. `close` event (a task
-    later): `awaitingClose` cleared; `false` intended → echo, no dispatch; animation read
+    later): `awaitingClose` cleared; the `libraryClose` marker → echo, no dispatch; animation read
     skipped (`transition` set). `P=false`. Firefox shows the same exit, which no CSS can give it.
 12. **Same, `transition` absent, Chromium.** As 11 until `C=false`: the render sees committed
     `true → false` and sets `held`, so the children stay; apply effect `close("cancel")`; the

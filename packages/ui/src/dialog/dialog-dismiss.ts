@@ -1,16 +1,13 @@
 // Dialog's JS baseline for what the platform gives only behind `closedby`: Escape on a
 // non-modal dialog and light dismiss (design/components/dialog.md 2.6). No "use client"
 // directive: DOM listeners only (conventions 7.1).
+import { afterDispatch } from "../internal/after-dispatch.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
-
-/** The nearest `<dialog>` around a node (the dialog itself counts). */
-function closestDialog(target: EventTarget | null): Element | null {
-  return target instanceof Element ? target.closest("dialog") : null;
-}
 
 /**
  * An open popover that takes Escape before the dialog: `auto` or `hint` (they have a close
- * watcher). A `manual` popover, or `hint` where the engine maps it to `manual`, does not.
+ * watcher). A `manual` popover, or `hint` where the engine maps it to `manual`, does not; one
+ * that closes on Escape from JS (HoverCard, Tooltip) prevents the `keydown` instead.
  */
 function isOpenLightPopover(element: Element): boolean {
   if (!element.hasAttribute("popover")) return false;
@@ -23,19 +20,19 @@ function isOpenLightPopover(element: Element): boolean {
 }
 
 /**
- * Whether Escape belongs to a layer inside `dialog` that sits above it (design 9: "closes the
- * innermost one only"): the target is inside an open nested `<dialog>` or popover, or an open
- * `auto` / `hint` popover inside the dialog would take the close request (close watchers are
- * per document, not per focus).
+ * Whether an Escape `keydown` at `dialog` belongs to a layer inside it that sits above it
+ * (design 2.6 and 9: "closes the innermost one only"), read from the event path **at the
+ * dialog**, where it is complete in any shadow mode: the target is inside an open nested
+ * `<dialog>` (that dialog's Escape) or an open `auto` / `hint` popover, or an open `auto` /
+ * `hint` popover inside the dialog would take the close request (close watchers are per
+ * document, not per focus).
  */
-function escapeBelongsToInnerLayer(dialog: HTMLDialogElement, target: EventTarget | null): boolean {
-  for (
-    let node = target instanceof Element ? target : null;
-    node !== null && node !== dialog;
-    node = node.parentElement
-  ) {
+function escapeBelongsToInnerLayer(dialog: HTMLDialogElement, event: Event): boolean {
+  const path = event.composedPath();
+  const index = path.indexOf(dialog);
+  for (const node of path.slice(0, Math.max(index, 0))) {
     if (node instanceof HTMLDialogElement && node.open) return true;
-    if (isOpenLightPopover(node)) return true;
+    if (node instanceof Element && isOpenLightPopover(node)) return true;
   }
   for (const element of dialog.querySelectorAll("[popover]")) {
     if (isOpenLightPopover(element)) return true;
@@ -76,22 +73,48 @@ export function listenDialogDismiss(
   const doc = dialog.ownerDocument;
   const listeners: [string, EventListener][] = [];
 
-  if (!modal) {
-    // Non-modal dialogs get no close watcher Escape from the platform (design 2.6).
-    listeners.push([
-      "keydown",
-      (event) => {
-        const keyboardEvent = event as KeyboardEvent;
-        if (keyboardEvent.key !== "Escape" || keyboardEvent.defaultPrevented) return;
-        if (!dialog.open || closestDialog(keyboardEvent.target) !== dialog) return;
-        // A popover or nested dialog inside takes this Escape (its close watcher); leave the
-        // event alone so that it can.
-        if (escapeBelongsToInnerLayer(dialog, keyboardEvent.target)) return;
-        keyboardEvent.preventDefault();
-        dialog.requestClose();
-      },
-    ]);
+  // Non-modal dialogs get no close watcher Escape from the platform (design 2.6). Record at the
+  // dialog, decide last (#177): a capture listener on the dialog records the Escape and the
+  // inner-layer snapshot (the path is complete there in any shadow mode, and no close watcher
+  // has closed a layer yet). The decision runs in a window bubble listener added for that event
+  // only, after every element and document listener, so an inner layer that closed on Escape
+  // from JS (a `manual` HoverCard or Tooltip) has prevented it by then: a prevented `keydown` is
+  // no close request, as for a modal dialog's close watcher. `stopPropagation()` does not keep
+  // the dialog open: when the event never reaches the window, the late path (`afterDispatch`)
+  // decides instead, without preventing (the dispatch is over). The first of the two wins.
+  const win = doc.defaultView;
+  let pending: { readonly event: KeyboardEvent; readonly inner: boolean } | null = null;
+  let cancelLate: (() => void) | null = null;
+  const clearPending = () => {
+    pending = null;
+    win?.removeEventListener("keydown", onWindow);
+    cancelLate?.();
+    cancelLate = null;
+  };
+  const settle = (canPrevent: boolean) => {
+    const record = pending;
+    clearPending();
+    if (record === null) return;
+    const { event, inner } = record;
+    if (event.defaultPrevented || inner || !dialog.open || !dialog.isConnected) return;
+    if (canPrevent) event.preventDefault();
+    dialog.requestClose();
+  };
+  function onWindow(event: Event): void {
+    if (pending === null || event !== pending.event) return;
+    settle(true);
   }
+  const record = (event: Event) => {
+    const keyboardEvent = event as KeyboardEvent;
+    if (keyboardEvent.key !== "Escape" || !dialog.open) return;
+    if (pending?.event === keyboardEvent) return;
+    // A new Escape while one is pending: the old event's dispatch is over; replace it.
+    clearPending();
+    pending = { event: keyboardEvent, inner: escapeBelongsToInnerLayer(dialog, keyboardEvent) };
+    win?.addEventListener("keydown", onWindow);
+    cancelLate = afterDispatch(keyboardEvent, () => settle(false));
+  };
+  if (!modal) dialog.addEventListener("keydown", record, true);
 
   // Light dismiss needs both the press and the click outside, like native `closedby="any"`: a
   // drag that starts inside (selecting text in an input) and ends on the backdrop or outside
@@ -158,6 +181,8 @@ export function listenDialogDismiss(
   for (const [type, listener] of listeners) dialog.addEventListener(type, listener);
   return () => {
     for (const [type, listener] of listeners) dialog.removeEventListener(type, listener);
+    if (!modal) dialog.removeEventListener("keydown", record, true);
+    clearPending();
     if (outsideAttached) {
       doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
       doc.removeEventListener("click", onOutsideClick, true);

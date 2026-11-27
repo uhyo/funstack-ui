@@ -362,6 +362,9 @@ const directiveFreeFiles = [
   "csp/index.mjs",
   "csp/style-hashes.mjs",
   "tooltip/tooltip-warm.mjs",
+  // A scheduling helper with no React: form reset and Dialog's Escape baseline (internal-hooks.md
+  // 3.8 rule 5).
+  "internal/after-dispatch.mjs",
 ];
 
 /** Files a release removed; a stale build must not keep shipping them (button.md row 20). */
