@@ -14868,3 +14868,20 @@ Code owed, replacing the timer lines of the entry above:
   settle(false))` instead of the timer; `settle` and the cleanup call `cancelLate()`.
 - Rows: the `stopPropagation()` rows in jsdom settle in a microtask (`await` once, no fake
   timers); the browser `stopPropagation()` rows (a real key) cover the task.
+
+## 2026-11-27, #177: record at the dialog, decide last, implemented
+
+Developer. The checklists of the two architect entries above, as written:
+`internal/after-dispatch.ts` (the API and body of the `afterDispatch` entry), the capture
+`record` / per-event window `onWindow` / `settle(canPrevent)` in `dialog-dismiss.ts`, and
+`containsOpenLayer(popup, event)` in HoverCard. No deviation. Rows: `dialog-escape.test.tsx`
+(jsdom: open and closed shadow roots with and without a HoverCard inside, nested and sibling
+non-modal dialogs, `stopPropagation()` from a native listener and from a React ancestor with and
+without `preventDefault()`, prevention from document and window listeners, a Combobox chip, a
+non-modal Dialog inside a HoverCard, and the window-listener leak rows) and
+`dialog.browser.test.tsx` (a non-modal Dialog inside a modal one, `stopPropagation()` on a real
+key press closing through the task, and `stopPropagation()` with an `auto` popover open inside).
+Two test notes: a window-listener count must replay adds and removes in call order (`record`
+removes before it adds), and a scripted Escape has settled by the time `act()` returns, so the
+"unmount while pending" row unmounts from a listener inside the dispatch. The `directives.test.ts`
+row for `internal/after-dispatch.mjs` is left to #185, which adds the same file.

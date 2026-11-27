@@ -549,7 +549,7 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
           ["Escape in a nested dialog", "Closes the innermost one only", "the browser"],
           [
             "Escape with a Popover, Menu, HoverCard or Tooltip open inside",
-            "Closes that layer only; the next Escape closes the dialog (modal and non-modal). A handler inside that calls `preventDefault()` on the Escape keeps the dialog open",
+            "Closes that layer only; the next Escape closes the dialog (modal and non-modal). A handler that calls `preventDefault()` on the Escape keeps the dialog open; `stopPropagation()` does not, as for the browser's own Escape",
             "the browser, the inner component, or the Popup (non-modal)",
           ],
           [

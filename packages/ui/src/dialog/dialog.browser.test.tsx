@@ -625,6 +625,90 @@ describe("Dialog (browser)", () => {
     });
   });
 
+  // #177, decided last (dialog.md 2.6): a real key press, so the late path of a stopped event
+  // is a task (a microtask checkpoint follows every listener of a user-caused dispatch).
+  describe("non-modal Escape: record at the dialog, decide last", () => {
+    it("a non-modal Dialog inside a modal one: Escape closes the inner only", async () => {
+      render(
+        <Dialog.Root defaultOpen={false}>
+          <Dialog.Trigger data-testid="trigger">Settings</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Settings" style={{ width: 400 }}>
+            <Dialog.Root defaultOpen={false} modal={false}>
+              <Dialog.Trigger data-testid="inner-trigger">Help</Dialog.Trigger>
+              <Dialog.Popup data-testid="inner" aria-label="Help">
+                <button type="button" data-testid="inner-inside">
+                  Inside
+                </button>
+              </Dialog.Popup>
+            </Dialog.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      expect(isModal()).toBe(true);
+      await user.click(screen.getByTestId("inner-trigger"));
+      const inner = screen.getByTestId("inner") as HTMLDialogElement;
+      await settle(() => expect(inner.open).toBe(true));
+      screen.getByTestId("inner-inside").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(inner.open).toBe(false));
+      await quietPeriod(50, "the inner dialog's Escape must not also close the modal one");
+      expect(popup().open).toBe(true);
+      screen.getByTestId("inner-trigger").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(popup().open).toBe(false));
+    });
+
+    it("stopPropagation() inside: a non-modal dialog still closes (the late path), one fact", async () => {
+      const fact = vi.fn<ActionFn>();
+      render(
+        <Dialog.Root defaultOpen={false} modal={false} onOpenChange={fact}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Help">
+            <input data-testid="field" onKeyDown={(event) => event.stopPropagation()} />
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      screen.getByTestId("field").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(popup().open).toBe(false));
+      await quietPeriod(50, "one fact only");
+      const closes = fact.mock.calls.filter(([next]) => !next);
+      expect(closes).toHaveLength(1);
+      expect(closes[0]![1].reason).toBe("dismiss");
+    });
+
+    it("stopPropagation() with an auto Popover open inside: the popover closes, the dialog stays", async () => {
+      render(
+        <Dialog.Root defaultOpen={false} modal={false}>
+          <Dialog.Trigger data-testid="trigger">Help</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Help">
+            <div onKeyDown={(event) => event.stopPropagation()}>
+              <button type="button" data-testid="inside">
+                Inside
+              </button>
+              <div popover="auto" data-testid="menu">
+                <button type="button" data-testid="item">
+                  Item
+                </button>
+              </div>
+            </div>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      const menu = screen.getByTestId("menu");
+      act(() => menu.showPopover());
+      screen.getByTestId("item").focus();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(menu.matches(":popover-open")).toBe(false));
+      // The snapshot at the record step saw the open popover; the late path must not close.
+      await quietPeriod(100, "the late path must not close the dialog too");
+      expect(popup().open).toBe(true);
+    });
+  });
+
   describe("light dismiss", () => {
     /** A real click on the ::backdrop: on the dialog, outside its border box. */
     async function clickBackdrop() {

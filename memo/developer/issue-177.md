@@ -2,18 +2,21 @@
 
 - Cause: `listenDialogDismiss` listened on the `<dialog>` (bubble), so it ran before the
   document Escape listeners of HoverCard and Tooltip; `manual` popovers were skipped by the
-  inner-layer check, so the dialog closed first (and HoverCard then stood down because the event
-  was prevented).
-- Fix: the non-modal Escape listener is on `doc.defaultView` (window, bubble), after every
-  element and document listener; it ignores a prevented keydown (same as the platform close
-  watcher of a modal dialog). Inner-layer check moved from `target.closest()` to
-  `composedPath()` (at window, target is retargeted out of shadow roots).
-- Rejected: "any open popover inside counts" (HoverCard's own rule). A consumer manual popover
-  without an Escape handler would make Escape dead; the existing jsdom "toast" row pins that
-  such a popover leaves Escape to the dialog.
-- Side effect: React `onKeyDown` preventing Escape inside the dialog now keeps a non-modal
-  dialog open (React's root listener runs before window). Also `stopPropagation()` on Escape
-  inside the dialog now blocks it (did not before).
-- Modal Dialog / AlertDialog / modal Drawer: platform close watcher, already respects the
-  prevented keydown; covered by the new browser rows (modal x manual/hint).
+  inner-layer check, so the dialog closed first.
+- First fix (f46cca10): a standing window bubble listener. Review found (a) closed shadow roots:
+  `composedPath()` at the window hides the nodes, dialog never closed; (b) `stopPropagation()`
+  anywhere cancelled the dismissal.
+- Final mechanism (architect, CHANGELOG entries "preventDefault() cancels, stopPropagation()
+  does not" and "afterDispatch"): capture listener on the dialog records the Escape + inner-layer
+  snapshot; a per-event window bubble listener decides with `settle(true)`; if propagation was
+  stopped, `afterDispatch` (internal/after-dispatch.ts, shared with #185) decides with
+  `settle(false)`. Scripted events settle in a microtask, real keys in a task.
+- HoverCard `containsOpenLayer(popup, event)` also counts an open non-modal dialog inside the
+  card that contains the target (the dialog now decides after the card's document listener).
+- Test gotcha: counting window listeners must replay add/remove in call order
+  (`invocationCallOrder`): `record` calls `removeEventListener` before `addEventListener`.
+- Test gotcha: with scripted events the late path has already run when `act()` returns, so
+  "unmount while pending" must unmount from a listener inside the dispatch.
 - WebKit is not runnable locally (missing host libs); relied on CI for it.
+- Follow-ups not done here (review nit 10): Escape path ignores `isComposing`; Tooltip's document
+  Escape listener does not check `defaultPrevented`.

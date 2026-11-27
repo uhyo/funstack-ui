@@ -1,6 +1,7 @@
 // Dialog's JS baseline for what the platform gives only behind `closedby`: Escape on a
 // non-modal dialog and light dismiss (design/components/dialog.md 2.6). No "use client"
 // directive: DOM listeners only (conventions 7.1).
+import { afterDispatch } from "../internal/after-dispatch.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 
 /**
@@ -19,18 +20,18 @@ function isOpenLightPopover(element: Element): boolean {
 }
 
 /**
- * Whether an Escape `keydown`, still being dispatched, is not this dialog's (design 2.6 and 9:
- * "closes the innermost one only"), read from its event path: it did not come from inside
- * `dialog`, or the target is inside a nested `<dialog>` (that dialog's Escape) or an open `auto` /
- * `hint` popover, or an open `auto` / `hint` popover inside the dialog would take the close
- * request (close watchers are per document, not per focus).
+ * Whether an Escape `keydown` at `dialog` belongs to a layer inside it that sits above it
+ * (design 2.6 and 9: "closes the innermost one only"), read from the event path **at the
+ * dialog**, where it is complete in any shadow mode: the target is inside an open nested
+ * `<dialog>` (that dialog's Escape) or an open `auto` / `hint` popover, or an open `auto` /
+ * `hint` popover inside the dialog would take the close request (close watchers are per
+ * document, not per focus).
  */
-function escapeIsNotTheDialogs(dialog: HTMLDialogElement, event: Event): boolean {
+function escapeBelongsToInnerLayer(dialog: HTMLDialogElement, event: Event): boolean {
   const path = event.composedPath();
   const index = path.indexOf(dialog);
-  if (index < 0) return true;
-  for (const node of path.slice(0, index)) {
-    if (node instanceof HTMLDialogElement) return true;
+  for (const node of path.slice(0, Math.max(index, 0))) {
+    if (node instanceof HTMLDialogElement && node.open) return true;
     if (node instanceof Element && isOpenLightPopover(node)) return true;
   }
   for (const element of dialog.querySelectorAll("[popover]")) {
@@ -72,22 +73,48 @@ export function listenDialogDismiss(
   const doc = dialog.ownerDocument;
   const listeners: [string, EventListener][] = [];
 
-  // Non-modal dialogs get no close watcher Escape from the platform (design 2.6). The listener
-  // is on the window, so it runs after every listener of the elements and of the document: an
-  // inner layer that closes on Escape from JS (a `manual` HoverCard or Tooltip, listening on the
-  // document) has prevented the event by then, and a prevented `keydown` is no close request,
-  // as for the platform's watcher of a modal dialog (#177).
-  const onEscape = (event: Event) => {
-    const keyboardEvent = event as KeyboardEvent;
-    if (keyboardEvent.key !== "Escape" || keyboardEvent.defaultPrevented || !dialog.open) return;
-    // A popover with a close watcher or a nested dialog inside takes this Escape; leave the
-    // event alone so that it can.
-    if (escapeIsNotTheDialogs(dialog, keyboardEvent)) return;
-    keyboardEvent.preventDefault();
+  // Non-modal dialogs get no close watcher Escape from the platform (design 2.6). Record at the
+  // dialog, decide last (#177): a capture listener on the dialog records the Escape and the
+  // inner-layer snapshot (the path is complete there in any shadow mode, and no close watcher
+  // has closed a layer yet). The decision runs in a window bubble listener added for that event
+  // only, after every element and document listener, so an inner layer that closed on Escape
+  // from JS (a `manual` HoverCard or Tooltip) has prevented it by then: a prevented `keydown` is
+  // no close request, as for a modal dialog's close watcher. `stopPropagation()` does not keep
+  // the dialog open: when the event never reaches the window, the late path (`afterDispatch`)
+  // decides instead, without preventing (the dispatch is over). The first of the two wins.
+  const win = doc.defaultView;
+  let pending: { readonly event: KeyboardEvent; readonly inner: boolean } | null = null;
+  let cancelLate: (() => void) | null = null;
+  const clearPending = () => {
+    pending = null;
+    win?.removeEventListener("keydown", onWindow);
+    cancelLate?.();
+    cancelLate = null;
+  };
+  const settle = (canPrevent: boolean) => {
+    const record = pending;
+    clearPending();
+    if (record === null) return;
+    const { event, inner } = record;
+    if (event.defaultPrevented || inner || !dialog.open || !dialog.isConnected) return;
+    if (canPrevent) event.preventDefault();
     dialog.requestClose();
   };
-  const escapeTarget: EventTarget | null = modal ? null : (doc.defaultView ?? doc);
-  escapeTarget?.addEventListener("keydown", onEscape);
+  function onWindow(event: Event): void {
+    if (pending === null || event !== pending.event) return;
+    settle(true);
+  }
+  const record = (event: Event) => {
+    const keyboardEvent = event as KeyboardEvent;
+    if (keyboardEvent.key !== "Escape" || !dialog.open) return;
+    if (pending?.event === keyboardEvent) return;
+    // A new Escape while one is pending: the old event's dispatch is over; replace it.
+    clearPending();
+    pending = { event: keyboardEvent, inner: escapeBelongsToInnerLayer(dialog, keyboardEvent) };
+    win?.addEventListener("keydown", onWindow);
+    cancelLate = afterDispatch(keyboardEvent, () => settle(false));
+  };
+  if (!modal) dialog.addEventListener("keydown", record, true);
 
   // Light dismiss needs both the press and the click outside, like native `closedby="any"`: a
   // drag that starts inside (selecting text in an input) and ends on the backdrop or outside
@@ -154,7 +181,8 @@ export function listenDialogDismiss(
   for (const [type, listener] of listeners) dialog.addEventListener(type, listener);
   return () => {
     for (const [type, listener] of listeners) dialog.removeEventListener(type, listener);
-    escapeTarget?.removeEventListener("keydown", onEscape);
+    if (!modal) dialog.removeEventListener("keydown", record, true);
+    clearPending();
     if (outsideAttached) {
       doc.removeEventListener("pointerdown", onOutsidePointerDown, true);
       doc.removeEventListener("click", onOutsideClick, true);
