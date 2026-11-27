@@ -15297,3 +15297,67 @@ Developer, on review-191-192 (`memo/reviewer/review-191-192.md`).
   unprevented; the header says the Firefox / WebKit rows replay synthetic events and assert
   that the engine's `KeyboardEvent` init honours `isComposing` and `keyCode`; the HoverCard IME
   row notes it also passes on master in Chromium.
+
+## 2026-11-27, #193: a Field writes its state after an edit's dispatch, the slot in the listener
+
+Developer (`memo/developer/issue-193.md`). Changed: field-form.md 2.2 (one sentence), 2.4 (the
+"Edits" paragraph), 3.4 (`dismissed` kept as a settle count); the `after-dispatch.ts` line of
+internal-hooks.md's file list.
+
+- **Root cause.** Field.Root's `input` / `change` listener is on the control (capture), React's
+  on the root, so the Field's runs first. Chromium runs a microtask checkpoint after each
+  listener of an `input` the user caused (the probe: a microtask queued in the Field's listener
+  saw `eventPhase === AT_TARGET`; in Firefox it saw `NONE`, after the dispatch). The Field's
+  `setMirror` (and `dismiss`, `setSuppressNext`) is a sync-lane update, flushed in that
+  checkpoint: the commit re-rendered the control with its previous controlled `value`, React's
+  listener then read the reverted DOM, and the keystroke was gone. Only a keystroke whose
+  mirror differs from the last one commits, hence "the keystroke that flips validity". Not the
+  Combobox draft, not `selectionchange`, not `setCustomValidity` itself.
+- **Affected** (Chromium; a browser row each, failing on the old code): Combobox's text, a
+  controlled `Field.Control` text input, a `Field.Control` rendering a controlled `<select>`,
+  `Select` (arrow keys on the closed select: `input` then `change`, React's `onChange` is the
+  `change`), OTPField, and the first keystroke that dismisses a shown server error (any
+  controlled control). **Not affected**: an uncontrolled `Field.Control` (React writes no
+  value), NumberField (its validity changes at the commit, in React's own handler, not on a
+  keystroke; rows guard it), MultiSelect, Checkbox, Switch, RadioGroup, Slider (their edits
+  reach React first, through `click` / pointer handlers, and tell the Field after the commit
+  with `notifyChange`).
+- **Decision (one principle, no engine check):** in an edit's listener the Field writes only
+  the DOM (the slot, so the platform's validity is right at once); every React state write
+  goes through `afterDispatch`, which also recomputes the slot from the value React settled on.
+  Cross-field edits on the form owner take the same path. Until the deferred write, a pending
+  edit already counts as a dismissal for every slot write (a blur or an Enter in between does
+  not put the edited-away server message back). `invalid`, `focusout` and the reset
+  are unchanged (no edit in flight; the reset already used `afterDispatch`).
+- **`dismissed` as a count.** Deferring the dismissal broke jsdom's OTPField
+  `submitOnComplete` row: the completing keystroke starts the submission inside its own
+  dispatch, so the dismissal landed during the flight, and React rebased that sync update over
+  the settle's render-phase `setDismissed(false)`: the answer was hidden. `editedAt` records
+  the committed settle count at the edit; `serverShown` requires `editedAt !== settles`, so a
+  late or rebased write is stale by construction.
+- **Rejected:** batching through React's synthetic `onInput` on Field.Root (fixes text inputs,
+  but a `<select>` commits between `input` and `change`); a `document` listener after React's
+  (lost to `stopPropagation`); a transition for the mirror (2.4 keeps it urgent); always a
+  task (would delay the script-dispatch path that is correct today).
+- **Rows:** browser `packages/ui/src/field/field-edit.browser.test.tsx` (outside `act`, every
+  control above with `validate` and with `required`, both directions, before and after a blur
+  so `aria-invalid` is live; the server-error row). jsdom in `field.test.tsx`: a target-phase
+  listener calling `flushSync` models the checkpoint (controlled control both modes, Combobox;
+  during the dispatch the slot is written and the state is not; a parent that keeps the old
+  text leaves the slot valid). All fail on the old code.
+- **Corrects** the #185 developer entry's description of this bug as "in a Combobox Input": it
+  is any controlled control in a Field.
+
+## 2026-11-27, #193 review: the deferred writes commit with `flushSync`
+
+Developer, after the review (`memo/reviewer/review-193.md`). Corrects the previous entry's
+2.4 sentence ("still the urgent lane ... in the same microtask as before"), which was wrong:
+written from a microtask or a task with no event, the deferred writes got React's default lane
+and committed in a later Scheduler task, so a frame could paint the old `aria-invalid` /
+`Field.Error`. Changed: field-form.md 2.4 (that sentence). The deferred dismissal and refresh
+now run inside `flushSync`; the dispatch is over then, so the synchronous commit cannot clobber
+the keystroke. `showsServerError` (the Form's settle focus) also treats a pending edit as a
+dismissal, like the slot. New browser rows: Enter right after the keystroke that makes the
+field invalid (blocked, text kept); Enter right after the keystroke that dismisses a server
+error (the new text is submitted, the errors re-show after the settle). Select-all in the rows
+is `{ControlOrMeta>}a`, so they also hold on macOS.

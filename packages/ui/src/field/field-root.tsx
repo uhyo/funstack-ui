@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
-import { useFormStatus } from "react-dom";
+import { flushSync, useFormStatus } from "react-dom";
 import { FieldContext, fieldDataAttributes, FormContext } from "../internal/form/field-context.js";
 import type {
   FieldContextValue,
@@ -18,6 +18,7 @@ import type {
   FieldState,
   FormFieldRegistration,
 } from "../internal/form/field-context.js";
+import { afterDispatch } from "../internal/after-dispatch.js";
 import { collectInvalid } from "../internal/form/focus-first-invalid.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -116,6 +117,15 @@ interface RefreshOptions {
   readonly dismiss?: boolean;
   /** After a form reset: the user-validity flag is clear again. */
   readonly reset?: boolean;
+}
+
+/** What `writeSlot` computed, for the mirror read that follows it. */
+interface SlotRead {
+  readonly el: ValidatableElement;
+  readonly surface: ValidatableElement | null;
+  readonly formData: FormData;
+  readonly custom: readonly string[];
+  readonly showServer: boolean;
 }
 
 function mirrorEquals(a: Mirror, b: Mirror): boolean {
@@ -229,7 +239,7 @@ export function FieldRoot({
     [errors, name],
   );
   const serverKey = serverMessages.join("\n");
-  const { serverShown, dismiss, setSuppressNext } = useServerErrorVisibility(
+  const { serverShown, dismiss, recordEdit, setSuppressNext } = useServerErrorVisibility(
     formPending,
     serverMessages,
   );
@@ -245,19 +255,24 @@ export function FieldRoot({
   const slotElement = useRef<ValidatableElement | null>(null);
 
   const latest = useLatest({ name, validate, serverMessages, serverShown, formPending, form });
+  /** An edit of the control whose state write is pending (`refreshAfterEdit`): its dismissal. */
+  const pendingEdit = useRef<(() => void) | null>(null);
 
-  /** Re-reads the slot and the mirror; returns the messages the Field shows for the control. */
-  const refresh = useCallback(
-    (options: RefreshOptions = {}): readonly string[] => {
+  /**
+   * Recomputes and writes the custom-validity slot (design 2.1). No React state is written, so it
+   * is safe in any listener; `null` when there is no control (or no element to validate).
+   */
+  const writeSlot = useCallback(
+    (options: RefreshOptions = {}): SlotRead | null => {
       const registration = controlRef.current;
-      if (registration === null) return NONE;
+      if (registration === null) return null;
       // The element whose validity is real (field-form.md, `validityElement`) and the
       // element whose `:user-invalid` the user's interaction sets; the same for every control but
       // NumberField.
       const surface = validityElementOf(registration.element);
       const el = registration.validityElement?.() ?? surface;
-      if (el === null) return NONE;
-      const { name, validate, serverMessages, serverShown, formPending, form } = latest.current;
+      if (el === null) return null;
+      const { name, validate, serverMessages, serverShown } = latest.current;
 
       const owner = el.form;
       const formData = owner === null ? new FormData() : new FormData(owner);
@@ -265,8 +280,10 @@ export function FieldRoot({
       const value = typeof entry === "string" ? entry : "";
       const custom = validate === undefined ? NONE : normaliseErrorValue(validate(value, formData));
 
-      // The slot (design 2.1): the server message while shown, else `validate`'s.
-      const showServer = serverShown && options.dismiss !== true;
+      // The slot (design 2.1): the server message while shown, else `validate`'s. An edit whose
+      // dismissal is not written yet (2.4) already counts: a submission attempt before it
+      // (an Enter in the next task) must not be blocked by the message the user edited away.
+      const showServer = serverShown && options.dismiss !== true && pendingEdit.current === null;
       if (slotElement.current !== null && slotElement.current !== el) {
         slotElement.current.setCustomValidity("");
       }
@@ -281,6 +298,18 @@ export function FieldRoot({
       ) {
         surface.setCustomValidity(el.validationMessage);
       }
+      return { el, surface, formData, custom, showServer };
+    },
+    [latest],
+  );
+
+  /** Re-reads the slot and the mirror; returns the messages the Field shows for the control. */
+  const refresh = useCallback(
+    (options: RefreshOptions = {}): readonly string[] => {
+      const read = writeSlot(options);
+      if (read === null) return NONE;
+      const { el, surface, formData, custom, showServer } = read;
+      const { name, serverMessages, formPending, form } = latest.current;
 
       if (options.reset === true) attempted.current = false;
       const userInvalid = supportsUserInvalid()
@@ -311,7 +340,50 @@ export function FieldRoot({
       }
       return showServer ? serverMessages : messages;
     },
-    [latest, setSuppressNext],
+    [latest, setSuppressNext, writeSlot],
+  );
+
+  /** The pending state write of the last edit, cancelled by the next one (it covers both). */
+  const cancelEditRefresh = useRef<(() => void) | null>(null);
+  /**
+   * An `input` / `change` (the control's own, or another field's on the form owner): the slot now,
+   * the state after the event's dispatch (design 2.4, `afterDispatch`). A state write in the
+   * listener would commit in the microtask checkpoint Chromium runs after it, before React's own
+   * listener has seen the event, and that commit writes a controlled input's previous `value`
+   * back over the keystroke (#193). After the dispatch the slot is recomputed too, from the value
+   * React settled on (a controlled parent that did not adopt the text restores the old one).
+   */
+  const refreshAfterEdit = useCallback(
+    (event: Event, edit: boolean): void => {
+      // An own edit still pending dismisses when another field's edit replaces its write.
+      const applyEdit = edit ? recordEdit() : pendingEdit.current;
+      pendingEdit.current = applyEdit;
+      writeSlot({ dismiss: applyEdit !== null });
+      cancelEditRefresh.current?.();
+      const cancel = afterDispatch(event, () => {
+        // Defence in depth: the next edit cancels this call, but only the latest write may run.
+        if (cancelEditRefresh.current !== cancel) return;
+        cancelEditRefresh.current = null;
+        pendingEdit.current = null;
+        // Committed at once, as the listener's own write used to be: outside any event React
+        // would give these writes the default lane and a paint could show the old error state.
+        // The dispatch is over, so a synchronous commit can no longer clobber the keystroke.
+        flushSync(() => {
+          applyEdit?.();
+          refresh({ dismiss: applyEdit !== null });
+        });
+      });
+      cancelEditRefresh.current = cancel;
+    },
+    [writeSlot, refresh, recordEdit],
+  );
+  // Nothing is written after the Field is gone.
+  useLayoutEffect(
+    () => () => {
+      cancelEditRefresh.current?.();
+      cancelEditRefresh.current = null;
+    },
+    [],
   );
 
   // The slot follows the server error and `validate` (and is written once the control is known).
@@ -335,10 +407,7 @@ export function FieldRoot({
   const element = control?.element ?? null;
   useLayoutEffect(() => {
     if (element === null) return;
-    const onEdit = () => {
-      dismiss();
-      refresh({ dismiss: true });
-    };
+    const onEdit = (event: Event) => refreshAfterEdit(event, true);
     const onBlur = () => refresh();
     const onInvalid = (event: Event) => {
       const target = event.target as ValidatableElement;
@@ -373,7 +442,7 @@ export function FieldRoot({
       element.removeEventListener("invalid", onInvalid, true);
       if (listenOutside) outside.removeEventListener("invalid", onInvalid, true);
     };
-  }, [element, control, refresh, dismiss]);
+  }, [element, control, refresh, refreshAfterEdit]);
 
   // The form owner's events: another field's edit re-runs `validate` (cross-field rules); a reset
   // clears the user-validity flag, re-read when the controls hold their reset values.
@@ -389,7 +458,7 @@ export function FieldRoot({
   const onOwnerEdit = (event: Event) => {
     const target = event.target;
     if (target instanceof Node && controlRef.current?.element.contains(target) === true) return;
-    refresh();
+    refreshAfterEdit(event, false);
   };
   useFormOwnerEvent(ownerRef, "input", onOwnerEdit);
   useFormOwnerEvent(ownerRef, "change", onOwnerEdit);
@@ -409,7 +478,8 @@ export function FieldRoot({
     if (registerField === undefined) return;
     const registration: FormFieldRegistration = {
       getFocusTarget: () => focusTargetOf(controlRef.current?.element ?? null),
-      showsServerError: () => latest.current.serverShown,
+      // An edit whose dismissal is not written yet already counts (design 2.4).
+      showsServerError: () => latest.current.serverShown && pendingEdit.current === null,
       serverMessages: () => latest.current.serverMessages,
       refresh: () => {
         refresh();

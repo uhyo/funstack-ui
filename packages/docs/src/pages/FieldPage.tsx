@@ -125,8 +125,10 @@ import { Form } from "@funstack/ui/form";
           the browser's bubble, as without the library.
         </li>
         <li>
-          The display state is updated synchronously from the DOM event, not in a transition: the
-          error must be in the DOM when focus reaches the field. So no Field part takes a{" "}
+          The display state is updated urgently from the DOM event, not in a transition: the error
+          must be in the DOM when focus reaches the field. After an edit it is updated once the
+          event has been dispatched, so your own <code>onChange</code> on a controlled control runs
+          first; the browser's validity follows the new value at once. So no Field part takes a{" "}
           <code>transition</code> prop, <code>Field.Error</code> animates its entry with CSS{" "}
           <code>@starting-style</code>, and content rendered inside it must not suspend.
         </li>
@@ -507,7 +509,7 @@ import { Form } from "@funstack/ui/form";
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "A Form with a function `action` runs it in its own transition: `data-pending` is on the form, on `Form.Submit` and on every Field part while the submission is in flight. A Field's display state (whether its error shows) is updated synchronously from the DOM event, not in a transition."
+          "A Form with a function `action` runs it in its own transition: `data-pending` is on the form, on `Form.Submit` and on every Field part while the submission is in flight. A Field's display state (whether its error shows) is updated urgently from the DOM event (after an edit, once the event has been dispatched), not in a transition."
         }
       />
 
