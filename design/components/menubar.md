@@ -311,9 +311,10 @@ The popups are DOM children of the `menubar` element, between the Triggers. That
 structure of the APG example (each `menu` sits in the bar next to its `menuitem`) and the one a
 submenu already has inside its parent `menu`.
 
-Development warnings: a `Menubar` with no menu of the bar after mount; a menu of the bar whose
-Trigger renders a non-button (Menu's existing warning applies: the awaited close needs an
-invoker button).
+Development warnings: a menu of the bar whose Trigger renders a non-button (Menu's existing
+warning applies: the awaited close needs an invoker button). The bar has no warning of its own;
+in particular none for a bar with no menus, because menus that are still suspended at mount
+have registered nothing either and the bar cannot tell the two apart.
 
 ---
 

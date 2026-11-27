@@ -14701,3 +14701,13 @@ beyond what `otherIntended` returns):
   focused; the same from the bar (`"none"`, focus on the Trigger); two disabled Triggers in a
   row; Escape, Tab and a click elsewhere end the hold (the next arrow only moves focus);
   `pointermove` onto an enabled Trigger while a disabled one holds the mode opens it.
+
+## 2026-11-27, #170: `Menubar`, no "no menu of the bar" warning
+
+Architect, after the merge. menubar.md 6 listed a development warning for a `Menubar` with no
+menu of the bar after mount. The developer dropped it and the document now agrees: a menu
+registers from its Trigger's ref, so a bar whose `Menu.Root`s are all suspended at mount (or
+arrive later) looks exactly like an empty bar, and a warning there would be false in the case
+the library is built for. A test row pins that such a bar stays silent. Not taken: warning
+after a delay or on the first key press (a guess about timing, for a mistake that is visible
+at once anyway: an empty bar).
