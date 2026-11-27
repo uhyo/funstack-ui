@@ -2304,38 +2304,64 @@ The audit, the options that were rejected and the prior art are in `design/direc
 
 Where the platform gives no close watcher (a non-modal dialog, a `manual` popover, the Toast
 region, a held Menubar Trigger), the library's `keydown` listener acts on an Escape only when it
-is a close request (#191, #192):
+is a close request:
 
 1. **`key === "Escape"`, not part of an IME composition**: `isComposing` is false **and**
    `keyCode !== 229` (WebKit fires `compositionend` before the key that ends a composition, so
    that keydown has `isComposing === false`; NumberField's and Combobox's guard). Escape during a
    composition cancels the composition only.
-2. **Not already prevented** (`defaultPrevented`). Innermost first: a handler or layer inside
-   that consumed the Escape (a Combobox chip, a HoverCard or Tooltip that closed on it, an input
-   that clears itself) prevented it, and nothing outside acts on it. A prevented `keydown` is
-   also no close request for a modal dialog's or an `auto` popover's close watcher. A listener
-   that runs **before** an inner layer's (Toast's React `onKeyDown`, below the document where
-   a Tooltip, a HoverCard and the `auto` close watchers act) cannot wait for that layer to
-   prevent: it stands down while a layer is open inside it (`internal/overlay/open-layer.ts`
-   `containsOpenLayer`: a shown popover, an open modal dialog, an open non-modal dialog the
-   event came from), as HoverCard does (`design/components/hover-card.md` 2.6). The inner layer
-   closes; the next Escape reaches the outer one.
-3. **A listener that closes something shown on it, or consumes it, prevents it**, so an
-   enclosing layer stays open and a second Escape reaches it (a Combobox chip consumes its
-   Escape: it moves focus to the Input). One that closes nothing shown (a Trigger cancelling a
-   coming open, a HoverCard open nobody sees yet, the Menubar ending menu mode) leaves it alone.
+2. **Not already consumed**: not `defaultPrevented`, and not taken by another layer of the
+   library (rule 3). Innermost first: a handler or layer inside that consumed the Escape (a
+   Combobox chip, a Tooltip that closed on it, an input that clears itself) prevented it, and
+   nothing outside acts on it. A prevented `keydown` is also no close request for a modal
+   dialog's or an `auto` popover's close watcher.
+3. **A listener that closes something shown on it, or consumes it, prevents it**
+   (`consumeEscape(event)`: `preventDefault()`, plus a mark the other layers read, for the
+   case where the dispatch is already over), so an enclosing layer stays open and a second
+   Escape reaches it (a Combobox chip consumes its Escape: it moves focus to the Input). One
+   that closes nothing shown (a Trigger cancelling a coming open, a HoverCard open nobody
+   sees yet, the Menubar ending menu mode) leaves it alone.
+4. **The signal is `preventDefault()`, never `stopPropagation()`**, as for a close watcher.
+   So a layer does not act in the listener that hears the Escape. It **records** the event
+   there, in the capture phase, and **decides last**:
+   `decideEscapeLast(event, decide, options?)`.
+   - *Record.* A layer the Escape must come from (the non-modal Dialog, a toast, a Trigger
+     with a coming open) listens on its own element, in capture. A layer that closes on
+     Escape wherever focus is (a shown or coming HoverCard, a shown Tooltip) listens on the
+     window, in capture, while it is intended open, and records with `{ global: true }`.
+     The record step runs `isEscapeRequest` and takes the **snapshot of what the layer
+     stands down for**: a layer inside it with a close watcher (an `auto` / `hint` popover, a
+     modal dialog), which closes after the dispatch and would look closed later
+     (`internal/overlay/open-layer.ts` `containsOpenLayer`; Dialog's own check in
+     `dialog.md` 2.6).
+   - *Decide.* Once per event, for all its recorded layers together: in a bubble `keydown`
+     listener added to the window for this event only (after every element, document and
+     earlier window listener), or, when a `stopPropagation()` kept the event from the
+     window, after the dispatch has ended (`afterDispatch`, 3.8 rule 5). Each layer's
+     `decide` is called only while the Escape is still a request (rule 2), so one Escape
+     closes one layer.
+   - *Order.* The global layers first, in the order they were recorded (the order they
+     opened); then the layers the Escape came from, **innermost first** (the reverse of the
+     capture order). A hint that is showing goes before the surface under it, wherever it
+     is; among surfaces the DOM decides. A global layer that contains the layer the Escape
+     belongs to stands down by its snapshot (a HoverCard with a Tooltip, a popover or a
+     dialog inside, `design/components/hover-card.md` 2.6).
 
-`internal/escape-key.ts` is the one check (`isEscapeRequest`; `isComposingKey` for rule 1
-alone, the IME guard of the listbox and NumberField keys).
+   A part that handles a key **on itself** (the Combobox chip that has focus, the Menubar's
+   held Trigger, a disabled button with nothing inside to stop the event) acts in its own
+   handler: it is the innermost by construction.
 
-**The signal is `preventDefault()`, never `stopPropagation()`**, as for a close watcher. How
-much of it a listener sees depends on where it sits. A listener on an element or the document
-(HoverCard, Tooltip, Toast, Menubar) reads `defaultPrevented` when it runs: it sees the
-listeners before it, and an Escape whose propagation was stopped below it does not reach it.
-The non-modal Dialog, the outermost JS layer, checks at its record step and again when it
-decides, after every listener, and is not starved by a stopped propagation
-(`design/components/dialog.md` 2.6); on its late path it closes without being able to prevent
-the event, the one exception to rule 3.
+`internal/escape-key.ts` holds all of it: `isEscapeRequest` (rules 1 and 2),
+`consumeEscape` (rule 3), `decideEscapeLast` (rule 4), and `isComposingKey` for rule 1
+alone, the IME guard of the listbox and NumberField keys.
+
+Two limits, which a page cannot do better on without a close watcher. On the late path
+(propagation was stopped) the event can no longer be prevented, so a layer **with a close
+watcher** that encloses the one that closed (a modal dialog, an `auto` popover) closes on the
+same Escape; the library's own layers still see the mark. And a **capture-phase**
+`stopPropagation()` above a layer's element hides the event from its record step, as it hides
+it from everything inside; the window listeners of the global layers run before any such
+listener except another one on the window.
 
 **Against the native close watchers** (a modal `<dialog>`, `auto` and `hint` popovers,
 `closedby`), which are the engine's and which the library does not second-guess: rules 2 and

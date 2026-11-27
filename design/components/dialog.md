@@ -472,25 +472,25 @@ Baseline JS for non-modal dialogs (both modes): Escape from inside the dialog cl
    would take the close request; section 9). The record is taken here because the layers'
    close watchers run after the dispatch and because the path is complete at the dialog: at
    the window the nodes of a closed shadow root are hidden, and a dialog may live in one.
-2. **Decide**, once per recorded event: in a bubble `keydown` listener the record step adds
-   to the window for this event only, so after every element, document and earlier window
-   listener; or, when a `stopPropagation()` kept the event from reaching the window, after
-   the dispatch has ended (the record step calls the internal `afterDispatch`, conventions
-   3.8 rule 5: a task for a key the user pressed, a microtask for a scripted event). The
-   dialog closes unless the event is
-   prevented, belonged to an inner layer, or the dialog is no longer open. When it closes
-   from the window listener it prevents the event first, so an enclosing layer (a modal
-   dialog's or an `auto` popover's close watcher, an outer non-modal dialog, a HoverCard)
-   stays open.
+2. **Decide**, through `decideEscapeLast` (conventions 15 rule 4), which the Dialog shares
+   with HoverCard, Tooltip and Toast: in a bubble `keydown` listener added to the window for
+   this event only, so after every element, document and earlier window listener; or, when a
+   `stopPropagation()` kept the event from reaching the window, after the dispatch has ended
+   (`afterDispatch`, conventions 3.8 rule 5: a task for a key the user pressed, a microtask
+   for a scripted event). The dialog closes unless the event is prevented or was taken by
+   another layer of the library, belonged to an inner layer, or the dialog is no longer
+   open. It consumes the event before closing (`consumeEscape`), so an enclosing layer (a
+   modal dialog's or an `auto` popover's close watcher, an outer non-modal dialog, a
+   HoverCard) stays open.
 
-So an inner layer that closes on Escape from JS (a `manual` HoverCard or Tooltip, on the
-document) closes first because it prevents the event, and a handler inside that consumes
-Escape (a Combobox chip, an input that clears itself) keeps the dialog open, as it keeps a
-modal one open. No listener stays on the window or the document for Escape. Two limits, both
-outside what a page can do better without a close watcher: on the late path the event can no
-longer be prevented, so an enclosing layer with a close watcher closes on the same Escape; and
-a **capture-phase** `stopPropagation()` above the dialog hides the event from the record step,
-as it hides it from everything inside the dialog.
+So a `manual` HoverCard or Tooltip that is showing closes first (the global layers decide
+before the layers the Escape came from), a toast or a nested non-modal dialog inside closes
+before the dialog around it (innermost first), and a handler inside that consumes Escape (a
+Combobox chip, an input that clears itself) keeps the dialog open, as it keeps a modal one
+open. No listener stays on the window or the document for the dialog's Escape. The limits are
+those of conventions 15: on the late path an enclosing layer with a close watcher closes on
+the same Escape, and a **capture-phase** `stopPropagation()` above the dialog hides the event
+from the record step.
 
 With `lightDismiss`, document `pointerdown` and `click` listeners (capture)
 close it when both the press and the click land outside the dialog, **the Trigger included**,
@@ -1416,7 +1416,7 @@ library surfaces it as `details.returnValue` (on the request and on the fact) an
 | Tab / Shift+Tab inside a modal dialog | cycles through the dialog's focusable content and the browser UI; the page is inert | browser |
 | Escape (modal) | closes via a close request; focus returns to the opener; `onOpenChange(false, { reason: "dismiss" })` | browser |
 | Escape (non-modal) | closes via `requestClose()` | Popup listener (or `closedby` with the flag) |
-| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal (2.6): the dialog **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. It also ignores a **prevented** Escape: a `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher, and one that closes on Escape from JS (HoverCard, Tooltip: document listeners) prevents the keydown, so it closes first and the dialog stays open. A `manual` popover that does not handle Escape leaves it to the dialog: Escape inside it closes the dialog | browser / Popup listener |
+| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal (2.6): the dialog **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. It also ignores a **prevented** Escape: a `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher, and one that closes on Escape from JS (HoverCard, Tooltip: global layers, which decide before the dialog, conventions 15 rule 4) consumes the keydown, so it closes first and the dialog stays open. A `manual` popover that does not handle Escape leaves it to the dialog: Escape inside it closes the dialog | browser / Popup listener |
 | Escape that a handler prevented (`preventDefault()`) | does not close, modal or not | browser / Popup listener |
 | Escape during an IME composition (`isComposing` or `keyCode` 229) | non-modal: does not close (conventions 15); modal: the platform's close watcher decides (Chromium runs none for the Escape an IME takes) | Popup listener / browser |
 | Escape whose propagation a handler stopped (`stopPropagation()`) | closes all the same, modal or not | browser / Popup listener |

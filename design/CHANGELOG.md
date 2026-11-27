@@ -15361,3 +15361,129 @@ dismissal, like the slot. New browser rows: Enter right after the keystroke that
 field invalid (blocked, text kept); Enter right after the keystroke that dismisses a server
 error (the new text is submitted, the errors re-show after the settle). Select-all in the rows
 is `{ControlOrMeta>}a`, so they also hold on macOS.
+
+## 2026-11-27, #194: every JS Escape layer records and decides last (conventions 15 rule 4)
+
+Architect, on the user's request to do #194. Changed: conventions 15 (rules 2 and 3 reworded,
+rule 4 new, the "signal" paragraph folded into it); dialog.md 2.6 step 2 and one row of
+section 9; hover-card.md 2.2 (two rows), 2.6 and walkthrough 5; tooltip.md 2.2 (the Escape
+row, a trigger row, one sentence); toast.md's Escape row; internal-hooks.md's file list.
+
+- **The problem.** HoverCard's and Tooltip's Escape listeners sat on the document in the
+  bubble phase, so a `stopPropagation()` below the document (a React `onKeyDown` anywhere
+  stops the native event at React's root) left the card or tooltip open. A close watcher and,
+  since #177, the non-modal Dialog do not care. Toast's Escape, a React `onKeyDown` on the
+  toast, had the same hole for a handler inside the toast.
+- **The rule.** The Dialog's record / decide shape for all of them, in one helper,
+  `decideEscapeLast` in `internal/escape-key.ts`: record in capture (on the layer's element,
+  or on the window for a layer that closes wherever focus is), decide in a per-event window
+  bubble listener or after the dispatch. One window listener and one `afterDispatch` per
+  event, however many layers recorded it.
+- **Order, the part the issue asked to work out.** Global layers (HoverCard, Tooltip) first,
+  in record order; then the layers the Escape came from, innermost first. This is what the
+  listener positions gave before (document before the Dialog's window listener), stated as a
+  rule instead of being a consequence of where listeners happened to sit, and it is the same
+  on the late path, where "who registered a window listener first" no longer orders anything.
+- **`consumeEscape` and its mark.** On the late path `preventDefault()` does nothing, so a
+  tooltip that closed could not tell the dialog. The mark (a `WeakSet` of events) is read by
+  `isEscapeRequest`, and `decideEscapeLast` checks it before each layer: one Escape closes one
+  layer on both paths. Native close watchers cannot read it; that limit is in the rule.
+- **The stand-down snapshot moves to the record step** for HoverCard and Toast, as the Dialog
+  has it: an `auto` popover inside is closed by its watcher after the dispatch, and a decision
+  on the late path would find it closed. `containsOpenLayer` reads the event's path instead
+  of `event.target` (at the window the target is retargeted out of an open shadow root).
+- **Toast is included.** It was the remaining layer that closes something shown from an
+  element listener. Its stand-down for a Tooltip or HoverCard inside it is no longer needed
+  for order (they decide first and consume) and stays for the layers with a close watcher.
+  One visible change: with a tooltip showing somewhere else and focus in a toast, Escape now
+  closes the tooltip and the next one the toast; before, the toast went first. This is what a
+  non-modal Dialog already does.
+- **Trigger cancels are included** (the coming open of a Tooltip or HoverCard): record on the
+  trigger in capture, decide last, leave the event alone. Before, a native listener on a
+  descendant that stopped propagation kept the timer running, and the tooltip opened after
+  the Escape.
+- **Left where they are:** the Combobox chip and Menubar's held Trigger handle a key on the
+  element that has focus; nothing inside can consume or stop it first.
+- **Not taken.** A registry of open layers with one standing window listener (a close-watcher
+  polyfill): order by open time is wrong for the layers the Escape must come from (two
+  non-modal dialogs side by side), so it would need the path as well, and the per-event list
+  already has it. Moving only the listeners to capture and acting there: a capture listener
+  cannot see a later `preventDefault()` (the Combobox chip). A decision in a task alone: it
+  could not prevent the event, and a modal dialog around a tooltip would close with it.
+- **Limits**, in the rule: the late path cannot keep a close-watcher layer open; a
+  capture-phase `stopPropagation()` above an element layer hides the event from it; in a
+  closed shadow root a HoverCard does not see a non-modal dialog inside itself on the path.
+
+Code owed:
+
+- `packages/ui/src/internal/escape-key.ts`:
+  - `const consumed = new WeakSet<Event>()`; `consumeEscape(event)`: `event.preventDefault()`
+    and `consumed.add(event)`; `isEscapeRequest` also returns `false` for a consumed event.
+  - `decideEscapeLast(event: KeyboardEvent, decide: () => void, options?: { global?: boolean }): () => void`.
+    A `WeakMap<Event, Entry>`; the first call for an event creates the entry, adds a bubble
+    `keydown` listener to the window of the listener's current target
+    (`ownerDocument.defaultView`, or the target itself when it is the window) and calls
+    `afterDispatch(event, run)`. `run` (once: remove the listener, cancel the other path,
+    delete the entry) calls the global deciders in record order, then the others in reverse
+    record order, each only if `isEscapeRequest(event)` still holds and it was not cancelled.
+    The returned function cancels this layer's decider (an unmount between record and
+    decide). The same layer recording the same event twice is ignored.
+- `dialog/dialog-dismiss.ts`: `record` keeps the inner-layer snapshot and calls
+  `decideEscapeLast(event, () => { if (inner || !dialog.open || !dialog.isConnected) return;
+  consumeEscape(event); dialog.requestClose(); })`; the cleanup calls the returned cancel.
+  `pending`, `onWindow`, `settle`, `cancelLate` go away.
+- `internal/overlay/open-layer.ts`: the non-modal dialog test becomes
+  `event.composedPath().includes(dialog)`.
+- `hover-card/use-hover-card-interest.ts`: `listenDocument` attaches the Escape listener to
+  the window in capture instead of the document in bubble; it runs `isEscapeRequest`, the
+  "shown or intended" test and takes `standDown = containsOpenLayer(popup, event)`, then
+  `decideEscapeLast(event, decide, { global: true })`; `decide` re-reads shown / intended,
+  returns on `standDown`, and otherwise does what the listener did, with `consumeEscape` in
+  place of `preventDefault()`. The Trigger's Escape listener: capture, `isEscapeRequest`,
+  `decideEscapeLast(event, () => { suppressed.current = true; timers.cancel(); })`.
+- `tooltip/use-tooltip-interaction.ts`: the same two changes (`onKeyDown` on the window in
+  capture, global; `onTriggerKeyDown` in capture); `decide` is `clear()`, then, if still open,
+  `hide()` and `consumeEscape`.
+- `toast/toast-root.tsx`: the Escape branch leaves `onKeyDown`; a capture `keydown` listener
+  on the Root element (an effect on its ref): `isEscapeRequest`, not `ending`,
+  `standDown = containsOpenLayer(root, event)`, `decideEscapeLast(event, () => { if
+  (standDown || ending) return; consumeEscape(event); close("dismiss", event); })`. Arrow
+  keys stay in `onKeyDown`.
+- Every listener's cleanup cancels its pending decider.
+
+Rows owed. jsdom (a scripted `keydown` decides at the window, or in a microtask when
+propagation is stopped: `await` once):
+
+- `internal/escape-key.test.ts`: order (two global, three nested element layers: global in
+  record order, then innermost first); one layer consuming stops the rest; `preventDefault()`
+  from a document and from a window listener stops all; `stopPropagation()` at the target
+  still decides, in the same order, and `consumeEscape` there still stops the rest; cancel;
+  one window listener per event and none left after it.
+- Tooltip and HoverCard, each: `stopPropagation()` in a native listener on the focused
+  element and in a React `onKeyDown` on an ancestor: closes. With `preventDefault()` as
+  well: stays. A Combobox chip's Escape with the tooltip shown: stays (existing row).
+  The Trigger cancel with `stopPropagation()` on a child of the trigger: the open is
+  cancelled; with a prevented Escape: not cancelled.
+- Tooltip and HoverCard showing together, not nested: first Escape closes the one that
+  opened first, second the other; the same with `stopPropagation()`.
+- Tooltip inside a HoverCard: tooltip, then card. An `auto` Popover inside a HoverCard with
+  `stopPropagation()`: the card stays (the snapshot).
+- Inside a non-modal Dialog, each of Tooltip and HoverCard, with `stopPropagation()` on the
+  focused element (both on the late path): the inner closes, the dialog stays; the next
+  Escape closes the dialog.
+- Toast: `stopPropagation()` in a field inside the toast: dismissed. `preventDefault()`:
+  kept. A Tooltip shown inside the toast, and one shown elsewhere: the tooltip first. A Menu
+  open inside: the toast stays (existing stand-down rows). A toast whose Viewport is inside a
+  non-modal Dialog: the toast, then the dialog. IME rows unchanged.
+- The existing Dialog rows (#177) and Escape rows (#191, #192) pass unchanged.
+
+Browser, a real key (the task path only exists there), three engines: a Tooltip, a
+HoverCard and a toast, each with a React `onKeyDown` that stops propagation: closes; a
+Tooltip inside a non-modal Dialog with the same handler: tooltip, then dialog; a Tooltip
+inside a **modal** Dialog with the handler: both close on one Escape (the stated limit,
+pinned so that a change is noticed); without the handler: tooltip only.
+
+Docs owed: the Tooltip, HoverCard and Toast pages' keyboard rows ("`preventDefault()` on the
+Escape keeps it open; `stopPropagation()` does not"), the Toast page's order note, the
+Roadmap's behaviour-change list (the three starvation fixes, the toast-versus-tooltip order),
+`skills/funstack-ui-knowledge` where it describes Escape.

@@ -201,11 +201,11 @@ Root's effect attaches, through `addEventListener`:
 | Trigger | `focus`, when the Trigger matches `:focus-visible` | start the open timer |
 | Trigger | `pointerleave`, `blur` | start the close timer (`closeDelay`) |
 | Trigger | `pointerdown` | close now, or cancel the coming open; no open until fresh interest (2.4) |
-| Trigger | `keydown` Escape (conventions 15: not during an IME composition, not prevented), before anything is intended | cancel the open timer |
+| Trigger, capture | `keydown` Escape, before anything is intended | record; decided last (conventions 15 rule 4): cancel the open timer, unless the Escape was consumed. The event is left alone |
 | Popup | `pointerenter`, `focusin` | cancel the close timer |
 | Popup | `pointerleave` | start the close timer. With a button held (a text selection dragged out of the card) the timer starts at the release instead |
 | Popup | `focusout` to an element outside the Popup that is not the Trigger | start the close timer |
-| document, while the card is intended open | `keydown` Escape | close now, unless the event is already prevented or belongs to an IME composition (conventions 15), or the Popup contains a shown popover or an open modal dialog (2.6); `preventDefault()` when a shown card closed (an Escape that only cancels an open nobody sees passes through) |
+| window, capture, while the card is intended open | `keydown` Escape | record as a global layer, with the stand-down snapshot (the Popup contains a shown popover, an open modal dialog, or an open non-modal dialog on the event's path, 2.6); decided last (conventions 15 rule 4): close now, unless the Escape was consumed (prevented by any listener, or taken by another layer) or the snapshot says stand down; `consumeEscape` when a shown card closed (an Escape that only cancels an open nobody sees passes through). `stopPropagation()` anywhere does not keep the card open |
 | document, capture, while the card is intended open | `pointerdown` outside the Popup | close now |
 
 "Intended open" is `intended()` of the Root: from the dispatch of the open until a close, so
@@ -338,14 +338,18 @@ with Menu's Tab-out for that reason. Cost: Firefox has no exit animation for a H
   `hint` inside a `hint` nests through its DOM ancestor.
 - **A Menu, Select picker, Popover or Tooltip opened from inside the card** keeps the card
   open (research 1.2). Its popup is a DOM descendant too.
-- **Escape closes the innermost first.** The card's Escape listener stands down while its Popup
-  contains a shown popover, an open modal dialog, or an open non-modal dialog that the
-  Escape came from (it decides after the card's document listener, dialog.md 2.6; one the
-  Escape did not come from takes no Escape), and when the event is already prevented
-  (a Tooltip inside handled it). The nested element closes; the next Escape closes the card.
+- **Escape closes the innermost first.** The card stands down while its Popup contains a
+  shown popover, an open modal dialog, or an open non-modal dialog that the Escape came from
+  (one the Escape did not come from takes no Escape), read when the Escape is recorded, and
+  when the Escape was consumed by the time it decides (a handler prevented it, or a Tooltip
+  recorded before it closed on it). The nested element closes; the next Escape closes the
+  card.
+- **One Escape closes one layer.** A card and an unrelated Tooltip showing together: the one
+  that opened first closes, the next Escape closes the other (conventions 15 rule 4, the
+  order of the global layers).
 - Inside a modal `<dialog>`, the card's Escape is prevented, so the dialog stays open and a
-  second Escape closes it (tooltip.md 2.2). Inside a non-modal `Dialog` or `Drawer` the same
-  holds: it decides after the document listeners and leaves a prevented Escape alone
+  second Escape closes it (tooltip.md 2.2). Inside a non-modal `Dialog` or `Drawer`, and with
+  focus in a toast, the same holds: the card is a global layer and decides before them
   (dialog.md 2.6).
 
 ### 2.7 Behaviour per engine and flag
@@ -754,9 +758,9 @@ Notation: `C` committed, `O` optimistic, `P` pending. Uncontrolled, JS path, `ma
    Firefox they unmount in that commit.
 5. **Keyboard: open, Tab in, Escape.** Tab to the link → `focus` with `:focus-visible` → open
    timer → card shown, focus on the link. Tab → focus on the card's first link; the link's
-   `blur` started the close timer and the Popup's `focusin` cancelled it. Escape → document
-   listener: no shown popover inside the card → intent recorded, `hidePopover()`,
-   `preventDefault()`. Focus was inside → the library focuses the link under the one-shot flag
+   `blur` started the close timer and the Popup's `focusin` cancelled it. Escape → the window
+   listener records it (no shown popover inside the card) and the card decides last: intent
+   recorded, `hidePopover()`, `consumeEscape`. Focus was inside → the library focuses the link under the one-shot flag
    → that `focus` starts no timer. The fact is reported as in 4 with the `keydown`.
 6. **A press on the link while the card loads.** `pointerdown` on the Trigger:
    `requestClose(event, "dismiss")`; the click navigates. Nothing appears afterwards, also when

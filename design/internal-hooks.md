@@ -251,7 +251,7 @@ packages/ui/src/internal/
   render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
   merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
   use-merged-refs.ts      # useMergedRefs(...refs): the memoised ref merge of every part with a library ref (1.4)
-  escape-key.ts           # isEscapeRequest(event): the one Escape rule of the JS handlers (no IME composition, not prevented), isComposingKey(event) (section 15); directive-free
+  escape-key.ts           # the Escape rule of the JS handlers (section 15): isEscapeRequest(event) (no IME composition, not prevented, not consumed), consumeEscape(event), decideEscapeLast(event, decide, options?) (record, then decide after every listener or after the dispatch; global layers first, then innermost first), isComposingKey(event); directive-free
   after-dispatch.ts       # afterDispatch(event, callback): after the event's dispatch and default action, a microtask or a task (section 3.8 rule 5, dialog.md 2.6, field-form.md 2.4); returns its cancel; directive-free
   use-latest.ts           # useLatest(value): a ref written in an insertion effect
   use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)
@@ -318,7 +318,7 @@ packages/ui/src/internal/
     content-focus-probe.tsx # useContentFocusProbe (popover.md 6.2)
     use-exit-animation.ts # held content while an exit animates (popover.md 4.4)
     popover-open.ts       # isPopoverOpen(element); directive-free
-    open-layer.ts         # containsOpenLayer(container, event): a layer open inside that takes Escape first (conventions 15 rule 2; HoverCard, Toast); directive-free
+    open-layer.ts         # containsOpenLayer(container, event): a layer open inside that takes Escape first, the stand-down snapshot of conventions 15 rule 4 (HoverCard, Toast); reads the event's path; directive-free
     invokers.ts           # eventSource, closedByPopoverTarget, isPopoverInvoker, listenInvokerPresses (popover.md 2.3, menu.md 2.2); directive-free
     focus-visible.ts      # QuietFocusTarget, supportsFocusVisibleOption, resetFocusVisibleOption (popover.md 6.1); directive-free
     anchor-position.ts    # positionArea, parsePositionArea, POSITION_TRY_FALLBACKS (section 13); directive-free

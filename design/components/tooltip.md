@@ -178,7 +178,8 @@ omitted from the trigger's prop type and consumer `onPointerEnter` et al. pass t
 | popup                          | `pointerleave`                                    | start close timer                                                                               |
 | popup                          | `beforetoggle` (both paths)                       | open: write `data-instant` by presence from "another `[role=\"tooltip\"]:popover-open` exists" (`syncPresence`); close: remove it (wave 12, #93). Synchronous, before the top-layer insertion, so the first style recalc of the open sees it |
 | popup                          | `toggle`                                          | reconcile open state (`event.newState === "open"`) for opens and closes the library did not perform; install or remove the document listeners below |
-| document (while open)          | `keydown` Escape                                  | hide now and `preventDefault()` (keeps an enclosing modal `<dialog>`, non-modal `Dialog` (dialog.md 2.6) or `auto` menu open; a second Escape closes them). Not an Escape already prevented (innermost first: a handler below consumed it, a Combobox chip) nor one of an IME composition (conventions 15); the same rule on the trigger's cancel of a pending open |
+| window (while open, capture)   | `keydown` Escape                                  | record as a global layer; decided last (conventions 15 rule 4): hide now and `consumeEscape` (keeps an enclosing modal `<dialog>`, non-modal `Dialog` (dialog.md 2.6), toast or `auto` menu open; a second Escape closes them), unless the Escape was consumed (a handler prevented it, a Combobox chip; or a layer recorded earlier took it) or belongs to an IME composition. `stopPropagation()` anywhere does not keep the tooltip open |
+| trigger (capture)              | `keydown` Escape                                  | record; decided last: cancel a pending open, unless the Escape was consumed. The event is left alone |
 | document (while open, capture) | `pointerdown`                                     | hide now (covers outside click, click on the trigger, and click on the popup)                   |
 
 Open means `popup.showPopover({ source: trigger })`, which creates the same implicit anchor and
@@ -201,7 +202,7 @@ light dismiss, so the library has to do this itself anyway. After an Escape or a
 reopens the tooltip until the pointer leaves and re-enters or focus leaves and returns. That
 matches "Escape cancels interest" on the native path without extra state.
 
-Why Escape is `preventDefault()`ed: the document `keydown` bubbles to the library's handler
+Why Escape is `preventDefault()`ed: the library decides in a `keydown` listener on the window,
 *before* the browser's close request reaches a modal `<dialog>` or an `auto` popover, so without
 it one Escape would close the tooltip and the enclosing dialog or menu together (verified in
 Chromium 153: with `hidePopover(); event.preventDefault()` in the same handler the dialog and
