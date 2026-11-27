@@ -65,6 +65,31 @@ describe("formatRangeValue", () => {
   it("uses the locale", () => {
     expect(formatRangeValue(40, 0, 100, undefined, "de")).toBe("40 %");
   });
+
+  // conventions 14.2 rule 1: a list is a preference order, as for `Intl`.
+  it("formats a list with its first supported tag", () => {
+    expect(formatRangeValue(40, 0, 100, undefined, ["de-DE", "en"])).toBe(
+      formatRangeValue(40, 0, 100, undefined, "de-DE"),
+    );
+    expect(formatRangeValue(40, 0, 100, undefined, ["en", "de-DE"])).toBe("40%");
+  });
+
+  it('["de-DE"] and "de-DE" give the same text', () => {
+    const format = { style: "decimal", minimumFractionDigits: 2 } as const;
+    expect(formatRangeValue(1234.5, 0, 2000, format, ["de-DE"])).toBe("1.234,50");
+    expect(formatRangeValue(1234.5, 0, 2000, format, "de-DE")).toBe("1.234,50");
+  });
+
+  it("an unsupported first tag falls through to the next", () => {
+    const format = { style: "decimal", minimumFractionDigits: 2 } as const;
+    expect(formatRangeValue(1234.5, 0, 2000, format, ["tlh", "de-DE"])).toBe("1.234,50");
+  });
+
+  it("accepts a frozen readonly list (copied, not handed to Intl)", () => {
+    const locales: readonly string[] = Object.freeze(["de-DE"]);
+    expect(formatRangeValue(1234.5, 0, 2000, {}, locales)).toBe("1.234,5");
+    expect(locales).toEqual(["de-DE"]);
+  });
 });
 
 describe("getNumberFormat", () => {
@@ -74,6 +99,14 @@ describe("getNumberFormat", () => {
     expect(a).toBe(b);
     expect(getNumberFormat("en", undefined)).toBe(getNumberFormat("en", undefined));
     expect(getNumberFormat("de", undefined)).not.toBe(getNumberFormat("en", undefined));
+  });
+
+  it("keys a list apart from a string and from another order", () => {
+    expect(getNumberFormat(["de", "en"], undefined)).toBe(getNumberFormat(["de", "en"], undefined));
+    expect(getNumberFormat(["de"], undefined)).not.toBe(getNumberFormat("de", undefined));
+    expect(getNumberFormat(["en", "de"], undefined)).not.toBe(
+      getNumberFormat(["de", "en"], undefined),
+    );
   });
 
   it("is bounded: past 32 entries the oldest is dropped", () => {

@@ -56,6 +56,22 @@ describe("Progress / Meter props", () => {
     );
   });
 
+  // conventions 14.2 rule 1: the type every Root that formats takes.
+  it("locale takes a tag or a readonly list of tags", () => {
+    expectTypeOf<ProgressRootProps["locale"]>().toEqualTypeOf<
+      string | readonly string[] | undefined
+    >();
+    expectTypeOf<MeterRootProps["locale"]>().toEqualTypeOf<
+      string | readonly string[] | undefined
+    >();
+    const locales: readonly string[] = ["de-DE", "en"];
+    void (<Progress.Root value={1} locale={locales} />);
+    void (<Meter.Root value={1} locale={locales} />);
+    void (<Progress.Root value={1} locale="de-DE" />);
+    // @ts-expect-error not a tag
+    void (<Meter.Root value={1} locale={42} />);
+  });
+
   it("MeterRegion is the platform's three names", () => {
     expectTypeOf<MeterRegion>().toEqualTypeOf<"optimum" | "suboptimum" | "even-less-good">();
   });

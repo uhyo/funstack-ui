@@ -197,6 +197,27 @@ describe("Progress", () => {
       expect(bar()).toHaveAttribute("aria-valuetext", "40 %");
     });
 
+    // conventions 14.2 rule 1: a list of tags, the first supported one wins.
+    it("takes a locale list for aria-valuetext and the Value part", () => {
+      render(
+        <Anatomy
+          value={1}
+          max={3}
+          locale={["tlh", "de-DE", "en"]}
+          format={{ style: "percent", maximumFractionDigits: 1 }}
+        />,
+      );
+      const expected = new Intl.NumberFormat("de-DE", {
+        style: "percent",
+        maximumFractionDigits: 1,
+      }).format(1 / 3);
+      expect(expected).toContain("33,3");
+      expect(bar()).toHaveAttribute("aria-valuetext", expected);
+      expect(
+        screen.getByText(expected, { selector: "span", normalizer: (t) => t }),
+      ).toBeInTheDocument();
+    });
+
     it("getAriaValueText receives the clamped value and the default state", () => {
       const get = vi.fn((value: number | null, state: ProgressState) =>
         value === null ? null : `${state.valueText}, 2 minutes left`,

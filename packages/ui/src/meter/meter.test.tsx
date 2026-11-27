@@ -63,6 +63,25 @@ describe("Meter", () => {
       expect(root).not.toHaveAttribute("data-complete");
     });
 
+    // conventions 14.2 rule 1: a list of tags, the first supported one wins.
+    it("takes a locale list for aria-valuetext and the Value part", () => {
+      render(
+        <Storage
+          value={4.25}
+          locale={["tlh", "de-DE", "en"]}
+          format={{ style: "unit", unit: "gigabyte", maximumFractionDigits: 2 }}
+        />,
+      );
+      const expected = new Intl.NumberFormat("de-DE", {
+        style: "unit",
+        unit: "gigabyte",
+        maximumFractionDigits: 2,
+      }).format(4.25);
+      expect(expected).toContain("4,25");
+      expect(meter()).toHaveAttribute("aria-valuetext", expected);
+      expect(screen.getByTestId("value").textContent).toBe(`${expected} of 5 GB`);
+    });
+
     it("names through aria-label with the dangling Label token", () => {
       render(<Meter.Root value={50} aria-label="CPU" aria-labelledby="" />);
       expect(meter().getAttribute("aria-labelledby")).toMatch(/-label$/);

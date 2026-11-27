@@ -25,19 +25,25 @@ const PERCENT: Intl.NumberFormatOptions = { style: "percent" };
 const CACHE_LIMIT = 32;
 const formatters = new Map<string, Intl.NumberFormat>();
 
+/** A tag or a preference list of tags, what the `Intl` constructors take (conventions 14.2). */
+export type RangeLocale = string | readonly string[];
+
 /**
  * One `Intl.NumberFormat` per `locale` + `format`, so an update loop does not construct one per
- * render. Bounded: past 32 entries the oldest is dropped.
+ * render. Bounded: past 32 entries the oldest is dropped. The key is JSON, as in
+ * `number-field/number-field-format.ts`, so a list and a string never collide.
  */
 export function getNumberFormat(
-  locale: string | undefined,
+  locale: RangeLocale | undefined,
   format: Intl.NumberFormatOptions | undefined,
 ): Intl.NumberFormat {
   const options = format ?? PERCENT;
-  const key = `${locale ?? ""}\u0000${JSON.stringify(options)}`;
+  const key = JSON.stringify([locale ?? null, options]);
   let formatter = formatters.get(key);
   if (formatter === undefined) {
-    formatter = new Intl.NumberFormat(locale, options);
+    // `Intl` takes a mutable `string[]`: copy a readonly list rather than cast it.
+    const locales = typeof locale === "string" || locale === undefined ? locale : [...locale];
+    formatter = new Intl.NumberFormat(locales, options);
     if (formatters.size >= CACHE_LIMIT) {
       const oldest = formatters.keys().next().value;
       if (oldest !== undefined) formatters.delete(oldest);
@@ -57,7 +63,7 @@ export function formatRangeValue(
   min: number,
   max: number,
   format: Intl.NumberFormatOptions | undefined,
-  locale: string | undefined,
+  locale: RangeLocale | undefined,
 ): string {
   const percentStyle = format === undefined || format.style === "percent";
   return getNumberFormat(locale, format).format(percentStyle ? fraction(value, min, max) : value);
