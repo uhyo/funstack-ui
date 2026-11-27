@@ -14750,3 +14750,24 @@ Developer (`memo/developer/issue-185-184.md`).
   be clicked. No `:disabled` bail was added to `acceptSingle` / `acceptMultiple` / MultiSelect's
   `toggle`. Three guard rows (Combobox single, `multiple`, MultiSelect) click the option only
   if the listbox is still shown, and assert it closes with no dispatch.
+
+## 2026-11-27, #185: `internal-hooks.md` 3.8 rule 5 states both orders of the reset microtask
+
+Architect, on the developer's proposal in the entry above. Checked against the HTML event
+loop: a microtask checkpoint runs after a listener only when the script stack is empty, which
+is the case for an event the browser dispatches from a task (a reset button click) and not
+for `form.reset()` called from script; the reset algorithm follows the dispatch in both.
+
+- **Rule 5** is now "Reset never reads the reset result", with the two orders spelled out and
+  the consequence for every `useFormReset` caller: read `defaultChecked` / an uncontrolled
+  `defaultValue`, or dispatch a JS-computed target. The developer's wording, plus the note
+  that a synchronous commit caused from the microtask also precedes the algorithm.
+- **The `useFormReset` table row** carries the contract; the OTPField-only aside is gone,
+  since the rule is every caller's.
+- **Rule 7** now says what the microtask can see. The same timing means that after a reset
+  button click `event.defaultPrevented` is read before listeners that run later than the
+  library's (React's delegated `onReset` on the form, a listener on `document`). Derived, not
+  measured: a `<form onReset={(e) => e.preventDefault()}>` with a real reset button would then
+  get the library's reset dispatch for a reset the browser does not perform. To be probed in
+  a browser row and filed as an issue if it reproduces.
+- radio-group.md's citation of rule 5 follows.

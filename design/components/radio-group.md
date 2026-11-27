@@ -329,8 +329,9 @@ is then re-synced by React's normal `checked` prop writes once the action settle
 Both paths read the DOM the same way: the Root queries `input[type="radio"]` inside the fieldset,
 keeps those whose `name` property equals the group name (nested groups have different names), and
 takes the `value` of the checked one, else `null`; for a reset it reads `defaultChecked` instead
-of `checked` (conventions 3.8 rule 5: by the time the microtask runs after React's own reset, the
-Items' re-apply effect has already put the optimistic value back into `checked`). The result is
+of `checked` (conventions 3.8 rule 5: after React's own reset the Items' re-apply effect has
+already put the optimistic value back into `checked` when the microtask runs, and after a
+reset button click the microtask runs before the browser has reset anything). The result is
 compared against **what the user already intends**: the latest in-flight dispatch's `next` if
 any, else the optimistic value (`latestInFlight()` from `useControllableAction`, exactly as
 Accordion's `dispatchFromDom` does). Reading the DOM alone would lose a pending optimistic check.

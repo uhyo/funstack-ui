@@ -128,7 +128,7 @@ the list of them plus the rules they implement (numbered: the source cites "3.8 
 | Helper (`internal/`) | Used by | What it is |
 | --- | --- | --- |
 | `useFormOwnerEvent(ref, type, handler, options?)` (`use-form-owner-event.ts`) | `useFormReset`; `Field.Root` (`input` / `change` for cross-field `validate`, `submit` and `reset` for its flags) | The stable subscription of rule 4 for any event of the form owner (`ref.current.form`; an `<input>`, `<select>` or `<fieldset>`, all honouring `form=`). |
-| `useFormReset(ref, onReset, onResetEvent?)` (`use-form-reset.ts`) | the hooks below, Combobox, `Select.Value` (the `<selectedcontent>` refresh), `CheckboxGroup.Parent`, `OTPField.Root` (which dispatches its computed target, not the input's text: see the #171 implementation entry in `design/CHANGELOG.md`) | The `reset` subscription: `onResetEvent(event)` synchronously in the event (rule 6's mirror write), then `onReset(event)` in a microtask unless the reset was cancelled (rules 5, 7). |
+| `useFormReset(ref, onReset, onResetEvent?)` (`use-form-reset.ts`) | the hooks below, Combobox, `Select.Value` (the `<selectedcontent>` refresh), `CheckboxGroup.Parent`, `OTPField.Root` | The `reset` subscription: `onResetEvent(event)` synchronously in the event (rule 6's mirror write), then `onReset(event)` in a microtask unless the reset was cancelled (rule 7). The microtask may run before or after the reset algorithm, so `onReset` never reads `checked` or `value` (rule 5). |
 | `useResetTarget(value, defaultValue)` (`use-form-reset.ts`) | Slider, NumberField, Select, Combobox (value and text) | Rule 6's target by mode; `undefined` when absent, and the caller adds its fallback. |
 | `useNativeChecked(options)` (`use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent` | Per element: the ref callback with the dev tag / `type` check, the re-apply effect of rule 8 and, unless `group: true`, the two residual paths of a single control, reported through `onPlatformChange(next, event)`. With `group: true` it reports nothing and calls the group's `onItemMounted` (rule 3). |
 | `useNativeGroupReconciliation<T>(options)` (`use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, `CheckboxGroup.Root`: `element` is the `<fieldset>`); `useNativeSelectValue`; Slider (through its first Thumb's input, with `readDefault` returning the JS-computed target and `onResetEvent` passed through) and NumberField | Mount reconciliation (`readCurrent()` against `base()`) and form reset (`readDefault()` against `base()`), **one dispatch per group** through `onPlatformChange(next, event, path)`; returns the stable `{ onItemMounted }` for late members (rule 3). Comparison is the `equals` option (default `Object.is`; `CheckboxGroup.Root` passes set equality). |
@@ -178,11 +178,22 @@ Rules, which component docs cite instead of restating:
 4. **The reset subscription must be stable.** React's automatic reset after a successful
    `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
    the next subscription, so a listener attached in a deps-less effect never sees it.
-5. **Reset reads `defaultChecked`, not `checked`.** The `reset` event precedes the reset
-   algorithm, so the hook waits a microtask; by then, for React's own reset, the re-apply effect
-   has already put the optimistic value back into `checked`. `el.defaultChecked` is the value the
-   browser reset to in every case; a group's `readDefault()` returns the value of the radio
-   whose `defaultChecked` is true, or `null`.
+5. **Reset never reads the reset result.** The `reset` event precedes the reset algorithm, and
+   the hook calls back in a microtask. Whether that microtask runs before or after the
+   algorithm depends on who started the reset:
+   - a script `form.reset()` (React's automatic reset included): script is on the stack, so
+     the microtask runs **after** the algorithm; for React's own reset the re-apply effect has
+     by then put the optimistic value back into `checked`;
+   - a click on a `<button type="reset">`: the event is dispatched from a task, a microtask
+     checkpoint follows each listener, and the microtask runs **before** the algorithm, while
+     `checked` and `value` still hold the user's state. A synchronous React commit caused from
+     the microtask also lands before the algorithm.
+
+   A callback therefore never reads `checked` or `value`. It reads `defaultChecked` (or the
+   `defaultValue` of an uncontrolled library-owned input), which holds the value the browser
+   resets to before and after the algorithm alike (a group's `readDefault()` returns the value
+   of the radio whose `defaultChecked` is true, or `null`), or it dispatches a target computed
+   in JS (rule 6). This holds for every caller of `useFormReset`.
 6. **Reset target by mode** (`useResetTarget`). Uncontrolled: the latest `defaultX` prop.
    Controlled: the mount-time value; the reset is **offered to the parent** as a `"platform"`
    dispatch with `event.type === "reset"`, and after settle the DOM follows the parent's
@@ -199,7 +210,10 @@ Rules, which component docs cite instead of restating:
      number input) is uncontrolled: `defaultValue` is the reset target, `.value` is written
      through the ref at every change and re-applied after every commit, so the platform's own
      reset applies and no `onResetEvent` mirror is needed.
-7. **A cancelled `reset`** (`event.defaultPrevented` in the microtask) dispatches nothing.
+7. **A cancelled `reset`** (`event.defaultPrevented` in the microtask) dispatches nothing. By
+   rule 5's timing, after a script reset the microtask sees every listener's
+   `preventDefault()`; after a reset button click it sees only the listeners that ran before
+   the library's own (which is attached to the form element).
 8. **Re-apply after every commit**, in the order `defaultChecked` (if given), `checked`
    (optimistic), `indeterminate` (if given). It is belt-and-braces for `checked` (react-dom
    rewrites it on every commit of the input) and load-bearing for `indeterminate` and
