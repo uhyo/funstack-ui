@@ -201,7 +201,7 @@ Root's effect attaches, through `addEventListener`:
 | Trigger | `focus`, when the Trigger matches `:focus-visible` | start the open timer |
 | Trigger | `pointerleave`, `blur` | start the close timer (`closeDelay`) |
 | Trigger | `pointerdown` | close now, or cancel the coming open; no open until fresh interest (2.4) |
-| Trigger, capture | `keydown` Escape, before anything is intended | record; decided last (conventions 15 rule 4): cancel the open timer, unless the Escape was consumed. The event is left alone |
+| Trigger, capture | `keydown` Escape, before anything is intended | record as a cancel (`{ cancel: true }`); decided last, before every layer that closes (conventions 15 rule 4): cancel the open timer, unless a handler prevented the Escape. A tooltip or another card closing on the same Escape does not stop it. The event is left alone |
 | Popup | `pointerenter`, `focusin` | cancel the close timer |
 | Popup | `pointerleave` | start the close timer. With a button held (a text selection dragged out of the card) the timer starts at the release instead |
 | Popup | `focusout` to an element outside the Popup that is not the Trigger | start the close timer |

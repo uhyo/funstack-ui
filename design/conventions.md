@@ -2345,10 +2345,15 @@ is a close request:
      event recorded twice by one listener is one record, a new Escape replaces a record that
      is still pending, and the listener's cleanup cancels it. When every layer of an event
      has cancelled, the window listener and the late path are removed at once.
-   - *Order.* The global layers first, in the order they were recorded (the order they
-     opened); then the layers the Escape came from, **innermost first** (the reverse of the
-     capture order). A hint that is showing goes before the surface under it, wherever it
-     is; among surfaces the DOM decides. A global layer that contains the layer the Escape
+   - *Order.* Three groups. First the **cancels**: a decider that closes nothing shown and
+     never consumes (a Trigger cancelling its coming open), recorded with `{ cancel: true }`.
+     Then the global layers, in the order they were recorded (the order they opened). Then
+     the layers the Escape came from, **innermost first** (the reverse of the capture
+     order). A cancel goes first because rule 3 leaves the event alone for it and so must
+     the other layers leave it alone: a Tooltip that closes on the same Escape and consumes
+     it must not keep the card on the focused Trigger coming. A page's `preventDefault()`
+     still stops a cancel (rule 2 is checked before every decider). A hint that is showing
+     goes before the surface under it, wherever it is; among surfaces the DOM decides. A global layer that contains the layer the Escape
      belongs to stands down by its snapshot (a HoverCard with a Tooltip, a popover or a
      dialog inside, `design/components/hover-card.md` 2.6).
 

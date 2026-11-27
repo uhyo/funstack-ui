@@ -15515,3 +15515,34 @@ holds for real keys). Changed: conventions 15 rules 3 and 4, internal-hooks.md's
   `decideEscapeLast` keeps one entry per event, the holder could let the old decision run
   and keep both cancels. Not a defect of the branch; a candidate for a follow-up issue, with a
   browser row that presses Escape twice behind a `stopPropagation()`.
+
+## 2026-11-27, #194: cancels decide first (review must-fix 1)
+
+Architect, on the review (`memo/reviewer/review-194.md`) and the product owner's ruling.
+Changed: conventions 15 rule 4 (the order), the trigger rows of tooltip.md 2.2 and
+hover-card.md 2.2.
+
+- **The regression.** The design made a Trigger's cancel of its coming open an element layer,
+  so it decided after the global layers. A Tooltip showing elsewhere closed on the Escape and
+  consumed it, the cancel on the focused Trigger was skipped, and the HoverCard opened after
+  its delay. On master the Trigger's own listener ran before the document listeners, so the
+  cancel always happened. I had seen this ordering when writing the design and judged it
+  negligible; the reviewer's reproduction shows it is the ordinary case of moving focus from
+  one hinted element to the next.
+- **The rule.** A third group, ahead of the globals: deciders recorded with
+  `{ cancel: true }`, which close nothing shown and never consume. Rule 3 already said such a
+  listener leaves the event alone; the order now makes the other layers leave it alone too.
+  Rule 2 still applies before each decider, so a `preventDefault()` by the page stops a
+  cancel as before.
+- **Not in the group:** a HoverCard's window record whose open nobody sees yet. It does not
+  consume either, but it shares one decider with the shown case and stands down by its
+  snapshot; as a global layer it already runs before the element layers, and after a cancel
+  nothing is left for it to do on the same card.
+
+Code owed: `DecideEscapeLastOptions.cancel?: boolean`; `run` orders cancels (record order),
+then globals, then the others reversed; the two Trigger listeners pass `{ cancel: true }`.
+Rows owed: for Tooltip and for HoverCard, a hint showing elsewhere and focus on a Trigger
+with a coming open: Escape closes the hint and the coming open never opens (the reviewer's
+case, with fake timers past `delay`); the same with a page `preventDefault()`: nothing is
+cancelled and nothing closes; `escape-key.test.ts`: a cancel runs although a global layer
+consumes, and runs before it.
