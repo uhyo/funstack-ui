@@ -14845,3 +14845,26 @@ Rows owed (jsdom unless said; a real key press in the browser rows):
 Docs owed: DialogPage's keyboard table (the row the developer added, plus "`stopPropagation()`
 does not keep it open"); the Drawer page if it repeats the Escape row; memo/developer/issue-177.md
 side-effect note is superseded.
+
+## 2026-11-27, #177: the Escape fallback uses `afterDispatch`, shared with form reset (#185)
+
+Architect. Adjusts the entry above in one point: the fallback of the decide step is not a
+bare `setTimeout(0)` but `afterDispatch(event, callback)`, the helper `useFormReset` uses for
+the same need ("after this event has been fully dispatched", internal-hooks.md 3.8 rule 5 on
+`review/185`): a microtask, and a task when the event is still being dispatched at that
+microtask (`event.eventPhase !== Event.NONE`). For a key the user pressed that is the task
+described above; for a scripted `keydown` (jsdom rows, `dispatchEvent`) the microtask already
+follows the whole dispatch, so the dialog closes without a timer. Changed: dialog.md 2.6
+(step 2, and "task path" is now "late path").
+
+Code owed, replacing the timer lines of the entry above:
+
+- `packages/ui/src/internal/after-dispatch.ts`, directive-free, the same file on both
+  branches (whichever merges second takes the other's):
+  `afterDispatch(event: Event, callback: () => void): () => void`. `queueMicrotask`: if
+  cancelled, return; if `event.eventPhase === Event.NONE`, `callback()`; else
+  `timer = setTimeout(callback, 0)`. Returns a cancel function.
+- `dialog-dismiss.ts`: `record` stores `cancelLate = afterDispatch(event, () =>
+  settle(false))` instead of the timer; `settle` and the cleanup call `cancelLate()`.
+- Rows: the `stopPropagation()` rows in jsdom settle in a microtask (`await` once, no fake
+  timers); the browser `stopPropagation()` rows (a real key) cover the task.

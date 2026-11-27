@@ -473,8 +473,10 @@ Baseline JS for non-modal dialogs (both modes): Escape from inside the dialog cl
    the window the nodes of a closed shadow root are hidden, and a dialog may live in one.
 2. **Decide**, once per recorded event: in a bubble `keydown` listener the record step adds
    to the window for this event only, so after every element, document and earlier window
-   listener; or, when a `stopPropagation()` kept the event from reaching the window, in a
-   task queued by the record step (`setTimeout(0)`). The dialog closes unless the event is
+   listener; or, when a `stopPropagation()` kept the event from reaching the window, after
+   the dispatch has ended (the record step calls the internal `afterDispatch`, conventions
+   3.8 rule 5: a task for a key the user pressed, a microtask for a scripted event). The
+   dialog closes unless the event is
    prevented, belonged to an inner layer, or the dialog is no longer open. When it closes
    from the window listener it prevents the event first, so an enclosing layer (a modal
    dialog's or an `auto` popover's close watcher, an outer non-modal dialog, a HoverCard)
@@ -484,7 +486,7 @@ So an inner layer that closes on Escape from JS (a `manual` HoverCard or Tooltip
 document) closes first because it prevents the event, and a handler inside that consumes
 Escape (a Combobox chip, an input that clears itself) keeps the dialog open, as it keeps a
 modal one open. No listener stays on the window or the document for Escape. Two limits, both
-outside what a page can do better without a close watcher: on the task path the event can no
+outside what a page can do better without a close watcher: on the late path the event can no
 longer be prevented, so an enclosing layer with a close watcher closes on the same Escape; and
 a **capture-phase** `stopPropagation()` above the dialog hides the event from the record step,
 as it hides it from everything inside the dialog.
