@@ -267,7 +267,8 @@ export function RadioGroupPage() {
           Safari (WebKit) neither wraps at the ends of the group nor mirrors ArrowLeft / ArrowRight
           under RTL: Right and Down always go to the next radio in document order, Left and Up to
           the previous one, and a press past the end does nothing (and dispatches nothing). This is
-          the platform's behaviour; the library deliberately adds no key handler to change it.
+          the platform's behaviour; the library deliberately adds no key handler to change it (see{" "}
+          <a href="/concepts/direction-and-locales">Direction and locales</a>).
         </li>
         <li>
           The checked state assistive technology reads is the optimistic one, so a new choice is

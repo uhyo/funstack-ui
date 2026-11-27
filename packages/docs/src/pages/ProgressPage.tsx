@@ -128,10 +128,10 @@ export function ProgressPage() {
           },
           {
             name: "locale",
-            type: "string",
+            type: "string | readonly string[]",
             default: "the runtime's",
             description:
-              "BCP 47 tag for `Intl.NumberFormat`. Pass it when a client component is server-rendered, so the server's and the browser's text agree at hydration. Under React Server Components the Root runs once and there is nothing to mismatch.",
+              "BCP 47 tag, or a preference list of tags, for `Intl.NumberFormat` (the type every Root that formats takes; see [Direction and locales](/concepts/direction-and-locales)). Pass it when a client component is server-rendered, so the server's and the browser's text agree at hydration. Under React Server Components the Root runs once and there is nothing to mismatch.",
           },
           {
             name: "getAriaValueText",

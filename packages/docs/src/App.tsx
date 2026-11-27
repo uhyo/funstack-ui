@@ -54,6 +54,7 @@ export const routes = [
               page("/concepts/server-components", "ServerComponentsPage"),
               page("/concepts/browser-owned-state", "BrowserOwnedStatePage"),
               page("/concepts/render", "RenderPage"),
+              page("/concepts/direction-and-locales", "DirectionLocalesPage"),
               page("/concepts/experimental", "ExperimentalPage"),
               page("/concepts/content-security-policy", "ContentSecurityPolicyPage"),
               page("/concepts/ai-agents", "AiAgentsPage"),

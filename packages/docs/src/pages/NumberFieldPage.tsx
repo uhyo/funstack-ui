@@ -135,7 +135,9 @@ export function NumberFieldPage() {
           </strong>
           . The default is the runtime's locale (on the server and in the browser alike); a
           development warning fires when the page's <code>lang</code> disagrees and no{" "}
-          <code>locale</code> was given.
+          <code>locale</code> was given. There is no locale provider:{" "}
+          <a href="/concepts/direction-and-locales#locale">Direction and locales</a> shows how to
+          pass your i18n library's locale once.
         </li>
         <li>
           The parser accepts what the formatter produces: the locale's decimal and group separators
@@ -406,7 +408,9 @@ export function NumberFieldPage() {
 .number-field:has(.input:focus-visible) { outline: 2px solid var(--accent); }`}</CodeBlock>
       <p>
         The buttons' order is your markup's: an RTL page places <code>Decrement</code> first in
-        source if it wants it at the inline start.
+        source if it wants it at the inline start. Direction never changes the keys (ArrowUp /
+        ArrowDown only) and the locale never sets the direction; see{" "}
+        <a href="/concepts/direction-and-locales">Direction and locales</a>.
       </p>
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>

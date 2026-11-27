@@ -29,6 +29,16 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          Direction and locale are decided (<a href={issue(172)}>#172</a>,{" "}
+          <a href={issue(188)}>#188</a>): <code>dir</code> is the only direction switch and there is
+          no provider; <code>locale</code> is a prop of each Root that formats. See{" "}
+          <a href="/concepts/direction-and-locales">Direction and locales</a>.{" "}
+          <code>OTPField.Root</code> now renders <code>dir="ltr"</code> unless you pass{" "}
+          <code>dir</code>, so inside an RTL page its boxes no longer mirror. <code>locale</code> on{" "}
+          <code>Progress.Root</code> and <code>Meter.Root</code> also takes a list of tags (
+          <code>string | readonly string[]</code>), as on NumberField.
+        </li>
+        <li>
           New component <a href="/components/drawer">Drawer</a> (<a href={issue(168)}>#168</a>): a
           Dialog attached to an edge (<code>side</code>, rendered as <code>data-side</code>) that
           the user can swipe back to it with mouse, pen or touch. The swipe writes{" "}
@@ -478,6 +488,11 @@ export function RoadmapPage() {
           <a href={issue(19)}>#19</a>);{" "}
           <a href="/concepts/server-components#js-free">Server Components</a> defines "JS-free" and
           the form-control pages show the plain HTML alternative.
+        </li>
+        <li>
+          Direction and locales: CSS <code>direction</code> is the one source, read per component at
+          the event; a <code>locale</code> prop per Root, no provider (<a href={issue(172)}>#172</a>
+          ). Guide: <a href="/concepts/direction-and-locales">Direction and locales</a>.
         </li>
       </ul>
 
