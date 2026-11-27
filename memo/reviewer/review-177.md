@@ -67,3 +67,36 @@ correct.
     skip `isComposing` (HoverCard does); Tooltip's document Escape listener
     (`tooltip/use-tooltip-interaction.ts:150-159`) does not check `defaultPrevented`, so it hides
     on an Escape a Combobox chip already consumed.
+
+## Re-review, fix/177-dialog-escape at 75f05880
+
+Verdict: **acceptable**. The capture record / per-event window decide / `afterDispatch` late path
+matches the two architect entries (cca8d3c0, ccd1b419), with no deviation.
+
+- Must-fix 1 (closed shadow root): fixed, since the path is read at the dialog. Covered by
+  `dialog-escape.test.tsx:105-147` (open + closed, with and without a HoverCard).
+- Needs-architect 2/3: decided (preventDefault cancels, stopPropagation does not) and written
+  into dialog.md 2.6, the section 9 rows and DialogPage.
+- Should-fix 4-6: nested and sibling rows (:149, :171), stopPropagation rows (:190-264, plus
+  browser rows for a real key and an `auto` popover), Combobox chip row (:266).
+- Nit 7 (listener leak): fixed. A window listener exists only during one Escape's dispatch,
+  and cleanup removes the capture listener, the window listener and the late call. Covered by
+  :340-397.
+- Verified: jsdom dialog/drawer/hover-card/tooltip/combobox 1006 pass; browser dialog +
+  hover-card on Chromium and Firefox 168 pass; lint and typecheck clean. Mutation: with
+  f46cca10's dialog-dismiss.ts 8 of the 16 new rows fail, including both closed-shadow rows;
+  with the old HoverCard `containsOpenLayer` the dialog-inside-card row fails.
+
+Nits:
+
+- Merge order. `internal/after-dispatch.ts:4` cites "internal-hooks.md 3.8 rule 5" and
+  dialog.md 2.6 cites "conventions 3.8 rule 5", but on this branch rule 5 is "Reset reads
+  `defaultChecked`". The rule exists only on review/185. The lint resolves section numbers,
+  not rules, so it passes. If #177 merges first, the citation points at the wrong rule until
+  #185 lands; the `directives.test.ts` row is deferred the same way.
+- Re-entrancy (`dialog-dismiss.ts`, `record`): a listener that synchronously dispatches
+  another Escape inside the dialog during the first one's dispatch replaces the pending
+  record, so the outer Escape is dropped. The comment "the old event's dispatch is over" does
+  not hold in that case. This is rare; a comment is enough.
+- The follow-ups from nit 10 still stand (`isComposing`; Tooltip's `defaultPrevented`). File
+  them as issues.
