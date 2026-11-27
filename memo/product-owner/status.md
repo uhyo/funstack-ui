@@ -477,3 +477,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - 2026-11-27 WAVE 28 start: dev-escape (#191+#192, fix/191-192-escape), dev-193 (fix/193-combobox-field).
 - 2026-11-27 WAVE 28 DONE: #191/#192 MERGED bbb2c306, #193 MERGED 051e7135. alpha.24 RELEASED. Filed #194 (HoverCard/Tooltip stopPropagation, needs architect). Lesson: gates don't catch conflict markers in .md — grep for them after resolving. Open: #178 (Chromium 160), #181 research, #189/#190 human, #194.
 - 2026-11-27 #194 MERGED 3fef2a14. alpha.25 RELEASED. Filed #195 (late-path double Escape, low). Open: #178 (Chromium 160), #181 research, #189/#190 human, #195.
+- 2026-11-27 #181 TextField ACCEPTED (all rec.; b82123c0; NumberField Escape revert added for alignment). dev-181 on feat/181-text-field. Filed #196 (textarea Ctrl/Cmd+Enter).
