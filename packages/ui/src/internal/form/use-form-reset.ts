@@ -10,8 +10,14 @@ import { useLatest } from "../use-latest.js";
  *
  * - Built on `useFormOwnerEvent`, with its owner-following rules (rule 4).
  * - The `reset` event fires before the reset algorithm, so `onReset` is called in a microtask,
- *   when the inputs hold their reset values (rule 5), and only if no listener cancelled the reset
- *   (rule 7).
+ *   and only if no listener cancelled the reset (rule 7). **The inputs may still hold the
+ *   user's values then**: after a script `form.reset()` (React's own reset included) the
+ *   microtask runs after the algorithm, but after a click on a `<button type="reset">` the event
+ *   is dispatched from a task and a microtask checkpoint follows each listener, so the microtask
+ *   (and a synchronous React commit it causes) runs *before* the algorithm (#185). `onReset`
+ *   therefore never reads a reset result from `.value` / `.checked`: it dispatches a target
+ *   computed in JS (rule 6) or read from `defaultChecked` / `defaultValue` (rule 5), which hold
+ *   the target before and after the algorithm alike.
  * - `onReset` always sees the latest committed render's values.
  */
 export function useFormReset(

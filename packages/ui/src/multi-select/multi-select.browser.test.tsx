@@ -96,6 +96,30 @@ const activeOption = () => {
 };
 
 describe("MultiSelect (browser)", () => {
+  // #184: the ancestor <fieldset> becomes disabled while the listbox is shown. The options are
+  // divs, so a click still reaches them; it must not dispatch on a Trigger that is now disabled.
+  it("an option click after the ancestor fieldset is disabled dispatches nothing (#184)", async () => {
+    const valueChangeAction = vi.fn<Action>();
+    render(
+      <fieldset data-testid="fieldset">
+        <Box root={{ valueChangeAction }} />
+      </fieldset>,
+    );
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await act(async () => {
+      (screen.getByTestId("fieldset") as HTMLFieldSetElement).disabled = true;
+    });
+    await flushFor();
+    expect(trigger().matches(":disabled")).toBe(true);
+    // An engine that blurs the disabled Trigger may close the listbox on the focus loss; one
+    // that keeps focus on it (the HTML focus-fixup rule fires no blur) still shows it.
+    if (isOpen()) await user.click(option("olive"));
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(valueChangeAction).not.toHaveBeenCalled();
+    expect(shown()).toBe("Choose");
+  });
+
   it("a click opens the listbox in the top layer under the Trigger, and focuses the Trigger", async () => {
     render(<Harness />);
     await user.click(trigger());

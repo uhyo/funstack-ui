@@ -1698,6 +1698,31 @@ describe("Combobox (browser)", () => {
     }
   });
 
+  // #184: the ancestor <fieldset> becomes disabled while the listbox is shown. The options are
+  // divs, so a click still reaches them; it must not dispatch on a control that is now disabled.
+  it("an option click after the ancestor fieldset is disabled dispatches nothing (#184)", async () => {
+    const valueAction = vi.fn<ValueAction>();
+    render(
+      <fieldset data-testid="fieldset">
+        <Box root={{ valueChangeAction: valueAction }} />
+      </fieldset>,
+    );
+    await typeInto("j");
+    await settle(() => expect(isOpen()).toBe(true));
+    const fieldset = screen.getByTestId("fieldset") as HTMLFieldSetElement;
+    await act(async () => {
+      fieldset.disabled = true;
+    });
+    await flushFor();
+    expect(input().matches(":disabled")).toBe(true);
+    // Chromium and Firefox blur the input that became disabled, and the focus-leaving close of
+    // 5.4 hides the listbox: nothing is left to click. An engine that keeps focus on it (the HTML
+    // focus-fixup rule fires no blur) still shows the listbox, and the option is clicked.
+    if (isOpen()) await user.click(option("jp"));
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(valueAction).not.toHaveBeenCalled();
+  });
+
   // #126: a consumer's own invoker of the listbox pressed while it is shown: the input keeps focus
   // and its text (the focus-leaving close of 5.4 never runs; design 5.4, conventions 3.5).
   let valueAction: Mock<ValueAction>;

@@ -113,6 +113,30 @@ async function focusInput() {
 }
 
 describe("Combobox multiple (browser)", () => {
+  // #184: see the single-value row in combobox.browser.test.tsx.
+  it("an option click after the ancestor fieldset is disabled dispatches nothing (#184)", async () => {
+    const action = vi.fn<Action>();
+    render(
+      <fieldset data-testid="fieldset">
+        <Box root={{ valueChangeAction: action }} />
+      </fieldset>,
+    );
+    await focusInput();
+    await user.keyboard("ja");
+    await settle(() => expect(isOpen()).toBe(true));
+    await act(async () => {
+      (screen.getByTestId("fieldset") as HTMLFieldSetElement).disabled = true;
+    });
+    await flushFor();
+    expect(input().matches(":disabled")).toBe(true);
+    // Chromium and Firefox blur the disabled input and the listbox closes; an engine that keeps
+    // focus on it still shows the listbox, and the option is clicked.
+    if (isOpen()) await user.click(screen.getByTestId("opt-jp"));
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(action).not.toHaveBeenCalled();
+    expect(chipTexts()).toEqual([]);
+  });
+
   it("a pick with the real keyboard toggles, clears the text and keeps the listbox open", async () => {
     const action = vi.fn<Action>();
     render(<Harness root={{ valueChangeAction: action }} />);
