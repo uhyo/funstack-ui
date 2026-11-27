@@ -96,6 +96,34 @@ const activeOption = () => {
 };
 
 describe("MultiSelect (browser)", () => {
+  // #184: the ancestor <fieldset> becomes disabled while the listbox is shown. The options are
+  // divs, so a click still reaches them; it must not dispatch on a Trigger that is now disabled.
+  it("an option click after the ancestor fieldset is disabled dispatches nothing (#184)", async () => {
+    const valueChangeAction = vi.fn<Action>();
+    render(
+      <fieldset data-testid="fieldset">
+        <Box root={{ valueChangeAction }} />
+      </fieldset>,
+    );
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    await act(async () => {
+      (screen.getByTestId("fieldset") as HTMLFieldSetElement).disabled = true;
+    });
+    await flushFor();
+    expect(trigger().matches(":disabled")).toBe(true);
+    // The premise: Chromium, Firefox and WebKit all blur the disabled Trigger (focus goes to
+    // <body>) and the listbox closes, so no option can be clicked. An engine that kept focus
+    // on it (the HTML focus-fixup rule fires no blur) fails here: then #184's `:disabled` bail
+    // in `toggle` is owed, with a row that clicks the option.
+    await settle(() => {
+      expect(document.activeElement).toBe(document.body);
+      expect(isOpen()).toBe(false);
+    });
+    expect(valueChangeAction).not.toHaveBeenCalled();
+    expect(shown()).toBe("Choose");
+  });
+
   it("a click opens the listbox in the top layer under the Trigger, and focuses the Trigger", async () => {
     render(<Harness />);
     await user.click(trigger());

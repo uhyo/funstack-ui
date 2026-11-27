@@ -548,9 +548,9 @@ The Input is an ordinary text control:
 - **Reset**: the browser resets the input to its default; the Root follows through
   `useFormReset` and reports `onValueChange` with `"platform"`. No completion. The value
   adopted is the **computed** reset target (the latest `defaultValue`, or the mount-time
-  `value` when controlled, filtered), not the input's text: after a click on a reset button
-  `useFormReset`'s microtask runs before the browser's reset algorithm (there is a microtask
-  checkpoint after each `reset` listener), when the input still holds the old text.
+  `value` when controlled, filtered), not the input's text: a computed target does not depend
+  on what a render between the event and the callback wrote into the input (conventions 3.8
+  rules 5 and 6).
 - **Implicit submission**: Enter, native.
 
 Inside a `Field.Root` the Input calls `useFieldControl({ labelable: true, … })` and merges

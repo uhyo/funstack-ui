@@ -109,9 +109,9 @@ export function SelectValue({ className, style, render, ...rest }: SelectValuePr
   // A form reset changes the selection without re-cloning (Chromium 156: `form.reset()` leaves
   // the old option's content in <selectedcontent>; memo/developer/select.md). `useFormReset`
   // listens on the select's form owner itself (so neither `stopPropagation()` on the form nor a
-  // shadow root hides the event), follows a changed owner or `form` attribute, and calls back in
-  // a microtask after an uncancelled reset. React's own reset after a form action is a
-  // `form.reset()` too.
+  // shadow root hides the event), follows a changed owner or `form` attribute, and calls back
+  // after the reset algorithm has changed the selection, unless the reset was cancelled
+  // (conventions 3.8 rules 5, 7). React's own reset after a form action is a `form.reset()` too.
   const selectRef = useMemo(
     () => ({
       get current(): HTMLSelectElement | null {

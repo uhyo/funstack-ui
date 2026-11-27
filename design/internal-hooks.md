@@ -127,8 +127,8 @@ the list of them plus the rules they implement (numbered: the source cites "3.8 
 
 | Helper (`internal/`) | Used by | What it is |
 | --- | --- | --- |
-| `useFormOwnerEvent(ref, type, handler, options?)` (`use-form-owner-event.ts`) | `useFormReset`; `Field.Root` (`input` / `change` for cross-field `validate`, `submit` and `reset` for its flags) | The stable subscription of rule 4 for any event of the form owner (`ref.current.form`; an `<input>`, `<select>` or `<fieldset>`, all honouring `form=`). |
-| `useFormReset(ref, onReset, onResetEvent?)` (`use-form-reset.ts`) | the hooks below, Combobox, `Select.Value` (the `<selectedcontent>` refresh), `CheckboxGroup.Parent`, `OTPField.Root` (which dispatches its computed target, not the input's text: see the #171 implementation entry in `design/CHANGELOG.md`) | The `reset` subscription: `onResetEvent(event)` synchronously in the event (rule 6's mirror write), then `onReset(event)` in a microtask unless the reset was cancelled (rules 5, 7). |
+| `useFormOwnerEvent(ref, type, handler, options?)` (`use-form-owner-event.ts`) | `useFormReset`; `Field.Root` (`input` / `change` for cross-field `validate`, `submit` for its flags) | The stable subscription of rule 4 for any event of the form owner (`ref.current.form`; an `<input>`, `<select>` or `<fieldset>`, all honouring `form=`). |
+| `useFormReset(ref, onReset, onResetEvent?)` (`use-form-reset.ts`) | the hooks below, Combobox, `Select.Value` (the `<selectedcontent>` refresh), `CheckboxGroup.Parent`, `OTPField.Root`, `Field.Root` (its validity refresh) | The `reset` subscription: `onResetEvent(event)` synchronously in the event (rule 6's mirror write), then `onReset(event)` after the dispatch and the reset algorithm (`afterDispatch`, rule 5) unless the reset was cancelled (rule 7). |
 | `useResetTarget(value, defaultValue)` (`use-form-reset.ts`) | Slider, NumberField, Select, Combobox (value and text) | Rule 6's target by mode; `undefined` when absent, and the caller adds its fallback. |
 | `useNativeChecked(options)` (`use-native-checked.ts`) | every `<input type="checkbox" \| "radio">` part: Switch, Checkbox, `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent` | Per element: the ref callback with the dev tag / `type` check, the re-apply effect of rule 8 and, unless `group: true`, the two residual paths of a single control, reported through `onPlatformChange(next, event)`. With `group: true` it reports nothing and calls the group's `onItemMounted` (rule 3). |
 | `useNativeGroupReconciliation<T>(options)` (`use-native-group-reconciliation.ts`) | a group Root (`RadioGroup.Root`, `CheckboxGroup.Root`: `element` is the `<fieldset>`); `useNativeSelectValue`; Slider (through its first Thumb's input, with `readDefault` returning the JS-computed target and `onResetEvent` passed through) and NumberField | Mount reconciliation (`readCurrent()` against `base()`) and form reset (`readDefault()` against `base()`), **one dispatch per group** through `onPlatformChange(next, event, path)`; returns the stable `{ onItemMounted }` for late members (rule 3). Comparison is the `equals` option (default `Object.is`; `CheckboxGroup.Root` passes set equality). |
@@ -178,11 +178,32 @@ Rules, which component docs cite instead of restating:
 4. **The reset subscription must be stable.** React's automatic reset after a successful
    `<form action>` runs in the commit's mutation phase, between the previous effect cleanup and
    the next subscription, so a listener attached in a deps-less effect never sees it.
-5. **Reset reads `defaultChecked`, not `checked`.** The `reset` event precedes the reset
-   algorithm, so the hook waits a microtask; by then, for React's own reset, the re-apply effect
-   has already put the optimistic value back into `checked`. `el.defaultChecked` is the value the
-   browser reset to in every case; a group's `readDefault()` returns the value of the radio
-   whose `defaultChecked` is true, or `null`.
+5. **`onReset` runs after the reset, in both orders.** The `reset` event precedes the reset
+   algorithm, and when the algorithm runs relative to a microtask depends on who started the
+   reset:
+   - a script `form.reset()` (React's automatic reset included; also `button.click()`,
+     Testing Library's `fireEvent`, and any click made inside `act`): script is on the stack,
+     so a microtask queued in the listener runs **after** the dispatch and the algorithm;
+   - a click the user makes on a `<button type="reset">`: the event is dispatched from a task,
+     a microtask checkpoint follows each listener, and the microtask runs **before** the later
+     listeners and the algorithm, while `checked` and `value` still hold the user's state.
+     Only a real click shows this order (a browser test that clicks outside `act`).
+
+   `useFormReset` therefore calls back through `afterDispatch(event, callback)` (a flat
+   module of `internal/`, shared with Dialog's Escape baseline): a microtask, and if the event is still being dispatched
+   then (`event.eventPhase !== Event.NONE`), a task (`setTimeout(0)`). Either way the callback
+   runs after every listener and after the algorithm, so it may read the DOM: `validity`,
+   `:user-invalid`, a `FormData`, the selected option. Every `reset` listener of the library
+   goes through `useFormReset`, `Field.Root`'s included; none queues its own microtask.
+
+   Two things the timing does not change. **A checkable input's reset value is read from
+   `defaultChecked`, not `checked`**: after React's own reset the re-apply effect has already
+   put the optimistic value back into `checked` when the callback runs (a group's
+   `readDefault()` returns the value of the radio whose `defaultChecked` is true, or `null`).
+   And a target computed in JS (rule 6) stays computed. After a real click the callback is a
+   task later than the reset, so a frame may paint the reset DOM before the library's
+   dispatch; `onResetEvent`, which is synchronous, is where a write that must precede the
+   algorithm goes.
 6. **Reset target by mode** (`useResetTarget`). Uncontrolled: the latest `defaultX` prop.
    Controlled: the mount-time value; the reset is **offered to the parent** as a `"platform"`
    dispatch with `event.type === "reset"`, and after settle the DOM follows the parent's
@@ -194,12 +215,14 @@ Rules, which component docs cite instead of restating:
      written in the `reset` event itself (`onResetEvent`) and the dispatch carries the
      JS-computed target, never a DOM read;
    - **a hidden input** (Combobox's value) has no reset behaviour at all: the target is computed
-     in JS and dispatched from the `reset` microtask;
+     in JS and dispatched from `onReset`;
    - **a library-owned native input that is not the user's surface** (NumberField's hidden
      number input) is uncontrolled: `defaultValue` is the reset target, `.value` is written
      through the ref at every change and re-applied after every commit, so the platform's own
      reset applies and no `onResetEvent` mirror is needed.
-7. **A cancelled `reset`** (`event.defaultPrevented` in the microtask) dispatches nothing.
+7. **A cancelled `reset`** dispatches nothing: the hook reads `event.defaultPrevented` when
+   the callback is due (rule 5), after every listener has run, so a `preventDefault()` from
+   any of them counts (React's delegated `onReset` on the form, a listener on `document`).
 8. **Re-apply after every commit**, in the order `defaultChecked` (if given), `checked`
    (optimistic), `indeterminate` (if given). It is belt-and-braces for `checked` (react-dom
    rewrites it on every commit of the input) and load-bearing for `indeterminate` and
@@ -228,6 +251,7 @@ packages/ui/src/internal/
   render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
   merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
   use-merged-refs.ts      # useMergedRefs(...refs): the memoised ref merge of every part with a library ref (1.4)
+  after-dispatch.ts       # afterDispatch(event, callback): after the event's dispatch and default action, a microtask or a task (section 3.8 rule 5, dialog.md 2.6); returns its cancel; directive-free
   use-latest.ts           # useLatest(value): a ref written in an insertion effect
   use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)
   use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)

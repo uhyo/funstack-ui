@@ -1202,7 +1202,7 @@ can bring the DOM back to either value by itself while a request is in flight. F
 - **Form reset**, both an external `form.reset()` and React's automatic reset after a successful
   `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time
   default without telling React. Each native-input component listens to `reset` on `input.form`
-  through its ref and, in a microtask after the reset, dispatches the new value with `event` set
+  through its ref and, after the reset (3.8 rule 5), dispatches the new value with `event` set
   to the `reset` event. What the reset target is, and how it reaches each kind of input (a
   checkable input, a controlled value input, a hidden input, a hidden native input that is not
   the user's surface), is 3.8 rule 6. A component that owns a form value with no visible form
@@ -1210,7 +1210,7 @@ can bring the DOM back to either value by itself while a request is in flight. F
   `reset` on it (Combobox).
 - A form `reset` also **clears the user-validity flag (`:user-invalid`) but not custom
   validity**, so `Field.Root` re-reads its validity mirror and recomputes its custom-validity
-  slot in the reset microtask.
+  slot after the reset, through the same hook (3.8 rule 5).
 - **Late-mounting options in a `<select>`** are never selected by React (`updateOptions` runs
   only in the select's own commit), so the Root re-applies the intended option when an Option
   reports its mount: an option that **hydrated** is reconciled first (a user may have picked it

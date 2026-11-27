@@ -113,6 +113,34 @@ async function focusInput() {
 }
 
 describe("Combobox multiple (browser)", () => {
+  // #184: see the single-value row in combobox.browser.test.tsx.
+  it("an option click after the ancestor fieldset is disabled dispatches nothing (#184)", async () => {
+    const action = vi.fn<Action>();
+    render(
+      <fieldset data-testid="fieldset">
+        <Box root={{ valueChangeAction: action }} />
+      </fieldset>,
+    );
+    await focusInput();
+    await user.keyboard("ja");
+    await settle(() => expect(isOpen()).toBe(true));
+    await act(async () => {
+      (screen.getByTestId("fieldset") as HTMLFieldSetElement).disabled = true;
+    });
+    await flushFor();
+    expect(input().matches(":disabled")).toBe(true);
+    // The premise: Chromium, Firefox and WebKit all blur the disabled input (focus goes to
+    // <body>) and the listbox closes, so no option can be clicked. An engine that kept focus
+    // on it (the HTML focus-fixup rule fires no blur) fails here: then #184's `:disabled` bail
+    // in acceptMultiple is owed, with a row that clicks the option.
+    await settle(() => {
+      expect(document.activeElement).toBe(document.body);
+      expect(isOpen()).toBe(false);
+    });
+    expect(action).not.toHaveBeenCalled();
+    expect(chipTexts()).toEqual([]);
+  });
+
   it("a pick with the real keyboard toggles, clears the text and keeps the listbox open", async () => {
     const action = vi.fn<Action>();
     render(<Harness root={{ valueChangeAction: action }} />);

@@ -821,8 +821,9 @@ applies); the reset is offered to the parent as `"platform"` with the `reset` ev
 mirrors `defaultChecked` from the derivation over `defaultValue` (effective values) in
 uncontrolled mode; in controlled mode its React reset target can be stale (its `values` changed,
 or it mounted after the Items with another value), so the Parent has its own `useFormReset` that
-writes its derivation back into `el.checked` in its reset microtask, which runs **before the
-Root's** (the Parent subscribed first: children mount before the parent); if the Root's microtask
+writes its derivation back into `el.checked` in its reset callback (after the reset algorithm,
+conventions 3.8 rule 5), which runs **before the
+Root's** (the Parent subscribed first: children mount before the parent); if the Root's callback
 then dispatches, the re-render re-applies `checked` from the new derivation anyway (review L2). A reset that
 checks some boxes and unchecks others carries both `added` and `removed`. A cancelled `reset`
 dispatches nothing. A disabled group still follows a reset (RadioGroup 5.3).

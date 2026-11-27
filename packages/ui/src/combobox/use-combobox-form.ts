@@ -55,9 +55,12 @@ export function useComboboxForm(options: ComboboxFormOptions): void {
   useFormReset(
     formElement,
     (event) => {
-      const input = inputRef.current;
-      const domText = input?.value ?? inputDefaultValue;
-      if (domText !== textRef.current) writeText(domText, "platform", event);
+      // The target is computed, not read from the input (conventions 3.8 rule 6): after a click
+      // on a reset button this microtask runs before the browser's reset algorithm, so the input
+      // still holds the typed text here (#185).
+      if (inputDefaultValue !== textRef.current) {
+        writeText(inputDefaultValue, "platform", event);
+      }
       // A controlled parent that does not adopt the text gets the DOM re-synced.
       setResync((n) => n + 1);
       options.resetValue(event);
