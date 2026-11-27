@@ -480,3 +480,4 @@ impl-toolbar, impl-progress, design-toolbar (conventions from Progress) and desi
 - 2026-11-27 #181 TextField ACCEPTED (all rec.; b82123c0; NumberField Escape revert added for alignment). dev-181 on feat/181-text-field. Filed #196 (textarea Ctrl/Cmd+Enter).
 - 2026-11-27 TextField MERGED 2eeb5a03 (+ reset tracker fix in 5 controls; rule 6 b1801e04). #181 closed. alpha.26 RELEASED. Filed #196 #197 #198. CI infra flake (playwright install-deps) → rerun --failed. Open: #178, #189/#190 human, #195, #196, #197, #198.
 - 2026-11-28 #198 MERGED 520583e1 (tests only; all checkable rows pass as-is). #195 MERGED 95098d19 (no cancel + settle earlier Escapes in isEscapeRequest; reviewed). Reviewer left main checkout detached → added worktree rule to reviewer.md. Open: #178, #189/#190 human, #196, #197.
+- 2026-11-28 #196/#197 MERGED 7272c6d4 (all rec.: Ctrl|Cmd, commit only, search unsupported). alpha.27 RELEASED. Open: #178 (Chromium 160, 2027-01-05), #189/#190 human.
