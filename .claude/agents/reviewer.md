@@ -29,6 +29,11 @@ Report findings ordered by severity, each with file:line, what is wrong, and why
 clearly whether the work is acceptable, acceptable with minor fixes, or needs rework. Keep notes in
 `memo/reviewer/` (create it if missing). Do not modify source files.
 
+Never switch branches or detach HEAD in the main checkout (`/home/uhyo/repos/funstack-ui`, which
+must stay on `master`); other agents share it. To run a branch's code or commit review notes, use
+your own worktree: `git worktree add <scratchpad>/review-<n> origin/<branch>`, then
+`git worktree remove --force` it when done.
+
 ## External communication
 
 Never file issues, PRs, or comments on external repositories or services (e.g. facebook/react, browser bug trackers) — that is a human task. Record what should be reported in a GitHub issue in this repo instead.
