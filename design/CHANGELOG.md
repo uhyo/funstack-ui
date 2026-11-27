@@ -14475,3 +14475,26 @@ Implementation details within the design:
   entangled with that pending transition and commits when it settles (its Trigger shows
   `data-open` meanwhile), as walkthrough 8.3 says for an item's action.
 - `axe-core` is a new devDependency of `@funstack/ui` (browser test only).
+
+## 2026-11-27, #170: `Menubar`, status and the developer's deviations (architect)
+
+- `design/components/menubar.md` is **implemented**; section 11's step 1 is replaced by its
+  result (passed: Chromium and Firefox trees, axe in three engines).
+- **Conventions 7.1 lists `internal/menubar-context.ts`** among the contexts shared by several
+  component folders, next to the Toolbar's. An enumeration extended; the rule is unchanged.
+- The developer's three deviations, all accepted:
+  - **The switch skips a menu the browser has just hidden** (`hiddenBeforeToggle()`). Now in
+    menubar.md 2.2 step 2. It is what the design meant ("the old menu's close is a fact"): the
+    text did not see that between step 1's synchronous hide and the queued `toggle` the menu
+    still reads as intended open, so step 2 would have sent a request for a close that had
+    already happened, and that Root would have heard both channels.
+  - **`alwaysFocusable` on `usePopoverTrigger`**: an internal option, the `aria-disabled`
+    mapping of `submenuItem` without its warning text. The design named the mapping, not the
+    option. A disabled Trigger in a bar renders no `popovertarget`, as a disabled
+    `SubmenuTrigger`; menubar.md 5 says so now.
+  - **A second switch waits for the first target's pending `openChangeAction(true)`**: React's
+    entanglement of a transition with a pending async action, the behaviour menu.md 10.11 and
+    menubar.md 8.3 already describe for an item's action. Walkthrough 8.2 said the second
+    open "is requested" and stopped; it now says when it commits. Not measured: a first open
+    held by suspended content alone (no async action), where nothing should entangle once the
+    open is superseded.
