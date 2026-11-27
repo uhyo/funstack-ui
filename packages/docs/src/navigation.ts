@@ -64,6 +64,7 @@ export const componentNavItems: NavItem[] = [
   { path: "/components/slider", label: "Slider", group: "Forms" },
   { path: "/components/number-field", label: "NumberField", group: "Forms" },
   { path: "/components/otp-field", label: "OTPField", group: "Forms" },
+  { path: "/components/text-field", label: "TextField", group: "Forms" },
   { path: "/components/progress", label: "Progress", group: "Output" },
   { path: "/components/meter", label: "Meter", group: "Output" },
   { path: "/components/avatar", label: "Avatar", group: "Output" },

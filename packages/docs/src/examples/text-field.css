@@ -1,0 +1,66 @@
+/* TextField: the title reads as text until it is used (field-sizing: content, a border that
+   appears on hover and focus); the notes are an ordinary textarea. Both dim while a save runs. */
+.demo-text-heading {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.demo-text-title {
+  field-sizing: content;
+  min-inline-size: 4ch;
+  max-inline-size: 100%;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.demo-text-title:hover,
+.demo-text-title:focus-visible {
+  border-color: var(--color-border);
+}
+
+.demo-text-title:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.demo-text-title:not(:focus) {
+  text-overflow: ellipsis;
+}
+
+.demo-text-label {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.demo-text-notes {
+  inline-size: min(100%, 28rem);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.demo-text-title[data-pending],
+.demo-text-notes[data-pending] {
+  color: var(--color-text-secondary);
+}
+
+.demo-text-error {
+  margin: 0;
+  min-block-size: 1.25em;
+  color: #dc2626;
+}
+
+.demo-text-status {
+  margin: 0;
+  min-block-size: 1.25em;
+  color: var(--color-text-secondary);
+}

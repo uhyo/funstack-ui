@@ -430,6 +430,10 @@ export function NumberFieldPage() {
             "Enter",
             "Commits the draft. Not prevented: inside a form with a submit button the implicit submission follows and posts the committed value.",
           ],
+          [
+            "Escape",
+            "With an edited draft (its text differs from the value's): the draft is dropped and the value's text shows again. Nothing is dispatched, and the key is consumed, so an enclosing Dialog or Popover stays open; the next Escape closes it. With no edited draft: not handled.",
+          ],
           ["Everything else", "Text editing. Tab leaves the field and the blur commits."],
           [
             "A button press",

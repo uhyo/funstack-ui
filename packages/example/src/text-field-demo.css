@@ -1,0 +1,47 @@
+.text-field {
+  font: inherit;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.text-field.title {
+  field-sizing: content;
+  min-inline-size: 4ch;
+  max-inline-size: 20rem;
+  border-color: transparent;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.text-field.title:hover,
+.text-field.title:focus-visible {
+  border-color: #cbd5e1;
+}
+
+.text-field.title:not(:focus) {
+  text-overflow: ellipsis;
+}
+
+.text-field.notes {
+  display: block;
+  inline-size: min(100%, 24rem);
+}
+
+.text-field[data-pending] {
+  color: #64748b;
+}
+
+.text-field[data-invalid] {
+  border-color: #dc2626;
+}
+
+.error {
+  color: #dc2626;
+  min-block-size: 1.25em;
+}
+
+.log {
+  font-size: 0.8rem;
+  color: #475569;
+}

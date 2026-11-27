@@ -25,6 +25,7 @@ import { ProgressMeterDemo } from "./progress-meter-demo.js";
 import { ToolbarDemo } from "./toolbar-demo.js";
 import { NumberFieldDemo } from "./number-field-demo.js";
 import { OTPFieldDemo } from "./otp-field-demo.js";
+import { TextFieldDemo } from "./text-field-demo.js";
 import { SeparatorDemo } from "./separator-demo.js";
 import { AvatarDemo } from "./avatar-demo.js";
 
@@ -63,6 +64,7 @@ export function App() {
       <SliderDemo />
       <NumberFieldDemo />
       <OTPFieldDemo />
+      <TextFieldDemo />
       <ProgressMeterDemo />
       <AvatarDemo />
       <SeparatorDemo />

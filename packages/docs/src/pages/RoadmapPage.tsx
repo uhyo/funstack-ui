@@ -29,6 +29,21 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/text-field">TextField</a> (
+          <a href={issue(181)}>#181</a>): a text field that saves itself. The typed text is a draft;
+          blur or Enter commits it through <code>valueCommitAction</code> with{" "}
+          <code>data-pending</code>, a refused save shows the saved text again, and Escape with an
+          edited draft puts the saved text back. Transition types <code>fsui-text-field*</code>.{" "}
+          <code>type="search"</code> is not supported in this version.
+        </li>
+        <li>
+          NumberField&apos;s Escape reverts an edited draft (<a href={issue(181)}>#181</a>): with
+          typed text that differs from the value&apos;s, the first Escape now shows the value again
+          and is consumed, so an enclosing Dialog or Popover stays open; the next Escape closes it.
+          Before, the first Escape closed the layer and the draft was lost with it. With no edited
+          draft nothing changes.
+        </li>
+        <li>
           Escape on a Tooltip, HoverCard or toast is no longer lost to a{" "}
           <code>stopPropagation()</code> (<a href={issue(194)}>#194</a>). A handler that stops the
           Escape, a React <code>onKeyDown</code> anywhere around the focus included, used to leave a
@@ -536,6 +551,10 @@ export function RoadmapPage() {
           Direction and locales: CSS <code>direction</code> is the one source, read per component at
           the event; a <code>locale</code> prop per Root, no provider (<a href={issue(172)}>#172</a>
           ). Guide: <a href="/concepts/direction-and-locales">Direction and locales</a>.
+        </li>
+        <li>
+          <a href="/components/text-field">TextField</a>, a text field with a commit action (
+          <a href={issue(181)}>#181</a>).
         </li>
       </ul>
 
