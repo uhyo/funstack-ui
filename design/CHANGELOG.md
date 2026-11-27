@@ -15719,3 +15719,25 @@ cost of the wrong type is a quirk, and silently changing a consumer's `type` hid
 Follow-up issue owed: `type="search"` in TextField (a rule for the native clear, a test on
 Safari itself, the dialog case in Chromium).
 
+## 2026-11-27, #181 review: a controlled value input re-writes its value after a reset (`syncValueTracker`)
+
+Architect, on the review of TextField and the developer's fix. Changed: internal-hooks.md 3.8
+rule 6 (the "controlled value input" item) and the file list (`internal/form/sync-value-tracker.ts`).
+
+- **The defect** (review; five controls: TextField, NumberField, Combobox's text, Slider,
+  OTPField). react-dom installs a tracker on a controlled input's `value` setter, records the
+  last value it saw there, and drops an `input` event whose value equals the record. The form
+  reset algorithm sets the value without that setter. When the render after the reset shows
+  the text the DOM already holds, react-dom writes nothing, so the record keeps the pre-reset
+  text. Typing `ab`, resetting to `a`, typing `b` again: the `input` for `ab` was dropped as
+  no change, and the control showed text its state did not have.
+- **The fix**: after the algorithm (`onReset`, through `afterDispatch`, rule 5) the control
+  assigns the element's value to itself, which goes through the setter. The value does not
+  change, so the caret does not move and no event fires.
+- **The developer's sentence is taken as written**; I checked it against the helper and its
+  five call sites. Added to it: which controls call it. The rule is for value inputs; the
+  hidden number input of NumberField is uncontrolled and has no tracker problem.
+- **Not examined here:** the checkable inputs. Their `checked` has the same kind of tracker;
+  rule 8's re-apply writes `checked` through the setter after every commit, which should cover
+  them, but no row pins "check, reset, check again". Worth one row per checkable control.
+

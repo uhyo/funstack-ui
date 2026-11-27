@@ -213,7 +213,13 @@ Rules, which component docs cite instead of restating:
    - **a controlled value input** (`type=text`, `type=range`; Combobox's text, Slider's thumbs):
      react-dom rewrites its `defaultValue` attribute after every value change, so the mirror is
      written in the `reset` event itself (`onResetEvent`) and the dispatch carries the
-     JS-computed target, never a DOM read;
+     JS-computed target, never a DOM read. After the reset algorithm (in `onReset`), a
+     controlled `<input>` / `<textarea>` writes its value back to itself (`syncValueTracker`):
+     the algorithm restores the value past react-dom's value tracker, and react-dom writes
+     nothing when the DOM already shows what it renders, so the first edit back to the
+     pre-reset value would be dropped as no change. Five controls call it: TextField,
+     NumberField (the visible input), Combobox (the text), Slider (each range input) and
+     OTPField;
    - **a hidden input** (Combobox's value) has no reset behaviour at all: the target is computed
      in JS and dispatched from `onReset`;
    - **a library-owned native input that is not the user's surface** (NumberField's hidden
@@ -303,6 +309,7 @@ packages/ui/src/internal/
     use-fieldset-group.ts # section 3.8: RadioGroup.Root / CheckboxGroup.Root
     group-member.ts       # section 3.8: a group Item's owned input layer
     sync-presence.ts      # hydration-time attribute presence sync (3.8)
+    sync-value-tracker.ts # react-dom's value tracker brought up to the DOM value after a reset (3.8 rule 6)
     field-context.ts      # FieldContext, FormContext, fieldDataAttributes (7.1)
     use-field-control.ts  # useFieldControl, useFieldValueChange, fieldInputProps, resolveFieldDefaults (3.8)
     validity.ts, focus-first-invalid.ts # Field helpers; directive-free
