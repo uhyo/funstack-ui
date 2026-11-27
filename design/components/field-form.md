@@ -732,8 +732,8 @@ submission, which `Form.Root` already runs. So:
   code (`useDeferredValue`, or Combobox when the result is a list of options).
 - **No commit action in this part.** "Save this text when the user is done with it" (blur or
   Enter, `data-pending` on the input, a rule for a rejected save) is a component of its own
-  with NumberField's draft-and-commit model, not a prop of `Field.Control`. Section 12; the
-  proposal is `design/components/text-field.md` (#181).
+  with NumberField's draft-and-commit model, not a prop of `Field.Control`: `TextField`
+  (`design/components/text-field.md`).
 
 **`Field.Control` outside a `Field.Root`** (#169) renders the plain control instead of
 throwing. Every FUNSTACK form control works both inside and outside a Field (`useFieldControl`
@@ -1059,6 +1059,7 @@ Which controls pass what:
 | `Checkbox`, `Switch`, `RadioGroup.Root`, `Select.Root` | the optimistic value | nothing (their native `input` / `change` already dismiss); covers a controlled change from outside and a rollback |
 | `MultiSelect.Root` | the optimistic selection | `true` for a change its own pick dispatched, `false` for a controlled change, a reset or a rollback |
 | `Slider.Root` (#60, proposed: slider.md 9.4) | the optimistic values joined (`optimisticValues.join("\u0000")`): one notification per gesture commit (uncontrolled), per adopted step (a controlled adopt-steps parent), and on a rollback | `true` when the latest commit's `reason` was `"activate"` (a pointer gesture, a key press, a JS-normalised vertical / RTL arrow), which are the gestures that fire no native `input` / `change`; `false` for `"platform"` and a rollback |
+| `TextField` | the shown text (the draft while one is open, else the optimistic value) | nothing: a revert follows keystrokes the Field heard, a rollback and a controlled change are not the user's edit |
 | `Field.Control` | nothing | a native control's value changes only through events the Field hears |
 
 The alternative was a synthetic bubbling `change` on the Combobox's hidden input (closest to the
@@ -1081,6 +1082,7 @@ hook is also what Slider needs (#60): a pointer gesture fires no native `input` 
 | `Slider` (#60, **proposed**: the design is slider.md 9.4, pending product-owner acceptance) | `Slider.Root` calls the hook (the thumb count is known there) with `labelable: count === 1`; the returned ref registers the only Thumb's `<input type="range">` (through context) or, with several thumbs, the Root's group `div` | per shape | `for` (the Root makes `thumbId(0)` the Field's control id) / `aria-labelledby` on the Root, token-merged with `Slider.Label`'s id | the first Thumb's input in DOM order (a range has no native constraints; the slot carries `validate` and server errors; `:user-invalid` matches it after a submit attempt) | `name` / `disabled` default from the Field (a Thumb's own `name` still wins; `errors` and `validate` key on the Field's name). `required` is not applicable (a range always has a value; `Field.Root required` warns). `aria-invalid` on every Thumb input (never on the group `div`, 5.1); `aria-describedby`: the input (one thumb) or the Root (several). `useFieldValueChange` keyed on the optimistic values, `edit = true` for `"activate"` commits (pointer and normalised keys fire no native event). `Slider.Label` stays for use outside a Field. |
 | `MultiSelect` | `MultiSelect.Trigger` registers the button (labelable) with the validity element as `validityElement` while `required` is set; the Root reads `FieldContext` for `name`, `disabled`, `required`, the Trigger's id and the List's `aria-labelledby` | yes | `for` on the Trigger; the Label's click focuses it (4.2) | the hidden one-option `<select>` (with `required`), else none | `validate`'s `value` is the first value (`formData.get(name)`); a rule over the selection reads `formData.getAll(name)`. The browser's bubble is never shown (multi-select.md B.10), so `Field.Error` is where the `required` message appears. `useFieldValueChange(selection, takeEdit)`. |
 | `OTPField` (#171) | `OTPField.Input` registers the one `<input>` (labelable), as `Field.Control` does; the Root reads `FieldContext` for `name`, `disabled`, `required` and `data-invalid` | yes | `for` on the Input | the Input itself (`required`, the derived `pattern`) | No hidden input and no validity mirror: the text shown is the value posted (`design/components/otp-field.md` 7). `useFieldValueChange(value, takeEdit)`: `takeEdit` is `true` for the library's write-back and a WebOTP fill, `false` for a controlled change, a reset and text adopted at hydration. |
+| `TextField` (#181) | its one `<input>` or `<textarea>` (labelable), as `Field.Control` does | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. The text shown is the value posted, the draft included, and `validate` sees it per keystroke (`design/components/text-field.md` 7). Its `data-pending` is its own `valueCommitAction`'s. `useFieldValueChange(text)` with no `takeEdit`: an Escape revert, a rollback and a controlled change move the text with no event. |
 | `Toggle`, `Menu`, `Tabs`, … | nothing | | | | not form controls; a Field around them is a dev warning (no registration). |
 
 Landing Field therefore touches each of these parts with one hook call and the owned-layer merge
@@ -1472,10 +1474,8 @@ const deferredQuery = useDeferredValue(query);
 ## 12. Not in v1
 
 - A `Fieldset` / `Legend` part (7.4) and `Input` / `Textarea` parts (4.3): the native elements.
-- A text field with a **commit action** (save on blur or Enter, with `data-pending` and a rule
-  for a rejected save; Ark UI's `Editable` is the nearest prior art): a separate component if it
-  is built, with NumberField's draft-and-commit model. Not a prop of `Field.Control`. Proposed
-  as `TextField` in `design/components/text-field.md` (#181), not accepted yet.
+- A commit action on `Field.Control` (save on blur or Enter): that is `TextField`, a component
+  of its own (`design/components/text-field.md`).
 - Async or debounced `validate` (Base UI's `validationDebounceTime`): a v2 question once a demo
   needs a uniqueness check before submit; the sync slot and the server channel cover it today.
 - `Field.Root invalid` / `error` overrides (Base UI's `invalid`, React Aria's `isInvalid` +

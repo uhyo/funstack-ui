@@ -326,7 +326,7 @@ section 2.6 for what this means for the "no handlers" rule.
 | State change | `<state>ChangeAction` | `(next, details)` | `pressedChangeAction`, `valueChangeAction`, `openChangeAction` |
 | Pure trigger (nothing to change) | `action` | `(details)` | `<Button action>`, `<Menu.Item action>` |
 | Pure trigger that carries a value, named after its event | `<event>Action` | `(value, details)` | `completeAction` (`OTPField.Root`): the code became complete. Nothing changes that could be rolled back (the value is already the state's, urgent); the action is a request about that value, run in the owner's transition, awaited, with `data-pending`. Used where a bare `action` would read as a form's `action` or where the trigger is not a part the user presses. No `whilePending` (2.5.1). |
-| Commit of a continuous state | `<state>CommitAction` | `(next, details)` | `valueCommitAction` (Slider): once per gesture (pointer release, key press, platform change), awaited in the owner's transition like a change action; the step action `<state>ChangeAction` runs per step. For a continuous control the commit action is the state owner's dispatch (section 3.3). |
+| Commit of a continuous state | `<state>CommitAction` | `(next, details)` | `valueCommitAction` (Slider): once per gesture (pointer release, key press, platform change), awaited in the owner's transition like a change action; the step action `<state>ChangeAction` runs per step. For a continuous control the commit action is the state owner's dispatch (section 3.3). **A text control has the commit alone** (`TextField`): one edit, from the first keystroke to the blur or the Enter, is the gesture; its steps are keystrokes, which are facts and have no action, so there is no `valueChangeAction` there. |
 | Fact about a state (the library cannot hold the change) | `on<State>Change` | `(next, details) => void` | `onInputValueChange` (Combobox), `onValueChange` (OTPField): a controlled text input's text, which React requires to be urgent. `onOpenChange` (Popover, Menu, Combobox, Dialog, HoverCard Roots; `NavigationMenu.Item`): the popup was closed without the library performing the close. **Not an action** (the handler rule below). Type `UrgentChangeHandler`. |
 | Fact with no state | `on<Event>` | `(details) => void` | `onClose` (a toast, `toast({ onClose })`): the toast left. Same rule. Type `UrgentHandler`. A callback for something that already happened is never an action. |
 
@@ -927,6 +927,9 @@ pair:
   `useState`, because the text is not a value until it is parsed at commit (blur, Enter, or
   before a step). The value under a held `Increment` / `Decrement` button follows Slider's
   `live` rule (3.2).
+- **The draft text of a TextField** is the same state without the parse: the text being
+  edited, written from the `input` event, shown instead of the saved value until a commit
+  (blur, Enter), an Escape revert or a reset clears it (`design/components/text-field.md` 2).
 
 ### 2.7 Form-level actions are a separate channel
 
@@ -987,6 +990,11 @@ Every controllable state `x` of type `T` comes as a triple:
 "None selected" is `null`, never `undefined`, so that `undefined` always means uncontrolled.
 Switching between modes after mount is unsupported (dev warning).
 
+One accepted exception to the third name (TextField): its triple is `value` / `defaultValue` /
+`valueCommitAction`. The saved text changes once per edit, at the commit, and
+`valueChangeAction` on a text input would read as a per-keystroke prop, which does not exist
+(2.1, the commit row; `design/components/text-field.md` 2.1).
+
 One accepted exception (Select): `Select.Root`'s `value` is `string`, with `""` for the
 placeholder option. A single `<select>` has no empty state other than an option (`select.value`
 is always a string) and `""` is what `required` validates against, so `null` would be a second
@@ -1025,7 +1033,7 @@ The state owner (`Root` or the single component) holds:
 | `optimistic` | `useOptimistic(committed, reducer)` | sync | trigger parts (`Tab`, `Trigger`, `Toggle`): `aria-pressed`, `aria-selected`, `data-selected`, state passed to their function props. ARIA state only where the optimistic value is what is displayed: a `<button>` overlay Trigger renders no `aria-expanded` at all (a `popovertarget` invoker: the browser exposes the popup's state), and where the attribute is still rendered (a non-button Trigger render, the Combobox Input) it follows the shown popup, the `shown` mirror below |
 | `pending` | `useTransition()` | sync | `data-pending` on the owner and on the trigger that initiated the change |
 | urgent (`inputValue`, the active option of a listbox) | `useState`, written from the DOM event; reported through an `on<State>Change` handler, not an action (section 2.6) | sync, urgent | the controlled text input; `aria-activedescendant` and `data-active` |
-| urgent, internal (the value a slider gesture has reached, `live`; NumberField's draft text and the value under its held button) | `useState`, written from the pointer or `input` event; no consumer-facing urgent action | sync, urgent | the thumbs, while a pointer is captured or a step or commit is in flight (`held`); otherwise they render `optimistic` (Slider 2.2) |
+| urgent, internal (the value a slider gesture has reached, `live`; NumberField's draft text and the value under its held button; TextField's draft text, shown by its input while one is open) | `useState`, written from the pointer or `input` event; no consumer-facing urgent action | sync, urgent | the thumbs, while a pointer is captured or a step or commit is in flight (`held`); otherwise they render `optimistic` (Slider 2.2) |
 | urgent, internal (`shown`: the popup is in the top layer) | `useState` in `usePopoverRoot` (Popover, Menu, Combobox, MultiSelect; Dialog has none), written by the Popup from its `toggle` event (read from `:popover-open`, never `newState`), set at mount for a pre-hydration open, cleared when the Popup unmounts; never inside a transition, so neither a pending notification nor an action entangled with it can delay it | sync, urgent | `aria-expanded` on a non-button overlay Trigger render, on the Combobox Input and on MultiSelect's `button[role=combobox]` Trigger (library mode; any other `<button>` Trigger is a `popovertarget` invoker and renders none; MultiSelect's renders it because the `combobox` role requires the state and the button is no invoker before hydration, multi-select.md B.9); `false` on the server and at hydration |
 
 **Virtual focus is urgent library state.** Where a pattern keeps DOM focus on one element and
@@ -1198,7 +1206,8 @@ can bring the DOM back to either value by itself while a request is in flight. F
   mount through the urgent handler with `reason: "platform"`; a value stepped into a native
   range (Slider) through its step + commit dispatch; text typed into a NumberField's visible
   input is parsed and dispatched as a `"platform"` step + commit, or adopted as the draft when
-  the input is still focused.
+  the input is still focused; text typed into a TextField is dispatched as a `"platform"`
+  commit, or adopted as the draft when the input is still focused.
 - **Form reset**, both an external `form.reset()` and React's automatic reset after a successful
   `<form action>` (`requestFormReset`), which restores controlled inputs to their mount-time
   default without telling React. Each native-input component listens to `reset` on `input.form`
@@ -1401,7 +1410,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 
 | Name | Kind | Where | Meaning |
 | --- | --- | --- | --- |
-| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `ToggleGroup.Root` and each `ToggleGroup.Item` whose optimistic pressed state differs from its committed one; `Button` (its own `action`, or a submission it started through its own function `formAction`); `NumberField.Root`, `NumberField.Input` and the `Increment` / `Decrement` button the latest step or commit came from; `OTPField.Root` and `OTPField.Input` (a `completeAction` in flight); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
+| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `ToggleGroup.Root` and each `ToggleGroup.Item` whose optimistic pressed state differs from its committed one; `Button` (its own `action`, or a submission it started through its own function `formAction`); `NumberField.Root`, `NumberField.Input` and the `Increment` / `Decrement` button the latest step or commit came from; `OTPField.Root` and `OTPField.Input` (a `completeAction` in flight); `TextField` (a `valueCommitAction` in flight); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
 | `disabled` | boolean | any | Disabled by prop or inherited from the owner; also a NumberField `Increment` / `Decrement` button whose next step would change nothing (at its bound, `readOnly`). Emitted in **every mode** in which the part renders `disabled` or `aria-disabled` (the JS-free Dialog and Popover Triggers included), so the styling hook and the ARIA state never disagree. |
 | `pressed` | boolean | Toggle, `ToggleGroup.Item` | Optimistic pressed state. |
 | `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`), `Combobox.Option` (optimistic `aria-selected`; distinct from `active`), `Combobox.Input` (a non-null optimistic value) | Optimistic selection on triggers; committed on panels. |
@@ -1415,7 +1424,7 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
 | `modal` | boolean | `Dialog.Popup` (and `AlertDialog.Popup`, `Drawer.Popup`, which run its code) | The Root's `modal` prop (default `true`): the dialog is opened with `showModal()` (library mode) or the invoker's `show-modal` command (JS-free). A prop echo, not a state: rendered in every mode, server HTML included, so a stylesheet can lay out a non-modal panel (`.dialog:not([data-modal])`) before hydration and while closed, where `:modal` is false either way. |
 | `index` | number (stringified) | `Slider.Thumb`; `OTPField.Slot` | The part's `index` prop: which entry of the value array a thumb edits (default `0`), which character position a slot shows (required). The attributes whose value is a consumer-chosen number, so a stylesheet can address a part by position (`[data-index="1"]`); `state.index` is the same number. |
 | `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab; every Slider part; `ToggleGroup.Root` and `Item` (the enclosing Toolbar's when inside one); `Toolbar.Root` and `Toolbar.Separator` (the separator's own, perpendicular to the toolbar's) | Enum attribute with value. |
-| `invalid` | boolean | every Field part; `OTPField.Root` and `OTPField.Input` inside a Field | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). The control also carries an explicit `aria-invalid="true" \| "false"`. |
+| `invalid` | boolean | every Field part; `OTPField.Root` and `OTPField.Input` inside a Field; `NumberField.Root` and `NumberField.Input`, and `TextField`, inside a Field | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). The control also carries an explicit `aria-invalid="true" \| "false"`. |
 | `required` | boolean | every Field part | `Field.Root required` or the control's own `required` (reported through its registration). |
 | `dragging` | boolean | Slider `Root` and the captured `Thumb` | A pointer is captured on a thumb (urgent state; keyboard never sets it). Style motion off under it (`[data-dragging] { transition: none }`). |
 | `swiping` | boolean | `Drawer.Popup` | A pointer is dragging the drawer toward its edge (from the drag's start to its release or abort), while `--drawer-swipe-x` / `-y` / `-progress` follow it. **Attribute only, no `state.swiping`**, like `data-instant`: a DOM write from the gesture's listeners in both modes (JS-free mode has no React state for it, and a render per gesture buys nothing), never server-rendered (`design/components/drawer.md` 4.3). Style motion off under it (`[data-swiping] { transition: none }`). |
@@ -2312,7 +2321,8 @@ is a close request:
    composition cancels the composition only.
 2. **Not already consumed**: not `defaultPrevented`, and not taken by another layer of the
    library (rule 3). Innermost first: a handler or layer inside that consumed the Escape (a
-   Combobox chip, a Tooltip that closed on it, an input that clears itself) prevented it, and
+   Combobox chip, a Tooltip that closed on it, an input that clears itself, a TextField or
+   NumberField input that reverted its edited draft) prevented it, and
    nothing outside acts on it. A prevented `keydown` is also no close request for a modal
    dialog's or an `auto` popover's close watcher.
 3. **A listener that closes something shown on it, or consumes it, prevents it**
@@ -2358,8 +2368,16 @@ is a close request:
      dialog inside, `design/components/hover-card.md` 2.6).
 
    A part that handles a key **on itself** (the Combobox chip that has focus, the Menubar's
-   held Trigger, a disabled button with nothing inside to stop the event) acts in its own
-   handler: it is the innermost by construction.
+   held Trigger, a disabled button with nothing inside to stop the event, a TextField or the
+   NumberField Input with an edited draft) acts in its own handler: it is the innermost by
+   construction. So a draft is reverted before any recorded layer decides, a hint that is
+   showing included: the Tooltip stays for that Escape and closes on the next.
+
+**A draft reverted on Escape** (TextField, NumberField). An input whose text is a library
+draft reverts it on an Escape request (rules 1 and 2) when the draft's text differs from the
+text of the shown value, and consumes the key (rule 3). With no draft, or one that shows the
+same text, the Escape is not the input's: nothing is consumed and the enclosing layer closes.
+The revert dispatches nothing and cancels nothing in flight.
 
 `internal/escape-key.ts` holds all of it: `isEscapeRequest` (rules 1 and 2),
 `consumeEscape` (rule 3), `decideEscapeLast` and `createEscapeRecord` (rule 4), and

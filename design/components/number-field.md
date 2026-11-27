@@ -46,7 +46,7 @@ in Slider.
 | 5 | Uncontrolled commit | Uncontrolled state is written when the **commit** action resolves (Slider 2.3): a rejected save rolls the text and the hidden input back to the value before the gesture, and a `valueChangeAction` consumer hears one `"dismiss"` step. |
 | 6 | Value shape | `value: number \| null` (`null` is empty; `undefined` is uncontrolled). Typed values are **neither clamped nor snapped** (the platform's rule for `type=number`): `min` / `max` / `step` are native constraints on the hidden input (`rangeUnderflow`, `rangeOverflow`, `stepMismatch`, the browser's message). **Stepping** clamps and snaps with the spec's `stepUp()` semantics (5.5). Every value the field commits or steps to is rounded to the format's `maximumFractionDigits`, so the text, the value and `FormData` agree (5.4; typed and stepped values alike). |
 | 7 | Numbers | `format: Intl.NumberFormatOptions` (`decimal`, `percent`, `currency`, `unit`), `locale` (default: the runtime's locale, with a dev warning when the document's `lang` disagrees and no `locale` was given). Parsing is library code driven by `formatToParts`: the locale's decimal, group, sign, percent, currency, unit and literal symbols and its digits; full-width digits accepted; **strict grouping** (a group separator must sit before the decimal separator and be followed by a whole group, so `1,5` under `en` is unparsable, not `15`); accounting parentheses and U+2212 as minus; percent scales by 100. Affixes (currency, unit, percent, literals) are stripped **at the edges only**, in every display the formatter has (`EUR`, `€`, `euros`, `km`, `kilometers`), case-insensitively; the number core stays strict (section 5.3). |
-| 8 | Keyboard | ArrowUp / ArrowDown `± step`; PageUp / PageDown and Shift+Arrow `± largeStep` (default `10 × step`); Home / End to `min` / the **largest on-grid value `≤ max`**, **only when that bound is set** and only without Shift (Shift+Home / Shift+End stay text selection); Ctrl / Meta / Alt combinations are the browser's; Enter commits (and lets the form's implicit submission post the committed value, which needs a submit button in the form, 4.1); every other key is native text editing. Each key press is a one-step gesture (step + commit), auto-repeat included (4.2). |
+| 8 | Keyboard | ArrowUp / ArrowDown `± step`; PageUp / PageDown and Shift+Arrow `± largeStep` (default `10 × step`); Home / End to `min` / the **largest on-grid value `≤ max`**, **only when that bound is set** and only without Shift (Shift+Home / Shift+End stay text selection); Ctrl / Meta / Alt combinations are the browser's; Enter commits (and lets the form's implicit submission post the committed value, which needs a submit button in the form, 4.1); Escape reverts an edited draft and consumes the key (4.2); every other key is native text editing. Each key press is a one-step gesture (step + commit), auto-repeat included (4.2). |
 | 9 | Buttons | `tabindex="-1"` (the input is the only Tab stop, APG), `aria-controls` → the input, built-in `aria-label` `"Increase"` / `"Decrease"` (static strings, overridden by the ordinary `aria-label` / `aria-labelledby` pass-through, Toast's rule), natively `disabled` when the next step from the **step base** (the parsed draft while one is open, else the shown value) would change nothing (at the bound, `readOnly`, `disabled`). **Press-and-hold**: one step on `pointerdown`, repeat after 400 ms then every 60 ms, commit at release; the press is `preventDefault()`ed so focus stays where it is and touch opens no keyboard; a `click` with no pointer gesture (assistive technology) steps once. `details.event` is `undefined` for the repeats of a hold and for a hold its bound ended (4.3). |
 | 10 | Wheel | **Off by default**; `stepOnWheel` enables it **only while the input is focused**, through a native non-passive `wheel` listener (React's `onWheel` is passive and cannot stop the page scroll). Each wheel event with a vertical delta is a one-step gesture; `deltaY === 0` (a horizontal scroll) is ignored and not prevented (4.4). |
 | 11 | Hidden native input | `<input type="number">` right after the visible input, `aria-hidden="true" tabindex="-1" autocomplete="off"`, visually hidden; carries `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readOnly` and the canonical value (`String(number)`, `""` for empty). **Uncontrolled**: its `defaultValue` prop is the reset target (uncontrolled: the latest `defaultValue`; controlled: the mount-time value), which react-dom keeps in the `value` attribute, so the platform's own reset applies to it; the library writes its `.value` synchronously at every step and re-applies the shown value after every commit. The library always cancels its `invalid` event, so the browser never reports on an `aria-hidden` element (section 6). |
@@ -56,7 +56,7 @@ in Slider.
 | 15 | Exposure | `data-pending` on Root, Input and the button the latest step or commit came from; `data-disabled` on every part; `data-invalid` (from a Field) on Root and Input. No `data-readonly` (`:read-only`), no `data-holding` (`:active` on the held button), no `data-editing`. `state.value` is the shown value (`live` while held, else optimistic), `state.text` the shown text. |
 | 16 | ViewTransition | **No `transition` prop on any part** (Select / Slider precedent): every change is urgent or optimistic. Types `fsui-number-field`, `fsui-number-field-change` (step), `fsui-number-field-commit` (gesture) for consumers' own boundaries. |
 | 17 | SSR | Every part file is `"use client"`; the parser / formatter and the arithmetic are directive-free modules. The server HTML carries the formatted text and the hidden input with its value and constraints; before hydration typing works (adopted at mount), a submission posts the default value, the buttons are inert. |
-| 18 | Not in v1 | `inputValue` triple, `smallStep` / Alt+Arrow, `step="any"`, a scrub area, `compact` notation, `maximumSignificantDigits` rounding, Escape reverting the draft, an iPhone `inputmode="text"` switch for negatives, a built-in "not a number" message (section 13). |
+| 18 | Not in v1 | `inputValue` triple, `smallStep` / Alt+Arrow, `step="any"`, a scrub area, `compact` notation, `maximumSignificantDigits` rounding, an iPhone `inputmode="text"` switch for negatives, a built-in "not a number" message (section 13). |
 
 ---
 
@@ -499,7 +499,20 @@ On the visible input (`keydown`; each row is a one-step gesture: `step` then `co
 | Shift+ArrowUp / Shift+ArrowDown, PageUp / PageDown | `± largeStep`. |
 | Home / End | `min` / the **largest on-grid value `≤ max`** (`boundValue`: with `0..5` by `2`, End is `4`, so no key can create a `stepMismatch`), **only when that bound is set** and **only without Shift**; otherwise the key is not handled: it moves the caret, and Shift+Home / Shift+End select text. |
 | Enter | Commits the draft (4.1). Not prevented. |
-| Alt / Ctrl / Meta + any key, Escape, Tab, everything else | Not handled (Cmd+Arrow and Ctrl+Home are caret moves on their platforms). Tab leaves the field and the `focusout` commits. Escape is left to the platform (a Dialog closes); reverting the draft on Escape is section 13. |
+| Escape | With a draft open whose text differs from the shown value's text (`draft !== format(shown)`): the draft is cleared, so the input shows the value again, and the key is consumed (below). Otherwise not handled: the platform's (a Dialog closes). |
+| Alt / Ctrl / Meta + any key, Tab, everything else | Not handled (Cmd+Arrow and Ctrl+Home are caret moves on their platforms). Tab leaves the field and the `focusout` commits. |
+
+**Escape reverts the draft**, by the rule TextField has (`design/components/text-field.md`
+4.3), so the two drafts behave alike. The key must be an Escape request (`isEscapeRequest`,
+conventions 15 rules 1 and 2: not composing, not already prevented or consumed). The input
+acts in its own handler, as a part that handles a key on itself (rule 4), and calls
+`consumeEscape` (rule 3): an enclosing dialog or popover stays open, and the next Escape, which
+finds no edited draft, is left alone and closes it. The comparison is on the **text**: a draft
+`1.0` over a value shown as `1` is reverted and consumed, because the user sees the text
+change. Nothing is dispatched, no step and no commit; `disabled` and `readOnly` handle nothing
+(no draft can be open). Escape does not cancel a step or a commit in flight and does not end a
+hold. The revert is a write to a controlled input, so the browser's undo history for the field
+is gone after it.
 
 Auto-repeat: each repeated `keydown` is its own one-step gesture, as a held key on a native
 range is (Slider 4.2). `readOnly` and `disabled` handle nothing. Keys are **never** handled on
@@ -1129,7 +1142,7 @@ step transition) can key a type map on them. A rollback carries no types.
   `onInputValueChange: UrgentChangeHandler`) exposing the draft, Combobox's shape. Nothing needs the raw text today;
   adding it later is additive (the draft already exists internally).
 - **`smallStep` and Alt+Arrow** (Base UI), **`step="any"`** (keys would need their own step),
-  a **scrub area** (Base UI's drag-on-label), **Escape reverting the draft**, a **`Clear`**
+  a **scrub area** (Base UI's drag-on-label), a **`Clear`**
   part.
 - **`notation: "compact"` parsing** ("1.2K"), **`maximumSignificantDigits` rounding**, **Indian
   grouping beyond `en-IN` / `hi-IN`** test coverage, **`ar` sign placement variants**.

@@ -1,10 +1,9 @@
 # TextField
 
-Status: **proposed** (#181). Not implemented; nothing here binds until the user decides the
-four questions at the end of this document. The prior-art research, what was not verified and
-the amendments other documents need on acceptance are in `design/CHANGELOG.md`, entry "#181:
-text-field.md, the design (proposed)". Follows `design/conventions.md`; where this document
-and the conventions disagree, the conventions win.
+Status: **accepted** (#181, user decision 2026-11-27), not implemented yet. The prior-art
+research, the options that were not taken and the decisions are in `design/CHANGELOG.md`,
+entries "#181". Follows `design/conventions.md`; where this document and the conventions
+disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md` (2.1, 2.3 to 2.7, 3.1 to 3.6, 4, 15),
 `design/internal-hooks.md` 3.8, `design/components/number-field.md` (the draft-and-commit
@@ -142,7 +141,8 @@ dispatch. The gesture here is one edit, from the first keystroke to the blur or 
   steps of a gesture (each tick of a held button). A text edit has no steps a consumer could
   act on other than keystrokes, so the step channel would be called exactly when the commit
   is, with the same arguments.
-- **Not `valueChangeAction`.** The triple of conventions 3.1 would give that name. On a text
+- **Not `valueChangeAction`.** The triple of conventions 3.1 would give that name; 3.1 records
+  this component as the exception. On a text
   input it reads as React's `onChange`, per keystroke, which is what field-form.md 4.3 rules
   out; and in the two components that have both names the save belongs in the commit action.
   A reader who knows Slider or NumberField finds the save under the same name here.
@@ -274,6 +274,7 @@ differs from the shown value**:
 The field acts in its own handler and not through `decideEscapeLast`: it handles a key on
 itself and is the innermost by construction (rule 4, last paragraph, as the Combobox chip).
 Consequence: a Tooltip that happens to be shown stays for that Escape and closes on the next.
+NumberField's Input has the same rule (number-field.md 4.2), stated once in conventions 15.
 
 Escape with no draft, or with a draft equal to the shown value, is not the field's: nothing is
 cleared, nothing is consumed. Escape does not cancel a save that is in flight, does not blur
@@ -541,6 +542,9 @@ A rollback carries no types.
 
 Each of these is a question for a later issue, not a decision made against it.
 
+- **Ctrl+Enter / Cmd+Enter to commit in a `<textarea>`** (Ark UI does this): the first
+  follow-up. Blur is the textarea's commit in v1.
+
 - **A read view as its own part** (`Preview`, with Edit / Submit / Cancel triggers): for a read
   state that is not plain text (a link, formatted or clamped text). Needs a compound anatomy,
   an edit-mode state with its own action, focus management and three built-in strings.
@@ -548,8 +552,6 @@ Each of these is a question for a later issue, not a decision made against it.
   `data-dirty`, and Enter tries again). The library cannot tell a refusal from a parent that
   adopted a normalised text, so it would need an explicit signal the action gives; the
   conventions have none (an action's return value is never interpreted, 2.7).
-- **Ctrl+Enter / Cmd+Enter to commit in a `<textarea>`** (Ark UI does this). Blur is the
-  textarea's commit today.
 - **A commit that waits for validity** (do not dispatch while the element is invalid). It
   would leave an edited, unfocused draft on screen, and NumberField would have to follow.
 - **`commitOnBlur={false}`** (Atlassian's `keepEditViewOpenOnBlur`, for long text), **saving
@@ -557,9 +559,6 @@ Each of these is a question for a later issue, not a decision made against it.
   through).
 - **`contenteditable`** as the element: it flows like text, but it is no form control (no
   `name`, no constraints, no `<label for>`).
-- **Escape in NumberField.** NumberField 13 keeps "Escape reverting the draft" out of v1. If
-  this component is accepted with section 4.3, NumberField should get the same rule so that
-  the two drafts behave alike.
 
 ---
 
@@ -567,6 +566,20 @@ Each of these is a question for a later issue, not a decision made against it.
 
 An outline; the rows of `design/testing.md` 10.1 apply as for any state owner, "both" meaning
 controlled and uncontrolled.
+
+**First steps, before the component is written.** Five points of this design were reasoned
+and not probed. Each is settled first, in a browser, on a bare controlled React input with a
+draft (no library code needed), in the three engines unless noted. The developer records the
+result and reports back to the architect **before going on** wherever it differs from what is
+expected below; the rule named is then amended, not worked around.
+
+| # | Question | Expected | If not |
+| --- | --- | --- | --- |
+| 1 | A field is blurred in the middle of an IME composition: do the composed text's `compositionend` and `input` arrive before `focusout`, or after? (Chromium through CDP; Firefox and WebKit if they can be driven, else recorded as not driven.) | Before: the blur commits the composed text and no draft is left. | After: a draft reopens on an unfocused field once the commit has run. Report back: 4.2 needs a rule for a draft written while the field is not focused, and NumberField has the same exposure. |
+| 2 | `type="search"`: the engine's own Escape (Chromium and WebKit clear the field). With an edited draft, does the prevented `keydown` stop the native clear? With no draft, is the native clear an `input` event that opens a draft `""`? | Yes to both: the first Escape reverts, and on an untouched field the first Escape clears natively and the second puts the saved text back. | Report back; 4.3 gets a sentence for `search`, or `search` leaves the supported types. |
+| 3 | After a controlled write that changes the text (the revert, a rollback), is the field's undo history gone (Ctrl / Cmd+Z does nothing)? | Yes, in all three. | Only the sentences in 4.3 and number-field.md 4.2 change (docs wording), no behaviour. Record the per-engine result. |
+| 4 | Does `text-overflow: ellipsis` show on an unfocused `<input>` with overflowing text, next to `field-sizing: content` with a `max-inline-size`? | Yes, in all three. | The CSS recipe of section 9 and the docs example lose the line; no code changes. |
+| 5 | Does `useNativeGroupReconciliation` fit one controlled text input as it stands (`element` the input, `readCurrent` the DOM text with the focused-draft adoption, `readDefault` the computed target, `onResetEvent` the `defaultValue` mirror), as NumberField uses it? (Read the hook and write the mount and reset rows first.) | Yes. | Do not bend the hook: report back with what does not fit; the fallback is `useFormReset` + `useResetTarget` and a mount layout effect in the component, which 4.4 allows. |
 
 jsdom, the component's test file:
 
@@ -594,44 +607,7 @@ Browser, three engines:
 | A real click on a reset button with a draft open and a save pending (the #185 order): the reset value shows and one `"platform"` commit is dispatched. |
 | Escape with an edited draft in a **modal** Dialog and in an `auto` Popover: the layer stays open (the close watcher saw a cancelled key); the next Escape closes it. |
 | Blur by a real Tab, by a click on a button (the commit is dispatched before the button's `click`), and by the window losing focus where the engine can be driven to it. |
-| IME, Chromium through CDP: Enter that confirms a composition commits nothing; a blur during a composition ends with the composed text committed and no draft left on the unfocused field. This row decides an open point (the changelog entry, "Not verified"). |
+| IME, Chromium through CDP: Enter that confirms a composition commits nothing; a blur during a composition ends as first step 1 found (expected: the composed text committed, no draft left on the unfocused field). |
+| `type="search"`: the Escape rows as first step 2 found. |
 | `startViewTransition` is not called by a commit or a rollback. |
 
----
-
-## Decisions for the user
-
-The recommendation is the first option of each.
-
-1. **What is built, and under which name.**
-   - **(a) A new single-element component, `TextField`.** It is the third of a family
-     (NumberField, OTPField: a text input whose text the library manages), with NumberField's
-     prop names. The page must say early that it is not a general input (#169 stands).
-   - (b) The same component, named `Editable` (Ark UI's name). Cannot be mistaken for "the
-     Input part", but the name promises a read view this design does not have.
-   - (c) An opt-in on `Field.Control` (`valueCommitAction` as one more prop). No new export;
-     against conventions 2.7 (the form's pending and the control's own on one element) and it
-     gives `value` two meanings on one part (section 1).
-2. **What a refused save does to the text.**
-   - **(a) NumberField's rule: the saved text returns** (section 5), and the docs show the two
-     recipes, "roll back" and "keep the text and say it is not saved", both written in the
-     action. No new rule; a consumer who forgets the second recipe on a long text loses it.
-   - (b) The library keeps the refused text on screen as an open draft with `data-dirty`, and
-     Enter tries again. Kinder to long text; needs a new signal by which an action says
-     "refused" (none exists), and NumberField would behave differently unless it follows.
-3. **A read view.**
-   - **(a) None in v1: always the input, the read look in CSS** (`field-sizing`, a border on
-     hover and focus). One element, no focus moves, no built-in strings.
-   - (b) Ark UI's anatomy: `Root`, `Preview`, `Input`, Edit / Submit / Cancel triggers, an
-     `edit` state with its action. Covers a read state that is not plain text; three to five
-     more parts, three built-in strings, and the accessibility costs listed in section 8.
-4. **The action's name.**
-   - **(a) `valueCommitAction` alone**, the name the save has in Slider and NumberField.
-     Conventions 2.1 and 3.1 then say that a text control's only action is its commit.
-   - (b) `valueChangeAction` alone, the triple of conventions 3.1 unchanged. Reads as
-     per-keystroke on a text input.
-   - (c) Both, as NumberField, called together with the same arguments. Uniform with
-     NumberField; the second prop does nothing the first does not.
-
-Smaller points the product owner can settle: Escape in NumberField for parity (section 13),
-and whether Ctrl / Cmd+Enter in a textarea joins v1.

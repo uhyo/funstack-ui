@@ -15630,3 +15630,54 @@ Owed on acceptance, in the commit that accepts (none of it is done now):
 - field-form.md 4.3, 7.2 (a row) and 12.
 - number-field.md 13, if Escape parity is taken.
 - text-field.md itself: status, and its "Decisions for the user" section moves here.
+
+## 2026-11-27, #181: TextField accepted; NumberField's Escape reverts its draft
+
+The user accepted every recommendation of the proposal (the product owner's message of
+2026-11-27). `design/components/text-field.md` is **accepted**, not implemented yet; its
+"Decisions for the user" section is removed and recorded here.
+
+Decided (and the options not taken):
+
+1. **A new single-element component, `TextField`.** Not taken: the same component named
+   `Editable` (Ark UI's name, which promises a read view); an opt-in on `Field.Control`
+   (against conventions 2.7, and `value` would mean two things on one part).
+2. **A refused save: NumberField's rule, the saved text returns**, with the two recipes of
+   text-field.md 5 in the docs. Not taken: the library keeping the refused text as an open
+   draft with `data-dirty` (needs a "refused" signal no action has).
+3. **No read view in v1**: always the input, the read look in CSS. Not taken: Ark UI's
+   `Preview` and trigger parts with an `edit` state.
+4. **`valueCommitAction` alone.** Not taken: `valueChangeAction` alone (the 3.1 triple
+   unchanged; reads as per-keystroke); both, as NumberField.
+
+Product owner:
+
+- **Alignment: NumberField's Escape reverts its draft too**, by the same rule, implemented
+  together with TextField. number-field.md decisions 8 and 18, 4.2 (a row and a paragraph) and
+  13. The comparison is on the text (`draft !== format(shown)`), so a draft `1.0` over `1` is
+  reverted and consumed. A behaviour change for NumberField: an Escape that used to close a
+  dialog now first reverts an edited draft (the Roadmap's behaviour-change list owes a line).
+- Ctrl / Cmd+Enter in a textarea: not in v1, the first follow-up (text-field.md 13).
+- A validity gate on the commit, `commitOnBlur={false}`, a debounced commit: not in v1.
+- The five unverified points of the proposal entry become **first steps of the test plan**
+  (text-field.md 14), each with what is expected and what to do otherwise; the developer
+  reports back where a result differs. Point 6 of that list (no inline edit in React Aria,
+  Base UI, Radix) stays unverified and changes nothing.
+
+Changed with the acceptance:
+
+- conventions 2.1 (the commit row: a text control has the commit alone), 3.1 (the exception
+  to the triple's third name), 2.6 and 3.2 (TextField's draft among the internal urgent
+  states), 3.5 (mount reconciliation), 4.1 (`pending`; `invalid`, which now also names
+  NumberField's Root and Input, emitted since #67 and missing from the row), 15 (rule 2's
+  examples, rule 4's on-itself parts and its consequence for a showing hint, and a new closing
+  paragraph, "A draft reverted on Escape", the one statement of the rule both inputs follow).
+- testing.md 10.1: a "Draft revert" row; "Platform path" (a focused hydrated draft, a reset
+  clearing a draft) and "Inside a Field" name TextField.
+- internal-hooks.md 3.8: TextField among the users of `useFormReset`, `useResetTarget`,
+  `useFieldControl`, `useFieldValueChange`.
+- field-form.md 4.3, 7.1 (the `useFieldValueChange` table), 7.2 (a row), 12.
+- Not changed here, owed with the code: the action-naming list of testing.md 10.1 gains
+  `TextFieldProps` in the commit that exports it; the docs site page and the
+  `funstack-ui-knowledge` skill; the Roadmap line above.
+
