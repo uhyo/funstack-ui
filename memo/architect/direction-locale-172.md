@@ -29,3 +29,10 @@ Proposal: `design/direction-locale.md` (status proposed). Changelog entry of the
   handled too. That is the real cost.
 - Typeahead and locale: `toLowerCase()` vs `toLocaleLowerCase(lang)` only matters for Turkish
   dotted I and similar; both sides are folded the same way, so matching still works.
+
+## Accepted (2026-11-27)
+
+User took 1(a), 2(a), 3(a), 4(a). Rules are conventions 14; otp-field.md 4.4 and decision 13;
+progress.md `locale` type. Implementation checklist sent to the team lead for an issue.
+`internal/range-value.ts` keys its formatter cache with a template string of `locale`; with a
+list that joins with commas, which works but a JSON key is cleaner (NumberField does that).

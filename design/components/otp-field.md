@@ -4,7 +4,9 @@ Status: **decided and implemented** (#171, part of #162). The decisions, the imp
 amendments, the probe results and the device checks still owed are in the 2026-11-26 #171
 entries of `design/CHANGELOG.md`. Follows `design/conventions.md`; where this document and the
 conventions disagree, the conventions win. **Provisional until the device checks are done**: the
-Input's inline style list (section 6) and the composition rule (section 4.1).
+Input's inline style list (section 6) and the composition rule (section 4.1). The Root's
+`dir="ltr"` default (section 4.4, #172) is decided; its three-engine probe and implementation
+are owed.
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.1, 1.2, 2.1, 2.2, 2.3, 2.4, 2.6, 3.6, 4.1,
 5, 8, 11), `design/components/field-form.md` (4.3: text is a fact; 7.1: `useFieldControl`,
@@ -39,6 +41,7 @@ is a request**, `completeAction`, run in a transition with `data-pending`.
 | 10 | ViewTransition | No `transition` prop. The completion's transition carries the types `fsui-otp-field` and `fsui-otp-field-complete` for a consumer's own boundary (the next screen). |
 | 11 | SSR | Every part file is `"use client"`; the filter is a directive-free module. The server HTML is the input and the slots with the default value. Before hydration typing works and is adopted at mount; the typed characters are not visible until then (section 9). |
 | 12 | Not in v1 | A mask, a custom character rule, a normaliser prop, per-slot placeholders as a prop, room for a password manager's badge (section 12). |
+| 13 | Direction | `OTPField.Root` renders `dir="ltr"` unless the consumer passes `dir`: a code is read left to right in every locale, so the boxes, the text and the caret keys stay left to right inside an RTL page (section 4.4, conventions 14.1). |
 
 ---
 
@@ -65,7 +68,7 @@ Rendered HTML after the user typed `12` (focused; the Input's inline style abbre
 
 ```html
 <label for="code">Verification code</label>
-<div class="otp" style="position: relative">
+<div class="otp" dir="ltr" style="position: relative">
   <input id="code" class="otp-input" type="text" value="12"
          autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}"
          autocapitalize="off" autocorrect="off" spellcheck="false"
@@ -82,7 +85,7 @@ Rendered HTML after the user typed `12` (focused; the Input's inline style abbre
 
 | Part | Element | Role | Renders from | Notes |
 | --- | --- | --- | --- | --- |
-| `Root` | `div` | none | value, pending | Owns the text state, the completion transition, the slot registry and the Field registration. Inline `position: relative`: it is the box the Input covers. `data-complete`, `data-pending`, `data-disabled`, `data-invalid`. |
+| `Root` | `div` | none | value, pending | Owns the text state, the completion transition, the slot registry and the Field registration. Inline `position: relative`: it is the box the Input covers. `dir="ltr"` unless the consumer passes `dir` (4.4). `data-complete`, `data-pending`, `data-disabled`, `data-invalid`. |
 | `Input` | `input[type=text]` | `textbox` | value, pending | The only focusable and the only thing assistive technology sees. Covers the Root (inline style, section 6). `value`, `autocomplete="one-time-code"`, `inputmode`, `pattern`, `name`, `form`, `required`, `disabled`, `readonly` from the Root; the Field's attributes. Same data attributes as the Root. |
 | `Slot` | `span` | none, `aria-hidden="true"` | value, selection | One character position. Default children: the character at `index`, or nothing. `data-index`, `data-filled`, `data-active`. Not focusable and never the pointer's target: the Input lies over it. |
 
@@ -186,6 +189,13 @@ export interface OTPFieldRootProps
   required?: boolean;
   disabled?: boolean;
   readOnly?: boolean;
+  /**
+   * The native attribute, with a library default: a code is read left to right in every
+   * locale. Pass `"rtl"` for a code that is not (section 4.4).
+   *
+   * @defaultValue `"ltr"`
+   */
+  dir?: ComponentPropsWithRef<"div">["dir"];
   /** Ask the browser for the code of an origin-bound SMS (WebOTP). Section 8. */
   experimental_webOTP?: boolean;
   className?: StateValue<string | undefined, OTPFieldState>;
@@ -408,6 +418,36 @@ the Slot under the pointer (from the registered Slot elements' boxes: the one co
 point, else the nearest), clamped to `value.length`. Clicking a filled box and typing replaces
 it. A second click of a double click (`detail > 1`) and a click that leaves a selected range
 (a drag) keep the browser's selection.
+
+### 4.4 Direction
+
+**The Root renders `dir="ltr"` when the consumer passes no `dir`** (conventions 14.1, rule 8).
+
+A one-time code is a left-to-right string in every locale: an SMS in Arabic or Hebrew shows
+`123456` in that order, and the user copies it box by box from the left. Without the attribute
+an RTL page would mirror the field in two ways that disagree. The Slots are consumer markup in
+DOM order, so an RTL container lays Slot 0 at the right and the boxes read right to left; the
+text in the one Input is a left-to-right run of digits whatever the direction, so the native
+caret keys move in that run and ArrowLeft would move the active box to the right.
+
+With the attribute, inside the Root:
+
+- Slot 0 is the leftmost box in any page, with the consumer's flex or grid layout unchanged.
+- The Input's text, caret keys and selection are left to right (4.2), matching the boxes.
+- Logical properties in the consumer's CSS for the Root and the Slots resolve as LTR.
+- Elements a consumer puts between the Slots (a separator) are laid out left to right too.
+
+Outside the Root nothing changes: the label, the description and the error message are the
+Field's or the consumer's elements (section 1) and follow the page.
+
+The default is an attribute on the library's own element, not a JS read and not a library
+prop: `dir` is the native attribute, and a consumer's value replaces the default
+(`<OTPField.Root dir="rtl">` for a code that really is right to left; there is no attribute
+value that means "inherit", so following an RTL container is spelled `"rtl"`). The default is
+applied when the prop is `undefined`. It is in the server HTML, so it holds before hydration.
+The library handles no key and reads no direction for this component.
+
+The pointer mapping of 4.3 uses the Slots' boxes and does not depend on direction.
 
 ## 5. Accessibility
 

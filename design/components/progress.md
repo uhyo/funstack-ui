@@ -203,6 +203,8 @@ Rules:
   string stays until the next render). The docs say: pass `locale` when the page is
   server-rendered as a client tree; under RSC the Root runs once, on the server, and there is
   nothing to mismatch.
+- `locale` is `string | readonly string[]`, the type every Root that formats takes (conventions
+  14.2); a list is a preference order, as for `Intl`.
 - The `Intl.NumberFormat` instance is cached per `locale` + `format` (JSON key, module-level
   `Map`, bounded) so a 60 Hz upload loop does not construct one per render.
 - `getAriaValueText` returning `null` or `undefined` omits the attribute.
@@ -322,8 +324,8 @@ export interface ProgressRootProps
    * Serialisable: a Server Component may pass it.
    */
   format?: Intl.NumberFormatOptions;
-  /** BCP 47 tag for `Intl.NumberFormat`; default: the runtime's locale. Pass it when a client tree is server-rendered. */
-  locale?: string;
+  /** BCP 47 tag(s) for `Intl.NumberFormat` (conventions 14.2); default: the runtime's locale. Pass it when a client tree is server-rendered. */
+  locale?: string | readonly string[];
   /**
    * The `aria-valuetext` to render instead of `formattedValue`. Called with the clamped value
    * (`null` while indeterminate) and the state as it would be without this prop. Return `null`
@@ -417,7 +419,7 @@ export interface MeterRootProps
   /** The best value. Default the midpoint. Decides which part of the range is `optimum`. */
   optimum?: number;
   format?: Intl.NumberFormatOptions;
-  locale?: string;
+  locale?: string | readonly string[];
   getAriaValueText?: (value: number, state: MeterState) => string | null | undefined;
   className?: StateValue<string | undefined, MeterState>;
   style?: StateValue<CSSProperties | undefined, MeterState>;

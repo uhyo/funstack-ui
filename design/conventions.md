@@ -40,6 +40,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 11 | Handlers (facts) and strings | A change the library cannot hold (the browser performed it before the library heard: a keystroke in a controlled text input, a dismissed popup, a toast that left) is reported to a **handler**, `on<State>Change: UrgentChangeHandler` or `on<Event>: UrgentHandler`, named as a handler precisely because it is not an action. **One rule for every `on*` handler the library defines**: called synchronously, outside any transition, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. The handlers: `onInputValueChange` (Combobox), `onValueChange` (OTPField), `onOpenChange` (Popover, Menu, Combobox, Dialog, AlertDialog, Drawer, HoverCard Roots), `onClose` (a toast). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 | 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/overlay/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/overlay/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13). |
 | 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay): shipped CSS covers placement and interaction timing, never visuals. A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>`. |
+| 14 | Direction and locale | **Direction is the computed CSS `direction` of an element, read at the event**: no direction provider, no library `dir` prop (the native `dir` attribute passes through), no default. Only ArrowLeft / ArrowRight of a horizontal orientation mirror. Keys the browser handles on a native control stay native, engine differences included (RadioGroup in WebKit); Slider is the recorded exception. **Locale is a `locale` prop on the Root** of a component that formats or parses, `string \| readonly string[]`, default the runtime's locale: no locale provider, no `lang` or `navigator.language` detection. Locale never sets direction. The first date or time component reopens the locale rule (section 14). |
 
 ---
 
@@ -2206,6 +2207,67 @@ Moved to `design/placement.md`, same numbers (13.1 keyword policy, 13.2 resolved
 13.3 the Firefox parent-direction bug, 13.4 placement at a point, 13.5). In one line: top-layer
 popups are placed by CSS Anchor Positioning with physical and `self-*` keywords only, and
 `data-side` / `data-align` report the resolved placement while the popup is shown.
+
+## 14. Direction and locale
+
+The audit, the options that were rejected and the prior art are in `design/direction-locale.md`.
+
+### 14.1 Direction
+
+1. **One source.** Direction is the computed CSS `direction` of an element. The library has no
+   direction provider, no `dir` prop of its own and no default. A consumer sets direction the
+   way the platform does: `dir` on `<html>`, on a container, or on a part through the native
+   pass-through (1.5), and the library follows. A subtree with another direction (an RTL island
+   in an LTR page) needs nothing more.
+2. **Read at the event.** `getComputedStyle(element).direction` is read in the handler of the
+   event it affects: each `keydown`, each press of a gesture (once per gesture), each open of a
+   point-placed popup. Never during render and never stored between events: the direction may
+   come from any ancestor and change at any time. Nothing in rendered markup depends on it.
+3. **Which element.** The element whose inline axis orders what the key moves: the container
+   for a move between items (the Tabs List, the ToggleGroup or Toolbar Root, a menu popup), the
+   control for a move of a value (the Slider input), the surface for a gesture (the Slider
+   Track, the Drawer dialog).
+4. **Only the inline axis mirrors.** ArrowLeft / ArrowRight swap under `rtl` for a horizontal
+   orientation. ArrowUp / ArrowDown, Home / End and vertical orientations do not.
+   `internal/arrow-keys.ts` is the one mapping for navigation between items. `writing-mode` is
+   not read.
+5. **Placement is CSS.** Direction-following placement uses `self-*` keywords and logical
+   properties, never a JS read that picks a physical side (13.1). The point-placed menu of 13.4
+   is the one exception, because it has no anchor.
+6. **Side names.** A prop that names a side or a swipe direction offers `inline-start` /
+   `inline-end` next to the physical values (Popover and Drawer `side`), so a consumer writes
+   RTL-safe code without knowing the direction.
+7. **Native keys stay native.** Where the browser handles the keys of a native control and
+   engines disagree under RTL, the component's design records the difference, the docs state
+   it, and the tests assert it per engine; the library installs no handler to even it out.
+   RadioGroup's arrows in WebKit, which neither mirror nor wrap, are the case
+   (`design/components/radio-group.md` 8). Slider is the recorded exception
+   (`design/components/slider.md` 7): there the value moved against the drawn track, and the
+   component already handled those keys for the vertical orientation.
+8. **A component whose content has a direction of its own sets it.** `OTPField.Root` renders
+   `dir="ltr"` unless the consumer passes `dir`: a code is read left to right in every locale
+   (`design/components/otp-field.md` 4.4). This is an attribute on the library's own element,
+   so rules 1 and 2 hold: everything inside reads the direction the attribute produces.
+
+### 14.2 Locale
+
+1. **`locale` is a prop of the Root** of a component that formats or parses (NumberField,
+   Progress, Meter): `locale?: string | readonly string[]`, what the `Intl` constructors take.
+   Plain data, so a Server Component passes it and a directive-free Root (7.1) uses it. Parts
+   get the formatter from the component's own context.
+2. **The default is the runtime's locale** (`undefined` to `Intl`), on the server and on the
+   client. It suits client-only rendering; the docs of every such component say to pass
+   `locale` when the page is server-rendered, because the server's and the browser's locales
+   can differ and the text would mismatch at hydration. A client Root warns in development when
+   `<html lang>` names another language than the resolved locale and no `locale` was given
+   (`design/components/number-field.md` 5.1); a directive-free Root has no effect to warn from.
+3. **No locale provider, no `lang` detection, no `navigator.language`.** A context could not be
+   read by a directive-free Root rendered by a Server Component, and an app that localises
+   already has a locale source to pass. Section 11 states the same for built-in strings.
+4. **Locale does not set direction.** They are independent: direction is CSS (14.1).
+5. **Reopened by the first date or time component.** Its design must revisit rules 1 and 3 with
+   the number of Roots that take `locale` and the cost of a provider to the directive-free
+   Roots.
 
 ## Resolved questions (2026-10-15)
 

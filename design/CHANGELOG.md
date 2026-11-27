@@ -14250,3 +14250,37 @@ libraries ship a direction/locale provider").
   first date component.
 - **For the user.** Four decisions: the direction source, RadioGroup's WebKit arrows under RTL,
   OTPField's direction, the locale input.
+
+## 2026-11-27, #172: direction and locale, accepted
+
+Decided by the user, all four as the proposal recommended (the entry above).
+
+- **Conventions: decision row 14 and a new section 14** ("Direction and locale"). 14.1: direction
+  is the computed CSS `direction`, read at the event from the element whose inline axis orders
+  what the key moves; only ArrowLeft / ArrowRight of a horizontal orientation mirror; placement
+  stays CSS; side props offer `inline-start` / `inline-end`; native keys stay native; a
+  component whose content has its own direction sets `dir` on its own element. 14.2: `locale`
+  is a prop of the Root, `string | readonly string[]`, default the runtime's locale; no
+  provider, no `lang` detection; locale never sets direction; the first date or time component
+  reopens it. The rules describe what the code already did, except the two changes below.
+- **Decision 1, direction source.** Taken: CSS only. Not taken: a `DirectionProvider` overriding
+  the CSS read (two sources, every read site checks both); a provider as the source (default
+  `"ltr"`, so `<html dir="rtl">` alone gives wrong keys, and a context a directive-free part
+  cannot read).
+- **Decision 2, RadioGroup in WebKit under RTL.** Taken: left native (14.1 rule 7); no change to
+  `radio-group.md`. Not taken: handling ArrowLeft / ArrowRight in JS as Slider does, which adds
+  a key handler to a component that has none and forces a choice about wrapping in WebKit.
+- **Decision 3, OTPField.** Taken: `OTPField.Root` renders `dir="ltr"` unless the consumer
+  passes `dir` (`otp-field.md` decision 13, new section 4.4, the anatomy and the Root props).
+  Not taken: a docs recipe only; following the container and mirroring the keys in JS. The
+  expected mirrored behaviour without the attribute is reasoning from the design; the
+  three-engine probe is part of the implementation.
+- **Decision 4, locale.** Taken: the prop per Root with one type. `progress.md`: `locale` on
+  `Progress.Root` and `Meter.Root` is `string | readonly string[]` (was `string`). Not taken: a
+  `LocaleProvider` for client components only (Progress and Meter would silently not follow
+  it); a provider with Progress and Meter turned into client components (gives up their server
+  rendering and server function props).
+- `design/direction-locale.md` is now **accepted** and holds the audit, the options and the
+  prior art; its sections 4, 5 and 7 state what was chosen.
+- Owed (code, tests, docs page): the `dir` default and its probe, the `locale` type on Progress
+  and Meter with the formatter cache key for a list, the "Direction and locales" docs page.

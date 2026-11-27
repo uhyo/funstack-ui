@@ -1,8 +1,9 @@
 # Direction and locale
 
-Status: **proposed** (#172, part of #162). Nothing here binds until the user decides the list in
-section 7. If accepted, sections 4 and 5 become a section of `design/conventions.md` and this
-document keeps the audit and the reasoning. No library code changes with this proposal.
+Status: **accepted** (#172, part of #162; decided by the user on 2026-11-27). The rules are
+`design/conventions.md` section 14; this document keeps the audit they rest on, the options
+that were rejected and the prior art. Where the two disagree, the conventions win. The audit
+(section 2) describes 0.1.0-alpha.21, before the follow-up work of section 6.
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.5, 7.1, 7.3, 8, 11), `design/placement.md`
 (13.1, 13.3, 13.4), the component designs named below, an audit of `packages/ui/src` on
@@ -11,19 +12,19 @@ Ariakit). Notes in `memo/architect/direction-locale-172.md`.
 
 The question: four of the six libraries we compare with ship a direction or locale provider.
 Does `@funstack/ui` need one, a `dir` prop, or neither? And is a `locale` prop per component
-enough for NumberField and for date components later?
+enough for NumberField and for date components later? The answer: neither a provider nor a
+library `dir` prop; a `locale` prop per Root.
 
 ## 1. Summary
 
-- **Direction: keep CSS `direction` as the only source. No provider, no `dir` prop.** The
-  library already reads the computed `direction` of the relevant element at the event, in every
-  component that needs it. The audit found no component that mirrors its arrow keys wrongly for
-  lack of a provider. The gaps that exist (section 2.3) are engine differences and one unprobed
-  component, and a provider would fix none of them.
-- **Locale: keep the `locale` prop on the Root. No provider now.** A provider is a context, and
+- **Direction: CSS `direction` is the only source. No provider, no `dir` prop.** The library
+  reads the computed `direction` of the relevant element at the event, in every component that
+  needs it. The audit found no component that mirrors its arrow keys wrongly for lack of a
+  provider. The gaps that exist (section 2.3) are engine differences and one component that
+  had no rule, and a provider would fix none of them.
+- **Locale: a `locale` prop on the Root. No provider.** A provider is a context, and
   `Progress.Root` and `Meter.Root` are deliberately directive-free so a Server Component can
-  render them; they could not read it. Revisit when the first date component is designed.
-- Write both down as conventions, and close four small gaps (section 6).
+  render them; they could not read it. The first date component reopens the question.
 
 ## 2. Current state
 
@@ -161,102 +162,42 @@ names, hour cycle, numbering system), all of it visible and server-rendered. Tha
 strongest case for L2, and also the point where the real cost can be measured: date and time
 is P3 and outside #162.
 
-## 4. Recommendation: direction
+## 4. Direction: what was chosen
 
-**Option A, written down.** Proposed rules (a new conventions section if accepted):
+**Option A**, as conventions 14.1. Trade-off accepted: a consumer coming from Radix or Base UI
+looks for a `DirectionProvider` and finds none; the docs say in one line that `dir` is enough.
 
-1. **One source.** Direction is the computed CSS `direction` of an element. The library has no
-   direction provider, no `dir` prop of its own and no default. A consumer sets direction the
-   way the platform does (`dir` on `<html>`, on a container, or on a part through the native
-   pass-through) and the library follows.
-2. **Read at the event.** `getComputedStyle(element).direction` is read in the handler of the
-   event it affects: each `keydown`, each press of a gesture (once per gesture), each open of a
-   point-placed popup. Never during render, never stored between events. The direction may
-   come from any ancestor and change at any time.
-3. **Which element.** The element whose inline axis orders what the key moves: the container
-   for a move between items (Tabs List, ToggleGroup / Toolbar Root, a menu popup), the control
-   for a move of a value (the Slider input), the surface for a gesture (the Slider Track, the
-   Drawer dialog). They differ only when a consumer sets direction on a part, and then the
-   part's own direction is the right one.
-4. **Only the inline axis mirrors.** ArrowLeft / ArrowRight swap under `rtl` for a horizontal
-   orientation. ArrowUp / ArrowDown, Home / End, and vertical orientations do not.
-   `internal/arrow-keys.ts` is the one mapping for item navigation.
-5. **Placement is CSS.** Direction-following placement uses `self-*` keywords and logical
-   properties, never a JS read to pick a physical side (`design/placement.md` 13.1; the
-   point-placed menu of 13.4 is the one exception, because it has no anchor).
-6. **API names.** A prop that names a side offers `inline-start` / `inline-end` next to the
-   physical values (Popover `side`, Drawer `side`), so a consumer writes RTL-safe code without
-   knowing the direction. This covers G8 when Toast's swipe is built.
-7. **Native keys and engine differences.** Where the browser handles the keys of a native
-   control and engines disagree under RTL, the component's design records the difference and
-   the tests assert it per engine. Whether the library then normalises it is decision 2 of
-   section 7.
+## 5. Locale: what was chosen
 
-Trade-off accepted: a consumer coming from Radix or Base UI looks for a `DirectionProvider`
-and finds none. The docs page (section 6) says in one line that `dir` is enough.
+**L4**, as conventions 14.2: the prop on the Root with one type, no provider, reopened by the
+first date or time component. Trade-off accepted: an app with several formatted components
+repeats one prop, or wraps the Roots once.
 
-## 5. Recommendation: locale
-
-**L4: keep the prop, no provider now, decide again at the first date component.** Proposed
-rules:
-
-1. **`locale` is a prop of the Root** of a component that formats or parses:
-   `locale?: string | readonly string[]` (what `Intl` constructors take), default the
-   runtime's locale. Plain data, so it crosses the server boundary. Parts read the formatter
-   from the component's context, never the locale from a library-wide one.
-2. **No locale provider, no `lang` detection, no `navigator.language`.** Extends the rule
-   conventions 11 has for built-in strings to formatting.
-3. **The default is for client-only rendering.** The docs of every such component say: pass
-   `locale` when the page is server-rendered. A client Root warns in development when
-   `<html lang>` disagrees with the resolved locale and no `locale` was given (NumberField's
-   warning, shared); a directive-free Root cannot.
-4. **Locale does not set direction.** React Aria and Ark derive direction from the locale's
-   script. Here they are independent: direction is CSS (section 4).
-5. **Revisit trigger.** The design of the first date or time component must reopen this
-   section, with the count of Roots taking `locale` and the cost of making Progress and Meter
-   read a provider.
-
-Trade-off accepted: an app with several formatted components repeats one prop, or wraps the
-Roots once.
-
-## 6. Follow-up work if accepted
-
-None of this is done by the proposal.
+## 6. Follow-up work
 
 | # | Work | Closes |
 | --- | --- | --- |
-| F1 | Move sections 4 and 5 into `design/conventions.md` as a new section; changelog entry. | G6 |
-| F2 | `locale` on `Progress.Root` and `Meter.Root` accepts `string \| readonly string[]`. Additive. | G4 |
-| F3 | Probe OTPField in an RTL container in three engines, then apply decision 3. | G2 |
+| F1 | The rules are conventions 14. Done with the acceptance. | G6 |
+| F2 | `locale` on `Progress.Root` and `Meter.Root` accepts `string \| readonly string[]` (`design/components/progress.md`). Additive. | G4 |
+| F3 | `OTPField.Root` renders `dir="ltr"` by default (`design/components/otp-field.md` 4.4), with a three-engine probe of the field in an RTL container. | G2 |
 | F4 | A docs page "Direction and locales": `dir` is the only switch; which keys mirror; the engine differences (G1, G5); `locale` and SSR; the wrapper recipe for an i18n library. | G3, G7 |
-| F5 | Apply decision 2 to RadioGroup. | G1 |
 
-## 7. Decisions for the user
+G1 stays as it is (decision 2). G8 is covered by conventions 14.1 rule 6 when Toast's swipe is
+built. G5 waits for Firefox. G9 is out of scope.
 
-Recommended option first.
+## 7. Decisions
 
-1. **Direction source.**
-   - (a) CSS `direction` only, written as a convention (section 4). No provider, no `dir` prop.
-   - (b) (a) plus a `DirectionProvider` that overrides the CSS read, for familiarity.
-   - (c) A `DirectionProvider` as the source, as Radix and Base UI do.
-2. **RadioGroup arrows under RTL in WebKit (G1).**
-   - (a) Leave native: a FUNSTACK radio group behaves like every native radio group in Safari.
-     Slider stays the exception because there the value moved against the drawn track.
-   - (b) Normalise in JS as Slider does: under RTL, handle ArrowLeft / ArrowRight in every
-     engine (focus and click the neighbour). Costs a key handler on a component that has none
-     today, and a choice about wrapping in WebKit.
-3. **OTPField under RTL (G2), after the probe of F3.**
-   - (a) `OTPField.Root` renders `dir="ltr"` by default (a code is read left to right in every
-     locale); a consumer's own `dir` wins.
-   - (b) Docs recipe only: tell consumers to pass `dir="ltr"`.
-   - (c) Follow the container: mirror the boxes and make the keys match in JS.
-4. **Locale input.**
-   - (a) `locale` prop per Root, no provider; unify the type (F2); reopen at the first date
-     component (section 5).
-   - (b) Add a `LocaleProvider` now for client components; Progress and Meter keep the prop
-     only.
-   - (c) Add a `LocaleProvider` now and make Progress and Meter client components so every
-     component follows it.
+Decided by the user on 2026-11-27; the options not taken are in the changelog entry of that
+date.
+
+1. **Direction source**: CSS `direction` only, written as a convention. No provider, no library
+   `dir` prop.
+2. **RadioGroup arrows under RTL in WebKit (G1)**: left native. A FUNSTACK radio group behaves
+   like every native radio group in Safari; Slider stays the exception.
+3. **OTPField under RTL (G2)**: `OTPField.Root` renders `dir="ltr"` by default; a consumer's
+   own `dir` wins.
+4. **Locale input**: a `locale` prop per Root with one type, no provider; reopened at the first
+   date component.
 
 ## 8. Prior art
 
