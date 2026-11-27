@@ -15777,10 +15777,11 @@ holder, and a new "Earlier Escapes first" step), internal-hooks.md's file list,
   a nested dispatch leaves the outer event pending; the holder's cancel cancels every
   pending decision.
 
-## 2026-11-28, #196, #197: a textarea's commit key; `type="search"` stays out of TextField (proposed)
+## 2026-11-28, #196, #197: a textarea's commit key; `type="search"` stays out of TextField
 
-Architect, for the product owner and the user. **Proposed**, not accepted: a draft on the branch
-`design/196-197`. Changed: text-field.md decision 4, 1 (the `search` paragraph), 4.2, 6
+Architect. **Accepted**: the user took the three recommendations (the product owner's message
+of 2026-11-28); the options not taken are recorded under each heading below. Not implemented
+yet. Changed: text-field.md decision 4, 1 (the `search` paragraph), 4.2, 6
 (walkthrough 10), 7, 8, 13, 14; conventions 2.1 (the commit row names the commit key). Probe:
 `memo/architect/probes-196-197/` (a browser test run locally on Chromium and Firefox and in CI
 on WebKit, run 46024498242).
@@ -15805,6 +15806,9 @@ Probed (Playwright builds on Linux; Safari on macOS was not available):
    the key for a clear nobody sees.
 
 ### #196: Ctrl+Enter or Cmd+Enter commits a textarea
+
+Decided by the user: **Ctrl or Cmd on every platform**, and **the key commits only, with no
+form submission**.
 
 The rule (text-field.md 4.2): in a `<textarea>`, Enter with `ctrlKey` or `metaKey` is the
 commit key. It runs the same commit as a blur, is `preventDefault()`ed, and does nothing else.
@@ -15835,9 +15839,11 @@ Enter alone, with Shift or with Alt, is a new line. An `<input>` is unchanged.
 
 ### #197: `type="search"` is not a supported type
 
+Decided by the user: **`search` stays unsupported.**
+
 The rule (text-field.md 1): unchanged from v1, now a decision and no longer a question for
-later. The warning stays and names `type="text"` with `role="searchbox"`; the item leaves
-"Not in v1".
+later. The warning stays and names `type="text"` with `role="searchbox"` and
+`enterKeyHint="search"`; the item leaves "Not in v1".
 
 Why. The engine's Escape clear of a search field already takes the Escape for itself (probe
 3), and it cannot be switched off while leaving the key to the enclosing layer: cancelling the
@@ -15845,7 +15851,7 @@ Why. The engine's Escape clear of a search field already takes the Escape for it
 leaves a key that does nothing and a dialog that Escape never closes from that field (probe
 4). So in a search field Escape has two candidates, the engine's "empty the field" and the
 component's "back to the saved text", and a TextField that supports the type must order them
-with a rule no other type has. The candidates:
+with a rule no other type has. The candidates, neither taken:
 
 - **(b) Escape is the clear; a search field has no revert.** An Escape request on a search
   field with text empties it (a draft `""`, written by the library and consumed with
@@ -15864,13 +15870,13 @@ with a rule no other type has. The candidates:
 
 What the type would add over `type="text"` with `role="searchbox"` and `enterKeyHint="search"`
 is the engine's clear button (Chromium and WebKit) and the search look of the field. Against
-that, one Escape rule for every TextField and for NumberField. If the user prefers the type,
-(b) is the candidate to take: it is the platform's behaviour made uniform.
+that, one Escape rule for every TextField and for NumberField. Should the type be wanted
+later, (b) is the candidate to start from: it is the platform's behaviour made uniform.
 
 Still not verified: Safari on macOS for any of the above (WebKit's source clears a search
 field on Escape with a `change` event and marks the key handled, which would make it behave
 as Chromium and Firefox in probe 3); the library-written clear of (b) in a real engine.
 
-Owed if accepted, with the code: the docs site page and the `funstack-ui-knowledge` skill (the
+Owed with the code: the docs site page and the `funstack-ui-knowledge` skill (the
 textarea's key, the form handler, `role="searchbox"`), the `search` warning text, the rows of
 text-field.md 14.

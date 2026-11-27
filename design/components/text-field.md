@@ -1,8 +1,10 @@
 # TextField
 
-Status: **accepted** (#181, user decision 2026-11-27), not implemented yet. The prior-art
-research, the options that were not taken and the decisions are in `design/CHANGELOG.md`,
-entries "#181". Follows `design/conventions.md`; where this document and the conventions
+Status: **accepted** and implemented (#181, user decision 2026-11-27). The textarea's commit
+key of section 4.2 and the `search` warning text of section 1 (#196, #197, user decision
+2026-11-28) are accepted and not implemented yet. The prior-art research, the options that
+were not taken and the decisions are in `design/CHANGELOG.md`, entries "#181" and "#196,
+#197". Follows `design/conventions.md`; where this document and the conventions
 disagree, the conventions win.
 
 Inputs: `docs/vision.md`, `design/conventions.md` (2.1, 2.3 to 2.7, 3.1 to 3.6, 4, 15),
@@ -120,7 +122,7 @@ component keeps one Escape rule instead.
 
 A search field that saves itself is `type="text"` with `role="searchbox"`, which is the role
 `type="search"` gives, and `enterKeyHint="search"` where the on-screen keyboard matters. The
-development warning for `search` says so. What is not carried over is the engine's clear
+development warning for `search` names all three. What is not carried over is the engine's clear
 button; a consumer who wants one renders a button next to the field. A search box that needs
 the engine's Escape, and no save of its own, is a native `<input type="search">` or
 `Field.Control`.
@@ -652,7 +654,7 @@ jsdom, the component's test file:
 
 | Area | Rows |
 | --- | --- |
-| Roles and ARIA | Renders one `input[type=text]` with the value; `render={<textarea />}` renders a textarea; no attribute the consumer did not pass, outside a Field. `type="search"` and `type="number"`, as a prop and on the `render` element, each warn once in development and render as given; the `search` warning names `type="text"` with `role="searchbox"`; `tel`, `url`, `email`, `password` do not warn. |
+| Roles and ARIA | Renders one `input[type=text]` with the value; `render={<textarea />}` renders a textarea; no attribute the consumer did not pass, outside a Field. `type="search"` and `type="number"`, as a prop and on the `render` element, each warn once in development and render as given; the `search` warning names `type="text"`, `role="searchbox"` and `enterKeyHint="search"`; `tel`, `url`, `email`, `password` do not warn. |
 | Draft | Typing shows at once and dispatches nothing; `state.text` follows the draft and `state.value` does not; a controlled `value` changed from outside shows when no draft is open and does not replace an open one. |
 | Commit (both) | Blur and Enter each dispatch once with `(next, { reason: "activate" })` and the native event; Enter is not `defaultPrevented`; a draft equal to the shown value dispatches nothing and is cleared; no draft, nothing; `disabled` / `readOnly` clear and dispatch nothing; an Enter with `isComposing`, and one with `keyCode` 229, dispatch nothing. |
 | Commit key, textarea (both) | Enter alone, with Shift and with Alt: nothing dispatched, not `defaultPrevented`. With `ctrlKey`, with `metaKey`, and with Shift held as well: one dispatch with `(next, { reason: "activate" })` and the `keydown`, `defaultPrevented`, the draft cleared. With no draft, an equal draft, `disabled` and `readOnly`: nothing dispatched, still `defaultPrevented`. With `isComposing` or `keyCode` 229: nothing, not prevented. A blur with a draft open commits; a blur after the key dispatches nothing more. Typing after it opens a new draft and a second key press commits it. An `<input>` with Ctrl+Enter: commits, not prevented (unchanged). |
