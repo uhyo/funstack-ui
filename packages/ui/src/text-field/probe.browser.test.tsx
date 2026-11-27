@@ -1,12 +1,22 @@
 // TEMPORARY probe (text-field.md 14, first steps). Not committed.
 import { act, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { cdp, page, userEvent } from "vitest/browser";
 import { addStyle, flushFor, sleep } from "../__tests__/browser-helpers.js";
 import { browserName } from "../__tests__/engine.js";
 
 const log: string[] = [];
+const out: string[] = [];
+function report(text: string) {
+  console.log(text);
+  out.push(text);
+}
+afterEach(() => {
+  const text = out.join("\n");
+  out.length = 0;
+  if (browserName === "webkit") throw new Error("PROBE-OUTPUT\n" + text);
+});
 
 function Bare({ type = "text", initial = "Saved" }: { type?: string; initial?: string }) {
   const [value, setValue] = useState(initial);
@@ -69,7 +79,7 @@ function listen(el: HTMLElement) {
 describe("probe", () => {
   it("1. blur mid composition (Chromium CDP)", async () => {
     if (browserName !== "chromium") {
-      console.log(`[probe1 ${browserName}] not driven`);
+      report(`[probe1 ${browserName}] not driven`);
       return;
     }
     for (const how of ["script-blur", "mouse-click", "tab"] as const) {
@@ -117,7 +127,7 @@ describe("probe", () => {
       log.push(
         `final active=${document.activeElement === input} dom=${JSON.stringify(input.value)} state=${screen.getByTestId("state").textContent}`,
       );
-      console.log(`[probe1 ${browserName} ${how}]\n` + log.join("\n"));
+      report(`[probe1 ${browserName} ${how}]\n` + log.join("\n"));
       // end any composition left
       await act(async () => {
         await session.send("Input.insertText", { text: "" });
@@ -141,7 +151,7 @@ describe("probe", () => {
     });
     await flushFor(30);
     log.push(`after Esc1: dom=${input.value} state=${screen.getByTestId("state").textContent}`);
-    console.log(`[probe2a ${browserName}]\n` + log.join("\n"));
+    report(`[probe2a ${browserName}]\n` + log.join("\n"));
     unmount();
     // (b) untouched
     log.length = 0;
@@ -159,7 +169,7 @@ describe("probe", () => {
     });
     await flushFor(30);
     log.push(`after Esc2: dom=${input.value} state=${screen.getByTestId("state").textContent}`);
-    console.log(`[probe2b ${browserName}]\n` + log.join("\n"));
+    report(`[probe2b ${browserName}]\n` + log.join("\n"));
     r2.unmount();
     expect(true).toBe(true);
   });
@@ -186,7 +196,7 @@ describe("probe", () => {
       });
       await flushFor(30);
       log.push(`after undo: dom=${input.value} state=${screen.getByTestId("state").textContent}`);
-      console.log(`[probe3 ${browserName} ${variant}]\n` + log.join("\n"));
+      report(`[probe3 ${browserName} ${variant}]\n` + log.join("\n"));
       unmount();
     }
   });
@@ -209,12 +219,12 @@ describe("probe", () => {
     await sleep(50);
     const a = await page.screenshot({ element: e, base64: true, save: false });
     const b = await page.screenshot({ element: c, base64: true, save: false });
-    console.log(
+    report(
       `[probe4 ${browserName}] width e=${e.getBoundingClientRect().width} sw=${e.scrollWidth} cw=${e.clientWidth} ` +
         `textOverflow=${getComputedStyle(e).textOverflow} differ=${a !== b}`,
     );
     const ab = typeof a === "string" ? a : a.base64;
     const bb = typeof b === "string" ? b : b.base64;
-    console.log(`[probe4 ${browserName}] screenshots differ: ${ab !== bb}`);
+    report(`[probe4 ${browserName}] screenshots differ: ${ab !== bb}`);
   });
 });
