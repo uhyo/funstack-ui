@@ -51,3 +51,24 @@ Not verified, for the implementer / tester:
 Reuse `useDelayedPair` + HoverCard's JS interest table on Trigger/Popup; click = pin (set a
 "pinned" flag so pointerleave does not close); ignore a click within N ms of a hover open. All
 Items library mode. Shared "skip delay" between Items like Tooltip's warm open.
+
+## Router probe result (2026-11-27) and the issue to file
+
+Dev's probe: Link close commits on its own (50-100 ms), route 800 ms later; not one commit.
+navigation-menu.md 9.3 rewritten.
+
+Issue text for this repo (a human reports it to uhyo/funstack-router; do not file there):
+
+> Title: FUNSTACK Router's `navigation` transition type can be consumed by an unrelated transition
+>
+> Found while implementing NavigationMenu (#170), FUNSTACK Router 1.6.0. The router calls
+> `addTransitionType("navigation")` before an `await`, and updates its location in a nested
+> `startTransition` after it. `addTransitionType` applies to the next transition commit, so
+> any transition that commits in between takes the type: here the panel's close
+> (`fsui-navigation-menu-close`), which commits 50-100 ms after the click. The route's own
+> commit then has no types, so a page `<ViewTransition>` keyed on `navigation` does not
+> animate. Chromium: every run; Firefox: about half.
+> Repro: example app's NavigationMenu demo (library-mode Item, route suspending 800 ms).
+> Suggested fix on the router side: call `addTransitionType` inside the same synchronous
+> `startTransition` scope that sets the location (after the await).
+> Our side: docs note on the NavigationMenu page (done); nothing to change in the library.

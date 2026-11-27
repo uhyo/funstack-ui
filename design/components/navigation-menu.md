@@ -207,6 +207,17 @@ panel stays open until Escape, a press outside or another panel; nothing is lost
 It runs in both modes: in JS-free mode it is a DOM-level `hidePopover()` that no React state
 hears about, like the `data-open` write (conventions 7.4).
 
+In library mode the fact's `details.event` is the `focusout` `FocusEvent` that caused the hide
+(its `relatedTarget` says where focus went), not the `toggle`, as HoverCard reports the event
+that began a library-initiated dismissal (hover-card.md 2.5).
+
+**A press on a foreign invoker is not a focus-out.** A consumer's own button outside the Item
+that names the panel (`popovertarget`, or `commandfor` with a popover command) would take focus
+on `mousedown` in Chromium and Firefox, and this rule would hide the panel before the button's
+click toggled it, showing it again. While shown, the Popup installs Menu's guard (menu.md 2.2,
+#126): the primary `mousedown` on such a button is prevented, so the press moves no focus and
+the button's own toggle is the one close, reported as `"activate"`.
+
 ### 3.3 Requests and facts (library mode)
 
 Popover's table (popover.md 2.8) applies to each Item. This component's rows:
@@ -235,10 +246,14 @@ A controlled Item needs `onOpenChange`, as every controlled overlay (conventions
 `NavigationMenu.Link` renders an `<a>` and passes every anchor prop through.
 
 - **Following a Link inside a Popup closes the panel.** On a `click` with the primary button and
-  no modifier key (the click that navigates this page), the Link closes its Item's panel: in
-  library mode `requestClose(event, "activate")` (awaited, a transition, `<ViewTransition>` if
-  set); in JS-free mode `hidePopover()`. A modified click (new tab, new window, download)
-  leaves the panel open, so several links can be opened from it.
+  no modifier key, the Link closes its Item's panel: in library mode `requestClose(event,
+  "activate")` (awaited, a transition, `<ViewTransition>` if set); in JS-free mode
+  `hidePopover()`. A modified click (new tab, new window, download) leaves the panel open, so
+  several links can be opened from it.
+- The rule reads the click and nothing else. `defaultPrevented` is not consulted: a router's
+  link prevents the default precisely when it navigates. Nor is `target` or `download`: a
+  `target="_blank"` Link closes the panel as well (the user has chosen, and resolving the
+  effective browsing context is not worth a rule); `closeOnActivate={false}` keeps it open.
 - Why: with a client-side router the navigation keeps the `nav` mounted, and a click inside a
   popover is not a light dismiss, so the panel would stay open over the new page. A full page
   load makes the close moot. This is HoverCard's reasoning for a press on its link (hover-card.md
@@ -311,9 +326,10 @@ export interface NavigationMenuItemProps
 }
 ```
 
-- `NavigationMenu.Root`: `ComponentPropsWithRef<"nav">` plus `render`; no state.
-- `NavigationMenu.List`: `ComponentPropsWithRef<"ul">` plus `render`; `role` defaults to
-  `"list"` (overridable).
+- `NavigationMenu.Root`: `ComponentPropsWithRef<"nav">` plus `render`, and `className` /
+  `style` / `children` as functions of an empty state (conventions 1.3; as `Menu.Group`).
+- `NavigationMenu.List`: `ComponentPropsWithRef<"ul">` plus `render` and the same function
+  props; `role` defaults to `"list"` (overridable).
 - `NavigationMenu.Trigger`: `PopoverTriggerProps` / `PopoverTriggerState` unchanged (owned keys:
   `type`, `popoverTarget`, `disabled`, `onClick` in library mode, `data-open`, `data-pending`,
   `data-disabled`; `aria-expanded`, `commandfor`, `command` reserved).
@@ -323,7 +339,7 @@ export interface NavigationMenuItemProps
   (both library mode only, as Popover), `render`, and `className` / `style` / `children` as
   functions of `{ open, side, align }` (`open` committed).
 - `NavigationMenu.Link`: `ComponentPropsWithRef<"a">` plus `closeOnActivate?: boolean` (default
-  `true`) and `render`. No state, no owned keys.
+  `true`), `render`, and the function props of an empty state. No owned keys.
 
 An `Item`'s own `focusout` listener is attached through the ref as well, so `onBlur` is not
 owned.
@@ -379,11 +395,29 @@ Library mode follows Popover 4 and 5 unchanged:
    `"dismiss"` fact, or nothing in JS-free mode).
 2. **The user tabs away meanwhile.** Focus leaves the Item → the pending open is superseded;
    the panel never appears.
-3. **A Link is followed.** The close is a request, so it is a transition like the router's
-   navigation. React commits pending transitions together where they overlap, so with a router
-   that navigates in a transition the panel is expected to stay until the new page is ready and
-   leave in the same commit; this is to be verified with FUNSTACK Router in the example app
-   before the docs promise it.
+3. **A Link is followed, with a client-side router.** The close and the navigation are two
+   commits. The Link's `click` requests the close: the Item's transition awaits
+   `openChangeAction(false)` and commits as soon as it settles, the panel hides in that commit
+   (with `transition` set, in a view transition of its own), and focus returns to the Trigger.
+   The new page commits whenever it is ready, in the router's transition, with its own view
+   transition if the page has one. **The panel does not wait for the new page**, and nothing
+   in the library ties the two together. Measured with FUNSTACK Router 1.6.0 and a route that
+   suspends for 800 ms, in Chromium and Firefox: the close commits 50 to 100 ms after the
+   click, the route about 800 ms later. Two limits of that measurement:
+   - It holds for a router that updates its location in a transition of its own after an
+     `await` (FUNSTACK Router does). An `openChangeAction(false)` that is still pending when
+     the router starts that transition may be entangled with it by React, and the panel would
+     then stay until the page is ready; not measured, and not a behaviour to rely on.
+   - **Transition types may land on the close commit.** `addTransitionType` applies to the next
+     transition that commits, whoever started it. A router that adds its type before its own
+     update is scheduled (FUNSTACK Router 1.6.0 adds `navigation` before an `await`) can
+     therefore have the type consumed by the panel's close, which commits first; the page's
+     commit then carries no type. Seen in Chromium in every run and in Firefox in half of
+     them. The library cannot prevent it (the type is added to React's global pending set
+     before the close commits); the docs page says so, and a Popup `transition` map keyed on
+     `fsui-navigation-menu-close` is unaffected by the extra type.
+
+   In JS-free mode the Link hides the panel in the click itself.
 4. **`openChangeAction` rejects**: the error reaches the nearest Error Boundary above the Item;
    the panel keeps its previous state (conventions 2.4).
 
@@ -430,15 +464,6 @@ different component around the same links (a Drawer or a Collapsible); the docs 
 
 ## 11. Test plan
 
-The first step, before any other row, because section 9 (walkthrough 3) states it as an
-expectation and no probe was run:
-
-1. **A Link's close committing together with a router transition.** In the example app, with
-   FUNSTACK Router: a library-mode Item, a `NavigationMenu.Link` rendered as the router's link
-   to a route whose content suspends. Follow the Link and record whether the panel stays shown
-   until the new route commits and leaves in that same commit (and, with `transition` set, in
-   the same view transition), or closes on its own before it. Either result is acceptable
-   behaviour; the step decides what walkthrough 3 and the docs page say. Report the result to
-   the architect, who amends section 9.
-
-The rest of the plan is in `design/CHANGELOG.md` (the #170 entries). Not part of the contract.
+Step 1 (a Link's close and a router transition) was run at implementation; its result is
+walkthrough 3 of section 9. The plan and the results are in `design/CHANGELOG.md` (the #170
+entries). Not part of the contract.

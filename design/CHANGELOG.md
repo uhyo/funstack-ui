@@ -14504,3 +14504,37 @@ Implementation choices the design leaves open, for review:
 - Development warnings: "does not directly follow" (an effect after mount, Popup vs the registered
   Trigger), a second Popup in an Item (the Popup's ref), a second Trigger (the shared
   `registerTrigger` text).
+
+## 2026-11-27, #170: NavigationMenu, the router probe and the open choices (architect)
+
+After the developer's step 1 result and "Implementation choices the design leaves open" (the
+entry above). `design/components/navigation-menu.md` amended:
+
+- **Section 9, walkthrough 3 rewritten from the measurement.** It said the Link's close was
+  "expected" to commit with the router's navigation. It does not: the close commits when
+  `openChangeAction(false)` settles, the page later, each with its own view transition. The
+  walkthrough now states that, the conditions of the measurement (FUNSTACK Router 1.6.0,
+  Chromium and Firefox; WebKit not run), the unmeasured case (a close action still pending when
+  the router's own transition starts) and the transition-type effect below. Section 11's step 1
+  is replaced by a pointer to the result.
+- **The `navigation` transition type on the close commit**: documented, nothing to change in
+  the library. `addTransitionType` feeds the next transition commit, so a type added before
+  the adder's own update exists goes to whichever transition commits first. The Link's close
+  is one such transition; any other transition an app starts during a navigation is another.
+  The remedy is on the router's side (add the type in the same synchronous scope as the
+  location update). Text for an issue in this repository, for a human to carry to FUNSTACK
+  Router, is in `memo/architect/menubar-navmenu-notes.md`.
+- **The open choices, all accepted and now rules:**
+  - Root, List and Link take `className` / `style` / `children` as functions of an empty state
+    (section 6): conventions 1.3 applies to every part, and the design's "element props plus
+    `render`" was an omission.
+  - `NavigationMenuTriggerProps` / `State` as aliases of Popover.Trigger's: what section 6
+    says.
+  - The focus-leave fact carries the `focusout` event, not the `toggle` (3.2): the cause, as
+    HoverCard.
+  - Menu's foreign-invoker press guard on the Popup (3.2): the focus-leave close is the same
+    trap as Menu's Tab rule (#126).
+  - The Link's close ignores `defaultPrevented` (required: a router link prevents the default)
+    and `target` / `download` (section 4). The design's parenthesis "the click that navigates
+    this page" suggested a `target` test; it is removed.
+  - The development warnings as built.
