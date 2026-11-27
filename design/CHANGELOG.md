@@ -14441,3 +14441,37 @@ Test plans: each document's section 11 now carries the unverified point of the p
 **first step** (Menubar: the accessibility tree and axe result for a `menu` that is a direct
 child of the `menubar`; NavigationMenu: a Link's close committing together with a router
 transition). The outlines in the proposal entry above are the rest.
+
+## 2026-11-27, #170: `Menubar` implemented
+
+Developer, branch `feat/170-menubar`. No rule of menubar.md changed. Notes:
+`memo/developer/menubar.md`.
+
+Test plan step 1 (the accessibility tree and axe for a `menu` that is a direct DOM child of the
+`menubar`): **passes**, the anatomy stands. Chromium 156 (CDP) and Firefox 157 (Marionette,
+the parent-process tree) expose the Triggers as `menuitem`s of the bar with their expanded
+state and `haspopup`, and the open `menu` as a child of the bar between its Triggers, named by
+its Trigger; axe-core 4.14.1 reports no violation (no `aria-required-children` /
+`aria-required-parent`) closed and open in Chromium and Firefox locally and in all three
+engines in CI (`menubar.browser.test.tsx` runs axe on the real component; WebKit's own tree is
+not reachable from Playwright on Linux). Probe: `memo/developer/probes/170-menubar-ax/`. A
+disabled Trigger (no `popovertarget`) is still exposed `expanded=false` in Chromium, from
+`aria-haspopup`.
+
+Implementation details within the design:
+
+- `internal/menubar-context.ts` (cross-folder: `Menubar`, `Menu.Trigger`, `Menu.Popup`; listed
+  in internal-hooks.md). The registry is keyed by the Trigger element, registered from the
+  Trigger's ref callback; `Menu.Popup` provides `null` to its content.
+- Switch step 2 skips a menu whose popup the browser already hid while its `toggle` is still
+  queued (`hiddenBeforeToggle()`): step 1's focus move hides the old menu through Menu's own
+  blur rule, synchronously, and its fact arrives a task later; without the check that menu
+  would also get `openChangeAction(false, "dismiss")`.
+- The switch keys read the bar's computed `direction` (conventions 14.1 rule 3: the container
+  of the move), not the popup's.
+- `usePopoverTrigger` gained `alwaysFocusable` (`aria-disabled`, focusable, the ordinary
+  non-button warning), which `Menu.Trigger` sets inside a bar.
+- A second switch while the first target's open is pending: the next target's open is
+  entangled with that pending transition and commits when it settles (its Trigger shows
+  `data-open` meanwhile), as walkthrough 8.3 says for an item's action.
+- `axe-core` is a new devDependency of `@funstack/ui` (browser test only).
