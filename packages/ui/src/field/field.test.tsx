@@ -15,11 +15,14 @@
 // The form channel (pending, server errors, the reset policy) is covered in `form.test.tsx`.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, useState } from "react";
+import { flushSync } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
 import { setupUser, flushMicrotasks, silenceErrors } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
+import { Combobox } from "../combobox/index.js";
 import { RadioGroup } from "../radio-group/index.js";
 import { Toggle } from "../toggle/index.js";
+import { Form } from "../form/index.js";
 import { Field } from "./index.js";
 import type { FieldState } from "./index.js";
 
@@ -500,6 +503,201 @@ describe("Field: validate", () => {
     await user.click(screen.getByRole("button", { name: "Accept all" }));
     expect(c.checked).toBe(true);
     expect(c.validationMessage).toBe("");
+  });
+});
+
+// #193: Chromium runs a microtask checkpoint after each listener of an `input` the user caused,
+// so a React state write in the Field's listener on the control commits before React's own
+// listener (on the root) has seen the event, and that commit writes a controlled input's
+// previous `value` over the keystroke. jsdom dispatches like a script (no checkpoint); a
+// listener after the Field's that calls `flushSync` commits what is queued at that point, which
+// is what the checkpoint does. The real keystrokes are in `field-edit.browser.test.tsx`.
+describe("Field: an edit's state write waits for the event's dispatch (#193)", () => {
+  /** Commits React's queued sync work in the target phase, after the Field's listeners. */
+  function checkpointAfterField(element: HTMLElement): void {
+    const flush = () => flushSync(() => {});
+    element.addEventListener("input", flush);
+    element.addEventListener("change", flush);
+  }
+
+  function Controlled({ initial = "Jap" }: { initial?: string }) {
+    const [text, setText] = useState(initial);
+    return <Field.Control data-testid="c" value={text} onChange={(e) => setText(e.target.value)} />;
+  }
+
+  function StateProbe({ state }: { state: FieldState }) {
+    return (
+      <output data-testid="state">
+        {state.validity.customError ? "custom" : state.validity.valueMissing ? "missing" : "ok"}
+      </output>
+    );
+  }
+
+  const c = () => screen.getByTestId("c") as HTMLInputElement;
+  const shown = () => screen.getByTestId("state").textContent;
+
+  it("validate: the keystroke that flips a controlled control to invalid and back is kept", async () => {
+    render(
+      <TestForm>
+        <Field.Root name="handle" validate={(v) => (v === "bad" ? "No bad." : null)}>
+          {(state) => (
+            <>
+              <Field.Label>Handle</Field.Label>
+              <Controlled />
+              <StateProbe state={state} />
+            </>
+          )}
+        </Field.Root>
+      </TestForm>,
+    );
+    await flushMicrotasks();
+    checkpointAfterField(c());
+    const user = setupUser();
+    await user.clear(c());
+    await user.type(c(), "bad");
+    expect(c().value).toBe("bad");
+    expect(c().validity.customError).toBe(true);
+    expect(shown()).toBe("custom");
+    await user.type(c(), "{Backspace}");
+    expect(c().value).toBe("ba");
+    expect(c().validity.valid).toBe(true);
+    expect(shown()).toBe("ok");
+  });
+
+  it("required: clearing a controlled control and typing again keeps every keystroke", async () => {
+    render(
+      <TestForm>
+        <Field.Root name="handle" required>
+          {(state) => (
+            <>
+              <Field.Label>Handle</Field.Label>
+              <Controlled initial="a" />
+              <StateProbe state={state} />
+            </>
+          )}
+        </Field.Root>
+      </TestForm>,
+    );
+    await flushMicrotasks();
+    checkpointAfterField(c());
+    const user = setupUser();
+    await user.type(c(), "{Backspace}");
+    expect(c().value).toBe("");
+    expect(shown()).toBe("missing");
+    await user.type(c(), "x");
+    expect(c().value).toBe("x");
+    expect(shown()).toBe("ok");
+  });
+
+  it("a Combobox's text: the flipping keystroke is kept", async () => {
+    render(
+      <TestForm>
+        <Field.Root validate={(_, data) => (data.get("text") === "bad" ? "No bad." : null)}>
+          {(state) => (
+            <>
+              <Field.Label>Text</Field.Label>
+              <Combobox.Root allowCustomValue defaultInputValue="Jap">
+                <Combobox.Input name="text" data-testid="c" />
+                <Combobox.Popup>
+                  <Combobox.List>
+                    <Combobox.Option value="jp">Japan</Combobox.Option>
+                  </Combobox.List>
+                </Combobox.Popup>
+              </Combobox.Root>
+              <StateProbe state={state} />
+            </>
+          )}
+        </Field.Root>
+      </TestForm>,
+    );
+    await flushMicrotasks();
+    checkpointAfterField(c());
+    const user = setupUser();
+    await user.clear(c());
+    await user.type(c(), "bad");
+    expect(c().value).toBe("bad");
+    expect(shown()).toBe("custom");
+    await user.type(c(), "{Backspace}");
+    expect(c().value).toBe("ba");
+    expect(shown()).toBe("ok");
+  });
+
+  it("during the dispatch the slot is already written and the state is not; after it, both", async () => {
+    render(
+      <TestForm>
+        <Field.Root name="handle" validate={(v) => (v === "bad" ? "No bad." : null)}>
+          {(state) => (
+            <>
+              <Field.Label>Handle</Field.Label>
+              <Controlled initial="ba" />
+              <StateProbe state={state} />
+            </>
+          )}
+        </Field.Root>
+      </TestForm>,
+    );
+    await flushMicrotasks();
+    const during: string[] = [];
+    c().addEventListener("input", () => {
+      flushSync(() => {});
+      during.push(`${c().value}:${c().validity.customError}:${shown()}`);
+    });
+    fireEvent.input(c(), { target: { value: "bad" } });
+    // The slot follows the new text at once (an Enter in the next task submits against it).
+    expect(during).toEqual(["bad:true:ok"]);
+    expect(c().value).toBe("bad");
+    await flushMicrotasks();
+    expect(shown()).toBe("custom");
+  });
+
+  it("a controlled parent that keeps the old text: the slot follows the text React restored", async () => {
+    render(
+      <TestForm>
+        <Field.Root name="handle" validate={(v) => (v === "bad" ? "No bad." : null)}>
+          {(state) => (
+            <>
+              <Field.Label>Handle</Field.Label>
+              <Field.Control data-testid="c" value="ba" onChange={() => {}} />
+              <StateProbe state={state} />
+            </>
+          )}
+        </Field.Root>
+      </TestForm>,
+    );
+    await flushMicrotasks();
+    fireEvent.input(c(), { target: { value: "bad" } });
+    await flushMicrotasks();
+    expect(c().value).toBe("ba");
+    expect(c().validity.customError).toBe(false);
+    expect(shown()).toBe("ok");
+  });
+
+  it("an edit takes a shown server message out of the slot at once; any refresh before the state write keeps it out", async () => {
+    render(
+      <Form.Root action={() => {}} errors={{ handle: "Taken." }}>
+        <Field.Root name="handle">
+          <Field.Label>Handle</Field.Label>
+          <Controlled initial="a" />
+          <Field.Error data-testid="error" />
+        </Field.Root>
+      </Form.Root>,
+    );
+    await flushMicrotasks();
+    expect(c().validationMessage).toBe("Taken.");
+    const during: string[] = [];
+    c().addEventListener("input", () => {
+      during.push(c().validationMessage);
+      // A refresh of its own before the edit's state write (a blur, a submission attempt).
+      c().dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+      during.push(c().validationMessage);
+    });
+    fireEvent.input(c(), { target: { value: "ab" } });
+    expect(during).toEqual(["", ""]);
+    expect(screen.getByTestId("error")).toHaveTextContent("Taken.");
+    await flushMicrotasks();
+    expect(screen.queryByTestId("error")).toBeNull();
+    expect(c().value).toBe("ab");
+    expect(c().validationMessage).toBe("");
   });
 });
 

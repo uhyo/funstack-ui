@@ -225,6 +225,8 @@ of a group's members are seen on the group's `<fieldset>`): `input`, `change`, `
 user-validity flag, so the Field re-reads after the reset algorithm, when the DOM holds the
 reset values: conventions 3.8 rule 5, also after a click on a reset button). The `invalid` listener is the one that fires for a submission attempt: it
 fires once per invalid control, synchronously, before `submit` would (which never comes).
+After an `input` or `change` (the control's own, or another field's on the form owner) the
+mirror is read once the event's dispatch is over (2.4).
 
 Where `:user-invalid` is not supported by the environment (jsdom), the Field falls back to
 "`invalid` fired for this control and it is still invalid" (cleared by reset), which is identical
@@ -260,6 +262,24 @@ for two reasons that are specific, as the vision's urgent opt-out requires:
    no consumer veto on "the field is invalid": the DOM already says so. This is the same category
    as Combobox's active option and Slider's `live` value (conventions 3.2: "it is focus, which is
    immediate and browser-owned everywhere else").
+
+**Edits: the slot in the listener, the state after the dispatch.** On an `input` or `change`
+(the control's own, or another field's on the form owner) the Field writes the custom-validity
+slot in its listener, so the platform's validity follows the new value at once (an Enter in the
+next task submits against it), and writes no React state there. The state (the mirror, a
+dismissal of the server error, the stale-value flag of 3.4) is written through `afterDispatch`
+(internal-hooks.md 3.8 rule 5), which recomputes the slot first: a controlled parent that did
+not adopt the value has had React restore the old one by then. The reason is the order of
+listeners: the Field's listener is on the control and React's on the root, so it runs first,
+and Chromium runs a microtask checkpoint after each listener of an `input` or `change` the user
+caused (Firefox only after the whole dispatch). A state write in the Field's listener committed in that checkpoint, before React had
+seen the event, and the commit wrote a controlled control's previous `value` back over the
+keystroke (#193: a Combobox's text, a controlled `Field.Control`, a `Select`, OTPField). It is
+still the urgent lane, not a transition: one task later where the engine is still dispatching,
+in the same microtask as before where it is not (a script dispatch, Firefox's `input`).
+`invalid`, `focusout` and the reset keep their timing: no user edit is in flight in them. Until
+the edit's state write, the edit already counts for the slot: a refresh in between (a blur, a
+submission attempt) leaves a server message the user edited away out of it.
 
 Consequences: Field parts have **no `transition` prop** (an urgent commit never starts a view
 transition, conventions 5.1, third category), `Field.Error` animates its appearance with CSS
@@ -433,6 +453,11 @@ keeps three flags of its own. For its `name`:
   own `useFormStatus` `true → false` edge (3.2), so a settle re-arms every field at once with no
   reset bookkeeping, and the next submission's errors are shown even when they are the same
   strings (the research's "clearing a server error on next input", with a precise re-show rule).
+  It is kept as the count of settles the Field had committed when the edit happened (dismissed
+  while it equals the current count), not as a flag: an edit's state write lands after its
+  event's dispatch (2.4), and when that event started a submission (OTPField's
+  `submitOnComplete`, an Enter) the write, or React's rebase of it over the settle's
+  render-phase update, would otherwise hide the answer to the very submission it preceded.
 - **Two hide flags for a stale value** (review M1). `suppressNext` is written during a flight:
   every refresh while the form is pending and the Form ran the submission compares
   `formData.getAll(name)` with `submittedData().getAll(name)` (string entries element-wise; a

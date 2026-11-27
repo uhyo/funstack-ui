@@ -1,11 +1,17 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 export interface ServerErrorVisibility {
   /** The server's messages for this field are shown. */
   readonly serverShown: boolean;
   /** Stable. The user edited the control: hide the server error until the next settle. */
   readonly dismiss: () => void;
+  /**
+   * Stable. Records an edit now and returns the state write that applies it, for a caller that
+   * must not write state yet (an event still being dispatched, design 2.4). Applied after the next
+   * settle, an edit recorded before it dismisses nothing: the settle re-armed the errors.
+   */
+  readonly recordEdit: () => () => void;
   /**
    * Stable. Whether the value differs from the one the submission in flight sent: if so, that
    * submission's errors stay hidden when it settles (design 3.2 item 2).
@@ -26,8 +32,14 @@ export function useServerErrorVisibility(
   formPending: boolean,
   serverMessages: readonly string[],
 ): ServerErrorVisibility {
-  /** The user edited the control since the last settled submission. */
-  const [dismissed, setDismissed] = useState(false);
+  /** Settles seen so far: an edit dismisses the errors of the settle it was made after. */
+  const [settles, setSettles] = useState(0);
+  /**
+   * The `settles` count at the user's last edit (`-1`: none). Dismissed while it equals `settles`.
+   * A count, not a flag: an edit applied late (after its event's dispatch) and React's rebase of
+   * that update over a settle's render-phase reset both leave a stale count, never a stale flag.
+   */
+  const [editedAt, setEditedAt] = useState(-1);
   /**
    * The errors shown now answer a value the user had already changed during their flight
    * (intercepted path). Fixed from one settle to the next, so a hidden stale error stays hidden
@@ -42,15 +54,25 @@ export function useServerErrorVisibility(
     if (formPending) {
       setSuppressNext(false);
     } else {
-      setDismissed(false);
+      setSettles(settles + 1);
       setSuppressed(suppressNext);
       setSuppressNext(false);
     }
   }
-  const dismiss = useCallback(() => setDismissed(true), []);
+  // The committed count, read when an edit is recorded.
+  const committedSettles = useRef(settles);
+  useLayoutEffect(() => {
+    committedSettles.current = settles;
+  });
+  const recordEdit = useCallback(() => {
+    const at = committedSettles.current;
+    return () => setEditedAt(at);
+  }, []);
+  const dismiss = useCallback(() => recordEdit()(), [recordEdit]);
   return {
-    serverShown: serverMessages.length > 0 && !dismissed && !suppressed,
+    serverShown: serverMessages.length > 0 && editedAt !== settles && !suppressed,
     dismiss,
+    recordEdit,
     setSuppressNext,
   };
 }

@@ -251,7 +251,7 @@ packages/ui/src/internal/
   render-element.ts       # the directive-free half of use-render: renderElement, rendersButton, isHostButton, disabledButton, cancelClick, pendingAriaDisabled (1.2)
   merge-props.ts          # mergeProps, mergeRefs, mergeTokenLists; directive-free
   use-merged-refs.ts      # useMergedRefs(...refs): the memoised ref merge of every part with a library ref (1.4)
-  after-dispatch.ts       # afterDispatch(event, callback): after the event's dispatch and default action, a microtask or a task (section 3.8 rule 5, dialog.md 2.6); returns its cancel; directive-free
+  after-dispatch.ts       # afterDispatch(event, callback): after the event's dispatch and default action, a microtask or a task (section 3.8 rule 5, dialog.md 2.6, field-form.md 2.4); returns its cancel; directive-free
   use-latest.ts           # useLatest(value): a ref written in an insertion effect
   use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)
   use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
