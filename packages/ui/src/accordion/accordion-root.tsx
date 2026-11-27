@@ -5,6 +5,7 @@ import { createActionDetails } from "../internal/action/action-details.js";
 import { resolveArrowKey } from "../internal/arrow-keys.js";
 import type { ArrowMove } from "../internal/arrow-keys.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { noteOpen, writeOpen } from "../internal/details-summary.js";
 import { compareDocumentOrder, sortByDocumentOrder } from "../internal/dom-order.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
@@ -173,11 +174,6 @@ function reduce(set: OpenSet, item: string, open: boolean, exclusive: boolean): 
   }
   if (exclusive) return new Set([item]);
   return set.has(item) ? set : new Set(set).add(item);
-}
-
-/** Writes `open` to the DOM; it fires `toggle`, whose handler sees DOM === committed and returns. */
-function applyOpen(element: HTMLDetailsElement, open: boolean): void {
-  if (element.open !== open) element.open = open;
 }
 
 function isEnabledTrigger(el: HTMLElement): boolean {
@@ -358,9 +354,11 @@ export function AccordionRoot(props: AccordionRootProps) {
     const base = intendedValue(latestInFlight, optimistic);
     const mismatches: { item: string; open: boolean }[] = [];
     for (const [element, item] of sortedItems()) {
+      // The value read becomes the known value (design 2.3), at mount and at an Activity re-show.
+      noteOpen(element);
       const want = committed.has(item);
       if (element.open === want) continue;
-      if (element.hasAttribute("data-disabled")) applyOpen(element, want);
+      if (element.hasAttribute("data-disabled")) writeOpen(element, want);
       else mismatches.push({ item, open: element.open });
     }
     if (mismatches.length === 0) return;
@@ -379,11 +377,11 @@ export function AccordionRoot(props: AccordionRootProps) {
   }, [isLibrary]);
 
   // Re-apply committed state to the DOM once nothing is in flight: closes what find-in-page
-  // revealed and the parent refused, or what a rejected action left open. Writing `open` fires
-  // `toggle`, whose handler sees DOM === committed and does nothing.
+  // revealed and the parent refused, or what a rejected action left open. The write records the
+  // known value, so the `toggle` it fires is an echo.
   useLayoutEffect(() => {
     if (!isLibrary || pending || latestInFlight() !== null) return;
-    for (const [element, item] of items.current) applyOpen(element, committed.has(item));
+    for (const [element, item] of items.current) writeOpen(element, committed.has(item));
   }, [isLibrary, pending, committed, latestInFlight]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
