@@ -26,14 +26,14 @@ export function DirectionLocalesPage() {
         Set it where the platform expects it: <code>{'<html dir="rtl">'}</code>, a container, or a
         part itself (every part passes native attributes through, so{" "}
         <code>{'<Tabs.List dir="rtl">'}</code> works). Each component reads the computed CSS{" "}
-        <code>direction</code> of its own element when a key is pressed or a gesture starts, so
-        nothing is needed at render and Server Components and the server HTML are unaffected.
+        <code>direction</code> of the relevant element (the table below) when a key is pressed or a
+        gesture starts, so nothing is needed at render and Server Components and the server HTML are
+        unaffected.
       </p>
-      <CodeBlock>{`<html lang="ar" dir="rtl">
-  …
-  <Tabs.Root defaultValue="a">
-    <Tabs.List>…</Tabs.List> {/* ArrowLeft moves to the next tab */}
-  </Tabs.Root>`}</CodeBlock>
+      <CodeBlock>{`// <html lang="ar" dir="rtl"> in your document, then no setup:
+<Tabs.Root defaultValue="a">
+  <Tabs.List>…</Tabs.List> {/* ArrowLeft moves to the next tab */}
+</Tabs.Root>`}</CodeBlock>
       <ul>
         <li>
           <strong>Why no provider.</strong> A provider would be a second source of truth next to{" "}
@@ -86,8 +86,8 @@ export function DirectionLocalesPage() {
           ],
           [
             "[Menu](/components/menu)",
-            "the arrow that opens and closes a submenu (the inline-end one); a menu opened at a point",
-            "the popup",
+            "the arrow that opens and closes a submenu (the inline-end one); the open key of a Trigger in a vertical Toolbar; which edge of a menu opened at a point sits at the pointer; the wheel hand-off of a horizontal scroller",
+            "the popup or its parent popup; the Trigger; the scroller",
           ],
           [
             "[Combobox](/components/combobox) `multiple`",

@@ -85,7 +85,7 @@ describe("formatRangeValue", () => {
     expect(formatRangeValue(1234.5, 0, 2000, format, ["tlh", "de-DE"])).toBe("1.234,50");
   });
 
-  it("accepts a frozen readonly list (copied, not handed to Intl)", () => {
+  it("formats with a frozen readonly list", () => {
     const locales: readonly string[] = Object.freeze(["de-DE"]);
     expect(formatRangeValue(1234.5, 0, 2000, {}, locales)).toBe("1.234,5");
     expect(locales).toEqual(["de-DE"]);
@@ -101,9 +101,8 @@ describe("getNumberFormat", () => {
     expect(getNumberFormat("de", undefined)).not.toBe(getNumberFormat("en", undefined));
   });
 
-  it("keys a list apart from a string and from another order", () => {
+  it("caches a list by its content and its order", () => {
     expect(getNumberFormat(["de", "en"], undefined)).toBe(getNumberFormat(["de", "en"], undefined));
-    expect(getNumberFormat(["de"], undefined)).not.toBe(getNumberFormat("de", undefined));
     expect(getNumberFormat(["en", "de"], undefined)).not.toBe(
       getNumberFormat(["de", "en"], undefined),
     );

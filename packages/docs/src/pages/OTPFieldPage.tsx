@@ -224,10 +224,10 @@ import { Separator } from "@funstack/ui/separator";
           },
           {
             name: "dir",
-            type: '"ltr" | "rtl" | "auto"',
+            type: "string",
             default: '"ltr"',
             description:
-              "The native attribute, with a library default: a code is read left to right in every locale, so the Slots, the text and the caret keys stay left to right inside an RTL page. Your value wins (on the Root or on a `render` element). See [Right-to-left pages](#right-to-left-pages).",
+              "The native attribute, with a library default: a code is read left to right in every locale, so the Slots, the text and the caret keys stay left to right inside an RTL page. Your value (`rtl`, `auto`) wins, on the Root or on a `render` element. See [Right-to-left pages](#right-to-left-pages).",
           },
           {
             name: "experimental_webOTP",
@@ -245,7 +245,7 @@ import { Separator } from "@funstack/ui/separator";
           "`OTPFieldState` is `{ value, length, complete, pending, disabled, readOnly, invalid }`: `value` is the filtered text, `complete` is `value.length === length`, `pending` is a `completeAction` in flight, `invalid` an error shown by an enclosing Field (`false` outside one)."
         }
         owned={
-          '`data-complete`, `data-pending`, `data-disabled`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it `dir` is `"ltr"` unless you pass one.'
+          '`data-complete`, `data-pending`, `data-disabled`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it. `dir` defaults to `"ltr"`; yours wins.'
         }
         note={
           'Both details objects are `{ reason, event }`. `onValueChange`: `"activate"` for an edit (`event` is the `input` event, or the `compositionend` that ended a composition), `"platform"` for a form reset (the `reset` event), text found at hydration and a WebOTP fill (`undefined`). `completeAction`: `"activate"` for an edit, `"platform"` for a WebOTP fill. Serialisable: a Server Function receives `{ reason }`.'
