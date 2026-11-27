@@ -33,6 +33,7 @@ import { isPopoverOpen } from "../__tests__/popover-shim.js";
 import { CSPProvider } from "../csp/index.js";
 import { TOOLTIP_WARM_RULES } from "./tooltip-warm.js";
 import { Combobox } from "../combobox/index.js";
+import { HoverCard } from "../hover-card/index.js";
 import { Menu } from "../menu/index.js";
 import { Tabs } from "../tabs/index.js";
 import { ToggleGroup } from "../toggle-group/index.js";
@@ -678,6 +679,58 @@ describe("Keyboard", () => {
       await settle();
       advance(150);
       expect(showSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Conventions 15 rule 4, the cancels group (#194 review): the trigger's cancel decides before
+  // the global layers, so a HoverCard that closes on the same Escape does not skip it.
+  describe("the trigger's cancel with a HoverCard showing elsewhere (#194)", () => {
+    function renderWithCard() {
+      render(
+        <>
+          <HoverCard.Root defaultOpen>
+            <HoverCard.Trigger href="/u/ada">@ada</HoverCard.Trigger>
+            <HoverCard.Popup data-testid="card">Ada</HoverCard.Popup>
+          </HoverCard.Root>
+          <Harness />
+        </>,
+      );
+      advance(1);
+      const card = screen.getByTestId("card");
+      expect(isPopoverOpen(card)).toBe(true);
+      return card;
+    }
+
+    it("Escape closes the card and the coming open never opens", async () => {
+      const user = setupTimers();
+      const card = renderWithCard();
+      // Keyboard focus on the trigger (a key press first, so `:focus-visible` holds).
+      await user.keyboard("a");
+      act(() => trigger().focus());
+      expect(trigger()).toHaveFocus();
+      advance(100);
+      escape(trigger());
+      expect(isPopoverOpen(card)).toBe(false);
+      advance(1000);
+      expect(showSpy.mock.contexts).not.toContain(popup());
+      expect(isPopoverOpen(popup())).toBe(false);
+    });
+
+    it("a page preventDefault(): nothing is cancelled and nothing closes", async () => {
+      const user = setupTimers();
+      const card = renderWithCard();
+      // Keyboard focus on the trigger (a key press first, so `:focus-visible` holds).
+      await user.keyboard("a");
+      act(() => trigger().focus());
+      expect(trigger()).toHaveFocus();
+      advance(100);
+      const prevent = (event: Event) => event.preventDefault();
+      document.addEventListener("keydown", prevent);
+      onTestFinished(() => document.removeEventListener("keydown", prevent));
+      escape(trigger());
+      expect(isPopoverOpen(card)).toBe(true);
+      advance(150);
+      expect(isPopoverOpen(popup())).toBe(true);
     });
   });
 

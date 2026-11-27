@@ -292,15 +292,21 @@ function attachInterest(
       else dismiss(event, false);
     });
     // Escape before anything is intended: cancel the coming open. Recorded in capture and
-    // decided last (conventions 15 rule 4), so a listener inside that stops the event does not
-    // keep the timer running; the event is left alone.
+    // decided after the dispatch (conventions 15 rule 4), so a listener inside that stops the
+    // event does not keep the timer running; a cancel, so it decides before the global layers
+    // and a Tooltip that closes on this Escape elsewhere does not skip it. The event is left
+    // alone.
     const triggerEscape = createEscapeRecord();
     const onTriggerKeyDown = (event: KeyboardEvent): void => {
       if (!isEscapeRequest(event)) return;
-      triggerEscape.record(event, () => {
-        suppressed.current = true;
-        timers.cancel();
-      });
+      triggerEscape.record(
+        event,
+        () => {
+          suppressed.current = true;
+          timers.cancel();
+        },
+        { cancel: true },
+      );
     };
     trigger.addEventListener("keydown", onTriggerKeyDown, true);
     cleanups.push(() => {

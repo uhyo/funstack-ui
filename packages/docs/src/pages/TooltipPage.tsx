@@ -384,7 +384,7 @@ export function TooltipPage() {
           ["Blur", "Closes after `closeDelay`."],
           [
             "Escape",
-            "Closes, wherever focus is; focus stays on the trigger. Only this tooltip closes: an enclosing Dialog, Menu or toast stays open for the next Escape. A `preventDefault()` on the Escape keeps it open; `stopPropagation()` does not. Before the tooltip shows, Escape on the trigger cancels the coming open.",
+            "Closes, wherever focus is; focus stays on the trigger. Only this tooltip closes: an enclosing Dialog, Menu or toast stays open for the next Escape. A `preventDefault()` on the Escape keeps it open; `stopPropagation()` does not, and inside a modal Dialog it makes the dialog close on the same Escape (the browser closes it before the library can claim the key). Before the tooltip shows, Escape on the trigger cancels the coming open.",
           ],
           [
             "Any pointerdown",

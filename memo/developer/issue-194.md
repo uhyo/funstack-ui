@@ -21,3 +21,14 @@
 - Browser rows: `src/__tests__/escape-last.browser.test.tsx`. ToastRootProps omits `onKeyDown`,
   so the toast row's stopping handler sits on a wrapper inside the Root. A closed Dialog unmounts
   the tooltip: `tipOpen` reads `queryByTestId`.
+
+## Review round (memo/reviewer/review-194.md, architect 47e40e22)
+
+- Must fix 1: `DecideEscapeLastOptions.cancel`; `run` orders cancels, globals, element layers
+  reversed. Both Trigger cancels pass `{ cancel: true }`. Rows: escape-key (cancel first despite a
+  consuming global, late path too, page preventDefault stops it), tooltip and hover-card (hint
+  elsewhere + coming open; with page preventDefault). Mutation (drop the option) fails the rows.
+- Should fix 2: toast row with an `auto` popover and a stand-in watcher (stop + hide); fails when
+  the snapshot moves to decide. 3: open-shadow HoverCard with a non-modal dialog inside
+  (dialog-escape, `it.runIf(mode === "open")`); fails with `event.target` in open-layer.ts.
+- Nit 4 done (Tooltip, HoverCard pages). Nit 6 skipped (#195).

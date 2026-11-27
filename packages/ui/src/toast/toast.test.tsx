@@ -2136,6 +2136,35 @@ describe("Toast", () => {
         expect(queryRoot(id)).not.toBeNull();
       });
 
+      it("an auto popover inside the toast whose watcher closes it first: the toast stays (snapshot at the record)", async () => {
+        const list = ({ toasts }: ToastViewportState) =>
+          toasts.map((t) =>
+            renderToast(
+              t,
+              <div popover="auto" data-testid={`pop-${t.id}`}>
+                <button type="button" data-testid={`in-pop-${t.id}`}>
+                  In popover
+                </button>
+              </div>,
+            ),
+          );
+        render(<Harness manager={manager} list={list} />);
+        const id = await call(() => manager({ title: "A", duration: null }));
+        const pop = screen.getByTestId(`pop-${id}`);
+        act(() => pop.showPopover());
+        const button = screen.getByTestId(`in-pop-${id}`);
+        // Stands in for the popover's close watcher, which closes it after the dispatch and
+        // before the toast decides on the late path: the decision must not find it closed.
+        button.addEventListener("keydown", (event) => {
+          event.stopPropagation();
+          pop.hidePopover();
+        });
+        fireEvent.keyDown(button, { key: "Escape" });
+        await flushTasks(2);
+        expect(isPopoverOpen(pop)).toBe(false);
+        expect(queryRoot(id)).not.toBeNull();
+      });
+
       it("a toast whose Viewport is inside a non-modal Dialog: the toast, then the dialog", async () => {
         render(
           <Dialog.Root defaultOpen modal={false}>

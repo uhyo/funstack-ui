@@ -1036,6 +1036,45 @@ describe("Escape with other layers: one Escape closes one layer (#194)", () => {
     },
   );
 
+  // The cancels group (#194 review): the Trigger's cancel decides before the global layers, so
+  // a Tooltip that closes on the same Escape does not skip it.
+  it("a Tooltip showing elsewhere, focus on the Trigger with a coming open: Escape closes the tooltip and the card never opens", async () => {
+    await renderAsync(
+      <>
+        <Harness />
+        {tooltip}
+      </>,
+    );
+    await showTooltip();
+    keyboardFocus(trigger());
+    await advance(300);
+    escape(trigger());
+    expect(isPopoverOpen(tip())).toBe(false);
+    await advance(1000);
+    await task();
+    expect(isPopoverOpen(popup())).toBe(false);
+  });
+
+  it("the same with a page preventDefault(): nothing is cancelled and nothing closes", async () => {
+    await renderAsync(
+      <>
+        <Harness />
+        {tooltip}
+      </>,
+    );
+    await showTooltip();
+    keyboardFocus(trigger());
+    await advance(300);
+    const prevent = (event: Event) => event.preventDefault();
+    document.addEventListener("keydown", prevent);
+    onTestFinished(() => document.removeEventListener("keydown", prevent));
+    escape(trigger());
+    expect(isPopoverOpen(tip())).toBe(true);
+    await advance(600);
+    await task();
+    expect(isPopoverOpen(popup())).toBe(true);
+  });
+
   it("an auto popover inside the card, propagation stopped: the card stays (the snapshot)", async () => {
     await renderAsync(
       <Harness

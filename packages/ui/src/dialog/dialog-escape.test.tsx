@@ -146,6 +146,37 @@ describe("non-modal Dialog Escape (#177)", () => {
       escape(view.getByTestId("a-inside"));
       expect(dialog.open).toBe(false);
     });
+
+    // The HoverCard's snapshot reads the event's path (open-layer.ts): at the window the target
+    // is retargeted to the shadow host, so `dialog.contains(event.target)` would miss the dialog
+    // the Escape came from. In a closed root the path hides it too: the stated limit (#194).
+    it.runIf(mode === "open")(
+      "a non-modal dialog inside a HoverCard: Escape inside the dialog closes it, the card stays",
+      async () => {
+        const view = renderInShadow(
+          <HoverCard.Root defaultOpen>
+            <HoverCard.Trigger href="/u/ada">@ada</HoverCard.Trigger>
+            <HoverCard.Popup data-testid="card">
+              <button type="button" data-testid="in-card">
+                Follow
+              </button>
+              <NonModal name="d" defaultOpen />
+            </HoverCard.Popup>
+          </HoverCard.Root>,
+        );
+        await flushTasks(2);
+        const card = view.getByTestId("card");
+        const dialog = dialogOf("d", view);
+        expect(isPopoverOpen(card)).toBe(true);
+        expect(dialog.open).toBe(true);
+        expect(escape(view.getByTestId("d-inside")).defaultPrevented).toBe(true);
+        expect(dialog.open).toBe(false);
+        expect(isPopoverOpen(card)).toBe(true);
+        await flushTasks(2);
+        expect(escape(view.getByTestId("in-card")).defaultPrevented).toBe(true);
+        expect(isPopoverOpen(card)).toBe(false);
+      },
+    );
   });
 
   // Conventions 15 (#191): Escape during an IME composition cancels the composition only.

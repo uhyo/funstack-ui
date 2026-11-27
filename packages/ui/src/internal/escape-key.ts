@@ -45,6 +45,8 @@ export function consumeEscape(event: Event): void {
 interface Decider {
   readonly decide: () => void;
   readonly global: boolean;
+  /** Closes nothing shown and never consumes (`{ cancel: true }`): decides first. */
+  readonly cancelOnly: boolean;
   cancelled: boolean;
 }
 
@@ -76,6 +78,12 @@ export interface DecideEscapeLastOptions {
    * Tooltip), recorded on the window: it decides before the layers the Escape came from.
    */
   readonly global?: boolean;
+  /**
+   * A decision that only cancels a coming open (a Trigger's cancel, conventions 15 rule 3):
+   * it closes nothing shown and never consumes, so it decides first, before the global layers,
+   * and another layer's consume does not skip it. A `preventDefault()` by the page still does.
+   */
+  readonly cancel?: boolean;
 }
 
 /** The first record of `event`: one window listener and one late path for all its layers. */
@@ -92,8 +100,9 @@ function createEntry(event: KeyboardEvent): Entry {
     if (entries.get(event) !== entry) return;
     dispose();
     const ordered = [
-      ...deciders.filter((decider) => decider.global),
-      ...deciders.filter((decider) => !decider.global).reverse(),
+      ...deciders.filter((decider) => decider.cancelOnly),
+      ...deciders.filter((decider) => !decider.cancelOnly && decider.global),
+      ...deciders.filter((decider) => !decider.cancelOnly && !decider.global).reverse(),
     ];
     for (const decider of ordered) {
       if (!isEscapeRequest(event)) return;
@@ -116,8 +125,9 @@ function createEntry(event: KeyboardEvent): Entry {
  * snapshot. The decision runs once per event for all its recorded layers together: in a bubble
  * `keydown` listener added to the window for this event only (after every element, document
  * and earlier window listener), or after the dispatch (`afterDispatch`) when a
- * `stopPropagation()` kept the event from the window. Order: the global layers in record order,
- * then the others innermost first (reverse record order); each `decide` only while the event is
+ * `stopPropagation()` kept the event from the window. Order: the cancel-only deciders, then the
+ * global layers in record order, then the others innermost first (reverse record order); each
+ * `decide` only while the event is
  * still an Escape request, so one Escape closes one layer. The same `decide` recorded twice for
  * an event is ignored. Returns a function that cancels this layer's decision (an unmount
  * between the record and the decision); once every layer of the event cancelled, the window
@@ -131,7 +141,12 @@ export function decideEscapeLast(
   const entry = entries.get(event) ?? createEntry(event);
   let decider = entry.deciders.find((recorded) => recorded.decide === decide);
   if (decider === undefined) {
-    decider = { decide, global: options?.global ?? false, cancelled: false };
+    decider = {
+      decide,
+      global: options?.global ?? false,
+      cancelOnly: options?.cancel ?? false,
+      cancelled: false,
+    };
     entry.deciders.push(decider);
   }
   const own = decider;

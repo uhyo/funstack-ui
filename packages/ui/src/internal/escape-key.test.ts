@@ -69,7 +69,7 @@ describe("decideEscapeLast", () => {
     target: EventTarget,
     name: string,
     log: string[],
-    { global = false, consume = false } = {},
+    { global = false, consume = false, cancel = false } = {},
   ) {
     on(
       target,
@@ -81,7 +81,7 @@ describe("decideEscapeLast", () => {
             log.push(name);
             if (consume) consumeEscape(event);
           },
-          { global },
+          { global, cancel },
         );
       },
       true,
@@ -168,6 +168,37 @@ describe("decideEscapeLast", () => {
     // The dispatch is over: the mark carries the result, the event stays as the page left it.
     expect(event.defaultPrevented).toBe(false);
     expect(isEscapeRequest(event)).toBe(false);
+  });
+
+  it("a cancel ({ cancel: true }) decides first, and runs although a global layer consumes", () => {
+    const log: string[] = [];
+    const { outer, inner } = tree();
+    layer(window, "g1", log, { global: true, consume: true });
+    layer(outer, "outer", log);
+    layer(inner, "cancel", log, { cancel: true });
+    escape(inner);
+    expect(log).toEqual(["cancel", "g1"]);
+  });
+
+  it("a cancel runs on the late path too, before the global layer that consumes", async () => {
+    const log: string[] = [];
+    const { inner } = tree();
+    layer(window, "g1", log, { global: true, consume: true });
+    layer(inner, "cancel", log, { cancel: true });
+    on(inner, (event) => event.stopPropagation(), false);
+    escape(inner);
+    await Promise.resolve();
+    expect(log).toEqual(["cancel", "g1"]);
+  });
+
+  it("a page preventDefault() stops a cancel too", () => {
+    const log: string[] = [];
+    const { inner } = tree();
+    layer(window, "g1", log, { global: true });
+    layer(inner, "cancel", log, { cancel: true });
+    on(inner, (event) => event.preventDefault(), false);
+    escape(inner);
+    expect(log).toEqual([]);
   });
 
   it("a cancelled layer does not decide; the others still do", () => {

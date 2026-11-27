@@ -197,11 +197,13 @@ function attachInteraction(
   // The window and document listeners exist only while the popup is open, so before that the trigger
   // itself cancels a pending open: a click or Escape before `delay` elapses must not open the
   // tooltip afterwards. Once open, the window listener does the hiding. The trigger's Escape is
-  // recorded in capture and decided last (conventions 15 rule 4), so a listener inside that
-  // stops the event does not keep the timer running; the event is left alone.
+  // recorded in capture and decided after the dispatch (conventions 15 rule 4), so a listener
+  // inside that stops the event does not keep the timer running; a cancel, it decides before
+  // the global layers, so a HoverCard or Tooltip that closes on this Escape does not skip it.
+  // The event is left alone.
   const triggerEscape = createEscapeRecord();
   const onTriggerKeyDown = (event: KeyboardEvent) => {
-    if (isEscapeRequest(event)) triggerEscape.record(event, clear);
+    if (isEscapeRequest(event)) triggerEscape.record(event, clear, { cancel: true });
   };
 
   trigger.addEventListener("pointerenter", onTriggerEnter);
