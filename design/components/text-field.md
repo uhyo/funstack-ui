@@ -99,9 +99,13 @@ Why this shape:
 - **`render={<textarea />}`** is `Field.Control`'s spelling; textarea-only props (`rows`,
   `wrap`) and a ref typed for the textarea go on the `render` element.
 
-Element constraints for `render`: an `<input>` whose `type` holds free text (`text`, `search`,
-`tel`, `url`, `email`, `password`) or a `<textarea>`; anything else is a development warning
-(`number`, `date` and the like have a value the browser sanitises, and NumberField exists).
+Element constraints for `render`: an `<input>` whose `type` is `text`, `tel`, `url`, `email` or
+`password`, or a `<textarea>`. Any other `type`, given as a prop or on the `render` element, is
+a development warning and is otherwise rendered as given, unsupported: `number`, `date` and the
+like have a value the browser sanitises (and NumberField exists), and **`search` is not
+supported in v1**, because the engines give Escape a meaning of their own there and disagree
+(section 13). A search-looking field that saves itself is `type="text"`, with
+`inputMode="search"` or `enterKeyHint="search"` if the keyboard matters.
 Library-controlled attributes (`value`, `data-*`, and inside a Field `id`, `aria-invalid`,
 the `aria-describedby` tokens) land on whichever element renders (owned keys, conventions 1.2).
 
@@ -443,7 +447,7 @@ field (`Form.Root errors`) is dismissed by the first keystroke, as for any text 
 
 | | |
 | --- | --- |
-| Role, name, value | The native `textbox` (`searchbox` for `type="search"`), named by `<label>`, `Field.Label` or `aria-label`; the value is the text. No `aria-roledescription`. |
+| Role, name, value | The native `textbox`, named by `<label>`, `Field.Label` or `aria-label`; the value is the text. No `aria-roledescription`. |
 | Keyboard | Tab reaches it. Enter commits (an `<input>`). Escape reverts an edited draft (4.3). Everything else is native text editing. A `<textarea>` commits when focus leaves it. |
 | Pending | `data-pending` only. No `aria-busy`, no native `disabled`, no announcement (conventions 3.6): the field stays editable while a save runs. |
 | Built-in strings | None (conventions 11). |
@@ -544,6 +548,13 @@ Each of these is a question for a later issue, not a decision made against it.
 
 - **Ctrl+Enter / Cmd+Enter to commit in a `<textarea>`** (Ark UI does this): the first
   follow-up. Blur is the textarea's commit in v1.
+- **`type="search"`.** On an untouched search field Escape is the engine's: Chromium and
+  Firefox clear the text with an `input` event, WebKit's source clears with a `change` event
+  and no `input`, and WebKit 27.2 under Playwright on Linux does not clear at all. The draft
+  model hears only `input`, so the same key would open a draft in two engines and none in the
+  third, and in Chromium the clear does not consume the key (an enclosing dialog would
+  probably close on it; not probed). Supporting it needs a rule for the native clear and a
+  test on Safari itself.
 
 - **A read view as its own part** (`Preview`, with Edit / Submit / Cancel triggers): for a read
   state that is not plain text (a link, formatted or clamped text). Needs a compound anatomy,
@@ -567,25 +578,17 @@ Each of these is a question for a later issue, not a decision made against it.
 An outline; the rows of `design/testing.md` 10.1 apply as for any state owner, "both" meaning
 controlled and uncontrolled.
 
-**First steps, before the component is written.** Five points of this design were reasoned
-and not probed. Each is settled first, in a browser, on a bare controlled React input with a
-draft (no library code needed), in the three engines unless noted. The developer records the
-result and reports back to the architect **before going on** wherever it differs from what is
-expected below; the rule named is then amended, not worked around.
-
-| # | Question | Expected | If not |
-| --- | --- | --- | --- |
-| 1 | A field is blurred in the middle of an IME composition: do the composed text's `compositionend` and `input` arrive before `focusout`, or after? (Chromium through CDP; Firefox and WebKit if they can be driven, else recorded as not driven.) | Before: the blur commits the composed text and no draft is left. | After: a draft reopens on an unfocused field once the commit has run. Report back: 4.2 needs a rule for a draft written while the field is not focused, and NumberField has the same exposure. |
-| 2 | `type="search"`: the engine's own Escape (Chromium and WebKit clear the field). With an edited draft, does the prevented `keydown` stop the native clear? With no draft, is the native clear an `input` event that opens a draft `""`? | Yes to both: the first Escape reverts, and on an untouched field the first Escape clears natively and the second puts the saved text back. | Report back; 4.3 gets a sentence for `search`, or `search` leaves the supported types. |
-| 3 | After a controlled write that changes the text (the revert, a rollback), is the field's undo history gone (Ctrl / Cmd+Z does nothing)? | Yes, in all three. | Only the sentences in 4.3 and number-field.md 4.2 change (docs wording), no behaviour. Record the per-engine result. |
-| 4 | Does `text-overflow: ellipsis` show on an unfocused `<input>` with overflowing text, next to `field-sizing: content` with a `max-inline-size`? | Yes, in all three. | The CSS recipe of section 9 and the docs example lose the line; no code changes. |
-| 5 | Does `useNativeGroupReconciliation` fit one controlled text input as it stands (`element` the input, `readCurrent` the DOM text with the focused-draft adoption, `readDefault` the computed target, `onResetEvent` the `defaultValue` mirror), as NumberField uses it? (Read the hook and write the mount and reset rows first.) | Yes. | Do not bend the hook: report back with what does not fit; the fallback is `useFormReset` + `useResetTarget` and a mount layout effect in the component, which 4.4 allows. |
+Probed before the component was written (the results are in the changelog, "#181: the first
+steps"): a blur during an IME composition delivers the composed text before the blur in
+Chromium (Firefox and WebKit could not be driven and are not recorded); a controlled write
+drops the field's undo history in all three engines; `text-overflow: ellipsis` shows on an
+unfocused input in all three.
 
 jsdom, the component's test file:
 
 | Area | Rows |
 | --- | --- |
-| Roles and ARIA | Renders one `input[type=text]` with the value; `render={<textarea />}` renders a textarea; no attribute the consumer did not pass, outside a Field. |
+| Roles and ARIA | Renders one `input[type=text]` with the value; `render={<textarea />}` renders a textarea; no attribute the consumer did not pass, outside a Field. `type="search"` and `type="number"`, as a prop and on the `render` element, each warn once in development and render as given; `tel`, `url`, `email`, `password` do not warn. |
 | Draft | Typing shows at once and dispatches nothing; `state.text` follows the draft and `state.value` does not; a controlled `value` changed from outside shows when no draft is open and does not replace an open one. |
 | Commit (both) | Blur and Enter each dispatch once with `(next, { reason: "activate" })` and the native event; Enter is not `defaultPrevented`; a draft equal to the shown value dispatches nothing and is cleared; no draft, nothing; `disabled` / `readOnly` clear and dispatch nothing; a textarea's Enter dispatches nothing and its blur does; an Enter with `isComposing`, and one with `keyCode` 229, dispatch nothing. |
 | Escape | With an edited draft: the text returns, nothing is dispatched, the event is `defaultPrevented` and marked consumed; with no draft, with an equal draft, when already prevented, and while composing: untouched. Inside a non-modal Dialog: the first Escape reverts and the dialog stays, the second closes it. |
@@ -607,7 +610,6 @@ Browser, three engines:
 | A real click on a reset button with a draft open and a save pending (the #185 order): the reset value shows and one `"platform"` commit is dispatched. |
 | Escape with an edited draft in a **modal** Dialog and in an `auto` Popover: the layer stays open (the close watcher saw a cancelled key); the next Escape closes it. |
 | Blur by a real Tab, by a click on a button (the commit is dispatched before the button's `click`), and by the window losing focus where the engine can be driven to it. |
-| IME, Chromium through CDP: Enter that confirms a composition commits nothing; a blur during a composition ends as first step 1 found (expected: the composed text committed, no draft left on the unfocused field). |
-| `type="search"`: the Escape rows as first step 2 found. |
+| IME, Chromium through CDP: Enter that confirms a composition commits nothing; a blur during a composition commits the composed text and leaves no draft on the unfocused field. |
 | `startViewTransition` is not called by a commit or a rollback. |
 
