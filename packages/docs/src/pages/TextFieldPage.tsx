@@ -190,9 +190,9 @@ export function TextFieldPage() {
           {
             name: "type",
             type: "string",
-            default: '"text"',
+            default: '"text" on the default element',
             description:
-              "`text`, `tel`, `url`, `email` or `password`. Others warn in development (`search` is not supported).",
+              '`text`, `tel`, `url`, `email` or `password`. Others warn in development (`search` is not supported). The library sets `type="text"` only on its default `<input>`: a `render` element keeps its own `type` (a `<textarea>` gets none, an `<input>` without one is a text input).',
           },
           {
             name: "placeholder, maxLength, minLength, pattern, autoComplete, inputMode, enterKeyHint, spellCheck, form, id, aria-*",

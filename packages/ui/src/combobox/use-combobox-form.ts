@@ -3,6 +3,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import type { ChangeReason } from "../internal/types.js";
 import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
+import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useFormReset, useResetTarget } from "../internal/form/use-form-reset.js";
 
 export interface ComboboxFormOptions {
@@ -55,6 +56,8 @@ export function useComboboxForm(options: ComboboxFormOptions): void {
   useFormReset(
     formElement,
     (event) => {
+      // The reset algorithm wrote the text past react-dom's value tracker (rule 6).
+      syncValueTracker(inputRef.current);
       // The target is computed, not read from the input (conventions 3.8 rule 6): after a click
       // on a reset button this microtask runs before the browser's reset algorithm, so the input
       // still holds the typed text here (#185).

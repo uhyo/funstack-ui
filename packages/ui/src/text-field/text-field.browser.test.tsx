@@ -17,7 +17,7 @@ import {
   spyViewTransitions,
 } from "../__tests__/browser-helpers.js";
 import { user } from "../__tests__/browser-user.js";
-import { browserName } from "../__tests__/engine.js";
+import { browserName, pressFocusesButtons } from "../__tests__/engine.js";
 import { deferred, ErrorCatcher, flushMicrotasks, silenceErrors } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
 import { NumberField } from "../number-field/index.js";
@@ -219,6 +219,55 @@ describe("TextField (browser)", () => {
     await flushMicrotasks();
     expect(action).toHaveBeenCalledTimes(2);
     expect(new FormData(screen.getByTestId("form") as HTMLFormElement).get("title")).toBe("Draft");
+  });
+
+  // The sibling row with an ordinary reset button: the press moves focus to it, so the blur
+  // commits the open draft first and the reset follows (where a press does not focus a button,
+  // macOS WebKit, the draft is still open at the reset, as in the row above).
+  it("a real reset click on a focusable button: the blur commits the draft, then the reset", async () => {
+    const focuses = await pressFocusesButtons();
+    const d = deferred();
+    const action = vi.fn<Fn>((_next, details) =>
+      details.reason === "activate" ? d.promise : undefined,
+    );
+    render(
+      <form data-testid="form" onSubmit={(e) => e.preventDefault()}>
+        <TextField
+          data-testid="field"
+          aria-label="Title"
+          name="title"
+          defaultValue="Draft"
+          valueCommitAction={action}
+        />
+        <button type="reset" data-testid="reset">
+          Reset
+        </button>
+      </form>,
+    );
+    await retype("Report");
+    await user.keyboard("{Enter}");
+    await settle(() => expect(field()).toHaveAttribute("data-pending"));
+    await user.keyboard(" 2");
+    expect(field().value).toBe("Report 2");
+    const restore = leaveActEnvironment();
+    try {
+      await userEvent.click(screen.getByTestId("reset"));
+    } finally {
+      restore();
+    }
+    await settle(() => expect(field().value).toBe("Draft"));
+    await settle(() =>
+      expect(
+        action.mock.calls.map(([n, details]) => [n, details.reason, details.event?.type]),
+      ).toEqual([
+        ["Report", "activate", "keydown"],
+        ...(focuses ? [["Report 2", "activate", "focusout"]] : []),
+        ["Draft", "platform", "reset"],
+      ]),
+    );
+    await act(async () => d.resolve());
+    await flushMicrotasks();
+    expect(field().value).toBe("Draft");
   });
 
   describe("IME (Chromium, CDP)", () => {

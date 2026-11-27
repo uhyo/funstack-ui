@@ -405,6 +405,9 @@ describe("TextField", () => {
       const first = key("Escape");
       expect(first.defaultPrevented).toBe(false);
       expect(isEscapeRequest(first)).toBe(true);
+      // A draft that ends on the value's text (React drops a change to the same text, so the
+      // draft is opened with other text first).
+      typeText("Dra");
       typeText("Draft");
       const second = key("Escape");
       expect(second.defaultPrevented).toBe(false);
@@ -569,6 +572,53 @@ describe("TextField", () => {
       // No draft is left: a blur commits nothing.
       blur();
       expect(action).toHaveBeenCalledTimes(2);
+    });
+
+    // The `defaultValue` mirror (design 4.4, conventions 3.8 rule 6): react-dom keeps a
+    // controlled input's `defaultValue` equal to its last committed value, so without the write
+    // in the `reset` event the algorithm would restore "Report", shown until the dispatch.
+    // `form.reset()` runs the algorithm synchronously, before `onReset`'s microtask.
+    it("the reset algorithm itself restores the target, before the dispatch", async () => {
+      render(
+        <form data-testid="form">
+          <Harness mode={mode} />
+        </form>,
+      );
+      typeText("Report");
+      blur();
+      await flushMicrotasks();
+      expect(field().value).toBe("Report");
+      let synchronously = "";
+      await act(async () => {
+        (screen.getByTestId("form") as HTMLFormElement).reset();
+        synchronously = field().value;
+      });
+      expect(synchronously).toBe("Draft");
+      expect(field().value).toBe("Draft");
+    });
+
+    it("an edit after a reset back to the old text opens a draft (react-dom's value tracker)", async () => {
+      const action = vi.fn<Fn>();
+      render(
+        <form data-testid="form">
+          <Harness mode={mode} action={action} />
+        </form>,
+      );
+      typeText("Report");
+      blur();
+      await flushMicrotasks();
+      await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+      await flushMicrotasks();
+      expect(field().value).toBe("Draft");
+      typeText("Report");
+      expect(field().value).toBe("Report");
+      blur();
+      await flushMicrotasks();
+      expect(action.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
+        ["Report", "activate"],
+        ["Draft", "platform"],
+        ["Report", "activate"],
+      ]);
     });
 
     it("a reset to the intended value with a draft open clears the draft, no dispatch", async () => {

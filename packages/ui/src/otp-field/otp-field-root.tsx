@@ -21,6 +21,7 @@ import { useActionTrigger } from "../internal/action/use-action-trigger.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { FieldContext } from "../internal/form/field-context.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/form/use-field-control.js";
+import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useFormReset, useResetTarget } from "../internal/form/use-form-reset.js";
 import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 import { resolveStateValue } from "../internal/render-element.js";
@@ -570,6 +571,8 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
   useFormReset(
     inputRef as RefObject<FormAssociatedElement | null>,
     (event) => {
+      // The reset algorithm wrote the text past react-dom's value tracker (rule 6).
+      syncValueTracker(inputRef.current);
       composingRef.current = false;
       setComposingText(null);
       // The target is computed, not read from the input: after a click on a reset button this

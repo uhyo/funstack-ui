@@ -16,6 +16,7 @@ import {
 import { dataAttr } from "../internal/data-attr.js";
 import { consumeEscape, isComposingKey, isEscapeRequest } from "../internal/escape-key.js";
 import { useFieldControl, useFieldValueChange } from "../internal/form/use-field-control.js";
+import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
 import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
@@ -271,6 +272,8 @@ export function TextField(props: TextFieldProps) {
       return element.value;
     },
     readDefault: () => {
+      // The reset algorithm wrote the text past react-dom's value tracker (rule 6).
+      syncValueTracker(elementRef.current);
       // A reset clears an open draft whatever the target.
       clearDraft();
       return resetTarget;

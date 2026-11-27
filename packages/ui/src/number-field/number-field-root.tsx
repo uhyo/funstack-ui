@@ -17,6 +17,7 @@ import type {
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/form/use-field-control.js";
 import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 import { useLatest } from "../internal/use-latest.js";
+import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
@@ -591,6 +592,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
         setDraft(text);
       }),
     readDefault: () => {
+      // The reset algorithm wrote the text past react-dom's value tracker (rule 6).
+      syncValueTracker(visibleRef.current);
       // A reset clears an open draft whatever the target.
       clearDraft();
       return resetTarget;

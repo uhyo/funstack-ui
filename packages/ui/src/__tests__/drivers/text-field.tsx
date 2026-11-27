@@ -1,7 +1,8 @@
 // TextField as seen by the value-action suite (value-action-suite.tsx) and the native platform
 // suite (native-group-platform-suite.tsx): one input starting on "Draft"; gesture i writes the
-// next text and tabs away (the blur commits, `details.event` is the `focusout`). The input shows the optimistic value and is the one pending element. No `transition` prop (design
-// 11). The reset target is computed in JS and written to `defaultValue` only in the `reset` event
+// next text and tabs away (the blur commits, `details.event` is the `focusout`). The input shows
+// the optimistic value and is the one pending element. No `transition` prop (design 11). The
+// reset target is computed in JS and written to `defaultValue` only in the `reset` event
 // (design 4.4), so `expectResetTarget` asserts nothing in the DOM: the suite's rows check the
 // value a reset dispatches and shows instead.
 import { act, fireEvent, screen } from "@testing-library/react";
@@ -28,9 +29,6 @@ export const textFieldDriver: NativeGroupPlatformDriver<string, TextFieldValueCh
   gesture: async (user, i) => {
     act(() => {
       field().focus();
-      // A form reset writes the DOM value past React's value tracker, which would drop a change
-      // back to the text it last saw: a script write (no event) brings the tracker along first.
-      field().value = "";
       fireEvent.change(field(), { target: { value: textFieldDriver.values[i + 1]! } });
     });
     await user.tab();

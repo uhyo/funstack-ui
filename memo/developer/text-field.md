@@ -60,3 +60,26 @@ password warns once per element and renders as given; no search-specific code.
 - Focus moving into an iframe needs `iframe.focus()` first in Firefox.
 - NumberField Escape: in the Root's `keyDown`, after the disabled / readOnly / composing
   return, compared with `formatter.format(shownRef.current)`.
+
+## Review fixes (review/181, 38d33c1b)
+
+- **Stale value tracker after a form reset** (must fix 1). The reset algorithm writes the value
+  without the JS setter react-dom's tracker wraps; react-dom writes nothing on the next render
+  when the DOM already shows its value, so the first edit back to the pre-reset text was dropped.
+  Fix: `internal/form/sync-value-tracker.ts` (`element.value = element.value`), called in the
+  `onReset` path (after the algorithm). Affected and fixed: TextField, NumberField (visible
+  input), Combobox (text), Slider (every thumb), OTPField (not named by the review, same few
+  lines). Rows: TextField and NumberField in their files, the other three in
+  `__tests__/form-reset-tracker.test.tsx`; all fail with the sync disabled. The driver's
+  `value = ""` workaround is gone; the suite's "in sync afterwards" row now catches it.
+  Slider in jsdom needs `fireEvent.input` then `fireEvent.change` (its commit is a native
+  `change` listener that runs before React's `onChange` for a bare change event).
+- Proposed sentence for internal-hooks.md 3.8 rule 6 (sent in the report): "After the reset
+  algorithm (in `onReset`), a controlled `<input>` / `<textarea>` writes its value back to itself
+  (`syncValueTracker`): the algorithm restores the value past react-dom's value tracker, and
+  react-dom writes nothing when the DOM already shows what it renders, so the first edit back to
+  the pre-reset value would be dropped as no change."
+- Equal-draft Escape rows type other text first (React dedups a change to the same text);
+  mutation-checked.
+- The `defaultValue` mirror is covered in jsdom: `form.reset()` runs the algorithm
+  synchronously, so the value read right after it is the algorithm's (mutation-checked).

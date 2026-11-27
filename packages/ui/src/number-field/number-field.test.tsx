@@ -1085,10 +1085,38 @@ describe("NumberField", () => {
         const first = escape();
         expect(first.defaultPrevented).toBe(false);
         expect(isEscapeRequest(first)).toBe(true);
+        // A draft that ends on the value's text (React drops a change to the same text).
+        typeText("12");
         typeText("1");
         const second = escape();
         expect(second.defaultPrevented).toBe(false);
         expect(isEscapeRequest(second)).toBe(true);
+      });
+    });
+
+    eachCommitMode("form reset, then an edit", (mode) => {
+      it("an edit after a reset back to the old text opens a draft (react-dom's value tracker)", async () => {
+        const onCommit = vi.fn<Fn>();
+        render(
+          <form data-testid="form">
+            <Fixture mode={mode} onCommit={onCommit} />
+          </form>,
+        );
+        typeText("5");
+        blur();
+        await flushMicrotasks();
+        await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+        await flushMicrotasks();
+        expect(input().value).toBe("1");
+        typeText("5");
+        expect(input().value).toBe("5");
+        blur();
+        await flushMicrotasks();
+        expect(onCommit.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([
+          [5, "activate"],
+          [1, "platform"],
+          [5, "activate"],
+        ]);
       });
     });
 

@@ -16,6 +16,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFieldControl, useFieldValueChange } from "../internal/form/use-field-control.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
+import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
@@ -420,7 +421,11 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   const { onItemMounted } = useNativeGroupReconciliation<readonly number[]>({
     element: formElement,
     readCurrent,
-    readDefault: resetTarget,
+    readDefault: () => {
+      // The reset algorithm wrote the values past react-dom's value tracker (rule 6).
+      for (const input of registry.values()) syncValueTracker(input);
+      return resetTarget();
+    },
     base: () => shownRef.current,
     // Compare as the DOM would hold the values: a consumer's off-grid value is sanitised by the
     // browser (not by jsdom), and that is not a platform change.

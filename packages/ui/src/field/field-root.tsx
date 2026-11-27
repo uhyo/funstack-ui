@@ -508,7 +508,7 @@ export function FieldRoot({
     console.error(
       "Field.Root: no form control registered. Render a Field.Control or a FUNSTACK form " +
         "control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, MultiSelect, " +
-        "Slider, NumberField) inside it.",
+        "Slider, NumberField, OTPField, TextField) inside it.",
     );
   }, []);
 
