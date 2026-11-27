@@ -339,12 +339,14 @@ with Menu's Tab-out for that reason. Cost: Firefox has no exit animation for a H
 - **A Menu, Select picker, Popover or Tooltip opened from inside the card** keeps the card
   open (research 1.2). Its popup is a DOM descendant too.
 - **Escape closes the innermost first.** The card's Escape listener stands down while its Popup
-  contains a shown popover or an open modal dialog, and when the event is already prevented
+  contains a shown popover, an open modal dialog, or an open non-modal dialog that the
+  Escape came from (it decides after the card's document listener, dialog.md 2.6; one the
+  Escape did not come from takes no Escape), and when the event is already prevented
   (a Tooltip inside handled it). The nested element closes; the next Escape closes the card.
 - Inside a modal `<dialog>`, the card's Escape is prevented, so the dialog stays open and a
   second Escape closes it (tooltip.md 2.2). Inside a non-modal `Dialog` or `Drawer` the same
-  holds: its JS Escape listener is on the window and leaves a prevented Escape alone
-  (dialog.md 2.6, #177).
+  holds: it decides after the document listeners and leaves a prevented Escape alone
+  (dialog.md 2.6).
 
 ### 2.7 Behaviour per engine and flag
 
