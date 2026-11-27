@@ -11,6 +11,7 @@ import { AlertDialogDemo } from "./alert-dialog-demo.js";
 import { DrawerDemo } from "./drawer-demo.js";
 import { PopoverDemo } from "./popover-demo.js";
 import { MenuDemo } from "./menu-demo.js";
+import { MenubarDemo } from "./menubar-demo.js";
 import { NavigationMenuDemo } from "./navigation-menu-demo.js";
 import { RadioGroupDemo } from "./radio-group-demo.js";
 import { CheckboxGroupDemo } from "./checkbox-group-demo.js";
@@ -49,6 +50,7 @@ export function App() {
       <AlertDialogDemo />
       <DrawerDemo />
       <MenuDemo />
+      <MenubarDemo />
       <NavigationMenuDemo />
       <ToastDemo />
       <FieldFormDemo />

@@ -1,6 +1,8 @@
 # Menubar
 
-Status: **accepted** (#170, part of #162; the user's decisions of 2026-11-27). Not implemented yet. History and the test plan:
+Status: **accepted** (#170, part of #162; the user's decisions of 2026-11-27), implemented in
+`packages/ui/src/menubar/` and `internal/menubar-context.ts` (the bar's context, read by
+`Menu.Trigger` and `Menu.Popup`). History and the test plan:
 `design/CHANGELOG.md`, the #170 entries. Follows `design/conventions.md`; where this document
 and the conventions disagree, the conventions win. **Read `design/components/menu.md` first**:
 a Menubar is a row of ordinary `Menu.Root`s, and every rule of a menu (items and their actions,
@@ -125,7 +127,7 @@ the bar**. A submenu Root is not; the bar's context ends at each `Menu.Popup`. A
 | --- | --- | --- |
 | each menu's `open` | its `Menu.Root` | Unchanged: requests through `openChangeAction`, facts through `onOpenChange` (menu.md 2.4). |
 | which Trigger is the Tab stop | the bar's engine | Urgent library state outside React, DOM-written (`design/components/toggle-group.md` 6). |
-| "the bar is in menu mode" | nobody | Derived when needed: some menu of the bar has an open intended (`intended()`), shown or still pending. |
+| "the bar is in menu mode" | nobody, but for one held case | Derived when needed: some menu of the bar has an open intended (`intended()`), shown or still pending. The one thing the bar holds itself, in a ref: menu mode **held on a disabled Trigger** (2.2 step 3), which no menu can vouch for. |
 | one menu at a time | the browser | Sibling `popover="auto"` elements: showing one hides the other. |
 
 The bar keeps a registry of its menus (each menu of the bar registers its Trigger element with
@@ -144,9 +146,17 @@ event)`:
 2. **Close every other menu of the bar**: one that is shown is hidden with `hidePopover()` at
    once; one whose open is still pending gets `requestClose(event, "dismiss")`, which supersedes
    the open so that menu never appears (the HoverCard rule for an open that lost its reason).
+   A menu that step 1 has just hidden is skipped: its popup is already hidden and its `toggle`
+   (the fact) is still queued, so it would otherwise count as intended open and receive a
+   request for a close that has happened. Each closed menu hears exactly one channel.
 3. **Request the target's open**: `requestOpen(event, "activate")` with the open cause `focus`
    (`"first"`: the first item is focused when the menu shows; `"none"`: focus stays on the
-   Trigger). Skipped when the target is disabled: the Trigger is focused and nothing opens.
+   Trigger). Skipped when the target is disabled: the Trigger is focused and nothing opens,
+   and **the bar stays in menu mode, held on that Trigger**, with the switch's `focus` cause
+   remembered. The next switch from it (2.3) opens its target with that cause, so a user
+   arrowing along the bar passes a disabled menu and the following one opens, as in a native
+   menubar. The hold ends when the Trigger loses focus in any other way (Tab, a click
+   elsewhere, focus leaving the bar) and on Escape; every switch replaces or clears it.
 
 Consequences:
 
@@ -176,7 +186,8 @@ target. The options not taken are in
 | an item that is not a `SubmenuTrigger`, any depth | ArrowRight (ArrowLeft in RTL) | next menu of the bar, `"first"` |
 | an item of a top-level menu | ArrowLeft (ArrowRight in RTL) | previous menu of the bar, `"first"` |
 | a Trigger whose menu is intended open | ArrowLeft / ArrowRight / Home / End | the Trigger the engine moves focus to, `"none"` |
-| a Trigger, while another menu of the bar is intended open | `pointermove` (not touch) | that Trigger's menu, `"none"` |
+| a disabled Trigger that holds menu mode | ArrowLeft / ArrowRight / Home / End | the Trigger the engine moves focus to, with the held cause (`"first"` when the user came from inside a menu, `"none"` from the bar) |
+| a Trigger, while another menu of the bar is intended open or another Trigger holds menu mode | `pointermove` (not touch) | that Trigger's menu, `"none"` |
 
 - "Next" and "previous" wrap when the bar's `loop` is on (the default), over every Trigger,
   disabled ones included.
@@ -211,6 +222,8 @@ the bar's.
 | Tab / Shift+Tab | outside the bar | focus enters the bar at its Tab stop: the Trigger focused last, the first one before any was | engine |
 | ArrowRight / ArrowLeft | Trigger | focus the next / previous Trigger (wraps with `loop`; mirrored in RTL). If the Trigger's menu was intended open: a switch (2.3) | engine, bar |
 | Home / End | Trigger | first / last Trigger; same rule | engine, bar |
+| ArrowRight / ArrowLeft / Home / End | disabled Trigger holding menu mode (2.2) | focus moves as above and the Trigger reached opens its menu, with the first item focused if the user came from inside a menu | engine, bar |
+| Escape | disabled Trigger holding menu mode | ends menu mode; focus stays | bar |
 | ArrowDown, Enter, Space | Trigger | open its menu, first item focused; with the menu already shown, focus its first item | `Menu.Trigger` (unchanged) |
 | ArrowUp | Trigger | open its menu, last item focused | `Menu.Trigger` (unchanged) |
 | ArrowRight | item, not a SubmenuTrigger | next menu of the bar, first item focused | `Menu.Popup`, bar |
@@ -278,7 +291,8 @@ the role. The name is the consumer's (`aria-label` or `aria-labelledby`), as for
 
 - `Menu.Trigger` renders `role="menuitem"`, renders no `tabindex` (the engine writes it), and
   turns `disabled` into `aria-disabled="true"` (the element stays focusable and never opens),
-  the mapping a `SubmenuTrigger` uses. `role` joins its owned keys there.
+  the mapping a `SubmenuTrigger` uses; a disabled one renders no `popovertarget`. `role`
+  joins its owned keys there.
 - `Menu.Root`'s `delay` / `closeDelay` stay submenu-only (the dev warning stands): a hover
   switch has no delay.
 - `Menu.Popup`'s defaults are unchanged (`side="bottom"`, `align="start"`).
@@ -290,7 +304,7 @@ the role. The name is the consumer's (`aria-label` or `aria-labelledby`), as for
 | Element | Attributes |
 | --- | --- |
 | `Menubar` | `role="menubar"`; the consumer's `aria-label` / `aria-labelledby` |
-| `Menu.Trigger` in a bar | `role="menuitem"`, `aria-haspopup="menu"`, `id`, `popovertarget`, `tabindex` (DOM-written), `aria-disabled="true"` when disabled; no `aria-expanded` (#121: every engine exposes the popover's state on its invoker, measured for a `menuitem` on `Menu.SubmenuTrigger`) |
+| `Menu.Trigger` in a bar | `role="menuitem"`, `aria-haspopup="menu"`, `id`, `popovertarget`, `tabindex` (DOM-written), `aria-disabled="true"` when disabled; no `aria-expanded` (#121: every engine exposes the popover's state on its invoker, measured for a `menuitem` on `Menu.SubmenuTrigger`). **A disabled Trigger is the exception**: it renders no `popovertarget` (it must not open, and `aria-disabled` does not stop a native invoker), so nothing exposes a state for it, and it renders `aria-expanded="false"` itself |
 | `Menu.Popup` and items | as menu.md 8 |
 
 The popups are DOM children of the `menubar` element, between the Triggers. That is the
@@ -332,7 +346,10 @@ Everything is Menu's (menu.md 12), per Root. What a bar makes visible:
 2. **ArrowRight again before it arrives.** Focus is on Edit's Trigger and Edit is intended open:
    the engine focuses View's Trigger and the bar switches with `"none"`: Edit's pending open is
    superseded (`openChangeAction(false, "dismiss")`, never shown), View's open is requested with
-   focus left on its Trigger. ArrowDown then enters View.
+   focus left on its Trigger. ArrowDown then enters View. If Edit's open was held by an async
+   `openChangeAction(true)` that is still running, React entangles View's open with it: View's
+   Trigger shows `data-open` and `data-pending` and its menu appears when Edit's action
+   settles, as in walkthrough 3. React's behaviour, not a rule of the bar.
 3. **An item's action is pending and the user switches.** "Save" shows `data-pending`; the
    pointer moves to Edit. File hides at once (step 2 of the switch); the action keeps running in
    the item's transition, and its close finds the open generation changed and does nothing
@@ -385,15 +402,6 @@ runs, and a user sweeping across the bar switches several times a second.
 
 ## 11. Test plan
 
-The first step, before any other row, because the design assumes it and no probe was run:
-
-1. **The accessibility tree and the axe result for a `menu` that is a direct DOM child of the
-   `menubar`**, in the three engines (a browser row with an accessibility snapshot of a bar with
-   one open menu, and axe on the same markup). The APG example has a `role="none"` `li` between
-   the two; here the popup sits in the bar next to its Trigger. Expected: the Triggers are
-   exposed as `menuitem`s of the bar with their expanded state, the open `menu` is named by its
-   Trigger, and axe reports no `aria-required-children` or `aria-required-parent` violation. If
-   it fails, stop and report to the architect: the anatomy (where `Menu.Popup` renders) is
-   what would change.
-
-The rest of the plan is in `design/CHANGELOG.md` (the #170 entries). Not part of the contract.
+Step 1 (the accessibility tree and the axe result for a `menu` that is a direct DOM child of
+the `menubar`) was run at implementation and **passed**: the anatomy stands. The result, the
+plan and the probe are in `design/CHANGELOG.md` (the #170 entries). Not part of the contract.

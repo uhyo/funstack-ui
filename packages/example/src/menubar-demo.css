@@ -1,0 +1,30 @@
+/* Menubar demo: the starter stylesheet of design/components/menubar.md section 9. The bar is a
+   <div role="menubar">; its Triggers are `role="menuitem"` with `data-open` (optimistic),
+   `data-pending` and `aria-disabled`. The popups use the Menu demo's .menu rules. */
+
+.menubar {
+  display: flex;
+  gap: 2px;
+  inline-size: fit-content;
+  padding: 2px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+.menubar > [role="menuitem"] {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  background: none;
+}
+.menubar > [role="menuitem"]:focus-visible,
+.menubar > [role="menuitem"][data-open] {
+  outline: none;
+  background: #e0e7ff;
+}
+.menubar > [role="menuitem"][data-pending] {
+  cursor: progress;
+}
+.menubar > [role="menuitem"][aria-disabled="true"] {
+  opacity: 0.4;
+}

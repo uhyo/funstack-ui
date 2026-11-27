@@ -165,6 +165,7 @@ type PublicProps = {
   MenuSeparatorProps: UI.MenuSeparatorProps;
   MenuSubmenuTriggerProps: UI.MenuSubmenuTriggerProps;
   MenuTriggerProps: UI.MenuTriggerProps;
+  MenubarProps: UI.MenubarProps;
   MeterIndicatorProps: UI.MeterIndicatorProps;
   MeterLabelProps: UI.MeterLabelProps;
   MeterRootProps: UI.MeterRootProps;
@@ -329,6 +330,7 @@ const listedKeys = {
   MenuSeparatorProps: true,
   MenuSubmenuTriggerProps: true,
   MenuTriggerProps: true,
+  MenubarProps: true,
   MeterIndicatorProps: true,
   MeterLabelProps: true,
   MeterRootProps: true,

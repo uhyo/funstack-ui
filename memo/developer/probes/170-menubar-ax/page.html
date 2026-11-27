@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Menubar AX probe</title></head>
+<body>
+<main>
+<h1>Menubar AX probe</h1>
+<!-- The markup of design/components/menubar.md section 1: each menu a direct child of the bar,
+     right after its Trigger. -->
+<div id="bar" role="menubar" aria-label="Application">
+  <button type="button" id="file-trigger" role="menuitem" tabindex="0" popovertarget="file" aria-haspopup="menu">File</button>
+  <div id="file" popover="auto" role="menu" aria-labelledby="file-trigger" tabindex="-1">
+    <div role="menuitem" tabindex="-1" id="file-new">New</div>
+    <div role="menuitem" tabindex="-1">Save</div>
+    <div role="separator"></div>
+    <div role="menuitemcheckbox" aria-checked="true" tabindex="-1">Autosave</div>
+  </div>
+  <button type="button" id="edit-trigger" role="menuitem" tabindex="-1" popovertarget="edit" aria-haspopup="menu">Edit</button>
+  <div id="edit" popover="auto" role="menu" aria-labelledby="edit-trigger" tabindex="-1">
+    <div role="menuitem" tabindex="-1">Undo</div>
+  </div>
+  <button type="button" id="view-trigger" role="menuitem" tabindex="-1" aria-haspopup="menu" aria-disabled="true" aria-expanded="false">View</button>
+  <div id="view" popover="auto" role="menu" aria-labelledby="view-trigger" tabindex="-1"></div>
+</div>
+</main>
+<script>window.__ready = true;</script>
+</body>
+</html>

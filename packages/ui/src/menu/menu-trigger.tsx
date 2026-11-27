@@ -1,15 +1,21 @@
 "use client";
+import { useCallback } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
   KeyboardEvent,
   MouseEvent as ReactMouseEvent,
+  PointerEvent,
   ReactNode,
 } from "react";
+import { useMenubarContext } from "../internal/menubar-context.js";
+import type { MenubarOpenFocus } from "../internal/menubar-context.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useLatest } from "../internal/use-latest.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { toggleFromTrigger, usePopoverTrigger } from "../internal/overlay/use-popover-trigger.js";
 import type { PopoverTriggerHookState } from "../internal/overlay/use-popover-trigger.js";
 import { useRender } from "../internal/use-render.js";
@@ -94,6 +100,20 @@ function isPointerClick(event: Event): boolean {
 }
 
 /**
+ * A switch's open (design/components/menubar.md 2.2 step 3): the first item focused when the menu
+ * shows (or at once, when it is already shown), or focus left on the Trigger.
+ */
+function openFromBar(menu: MenuContextValue, event: Event, focus: MenubarOpenFocus): void {
+  if (focus === "first") {
+    openMenuWithFocus(menu, event, "first");
+    return;
+  }
+  if (menu.popover.intended()) return;
+  menu.setOpenCause("none");
+  menu.popover.requestOpen(event, "activate");
+}
+
+/**
  * The menu button: `<button type="button" popovertarget aria-haspopup="menu">`, with no
  * `aria-expanded` (the browser exposes the menu's state on its invoker; a link or other non-button
  * element, or a disabled component `render`, renders it from the shown menu). A click (Enter,
@@ -101,10 +121,17 @@ function isPointerClick(event: Event): boolean {
  * first / last item focused (inside a vertical `Toolbar.Root`: the inline-end arrow, with the
  * first item focused).
  *
+ * Inside a `Menubar` it is an item of the bar (design/components/menubar.md): `role="menuitem"`,
+ * no rendered `tabindex` (the bar writes it), and `disabled` as `aria-disabled="true"` (it stays
+ * focusable and never opens). Moving the pointer onto it while another menu of the bar is open
+ * switches to its menu.
+ *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
- * (link or component `render`), `popoverTarget`, `aria-haspopup`, `aria-expanded`, `onClick`,
- * `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`; `commandfor`,
- * `command` and `popoverTargetAction` (never written; omitted from the props type).
+ * (link or component `render`, and in a Menubar), `popoverTarget`, `aria-haspopup`,
+ * `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`,
+ * `data-disabled`, and in a Menubar `role`; `commandfor`, `command` and `popoverTargetAction`
+ * (never written; omitted from the props type). In a Menubar the hover switch is an
+ * `onPointerMove` handler merged with the consumer's (theirs runs first).
  *
  * @see https://ui.funstack.work/components/menu
  */
@@ -124,13 +151,17 @@ export function MenuTrigger({
         "parent menu.",
   );
 
+  // An item of an enclosing Menubar (design/components/menubar.md 1); the bar's context ends at
+  // each Menu.Popup, so a Trigger in a menu never sees it.
+  const bar = useMenubarContext();
+  const inBar = bar !== null;
   // Inside a vertical Toolbar, ArrowDown / ArrowUp are the Toolbar's: the trigger opens on the
   // inline-end arrow instead, as a submenu trigger does (design/components/toggle-group.md 7.4).
   const toolbar = useToolbarContext();
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (disabled || hasModifier(event)) return;
     let which: "first" | "last";
-    if (toolbar?.orientation === "vertical") {
+    if (!inBar && toolbar?.orientation === "vertical") {
       const openKey = isRtl(event.currentTarget) ? "ArrowLeft" : "ArrowRight";
       if (event.key !== openKey) return;
       which = "first";
@@ -144,12 +175,47 @@ export function MenuTrigger({
     openMenuWithFocus(menu, event.nativeEvent, which);
   };
 
-  const { state, libraryProps, ref } = usePopoverTrigger(menu.popover, {
+  // The menu as the bar sees it (menubar.md 2.1), read through the latest render.
+  const latest = useLatest({ menu, disabled });
+  const barRef = useCallback(
+    (element: HTMLElement) =>
+      bar?.register(element, {
+        disabled: () => latest.current.disabled,
+        intended: () => latest.current.menu.popover.intended(),
+        hiddenBeforeToggle: () => latest.current.menu.popover.hiddenBeforeToggle(),
+        popup: () => latest.current.menu.popover.popupRef.current,
+        open: (event, focus) => openFromBar(latest.current.menu, event, focus),
+        supersede: (event) => latest.current.menu.popover.requestClose(event, "dismiss"),
+      }),
+    [bar, latest],
+  );
+
+  // Menu mode (menubar.md 2.3, 4): the pointer moving onto this Trigger while another menu of the
+  // bar is intended open switches to this menu, focus left on the Trigger. `pointermove`, not
+  // `pointerenter`: a menu appearing under a resting pointer is no move.
+  const onPointerMove =
+    bar === null
+      ? undefined
+      : (event: PointerEvent<HTMLButtonElement>) => {
+          if (event.pointerType === "touch" || disabled || menu.popover.intended()) return;
+          const element = event.currentTarget;
+          if (!bar.otherIntended(element)) return;
+          bar.switchTo(element, "none", event.nativeEvent, true);
+        };
+
+  const {
+    state,
+    libraryProps,
+    ref: triggerRef,
+  } = usePopoverTrigger(menu.popover, {
     part: "Menu.Trigger",
     disabled,
     render,
+    alwaysFocusable: inBar,
     handlers: {
       onKeyDown,
+      // Only in a bar: an `undefined` key in the owned layer would remove the consumer's handler.
+      ...(onPointerMove !== undefined && { onPointerMove }),
       onMouseDown: (event: ReactMouseEvent<HTMLButtonElement>) => {
         // A press on the Trigger of an open menu must not move focus out of the popup: the Popup's
         // focusout would hide the menu before the click's library-owned close (design 2.2).
@@ -163,6 +229,8 @@ export function MenuTrigger({
       ),
   });
 
+  const ref = useMergedRefs(triggerRef, barRef);
+
   return useRender<ComponentPropsWithRef<"button">, MenuTriggerState>({
     defaultElement: "button",
     render,
@@ -173,6 +241,7 @@ export function MenuTrigger({
     props: rest,
     libraryProps: {
       ...libraryProps,
+      ...(inBar && { role: "menuitem" }),
       id: menu.triggerId,
       "aria-haspopup": "menu",
     },

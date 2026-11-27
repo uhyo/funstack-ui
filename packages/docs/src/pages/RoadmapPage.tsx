@@ -29,6 +29,13 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/menubar">Menubar</a> (<a href={issue(170)}>#170</a>): a{" "}
+          <code>{'<div role="menubar">'}</code> around ordinary <code>Menu.Root</code>s. A{" "}
+          <code>Menu.Trigger</code> inside it renders <code>role="menuitem"</code>, and its{" "}
+          <code>disabled</code> renders <code>aria-disabled</code> (it stays focusable); outside a
+          bar nothing changes.
+        </li>
+        <li>
           New component <a href="/components/navigation-menu">NavigationMenu</a> (
           <a href={issue(170)}>#170</a>): a site's main navigation as the disclosure pattern, each
           panel a <code>popover="auto"</code> next to its <code>popovertarget</code> button. It

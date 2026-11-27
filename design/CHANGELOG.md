@@ -14599,3 +14599,105 @@ entry above). `design/components/navigation-menu.md` amended:
     and `target` / `download` (section 4). The design's parenthesis "the click that navigates
     this page" suggested a `target` test; it is removed.
   - The development warnings as built.
+
+## 2026-11-27, #170: `Menubar` implemented
+
+Developer, branch `feat/170-menubar`. No rule of menubar.md changed. Notes:
+`memo/developer/menubar.md`.
+
+Test plan step 1 (the accessibility tree and axe for a `menu` that is a direct DOM child of the
+`menubar`): **passes**, the anatomy stands. Chromium 156 (CDP) and Firefox 157 (Marionette,
+the parent-process tree) expose the Triggers as `menuitem`s of the bar with their expanded
+state and `haspopup`, and the open `menu` as a child of the bar between its Triggers, named by
+its Trigger; axe-core 4.14.1 reports no violation (no `aria-required-children` /
+`aria-required-parent`) closed and open in Chromium and Firefox locally and in all three
+engines in CI (`menubar.browser.test.tsx` runs axe on the real component; WebKit's own tree is
+not reachable from Playwright on Linux). Probe: `memo/developer/probes/170-menubar-ax/`. A
+disabled Trigger is no invoker: it renders no `popovertarget` and renders
+`aria-expanded="false"` itself, which is what Chromium and Firefox expose for it (the probe page
+first gave it a `popovertarget`; corrected and re-run, same tree and axe result).
+
+Implementation details within the design:
+
+- `internal/menubar-context.ts` (cross-folder: `Menubar`, `Menu.Trigger`, `Menu.Popup`; listed
+  in internal-hooks.md). The registry is keyed by the Trigger element, registered from the
+  Trigger's ref callback; `Menu.Popup` provides `null` to its content.
+- Switch step 2 skips a menu whose popup the browser already hid while its `toggle` is still
+  queued (`hiddenBeforeToggle()`): step 1's focus move hides the old menu through Menu's own
+  blur rule, synchronously, and its fact arrives a task later; without the check that menu
+  would also get `openChangeAction(false, "dismiss")`.
+- The switch keys read the bar's computed `direction` (conventions 14.1 rule 3: the container
+  of the move), not the popup's.
+- `usePopoverTrigger` gained `alwaysFocusable` (`aria-disabled`, focusable, the ordinary
+  non-button warning), which `Menu.Trigger` sets inside a bar.
+- A second switch while the first target's open is pending on an **async action** (its
+  `openChangeAction(true)`, or an item's action as walkthrough 8.3): the next target's open is
+  entangled with that action and commits when it settles (its Trigger shows `data-open`
+  meanwhile). When the first open is held only by **suspending items**, nothing entangles: the
+  next menu opens at once and the superseded one never shows (row in menubar.test.tsx).
+- `axe-core` is a new devDependency of `@funstack/ui` (browser test only).
+- **Deviation (review nit 7): the "no menu of the bar after mount" development warning of
+  menubar.md 6 is not implemented.** It fired falsely when every `Menu.Root` sat behind a
+  Suspense boundary showing its fallback at mount, and nothing at mount tells that case from a
+  bar with no menus. menubar.md 6 still lists it, for the architect to drop or redefine.
+
+## 2026-11-27, #170: `Menubar`, status and the developer's deviations (architect)
+
+- `design/components/menubar.md` is **implemented**; section 11's step 1 is replaced by its
+  result (passed: Chromium and Firefox trees, axe in three engines).
+- **Conventions 7.1 lists `internal/menubar-context.ts`** among the contexts shared by several
+  component folders, next to the Toolbar's. An enumeration extended; the rule is unchanged.
+- The developer's three deviations, all accepted:
+  - **The switch skips a menu the browser has just hidden** (`hiddenBeforeToggle()`). Now in
+    menubar.md 2.2 step 2. It is what the design meant ("the old menu's close is a fact"): the
+    text did not see that between step 1's synchronous hide and the queued `toggle` the menu
+    still reads as intended open, so step 2 would have sent a request for a close that had
+    already happened, and that Root would have heard both channels.
+  - **`alwaysFocusable` on `usePopoverTrigger`**: an internal option, the `aria-disabled`
+    mapping of `submenuItem` without its warning text. The design named the mapping, not the
+    option. A disabled Trigger in a bar renders no `popovertarget`, as a disabled
+    `SubmenuTrigger`; menubar.md 5 says so now.
+  - **A second switch waits for the first target's pending `openChangeAction(true)`**: React's
+    entanglement of a transition with a pending async action, the behaviour menu.md 10.11 and
+    menubar.md 8.3 already describe for an item's action. Walkthrough 8.2 said the second
+    open "is requested" and stopped; it now says when it commits. Not measured: a first open
+    held by suspended content alone (no async action), where nothing should entangle once the
+    open is superseded.
+
+## 2026-11-27, #170: `Menubar`, menu mode is kept across a disabled Trigger (review nits 8 and 5)
+
+Architect, after the review (`memo/reviewer/review-170-bar.md`).
+
+- **2.2 step 3, 2.3, 3: a switch onto a disabled Trigger keeps the bar in menu mode.** Before,
+  menu mode was only ever derived ("some menu has an open intended"), so it ended on a disabled
+  Trigger, which opens nothing: File → (disabled) Edit → the next arrow only moved focus.
+  Native menubars keep the mode, and the user's priority is expected behaviour. Now the bar
+  holds, in a ref, the disabled Trigger a switch landed on together with that switch's focus
+  cause; an arrow, Home or End from it is a switch with the held cause, and a `pointermove` on
+  another Trigger counts it as menu mode. The hold ends when that Trigger loses focus any other
+  way and on Escape. Not taken: skipping disabled Triggers in the switch (the APG keeps
+  disabled items focusable, and the bar's own arrows stop on them when closed), and mirroring
+  menu mode into React state.
+- **6: a disabled Trigger renders `aria-expanded="false"` and no `popovertarget`**, the
+  exception to "no `aria-expanded`". As built; the text had no exception.
+- Also from the review: the case this document's previous entry called not measured (a first
+  open held by suspended content alone, then a second switch) was probed by the reviewer:
+  nothing waits. The developer adds the row.
+
+Code owed for the first item (`Menubar` only; no change to Menu parts or the context's shape
+beyond what `otherIntended` returns):
+
+- A ref `held: { trigger, focus } | null`.
+- `switchTo`: clear `held` on entry; in step 3, when the target is disabled, set
+  `held = { trigger: target, focus }`.
+- The bar's `onKeyDown`: read `held` before the engine runs; menu mode is `menu.intended()` or
+  `held.trigger === event.target`; the switch that follows the engine's move uses
+  `held.focus` in the second case, `"none"` in the first. Escape on the held Trigger clears
+  `held` (the event is not prevented).
+- The bar's `onBlur`: clear `held` when `event.target` is the held Trigger (the keydown
+  handler has read it already, so an arrow move still switches).
+- `otherIntended(trigger)`: also true when `held` names another Trigger.
+- Rows: item → ArrowRight → disabled → ArrowRight opens the next menu with its first item
+  focused; the same from the bar (`"none"`, focus on the Trigger); two disabled Triggers in a
+  row; Escape, Tab and a click elsewhere end the hold (the next arrow only moves focus);
+  `pointermove` onto an enabled Trigger while a disabled one holds the mode opens it.

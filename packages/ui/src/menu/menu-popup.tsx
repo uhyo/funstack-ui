@@ -4,6 +4,7 @@ import type {
   ComponentPropsWithRef,
   CSSProperties,
   FocusEvent,
+  KeyboardEvent,
   MouseEvent,
   PointerEvent,
   ReactNode,
@@ -11,6 +12,7 @@ import type {
 } from "react";
 import type { AnchorAlign, AnchorSide } from "../internal/overlay/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
+import { MenubarContext, useMenubarContext } from "../internal/menubar-context.js";
 import { listenInvokerPresses } from "../internal/overlay/invokers.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
@@ -27,7 +29,7 @@ import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { claimPress, MenuListContext, useMenuContext } from "./menu-context.js";
 import type { MenuListContextValue } from "./menu-context.js";
-import { edgeItem } from "./menu-dom.js";
+import { edgeItem, hasModifier, ITEM_SELECTOR } from "./menu-dom.js";
 import { scheduleHoverClose } from "./menu-hover.js";
 import { listenOutside } from "./menu-outside.js";
 import { MENU_POINT_HREF, MENU_POINT_RULES, pointStyle } from "./menu-point.js";
@@ -212,7 +214,34 @@ export function MenuPopup({
   const { side, align: resolvedAlign, ref: placementRef } = placement;
 
   const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
-  const { onKeyDown, typingAhead } = useMenuKeyboard(menu, nativeFocusgroup);
+  const { onKeyDown: onMenuKeyDown, typingAhead } = useMenuKeyboard(menu, nativeFocusgroup);
+  // A menu of a Menubar (design/components/menubar.md 2.3). `null` in a submenu: this Popup ends
+  // the bar's context for its content.
+  const bar = useMenubarContext();
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    onMenuKeyDown(event);
+    if (bar === null || event.defaultPrevented || hasModifier(event)) return;
+    const popup = event.currentTarget;
+    const target = event.target as Element;
+    // An item at any depth: submenus are DOM descendants of this popup. A SubmenuTrigger keeps
+    // its forward arrow (it opens the submenu; a disabled one does nothing).
+    if (!target.matches(ITEM_SELECTOR) || !popup.contains(target)) return;
+    const rtl = bar.rtl();
+    let delta: 1 | -1;
+    if (event.key === (rtl ? "ArrowLeft" : "ArrowRight")) {
+      if (target.hasAttribute("aria-haspopup")) return;
+      delta = 1;
+    } else if (event.key === (rtl ? "ArrowRight" : "ArrowLeft")) {
+      // Only from the top level: in a submenu the backward arrow closes the submenu.
+      if (target.closest('[role="menu"]') !== popup) return;
+      delta = -1;
+    } else {
+      return;
+    }
+    const trigger = popover.triggerRef.current;
+    if (trigger === null) return;
+    if (bar.step(trigger, delta, event.nativeEvent)) event.preventDefault();
+  };
 
   const { setElement, visible, renderContent, reshow } = usePopoverPopup(popover, {
     part: "Menu.Popup",
@@ -364,12 +393,16 @@ export function MenuPopup({
       </style>
     ) : null;
 
-  const content = (s: MenuPopupState): ReactNode => (
-    <MenuListContext value={listContext}>
-      {pointRules}
-      {renderContent(() => resolveStateValue(children, s))}
-    </MenuListContext>
-  );
+  const content = (s: MenuPopupState): ReactNode => {
+    const list = (
+      <MenuListContext value={listContext}>
+        {pointRules}
+        {renderContent(() => resolveStateValue(children, s))}
+      </MenuListContext>
+    );
+    // The bar's context ends here: a Root inside is a submenu, not a menu of the bar.
+    return bar === null ? list : <MenubarContext value={null}>{list}</MenubarContext>;
+  };
 
   const element = useRender<ComponentPropsWithRef<"div">, MenuPopupState>({
     defaultElement: "div",

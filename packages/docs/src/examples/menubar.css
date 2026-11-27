@@ -1,0 +1,40 @@
+/* Menubar: the bar is a <div role="menubar">; its items are the Menu.Triggers
+   (`role="menuitem"`), with the popups between them. The popups use the Menu styles (menu.css).
+   A Trigger carries `data-open` (optimistic: highlighted as soon as a switch asks for its menu),
+   `data-pending` while its menu's items load, and `aria-disabled` when disabled. */
+.demo-menubar {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.demo-menubar-trigger {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  cursor: default;
+}
+
+.demo-menubar-trigger:hover,
+.demo-menubar-trigger:focus-visible,
+.demo-menubar-trigger[data-open] {
+  outline: none;
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.demo-menubar-trigger[data-pending] {
+  cursor: progress;
+}
+
+.demo-menubar-trigger[aria-disabled="true"] {
+  opacity: 0.45;
+}
+
+.demo-menubar-trigger[aria-disabled="true"]:hover {
+  background: none;
+}

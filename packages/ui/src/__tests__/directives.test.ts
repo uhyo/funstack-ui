@@ -238,6 +238,9 @@ const clientFiles = [
   "toolbar/toolbar-separator.mjs",
   "internal/toolbar-context.mjs",
   "internal/use-roving-focus.mjs",
+  // Menubar and its context, read by Menu.Trigger and Menu.Popup (design/components/menubar.md 7).
+  "menubar/menubar.mjs",
+  "internal/menubar-context.mjs",
   // Every NumberField part and its context are client modules (design/components/number-field.md
   // 10, 15).
   "number-field/number-field-context.mjs",
@@ -344,6 +347,7 @@ const directiveFreeFiles = [
   "internal/action/call-urgent-handler.mjs",
   "toggle-group/index.mjs",
   "toolbar/index.mjs",
+  "menubar/index.mjs",
   "number-field/index.mjs",
   // Pure formatting, parsing and arithmetic (number-field.md 15).
   "number-field/number-field-format.mjs",

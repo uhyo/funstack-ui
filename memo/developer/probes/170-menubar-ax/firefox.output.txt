@@ -1,0 +1,16 @@
+firefox 157.0
+--- closed
+menubar "Application" []
+  menuitem "File" [collapsed,haspopup,expandable]
+  menuitem "Edit" [collapsed,haspopup,expandable]
+  menuitem "View" [unavailable,collapsed,haspopup,expandable]
+--- File open
+menubar "Application" []
+  menuitem "File" [expanded,haspopup,expandable]
+  menupopup "File" []
+    menuitem "New" [focused]
+    menuitem "Save" []
+    separator "" []
+    check menu item "Autosave" [checked]
+  menuitem "Edit" [collapsed,haspopup,expandable]
+  menuitem "View" [unavailable,collapsed,haspopup,expandable]

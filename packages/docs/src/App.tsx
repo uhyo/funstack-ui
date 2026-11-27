@@ -72,6 +72,7 @@ export const routes = [
               page("/components/popover", "PopoverPage"),
               page("/components/menu", "MenuPage"),
               page("/components/context-menu", "ContextMenuPage"),
+              page("/components/menubar", "MenubarPage"),
               page("/components/toolbar", "ToolbarPage"),
               page("/components/toggle-group", "ToggleGroupPage"),
               page("/components/switch", "SwitchPage"),
