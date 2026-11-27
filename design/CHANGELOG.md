@@ -14711,3 +14711,36 @@ arrive later) looks exactly like an empty bar, and a warning there would be fals
 the library is built for. A test row pins that such a bar stays silent. Not taken: warning
 after a delay or on the first key press (a guess about timing, for a mistake that is visible
 at once anyway: an empty bar).
+
+## 2026-11-27, #177: a non-modal Dialog's Escape waits for the inner layers' JS listeners
+
+Developer, from review-166 (finding 2). dialog.md 2.6 put the non-modal dialog's Escape
+`keydown` listener on the dialog element, so it ran before the document listeners of HoverCard
+and Tooltip, and its inner-layer check skipped `manual` popovers (no close watcher). Escape with
+a `manual` card or tooltip shown inside a non-modal Dialog or Drawer closed the dialog and left
+the card `:popover-open` inside it, against "innermost first" (hover-card.md 2.6, tooltip.md
+2.2). A `hint` tooltip or card in Safari 27.0 (mapped to `manual`) had the same gap.
+
+Amended (dialog.md 2.6 and the nested-layer row of section 9; one sentence each in
+hover-card.md 2.6 and the Tooltip listener table): the listener is on the **window**, so it runs
+after every element and document listener, and it leaves an already prevented Escape alone. A
+`manual` HoverCard or Tooltip prevents the Escape it closes on, so it closes first and the
+next Escape closes the dialog: the platform rule for a modal dialog's close watcher (a canceled
+`keydown` is no close request) now holds for the JS path too. The inner-layer check reads the
+event path (`composedPath()`), not `target.closest()`, because the target is retargeted by the
+time the event reaches the window. Side effect, intended: a consumer handler inside the dialog
+that prevents Escape (an input that clears itself) keeps a non-modal dialog open, as it already
+keeps a modal one open.
+
+Not taken: counting every open popover inside the dialog as an inner layer (HoverCard's own
+stand-down rule). A consumer's `manual` popover that does not handle Escape would then make
+Escape dead in the dialog; with the prevented-event rule it still closes the dialog, as the
+existing jsdom row pins. Modal Dialog, AlertDialog and modal Drawer needed no change: their
+Escape is the platform's close watcher, which already respects the prevented keydown; Popover
+and Menu are `auto` popovers and were already covered by the close-watcher check. No change to
+the conventions (overlay-open-state.md states no layering rule for Escape).
+
+Rows: jsdom (dialog.test.tsx) for a HoverCard and a Tooltip (focus on its trigger) inside a
+non-modal Dialog, a HoverCard inside a non-modal Drawer, and a prevented Escape from a handler
+inside; browser (dialog.browser.test.tsx) for HoverCard and Tooltip, `manual` and
+`experimental_hint` (branching on `supportsPopoverHint`), in a modal and a non-modal Dialog.

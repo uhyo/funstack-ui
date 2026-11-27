@@ -342,7 +342,9 @@ with Menu's Tab-out for that reason. Cost: Firefox has no exit animation for a H
   contains a shown popover or an open modal dialog, and when the event is already prevented
   (a Tooltip inside handled it). The nested element closes; the next Escape closes the card.
 - Inside a modal `<dialog>`, the card's Escape is prevented, so the dialog stays open and a
-  second Escape closes it (tooltip.md 2.2).
+  second Escape closes it (tooltip.md 2.2). Inside a non-modal `Dialog` or `Drawer` the same
+  holds: its JS Escape listener is on the window and leaves a prevented Escape alone
+  (dialog.md 2.6, #177).
 
 ### 2.7 Behaviour per engine and flag
 

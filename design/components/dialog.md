@@ -459,11 +459,14 @@ in JS-free mode the Trigger records `dialog.open` at `pointerdown` and skips `sh
 click if it was open, so the outcome is "closed" on every path (a keyboard click has no press
 and stays a no-op).
 
-Baseline JS for non-modal dialogs (both modes): a `keydown` listener on the dialog closes it on
-Escape with `requestClose()`, leaving the event alone while it belongs to an inner layer (the
-target is inside an open nested `<dialog>` or an open `auto` / `hint` popover, or any open
-`auto` / `hint` popover inside the dialog would take the close request; section 9), so the APG
-expectation holds; with `lightDismiss`, document `pointerdown` and `click` listeners (capture)
+Baseline JS for non-modal dialogs (both modes): a `keydown` listener on the **window** closes
+the dialog on an Escape from inside it with `requestClose()`. It runs after every element and
+document listener, and it leaves the event alone when it is already prevented (an inner layer
+that closes on Escape from JS, such as a `manual` HoverCard or Tooltip, prevents it; a
+prevented `keydown` is no close request, as for a modal dialog's close watcher) or belongs to
+an inner layer (the target is inside a nested `<dialog>` or an open `auto` / `hint` popover, or
+any open `auto` / `hint` popover inside the dialog would take the close request; section 9), so
+the APG expectation holds and the innermost layer closes first; with `lightDismiss`, document `pointerdown` and `click` listeners (capture)
 close it when both the press and the click land outside the dialog, **the Trigger included**,
 as native `closedby="any"` does (#116; the click does not re-open the dialog: in library mode
 it arrives while the dialog is still optimistically open, in JS-free mode the Trigger saw it
@@ -1373,7 +1376,7 @@ library surfaces it as `details.returnValue` (on the request and on the fact) an
 | Tab / Shift+Tab inside a modal dialog | cycles through the dialog's focusable content and the browser UI; the page is inert | browser |
 | Escape (modal) | closes via a close request; focus returns to the opener; `onOpenChange(false, { reason: "dismiss" })` | browser |
 | Escape (non-modal) | closes via `requestClose()` | Popup listener (or `closedby` with the flag) |
-| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal: the dialog's JS `keydown` listener **ignores Escape while it belongs to an inner layer**: the target is inside an open nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. A `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher and does not take Escape: Escape inside it closes the dialog | browser / Popup listener |
+| Escape inside a nested popover or dialog | modal: closes the innermost one only (platform close watchers). Non-modal: the dialog's JS `keydown` listener (on the window, so after the element and document listeners) **ignores Escape while it belongs to an inner layer**: the target is inside a nested `<dialog>` or an open `auto` / `hint` popover within the Popup, **or any open `auto` / `hint` popover inside the dialog is open** (close watchers are per document, not per focus, so an open popover takes the close request wherever focus is). The event is neither prevented nor acted on, the inner layer closes, and the next Escape closes the dialog. It also ignores an **already prevented** Escape: a `manual` popover (or `hint` where the engine maps it to `manual`, read through the `popover` IDL attribute) has no close watcher, and one that closes on Escape from JS (HoverCard, Tooltip: document listeners) prevents the keydown, so it closes first and the dialog stays open (#177), as a modal dialog's close watcher does. A `manual` popover that does not handle Escape leaves it to the dialog: Escape inside it closes the dialog | browser / Popup listener |
 | Enter in a form field | submits the Form: closes (`method="dialog"`) or runs the action then closes | browser / Form |
 
 | Part | ARIA |

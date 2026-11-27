@@ -18,7 +18,14 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { user } from "../__tests__/browser-user.js";
 import { mouse } from "../__tests__/browser-commands.js";
-import { browserName, pressFocusesButtons, supportsDialogClosedBy } from "../__tests__/engine.js";
+import {
+  browserName,
+  pressFocusesButtons,
+  supportsDialogClosedBy,
+  supportsPopoverHint,
+} from "../__tests__/engine.js";
+import { HoverCard } from "../hover-card/index.js";
+import { Tooltip } from "../tooltip/index.js";
 import {
   addExitStyle,
   describeOverlayInBrowser,
@@ -545,6 +552,76 @@ describe("Dialog (browser)", () => {
       screen.getByTestId("inside").focus();
       await user.keyboard("{Escape}");
       expect(popup().open).toBe(false);
+    });
+  });
+
+  // #177: innermost first (hover-card.md 2.6, tooltip.md 2.2). A `manual` HoverCard or Tooltip
+  // closes on Escape from a document listener and prevents the keydown; the non-modal dialog's
+  // JS Escape (a window listener) and a modal dialog's close watcher both leave a prevented
+  // Escape alone. With `experimental_hint`, Safari 27.0 maps `hint` to `manual`, so there the
+  // prevented keydown is what keeps the dialog open; elsewhere the `hint` close watcher is too.
+  describe.each([
+    ["non-modal", false, false],
+    ["non-modal", false, true],
+    ["modal", true, false],
+    ["modal", true, true],
+  ] as const)("Escape with a shown hover popup inside (%s, hint %s)", (_, modal, hint) => {
+    const expectedType = hint && supportsPopoverHint ? "hint" : "manual";
+
+    async function escapeTwice(inner: HTMLElement, focus: HTMLElement) {
+      await expect.poll(() => inner.matches(":popover-open")).toBe(true);
+      expect(inner.popover).toBe(expectedType);
+      focus.focus();
+      await user.keyboard("{Escape}");
+      await expect.poll(() => inner.matches(":popover-open")).toBe(false);
+      await quietPeriod(50, "the first Escape must not also close the dialog");
+      expect(popup().open).toBe(true);
+      await user.keyboard("{Escape}");
+      await settle(() => expect(popup().open).toBe(false));
+    }
+
+    it("HoverCard: the first Escape closes the card, the second the dialog", async () => {
+      render(
+        <Dialog.Root defaultOpen={false} modal={modal}>
+          <Dialog.Trigger data-testid="trigger">Profile</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Profile" style={{ width: 300 }}>
+            <HoverCard.Root delay={0} closeDelay={10_000}>
+              <HoverCard.Trigger href="#ada" data-testid="card-trigger">
+                @ada
+              </HoverCard.Trigger>
+              <HoverCard.Popup data-testid="card" experimental_hint={hint}>
+                <button type="button" data-testid="follow">
+                  Follow
+                </button>
+              </HoverCard.Popup>
+            </HoverCard.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      await user.hover(screen.getByTestId("card-trigger"));
+      // Focus inside the card.
+      await escapeTwice(screen.getByTestId("card"), screen.getByTestId("follow"));
+    });
+
+    it("Tooltip: the first Escape on its trigger hides the tooltip, the second closes the dialog", async () => {
+      render(
+        <Dialog.Root defaultOpen={false} modal={modal}>
+          <Dialog.Trigger data-testid="trigger">Edit</Dialog.Trigger>
+          <Dialog.Popup data-testid="popup" aria-label="Edit" style={{ width: 300 }}>
+            <Tooltip.Root delay={0} closeDelay={10_000}>
+              <Tooltip.Trigger data-testid="tip-trigger">Save</Tooltip.Trigger>
+              <Tooltip.Popup data-testid="tip" experimental_hint={hint}>
+                Saves the document
+              </Tooltip.Popup>
+            </Tooltip.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await openWithTrigger();
+      await user.hover(screen.getByTestId("tip-trigger"));
+      // Focus on the Tooltip's trigger, outside the tooltip.
+      await escapeTwice(screen.getByTestId("tip"), screen.getByTestId("tip-trigger"));
     });
   });
 
