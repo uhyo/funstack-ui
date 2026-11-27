@@ -132,3 +132,37 @@ only with an empty JS stack. The rule is needed. Corrections:
 - Combobox inside a Field.
 - A controlled CheckboxGroup or Checkbox that refuses the reset. It passes in the probe; add it
   as a row.
+
+## Re-review at d7201afe: clean
+
+The fix: `useFormReset` calls back through `afterDispatch`, and Field.Root now uses
+`useFormReset`.
+
+**Must-fix 1 (Field) and 2 (cancel after the library's listener) are resolved.** I checked that
+the new rows really catch the bugs. With only `use-form-reset.ts` and `field-root.tsx` reverted
+to 4f6989b5, Chromium and Firefox fail 8 of the 46 rows in `form-reset-button.browser.test.tsx`.
+The failing rows are the real-reset rows for a Field error, a Combobox in a Field, a cancel in
+React's `onReset`, and a cancel in a document listener. With the branch as it is, all 46 pass. The
+script-order rows pass in both cases, which is what they are there for.
+
+**Must-fix 3 (the docs overclaimed) is resolved.** Rule 5 now says the callback runs after the
+algorithm in both orders, so the DOM reads in Select.Value and CheckboxGroup.Parent are correct.
+
+**Script order is unaffected.** `form.reset()` finishes its dispatch synchronously, so
+`eventPhase` is `NONE` when the microtask runs, and the callback runs there, as before. A nested
+call, `form.reset()` from inside another event's listener, takes the same path, because
+`eventPhase` belongs to the reset event. I probed React's automatic reset after a real submit
+click on Chromium and Firefox, with both a sync and an async `<form action>`. A Checkbox got
+`[false, "platform", reset]` and unchecked, inside the default `settle` window.
+
+Nits:
+- `use-form-reset.ts:35` drops the cancel function that `afterDispatch` returns. If the
+  component unmounts between the click and the task, the callback still runs. That is harmless
+  today: Field's `refresh` returns early when the control is null, and the other callers only
+  set state or dispatch.
+- On the task path there is a one-task gap between the click and the callback. In theory, a
+  user input already queued (Chromium gives input priority over timers) could commit before a
+  Combobox reset dispatch and be overwritten by it. I did not observe this; recording it only.
+- `form-reset-cancelled.test.tsx` runs in jsdom, where the order is always the script one, so it
+  passes against the old code too. Its header says it is the script-order control, so this is
+  fine.
