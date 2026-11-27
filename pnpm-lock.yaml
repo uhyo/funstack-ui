@@ -90,6 +90,9 @@ importers:
 
   packages/example:
     dependencies:
+      '@funstack/router':
+        specifier: ^1.6.0
+        version: 1.6.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@funstack/ui':
         specifier: workspace:*
         version: link:../ui
