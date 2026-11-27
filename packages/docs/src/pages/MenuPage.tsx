@@ -389,7 +389,7 @@ export function MenuPage() {
             type: '"run" | "ignore"',
             default: '"ignore", or "run" with closeOnActivate={false}',
             description:
-              'What a click, Enter or Space does while this item\'s `action` is pending. `"ignore"`: nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); a closing item closes the menu once the last run has settled, and only if the latest run resolved: a rejection keeps the menu open in both modes. No effect without `action`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+              'What a click, Enter or Space does while this item\'s `action` is pending. `"ignore"`: nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending` until every run has settled, no `aria-disabled`); a closing item closes the menu once the last run has settled, and only if the latest run resolved: a rejection keeps the menu open in both modes. No effect without `action`: the item then shows `data-pending` while the menu\'s close waits, never `aria-disabled`. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
         ]}
       />
@@ -570,7 +570,7 @@ export function MenuPage() {
           [
             "`data-pending`",
             "Item, CheckboxItem, RadioItem, RadioGroup",
-            "The item's `action` or change action is in flight; on the RadioGroup while a selection is.",
+            "The item's `action` or change action is in flight, then (a closing Item, with or without `action`) until the menu's close has committed; on the RadioGroup while a selection is.",
           ],
           [
             "`aria-disabled`",
@@ -722,7 +722,7 @@ export function MenuPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the state the browser exposes on the Trigger follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs; a second activation is ignored, or with `closeOnActivate={false}` runs again (`whilePending`)."
+          "The Trigger's `data-open` and CheckboxItem and RadioItem `data-checked` are optimistic; the state the browser exposes on the Trigger follows the shown menu. Items render from the committed open state. An Item is a [pure trigger](/concepts/pending-and-optimistic#pure-trigger): `data-pending` while its action runs and until the menu's close it asked for has committed (also without `action`, then never `aria-disabled`); a second activation is ignored, or with `closeOnActivate={false}` runs again (`whilePending`)."
         }
       >
         <h4 id="slow-open-change-action">

@@ -37,7 +37,9 @@ export interface AlertDialogActionProps extends Omit<
   /**
    * What a click does while the `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the dialog
-   * closes once, after the last run and only if the latest one resolved.
+   * closes once, after the last run and only if the latest one resolved. No effect without
+   * `action`: the part then shows `data-pending` while the Root's close waits, without
+   * `aria-disabled`.
    *
    * @defaultValue `"ignore"`
    */

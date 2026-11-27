@@ -128,6 +128,14 @@ export function PendingOptimisticPage() {
           the trigger (an indicator) may mirror it.
         </li>
         <li>
+          <strong>On a part that asked its owner to close</strong> (a <code>Dialog.Close</code>,{" "}
+          <code>Popover.Close</code>, <code>Drawer.Close</code>, an AlertDialog Cancel or Action, a
+          closing <code>Menu.Item</code>): from the click until that close has committed, with or
+          without an <code>action</code> of its own. The Trigger may be out of sight under a modal
+          backdrop. Without an <code>action</code> the part is never <code>aria-disabled</code>:
+          nothing of its own is ignored.
+        </li>
+        <li>
           <strong>Never on content regions.</strong> A content region shows the committed value or
           nothing; it is never "in between". To dim the old content while the next one loads, select
           through the state owner.

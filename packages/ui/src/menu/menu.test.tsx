@@ -1274,6 +1274,38 @@ describe("Menu.Item actions", () => {
       expect(isOpen()).toBe(false);
     });
 
+    it("without action: data-pending while the Root's close is awaited, no aria-disabled (#183)", async () => {
+      const user = setupUser();
+      const openChange = vi.fn<OpenAction>();
+      const hide = spyHide();
+      render(
+        <Harness
+          root={{ openChangeAction: openChange }}
+          content={
+            <Menu.Item data-testid="plain" whilePending="ignore">
+              Plain
+            </Menu.Item>
+          }
+        />,
+      );
+      await openMenu(user);
+      const closing = deferred();
+      openChange.mockImplementation((next) => (next ? undefined : closing.promise));
+      const plain = item("plain");
+      await user.click(plain);
+      await flushTasks(2);
+      // Conventions 4.3: the item the user acted on shows the wait; nothing of its own is in
+      // flight to ignore, so `whilePending` resolves to "run" (2.5.1) and no aria-disabled.
+      expectPending(plain);
+      expect(plain).not.toHaveAttribute("aria-disabled");
+      expect(isOpen()).toBe(true);
+      expect(openChange.mock.calls.map(([next]) => next)).toEqual([true, false]);
+      await act(async () => closing.resolve());
+      await flushTasks(2);
+      expect(hide).toHaveBeenCalledTimes(1);
+      expect(isOpen()).toBe(false);
+    });
+
     it("an explicit whilePending wins over the closeOnActivate default", async () => {
       const user = setupUser();
       const work = deferred();

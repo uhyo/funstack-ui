@@ -17,7 +17,11 @@ import { usePopoverContext } from "./popover-context.js";
  * `render`.
  */
 export interface PopoverCloseState {
-  /** The `action` is in flight. */
+  /**
+   * From the click until the close this part asked for has committed: the `action` in flight,
+   * then the Root's close (an awaited `openChangeAction(false)`, or another pending action the
+   * close is entangled with). Also without `action`, in library mode.
+   */
   readonly pending: boolean;
   /** The `disabled` prop. */
   readonly disabled: boolean;
@@ -48,7 +52,8 @@ export interface PopoverCloseProps extends Omit<
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`
    * until every run has settled); the popover closes once, when the last run settles and only
    * if the latest run resolved (a rejection leaves it open, as in `"ignore"` mode). No effect
-   * without `action`.
+   * without `action`: the part then shows `data-pending` while the Root's close waits, without
+   * `aria-disabled`.
    *
    * @defaultValue `"ignore"`
    */
@@ -79,7 +84,8 @@ export interface PopoverCloseProps extends Omit<
  * commit). With `action` the action runs first in this part's own transition (`data-pending` on
  * the button, with `aria-disabled`; a second click meanwhile is ignored unless
  * `whilePending="run"`); a rejection leaves the
- * popover open. It keeps `commandfor` where the Trigger has `popovertarget`: an invoker
+ * popover open. With or without `action`, the button has `data-pending` until the close it
+ * asked for has committed. It keeps `commandfor` where the Trigger has `popovertarget`: an invoker
  * inside its own popover exposes no state either way, and the `command` event tells the Popup a
  * foreign hide's reason.
  *

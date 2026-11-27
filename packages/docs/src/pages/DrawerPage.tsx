@@ -322,11 +322,12 @@ export function DrawerPage() {
         <code>Dialog.Close</code>, unchanged: <code>{'<button command="request-close">'}</code> in
         JS-free mode, a close request through the Root in library mode; with an <code>action</code>,
         the action runs first in the button's own transition (<code>data-pending</code>) and a
-        rejection leaves the drawer open. Props: <code>action</code>, <code>whilePending</code>,{" "}
-        <code>value</code>, <code>disabled</code>, <code>className</code>, <code>style</code>,{" "}
-        <code>children</code> (functions of <code>DrawerCloseState</code>,{" "}
-        <code>{"{ pending, disabled }"}</code>), <code>render</code>. See{" "}
-        <a href="/components/dialog#props">Dialog.Close</a>.
+        rejection leaves the drawer open. With or without <code>action</code>, the button has{" "}
+        <code>data-pending</code> until the close it asked for has committed. Props:{" "}
+        <code>action</code>, <code>whilePending</code>, <code>value</code>, <code>disabled</code>,{" "}
+        <code>className</code>, <code>style</code>, <code>children</code> (functions of{" "}
+        <code>DrawerCloseState</code>, <code>{"{ pending, disabled }"}</code>), <code>render</code>.
+        See <a href="/components/dialog#props">Dialog.Close</a>.
       </p>
 
       <h4>
@@ -367,7 +368,11 @@ export function DrawerPage() {
             "Offset / extent, from 0 to 1. `::backdrop` inherits it.",
           ],
           ["`data-open`, `data-pending`", "Trigger", "Library mode, as on a Dialog."],
-          ["`data-pending`", "Close", "Its `action` is in flight."],
+          [
+            "`data-pending`",
+            "Close",
+            "From the click until the close it asked for has committed: its `action`, then the Root's close (library mode, also without `action`).",
+          ],
           ["`data-disabled`", "Trigger, Close", "The `disabled` prop."],
         ]}
       />
@@ -392,7 +397,7 @@ export function DrawerPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "As a Dialog's: the Trigger is pending while an open is in flight, a Close with an `action` is pending while it runs. A swipe is never pending: it is a fact, reported the moment the browser closes the dialog, and it supersedes a close a part asked for. A Close action that is still running keeps running; its close is then a no-op."
+          "As a Dialog's: the Trigger is pending while an open is in flight, a Close is pending from the click until the close it asked for has committed (its `action`, then the Root's close; also without `action`). A swipe is never pending: it is a fact, reported the moment the browser closes the dialog, and it supersedes a close a part asked for. A Close action that is still running keeps running; its close is then a no-op."
         }
       >
         <h4>Walkthrough: a swipe</h4>

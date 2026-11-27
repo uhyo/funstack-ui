@@ -21,7 +21,11 @@ const isDev = process.env.NODE_ENV !== "production";
  * `render`.
  */
 export interface DialogCloseState {
-  /** The `action` is in flight. */
+  /**
+   * From the click until the close this part asked for has committed: the `action` in flight,
+   * then the Root's close (an awaited `openChangeAction(false)`, or another pending action the
+   * close is entangled with). Also without `action`, in library mode.
+   */
   readonly pending: boolean;
   /** The `disabled` prop. */
   readonly disabled: boolean;
@@ -59,7 +63,8 @@ export interface DialogCloseProps extends Omit<
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`
    * until every run has settled); the dialog closes once, when the last run settles and only if
    * the latest run resolved (a rejection leaves it open, as in `"ignore"` mode). No effect
-   * without `action`.
+   * without `action`: the part then shows `data-pending` while the Root's close waits, without
+   * `aria-disabled`.
    *
    * @defaultValue `"ignore"`
    */
@@ -92,7 +97,8 @@ export interface DialogCloseProps extends Omit<
  * through the Root (`openChangeAction(false)` awaited, then `close(value)` in the commit, inside
  * the view transition if the Popup's `transition` is set). With `action` the action runs first in
  * this part's own transition (`data-pending` and `aria-disabled` on the button; a second click
- * meanwhile is ignored unless `whilePending="run"`); a rejection leaves the dialog open.
+ * meanwhile is ignored unless `whilePending="run"`); a rejection leaves the dialog open. With or
+ * without `action`, the button has `data-pending` until the close it asked for has committed.
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
  * `command` (neither rendered with `action`), `value`, `onClick` (library mode, or with `action`), `aria-disabled`, `data-pending`,

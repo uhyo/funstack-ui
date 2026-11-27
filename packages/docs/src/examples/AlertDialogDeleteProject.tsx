@@ -38,7 +38,8 @@ export function AlertDialogDeleteProject() {
           </AlertDialog.Description>
           <DemoErrorBoundary>
             <div className="demo-dialog-actions">
-              <AlertDialog.Cancel className="demo-button">Cancel</AlertDialog.Cancel>
+              {/* Clicked while Delete runs, it shows data-pending until the dialog closes. */}
+              <AlertDialog.Cancel className="demo-button demo-cancel">Cancel</AlertDialog.Cancel>
               <AlertDialog.Action
                 className="demo-button demo-danger"
                 action={async () => {

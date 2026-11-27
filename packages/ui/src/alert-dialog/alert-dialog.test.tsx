@@ -101,6 +101,20 @@ describeOverlayClosePart<AlertDialogOpenChangeDetails>({
   },
 });
 
+describeOverlayClosePart<AlertDialogOpenChangeDetails>({
+  name: "AlertDialog (Cancel)",
+  Harness: AlertHarness,
+  isOpen: () => popup().open,
+  Close: (props) => <AlertDialog.Cancel value="v" {...props} />,
+  spyClose,
+  closeArgs: ["v"],
+  value: "v",
+  dismiss: () => popup().requestClose(),
+  openStatic: async () => {
+    await act(async () => popup().showModal());
+  },
+});
+
 /** A minimal AlertDialog; `popup` and `children` replace the defaults. */
 function Confirm({
   root,
@@ -745,6 +759,10 @@ describe("AlertDialog", () => {
       );
       expect(popup().open).toBe(true);
       expectPending(trigger());
+      // The Cancel shows that its click was taken (walkthrough 4, conventions 4.3): pending
+      // until its close commits, without aria-disabled.
+      expectPending(cancel());
+      expect(cancel()).not.toHaveAttribute("aria-disabled");
       await act(async () => work.resolve());
       await flushTasks(2);
       // One close: the Action's own close found `false` already intended.

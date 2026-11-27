@@ -54,7 +54,8 @@ export interface MenuItemProps extends Omit<
    * nothing (the event is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs
    * again (`data-pending` until every run has settled); a closing item closes the menu once,
    * when the last run settles and only if the latest run resolved (a rejection keeps the menu
-   * open, as in `"ignore"` mode). No effect without `action`.
+   * open, as in `"ignore"` mode). No effect without `action`: the item then shows
+   * `data-pending` while the menu's close waits, without `aria-disabled`.
    *
    * @defaultValue `"ignore"`, or `"run"` with `closeOnActivate={false}`
    */
@@ -108,8 +109,10 @@ export function MenuItem({
   // The close belongs to the top-level menu, so its open generation guards it.
   // Mixed ownership (conventions 2.5.1): an item the library closes the menu after ignores by
   // default; a keep-open item is a user-owned trigger and runs every activation.
+  // Without `action` nothing of the item's own is in flight to ignore: `"run"`, so the item shows
+  // `data-pending` while the close waits but no `aria-disabled` (conventions 2.5.1, 4.3).
   const trigger = usePureTrigger({
-    whilePending,
+    whilePending: action === undefined ? "run" : whilePending,
     defaultWhilePending: closeOnActivate ? "ignore" : "run",
     openGeneration: menu.root.popover.openGeneration,
   });
