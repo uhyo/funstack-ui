@@ -1,6 +1,6 @@
 // TextField rows that need a real engine (design/components/text-field.md 14, browser): Escape
 // with an edited draft in a modal Dialog and an `auto` Popover (the close watcher sees a cancelled
-// key), the same for NumberField's Input (testing.md 10.1 "Draft revert"), blurs by a real Tab, a
+// key), real Ctrl+Enter / Cmd+Enter in a textarea (no line, no form submission), the same for NumberField's Input (testing.md 10.1 "Draft revert"), blurs by a real Tab, a
 // real click on a button and focus moving into another frame, a real reset click with a draft
 // open and a save pending (#185), the IME rows (Chromium through CDP), and no document view
 // transition. The real-key rows inside a Field (#193) are in field/field-edit.browser.test.tsx.
@@ -165,6 +165,81 @@ describe("TextField (browser)", () => {
         window.focus();
         document.body.focus();
       }
+    });
+  });
+
+  describe("the textarea's commit key", () => {
+    function Notes({ action, inForm = false }: { action: Fn; inForm?: boolean }) {
+      const area = (
+        <TextField
+          data-testid="field"
+          aria-label="Notes"
+          name="notes"
+          defaultValue="a"
+          render={<textarea rows={3} />}
+          valueCommitAction={action}
+        />
+      );
+      return inForm ? (
+        <form data-testid="form">
+          {area}
+          <button type="submit">Post</button>
+        </form>
+      ) : (
+        area
+      );
+    }
+
+    /** Puts the caret at the end of the textarea and types a second line with real keys. */
+    async function secondLine(): Promise<void> {
+      await user.click(field());
+      field().setSelectionRange(1, 1);
+      await user.keyboard("{Enter}b");
+    }
+
+    for (const modifier of ["Control", "Meta"] as const) {
+      it(`a real ${modifier}+Enter commits once, adds no line, keeps focus and the caret`, async () => {
+        const action = vi.fn<Fn>();
+        render(<Notes action={action} />);
+        await secondLine();
+        expect(field().value).toBe("a\nb");
+        expect(action).not.toHaveBeenCalled();
+        await user.keyboard(`{${modifier}>}{Enter}{/${modifier}}`);
+        await settle(() => expect(action).toHaveBeenCalledTimes(1));
+        expect(action.mock.calls[0]![0]).toBe("a\nb");
+        const event = action.mock.calls[0]![1].event as KeyboardEvent;
+        expect(event.type).toBe("keydown");
+        expect(event.defaultPrevented).toBe(true);
+        await quietPeriod(100, "the key must add no line after the commit");
+        expect(field().value).toBe("a\nb");
+        expect(document.activeElement).toBe(field());
+        expect([field().selectionStart, field().selectionEnd]).toEqual([3, 3]);
+        expect(action).toHaveBeenCalledTimes(1);
+      });
+
+      it(`a real ${modifier}+Enter in a form with a submit button submits nothing`, async () => {
+        const action = vi.fn<Fn>();
+        const submit = vi.fn((event: SubmitEvent) => event.preventDefault());
+        render(<Notes action={action} inForm />);
+        const form = screen.getByTestId("form") as HTMLFormElement;
+        form.addEventListener("submit", submit);
+        await secondLine();
+        await user.keyboard(`{${modifier}>}{Enter}{/${modifier}}`);
+        await settle(() => expect(action).toHaveBeenCalledTimes(1));
+        await quietPeriod(100, "the textarea's commit key must not submit the form");
+        expect(submit).not.toHaveBeenCalled();
+        form.removeEventListener("submit", submit);
+      });
+    }
+
+    it("a real Enter adds a line and commits nothing", async () => {
+      const action = vi.fn<Fn>();
+      render(<Notes action={action} />);
+      await secondLine();
+      await user.keyboard("{Enter}");
+      await quietPeriod(100, "Enter alone must not commit a textarea");
+      expect(field().value).toBe("a\nb\n");
+      expect(action).not.toHaveBeenCalled();
     });
   });
 

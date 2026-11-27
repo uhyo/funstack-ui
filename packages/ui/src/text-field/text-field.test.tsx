@@ -3,7 +3,8 @@
 // suspending content, the post-await rule, a controlled veto, details, dev warnings) and of the
 // native platform suite (mount reconciliation, form reset, React's reset after a form action)
 // come from the shared suites with the driver __tests__/drivers/text-field.tsx; the rows here are
-// the component's own: the draft, the commit keys, Escape, Field and Form.
+// the component's own: the draft, the commit keys (the textarea's Ctrl+Enter / Cmd+Enter too),
+// Escape, Field and Form.
 //
 // Covered by text-field.browser.test.tsx instead: real keys outside `act` inside a Field (#193),
 // a real reset click (#185), Escape in a modal Dialog and an `auto` Popover, real blurs, the IME
@@ -152,7 +153,8 @@ describe("TextField", () => {
       expect(message).toMatch(new RegExp(`^TextField: .*type="${type}"`));
       if (type === "search") {
         expect(message).toMatch(/Escape/);
-        expect(message).toMatch(/inputMode="search"/);
+        expect(message).toMatch(/type="text"/);
+        expect(message).toMatch(/role="searchbox"/);
         expect(message).toMatch(/enterKeyHint="search"/);
       }
     });
@@ -341,18 +343,6 @@ describe("TextField", () => {
       },
     );
 
-    it("a textarea's Enter is a new line and commits nothing; its blur commits", async () => {
-      const action = vi.fn<Fn>();
-      render(<Harness mode={mode} action={action} render={<textarea />} />);
-      typeText("Line one");
-      const event = key("Enter");
-      expect(event.defaultPrevented).toBe(false);
-      expect(action).not.toHaveBeenCalled();
-      blur();
-      await flushMicrotasks();
-      expect(action).toHaveBeenCalledExactlyOnceWith("Line one", expect.anything());
-    });
-
     it.each([
       ["isComposing", { isComposing: true }],
       ["keyCode 229", { keyCode: 229 }],
@@ -380,6 +370,148 @@ describe("TextField", () => {
       expectNotPending(field());
       expect(field().value).toBe("Report 2");
       expect(committed()).toBe("Report");
+    });
+  });
+
+  // --- Commit key, textarea (design 4.2) ---------------------------------------------------------
+
+  renderBoth("commit key, textarea", (mode) => {
+    const area = (props: Omit<TextFieldProps, "value" | "defaultValue"> = {}, action?: Fn) =>
+      render(<Harness mode={mode} action={action} render={<textarea />} {...props} />);
+
+    it.each([
+      ["alone", {}],
+      ["with Shift", { shiftKey: true }],
+      ["with Alt", { altKey: true }],
+    ] as const)("Enter %s is a new line: nothing dispatched, not prevented", (_label, init) => {
+      const action = vi.fn<Fn>();
+      area({}, action);
+      typeText("Line one");
+      const event = key("Enter", init);
+      expect(event.defaultPrevented).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+      expect(field().value).toBe("Line one");
+    });
+
+    it.each([
+      ["Ctrl", { ctrlKey: true }],
+      ["Cmd", { metaKey: true }],
+      ["Ctrl+Shift", { ctrlKey: true, shiftKey: true }],
+      ["Cmd+Shift", { metaKey: true, shiftKey: true }],
+    ] as const)("%s+Enter commits once with the keydown, prevented", async (_label, init) => {
+      const action = vi.fn<Fn>();
+      const seen: TextFieldState[] = [];
+      area(
+        {
+          className: (state) => {
+            seen.push(state);
+            return undefined;
+          },
+        },
+        action,
+      );
+      field().focus();
+      typeText("Line one\nLine two");
+      const event = key("Enter", init);
+      await flushMicrotasks();
+      expect(event.defaultPrevented).toBe(true);
+      expect(action).toHaveBeenCalledTimes(1);
+      const [next, details] = action.mock.calls[0]!;
+      expect(next).toBe("Line one\nLine two");
+      expect(details.reason).toBe("activate");
+      expect(details.event).toBe(event);
+      expect(document.activeElement).toBe(field());
+      expect(field().value).toBe("Line one\nLine two");
+      expect(committed()).toBe("Line one\nLine two");
+      // The draft is cleared: the shown text is the value.
+      expect(seen.at(-1)).toMatchObject({
+        value: "Line one\nLine two",
+        text: "Line one\nLine two",
+      });
+      // A blur after the key dispatches nothing more.
+      blur();
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it("no draft, or an equal draft: nothing dispatched, still prevented", () => {
+      const action = vi.fn<Fn>();
+      area({}, action);
+      expect(key("Enter", { ctrlKey: true }).defaultPrevented).toBe(true);
+      typeText("Drafts");
+      typeText("Draft");
+      expect(key("Enter", { metaKey: true }).defaultPrevented).toBe(true);
+      expect(action).not.toHaveBeenCalled();
+      expect(field().value).toBe("Draft");
+    });
+
+    it.each([["disabled"], ["readOnly"]] as const)(
+      "%s: nothing dispatched, still prevented",
+      (prop) => {
+        const action = vi.fn<Fn>();
+        function Toggle() {
+          const [off, setOff] = useState(false);
+          return (
+            <>
+              <Harness mode={mode} action={action} render={<textarea />} {...{ [prop]: off }} />
+              <button type="button" onClick={() => setOff(true)}>
+                off
+              </button>
+            </>
+          );
+        }
+        render(<Toggle />);
+        typeText("Report");
+        fireEvent.click(screen.getByRole("button", { name: "off" }));
+        expect(key("Enter", { ctrlKey: true }).defaultPrevented).toBe(true);
+        expect(action).not.toHaveBeenCalled();
+        expect(field().value).toBe("Draft");
+      },
+    );
+
+    it.each([
+      ["isComposing", { ctrlKey: true, isComposing: true }],
+      ["keyCode 229", { metaKey: true, keyCode: 229 }],
+    ] as const)("a modified Enter with %s is the IME's: nothing, not prevented", (_l, init) => {
+      const action = vi.fn<Fn>();
+      area({}, action);
+      typeText("Report");
+      const event = key("Enter", init);
+      expect(event.defaultPrevented).toBe(false);
+      expect(action).not.toHaveBeenCalled();
+      expect(field().value).toBe("Report");
+    });
+
+    it("a blur with a draft open commits", async () => {
+      const action = vi.fn<Fn>();
+      area({}, action);
+      typeText("Line one");
+      blur();
+      await flushMicrotasks();
+      expect(action).toHaveBeenCalledExactlyOnceWith("Line one", expect.anything());
+      expect(action.mock.calls[0]![1].event?.type).toBe("focusout");
+    });
+
+    it("typing after the key opens a new draft; a second key press commits it", async () => {
+      const action = vi.fn<Fn>();
+      area({}, action);
+      typeText("a");
+      key("Enter", { ctrlKey: true });
+      await flushMicrotasks();
+      typeText("ab");
+      expect(field().value).toBe("ab");
+      key("Enter", { metaKey: true });
+      await flushMicrotasks();
+      expect(action.mock.calls.map(([next]) => next)).toEqual(["a", "ab"]);
+    });
+
+    it("an <input> with Ctrl+Enter commits and is not prevented (unchanged)", async () => {
+      const action = vi.fn<Fn>();
+      render(<Harness mode={mode} action={action} />);
+      typeText("Report");
+      const event = key("Enter", { ctrlKey: true });
+      await flushMicrotasks();
+      expect(event.defaultPrevented).toBe(false);
+      expect(action).toHaveBeenCalledExactlyOnceWith("Report", expect.anything());
     });
   });
 
@@ -788,6 +920,68 @@ describe("TextField", () => {
       await user.type(field(), "Report{Enter}");
       await flushMicrotasks();
       expect(order).toEqual(["commit Report", "submit Report"]);
+    });
+
+    it("a textarea's Ctrl+Enter in a Form.Root commits and does not submit", async () => {
+      const order: string[] = [];
+      render(
+        <Form.Root
+          autoReset={false}
+          action={(formData) => {
+            order.push(`submit ${String(formData.get("notes"))}`);
+          }}
+        >
+          <TextField
+            aria-label="Notes"
+            name="notes"
+            defaultValue="a"
+            render={<textarea />}
+            valueCommitAction={(next) => {
+              order.push(`commit ${next}`);
+            }}
+          />
+          <button type="submit">Save</button>
+        </Form.Root>,
+      );
+      typeText("a\nb");
+      key("Enter", { ctrlKey: true });
+      await flushMicrotasks();
+      await flushTasks(1);
+      expect(order).toEqual(["commit a\nb"]);
+    });
+
+    it("with the form-level handler of design 7: the commit, then the submission, once each", async () => {
+      const order: string[] = [];
+      render(
+        <Form.Root
+          autoReset={false}
+          action={(formData) => {
+            order.push(`submit ${String(formData.get("notes"))}`);
+          }}
+          onKeyDown={(event) => {
+            if (!(event.target instanceof HTMLTextAreaElement) || event.nativeEvent.isComposing)
+              return;
+            if (event.key === "Enter" && (event.ctrlKey || event.metaKey))
+              event.currentTarget.requestSubmit();
+          }}
+        >
+          <TextField
+            aria-label="Notes"
+            name="notes"
+            defaultValue="a"
+            render={<textarea />}
+            valueCommitAction={(next) => {
+              order.push(`commit ${next}`);
+            }}
+          />
+          <button type="submit">Save</button>
+        </Form.Root>,
+      );
+      typeText("a\nb");
+      key("Enter", { metaKey: true });
+      await flushMicrotasks();
+      await flushTasks(1);
+      expect(order).toEqual(["commit a\nb", "submit a\nb"]);
     });
 
     it("autoReset after a successful submission dispatches a platform commit", async () => {

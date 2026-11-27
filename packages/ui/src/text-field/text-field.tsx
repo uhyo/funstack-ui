@@ -39,8 +39,8 @@ const isDev = process.env.NODE_ENV !== "production";
 /** Details passed as the second argument of `valueCommitAction`. */
 export interface TextFieldValueChangeDetails extends ActionDetails {
   /**
-   * `"activate"`: the user committed an edit (`details.event` is the `focusout` or the Enter
-   * `keydown`). `"platform"`: a form reset (the `reset` event), or text adopted at mount
+   * `"activate"`: the user committed an edit (`details.event` is the `focusout` or the commit
+   * key's `keydown`: Enter in an `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`). `"platform"`: a form reset (the `reset` event), or text adopted at mount
    * (`undefined`: typed before hydration, restored by the browser).
    */
   readonly reason: ChangeReason;
@@ -88,8 +88,8 @@ export interface TextFieldProps extends Omit<
    */
   defaultValue?: string;
   /**
-   * Runs inside the field's transition once per edit (blur, or Enter in an `<input>`), and for a
-   * platform change (a form reset, text adopted at mount). Where the save goes: uncontrolled
+   * Runs inside the field's transition once per edit (blur, or the commit key: Enter in an
+   * `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`), and for a platform change (a form reset, text adopted at mount). Where the save goes: uncontrolled
    * state is committed when it resolves; a rejection shows the saved text again. May be a Server
    * Function.
    */
@@ -124,7 +124,8 @@ export interface TextFieldProps extends Omit<
   style?: StateValue<CSSProperties | undefined, TextFieldState>;
   /**
    * Replace the default `<input type="text">`: a text `<input>` (`text`, `tel`, `url`, `email`,
-   * `password`) or a `<textarea>` (`render={<textarea rows={4} />}`). `search` is not supported.
+   * `password`) or a `<textarea>` (`render={<textarea rows={4} />}`). `search` is not supported:
+   * use `type="text"` with `role="searchbox"` and `enterKeyHint="search"`.
    */
   render?: RenderProp<ComponentPropsWithRef<"input">, TextFieldState>;
 }
@@ -139,7 +140,8 @@ type TextElement = HTMLInputElement | HTMLTextAreaElement;
 
 /**
  * A text field that saves itself (design/components/text-field.md). The typed text is an urgent
- * internal draft; a blur, or Enter in an `<input>`, commits it through `valueCommitAction` in the
+ * internal draft; a blur or the commit key (Enter in an `<input>`, Ctrl+Enter or Cmd+Enter in a
+ * `<textarea>`) commits it through `valueCommitAction` in the
  * field's transition (`data-pending` meanwhile; a rejection shows the saved text again). Escape
  * with an edited draft puts the saved text back and consumes the key (conventions 15). One
  * element: it carries `name`, the constraints and the text the form posts.
@@ -238,9 +240,17 @@ export function TextField(props: TextFieldProps) {
   const keyDown = useCallback(
     (event: globalThis.KeyboardEvent, element: TextElement) => {
       if (event.key === "Enter") {
-        // A textarea's Enter is a new line; an Enter that confirms a composition is the IME's.
-        if (element.tagName !== "INPUT" || isComposingKey(event)) return;
-        // Not prevented: inside a form the implicit submission follows (design 7).
+        // An Enter that confirms a composition is the IME's, with any modifier.
+        if (isComposingKey(event)) return;
+        if (element.tagName === "INPUT") {
+          // Not prevented: inside a form the implicit submission follows (design 7).
+          commit(event);
+          return;
+        }
+        // A textarea: Enter alone, with Shift or with Alt is a new line; Ctrl or Cmd commits
+        // (design 4.2). Always prevented, so the key means one thing and adds no line.
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
         commit(event);
         return;
       }
@@ -264,7 +274,7 @@ export function TextField(props: TextFieldProps) {
       const element = elementRef.current;
       const current = latest.current.optimistic;
       if (element === null || element.value === current) return current;
-      // Still being typed (focused before hydration): the user's blur or Enter commits it.
+      // Still being typed (focused before hydration): the user's blur or commit key commits it.
       if (element.ownerDocument.activeElement === element) {
         openDraft(element.value);
         return current;
@@ -302,9 +312,10 @@ export function TextField(props: TextFieldProps) {
         const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
         if (type === "search") {
           return (
-            'TextField: type="search" is not supported. Engines give Escape a meaning of their ' +
-            "own in a search field and disagree on it, so the revert differs per engine. Use " +
-            'type="text" with inputMode="search" or enterKeyHint="search".'
+            'TextField: type="search" is not supported. In a search field Escape is the ' +
+            "engine's own key (it empties the field), which would give Escape two meanings. " +
+            'Use type="text" with role="searchbox" (the role type="search" gives) and ' +
+            'enterKeyHint="search".'
           );
         }
         return (
