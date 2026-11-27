@@ -425,15 +425,26 @@ it. A second click of a double click (`detail > 1`) and a click that leaves a se
 
 A one-time code is a left-to-right string in every locale: an SMS in Arabic or Hebrew shows
 `123456` in that order, and the user copies it box by box from the left. Without the attribute
-an RTL page would mirror the field in two ways that disagree. The Slots are consumer markup in
-DOM order, so an RTL container lays Slot 0 at the right and the boxes read right to left; the
-text in the one Input is a left-to-right run of digits whatever the direction, so the native
-caret keys move in that run and ArrowLeft would move the active box to the right.
+an RTL page changes the field in two ways (probed in three engines, #188):
+
+- **The boxes mirror, in every engine.** The Slots are consumer markup in DOM order, so an RTL
+  container lays Slot 0 at the right and the code reads right to left.
+- **The caret keys differ by engine.** The Input inherits `direction: rtl` and holds a
+  left-to-right run of digits or Latin letters. Chromium moves the caret logically: ArrowLeft
+  goes to the higher index, which is the box to the left in the mirrored row, so keys and
+  boxes agree. Firefox moves it visually inside the run: ArrowLeft goes to the lower index,
+  the box to the **right**. WebKit does the same inside the run and jumps at its edges
+  (ArrowLeft at index 0 goes to the end of the text). Home and End are logical everywhere.
+
+So without the attribute the code is drawn backwards everywhere, and in two engines the arrow
+keys move against the boxes. With it, the three engines behave alike.
 
 With the attribute, inside the Root:
 
 - Slot 0 is the leftmost box in any page, with the consumer's flex or grid layout unchanged.
-- The Input's text, caret keys and selection are left to right (4.2), matching the boxes.
+- The Input's text, caret keys and selection are left to right (4.2), matching the boxes, in
+  every engine: ArrowLeft goes to the lower index, ArrowRight to the higher, Home to 0 and End
+  to the end of the text.
 - Logical properties in the consumer's CSS for the Root and the Slots resolve as LTR.
 - Elements a consumer puts between the Slots (a separator) are laid out left to right too.
 
@@ -442,7 +453,8 @@ Field's or the consumer's elements (section 1) and follow the page.
 
 The default is an attribute on the library's own element, not a JS read and not a library
 prop: `dir` is the native attribute, and a consumer's value replaces the default
-(`<OTPField.Root dir="rtl">` for a code that really is right to left; there is no attribute
+(`<OTPField.Root dir="rtl">` for a code that really is right to left, with the per-engine keys
+above; there is no attribute
 value that means "inherit", so following an RTL container is spelled `"rtl"`). The default is
 applied when the prop is `undefined`. It is in the server HTML, so it holds before hydration.
 The library handles no key and reads no direction for this component.

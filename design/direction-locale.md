@@ -3,7 +3,10 @@
 Status: **accepted** (#172, part of #162; decided by the user on 2026-11-27). The rules are
 `design/conventions.md` section 14; this document keeps the audit they rest on, the options
 that were rejected and the prior art. Where the two disagree, the conventions win. The audit
-(section 2) describes 0.1.0-alpha.21, before the follow-up work of section 6.
+(section 2) describes 0.1.0-alpha.21, before the follow-up work of section 6, and is not
+updated: G2's "expected result" was written before the probe, which found the boxes mirrored
+in every engine and the arrow keys moving against them in Firefox and WebKit only
+(`design/components/otp-field.md` 4.4).
 
 Inputs: `docs/vision.md`, `design/conventions.md` (1.5, 7.1, 7.3, 8, 11), `design/placement.md`
 (13.1, 13.3, 13.4), the component designs named below, an audit of `packages/ui/src` on
@@ -178,9 +181,9 @@ repeats one prop, or wraps the Roots once.
 | # | Work | Closes |
 | --- | --- | --- |
 | F1 | The rules are conventions 14. Done with the acceptance. | G6 |
-| F2 | `locale` on `Progress.Root` and `Meter.Root` accepts `string \| readonly string[]` (`design/components/progress.md`). Additive. | G4 |
-| F3 | `OTPField.Root` renders `dir="ltr"` by default (`design/components/otp-field.md` 4.4), with a three-engine probe of the field in an RTL container. | G2 |
-| F4 | A docs page "Direction and locales": `dir` is the only switch; which keys mirror; the engine differences (G1, G5); `locale` and SSR; the wrapper recipe for an i18n library. | G3, G7 |
+| F2 | Done (#188). `locale` on `Progress.Root` and `Meter.Root` accepts `string \| readonly string[]` (`design/components/progress.md`). Additive. | G4 |
+| F3 | Done (#188). `OTPField.Root` renders `dir="ltr"` by default (`design/components/otp-field.md` 4.4), with a three-engine probe of the field in an RTL container: the boxes mirror in every engine, the caret keys differ by engine. | G2 |
+| F4 | Done (#188). A docs page "Direction and locales": `dir` is the only switch; which keys mirror; the engine differences (G1, G5); `locale` and SSR; the wrapper recipe for an i18n library. | G3, G7 |
 
 G1 stays as it is (decision 2). G8 is covered by conventions 14.1 rule 6 when Toast's swipe is
 built. G5 waits for Firefox. G9 is out of scope.

@@ -14327,3 +14327,20 @@ Implementation of the #172 decisions (the entry above); no rule changed.
   stays `rtl`, and a `dir="rtl"` row asserting the per-engine arrow results above.
 - **Docs.** A "Direction and locales" guide page; the OTPField, Progress, Meter, RadioGroup,
   Slider, NumberField and Roadmap pages updated.
+
+## 2026-11-27, #188: `otp-field.md` 4.4 amended after the probe
+
+By the architect, from the probe table of the #188 entry above. The rule is unchanged
+(`OTPField.Root` renders `dir="ltr"` unless the consumer passes `dir`); its reason is restated.
+
+- **4.4 said** that without the attribute, in an RTL container, "ArrowLeft would move the active
+  box to the right". That was reasoning from the design and holds for Firefox and WebKit only.
+- **4.4 now says** what was measured: the boxes mirror in every engine; Chromium moves the caret
+  logically (ArrowLeft to the higher index, the box to the left, so keys and boxes agree),
+  Firefox visually inside the left-to-right run (ArrowLeft to the box on the right), WebKit the
+  same with jumps at the ends of the text; Home and End are logical everywhere. The reason for
+  the default is therefore: the code is drawn backwards in every engine, the arrow keys move
+  against the boxes in two, and the three engines disagree. With `dir="ltr"` they behave alike.
+  The line about a consumer's `dir="rtl"` notes that it brings the per-engine keys back.
+- `design/direction-locale.md`: follow-ups F2, F3 and F4 marked done (#188); the status line
+  notes that the audit's G2 was written before the probe.
