@@ -260,7 +260,7 @@ undo history are the browser's.
   | Element | Commit key | Enter alone | After the commit |
   | --- | --- | --- | --- |
   | `<input>` | Enter, with or without modifiers (NumberField's rule) | commits | Not `preventDefault()`ed: inside a form the implicit submission follows and posts the same text (section 7). |
-  | `<textarea>` | Enter with **Ctrl or Cmd** held (`ctrlKey` or `metaKey`), on every platform | a new line, as with Shift or Alt | `preventDefault()`ed: the key is the field's alone. |
+  | `<textarea>` | Enter with **Ctrl or Cmd** held (`ctrlKey` or `metaKey`), on every platform | a new line, as with Shift; Alt+Enter is not the field's (the engine's, which inserts nothing in the three probed) | `preventDefault()`ed: the key is the field's alone. |
 
   In both, focus stays in the field and the caret does not move.
 - **Not during an IME composition**: an Enter that confirms a composition (`isComposing`, or
@@ -270,8 +270,8 @@ The textarea's key, in detail:
 
 - **Ctrl or Cmd, not one per platform.** The library reads no platform anywhere (its other
   keys test `ctrlKey || metaKey` too), and a page that accepts both needs no hint text per
-  operating system. Shift or Alt held as well changes nothing. Ark UI takes Cmd on Apple
-  platforms and Ctrl elsewhere.
+  operating system. Shift or Alt held as well as Ctrl or Cmd changes nothing. Ark UI takes
+  Cmd on Apple platforms and Ctrl elsewhere.
 - **It is the same commit as a blur**, with the `keydown` as `details.event`. With no draft
   open, a draft equal to the shown value, or a `disabled` / `readOnly` field, nothing is
   dispatched (the list below), and the key is still prevented, so it means one thing whenever
@@ -467,7 +467,8 @@ model" applies word for word: the text the user sees is the text the form posts)
   <Form.Root
     action={post}
     onKeyDown={(event) => {
-      if (!(event.target instanceof HTMLTextAreaElement) || event.nativeEvent.isComposing) return;
+      const { isComposing, keyCode } = event.nativeEvent;
+      if (!(event.target instanceof HTMLTextAreaElement) || isComposing || keyCode === 229) return;
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.currentTarget.requestSubmit();
     }}
   >
@@ -657,7 +658,7 @@ jsdom, the component's test file:
 | Roles and ARIA | Renders one `input[type=text]` with the value; `render={<textarea />}` renders a textarea; no attribute the consumer did not pass, outside a Field. `type="search"` and `type="number"`, as a prop and on the `render` element, each warn once in development and render as given; the `search` warning names `type="text"`, `role="searchbox"` and `enterKeyHint="search"`; `tel`, `url`, `email`, `password` do not warn. |
 | Draft | Typing shows at once and dispatches nothing; `state.text` follows the draft and `state.value` does not; a controlled `value` changed from outside shows when no draft is open and does not replace an open one. |
 | Commit (both) | Blur and Enter each dispatch once with `(next, { reason: "activate" })` and the native event; Enter is not `defaultPrevented`; a draft equal to the shown value dispatches nothing and is cleared; no draft, nothing; `disabled` / `readOnly` clear and dispatch nothing; an Enter with `isComposing`, and one with `keyCode` 229, dispatch nothing. |
-| Commit key, textarea (both) | Enter alone, with Shift and with Alt: nothing dispatched, not `defaultPrevented`. With `ctrlKey`, with `metaKey`, and with Shift held as well: one dispatch with `(next, { reason: "activate" })` and the `keydown`, `defaultPrevented`, the draft cleared. With no draft, an equal draft, `disabled` and `readOnly`: nothing dispatched, still `defaultPrevented`. With `isComposing` or `keyCode` 229: nothing, not prevented. A blur with a draft open commits; a blur after the key dispatches nothing more. Typing after it opens a new draft and a second key press commits it. An `<input>` with Ctrl+Enter: commits, not prevented (unchanged). |
+| Commit key, textarea (both) | Enter alone, with Shift and with Alt: nothing dispatched, not `defaultPrevented`. With `ctrlKey`, with `metaKey`, and with Shift or Alt held as well: one dispatch with `(next, { reason: "activate" })` and the `keydown`, `defaultPrevented`, the draft cleared. With no draft, an equal draft, `disabled` and `readOnly`: nothing dispatched, still `defaultPrevented`. With `isComposing` or `keyCode` 229: nothing, not prevented. A blur with a draft open commits; a blur after the key dispatches nothing more. Typing after it opens a new draft and a second key press commits it. An `<input>` with Ctrl+Enter: commits, not prevented (unchanged). |
 | Escape | With an edited draft: the text returns, nothing is dispatched, the event is `defaultPrevented` and marked consumed; with no draft, with an equal draft, when already prevented, and while composing: untouched. Inside a non-modal Dialog: the first Escape reverts and the dialog stays, the second closes it. |
 | Async action (both) | `data-pending` from the commit until the deferred resolves; the text does not change during it; the field is not disabled and typing during it opens a draft. |
 | Rejection (both) | The boundary receives it; the optimistic text reverts; the uncontrolled value is unchanged. Caught inside: resolves and commits (uncontrolled). A controlled parent that does not adopt: the saved text returns. A draft opened before the settle is kept in each case. |

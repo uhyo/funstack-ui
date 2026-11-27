@@ -100,7 +100,7 @@ export function TextFieldPage() {
           ],
           [
             "Blur, the commit key",
-            "The commit: the draft is cleared and `valueCommitAction(next, { reason: \"activate\" })` runs in the field's transition, with `data-pending`. The commit key is Enter in an `<input>`: not prevented, so a form's implicit submission follows with the same text. In a `<textarea>` it is Ctrl+Enter or Cmd+Enter (either, on every platform): always prevented, so no line is added, and it submits no form. Enter alone, with Shift or with Alt is a new line there. An Enter that confirms an IME composition commits nothing.",
+            "The commit: the draft is cleared and `valueCommitAction(next, { reason: \"activate\" })` runs in the field's transition, with `data-pending`. The commit key is Enter in an `<input>`: not prevented, so a form's implicit submission follows with the same text. In a `<textarea>` it is Ctrl+Enter or Cmd+Enter (either, on every platform): always prevented, so no line is added, and it submits no form. Enter alone or with Shift is a new line there; Alt+Enter is not the field's key (the browser decides). An Enter that confirms an IME composition commits nothing.",
           ],
           [
             "No change",
@@ -262,7 +262,11 @@ export function TextFieldPage() {
             "Ctrl+Enter, Cmd+Enter (a textarea)",
             "Commits, as a blur does. Always prevented, even when there is nothing to commit, so no line is added; focus and the caret stay. Submits no form.",
           ],
-          ["Enter, Shift+Enter, Alt+Enter (a textarea)", "A new line. Nothing is committed."],
+          ["Enter, Shift+Enter (a textarea)", "A new line. Nothing is committed."],
+          [
+            "Alt+Enter (a textarea)",
+            "Not the field's key: the browser decides (it inserts nothing in current engines). Nothing is committed.",
+          ],
           [
             "Escape",
             "With an edited draft: reverts it and is consumed. Otherwise not handled (an enclosing dialog closes).",
@@ -388,7 +392,8 @@ export function TextFieldPage() {
       <CodeBlock>{`<Form.Root
   action={post}
   onKeyDown={(event) => {
-    if (!(event.target instanceof HTMLTextAreaElement) || event.nativeEvent.isComposing) return;
+    const { isComposing, keyCode } = event.nativeEvent;
+    if (!(event.target instanceof HTMLTextAreaElement) || isComposing || keyCode === 229) return;
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.currentTarget.requestSubmit();
   }}
 >`}</CodeBlock>

@@ -40,8 +40,9 @@ const isDev = process.env.NODE_ENV !== "production";
 export interface TextFieldValueChangeDetails extends ActionDetails {
   /**
    * `"activate"`: the user committed an edit (`details.event` is the `focusout` or the commit
-   * key's `keydown`: Enter in an `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`). `"platform"`: a form reset (the `reset` event), or text adopted at mount
-   * (`undefined`: typed before hydration, restored by the browser).
+   * key's `keydown`: Enter in an `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`).
+   * `"platform"`: a form reset (the `reset` event), or text adopted at mount (`undefined`: typed
+   * before hydration, restored by the browser).
    */
   readonly reason: ChangeReason;
 }
@@ -89,9 +90,9 @@ export interface TextFieldProps extends Omit<
   defaultValue?: string;
   /**
    * Runs inside the field's transition once per edit (blur, or the commit key: Enter in an
-   * `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`), and for a platform change (a form reset, text adopted at mount). Where the save goes: uncontrolled
-   * state is committed when it resolves; a rejection shows the saved text again. May be a Server
-   * Function.
+   * `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`), and for a platform change (a form
+   * reset, text adopted at mount). Where the save goes: uncontrolled state is committed when it
+   * resolves; a rejection shows the saved text again. May be a Server Function.
    */
   valueCommitAction?: ChangeAction<string, TextFieldValueChangeDetails>;
   /**
@@ -247,7 +248,8 @@ export function TextField(props: TextFieldProps) {
           commit(event);
           return;
         }
-        // A textarea: Enter alone, with Shift or with Alt is a new line; Ctrl or Cmd commits
+        // A textarea: Enter without Ctrl or Cmd is not the field's (a new line, alone or with
+        // Shift; the engine's with Alt); Ctrl or Cmd commits
         // (design 4.2). Always prevented, so the key means one thing and adds no line.
         if (!event.ctrlKey && !event.metaKey) return;
         event.preventDefault();

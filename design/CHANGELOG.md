@@ -15812,7 +15812,8 @@ form submission**.
 
 The rule (text-field.md 4.2): in a `<textarea>`, Enter with `ctrlKey` or `metaKey` is the
 commit key. It runs the same commit as a blur, is `preventDefault()`ed, and does nothing else.
-Enter alone, with Shift or with Alt, is a new line. An `<input>` is unchanged.
+Enter alone or with Shift is a new line; Alt+Enter is not the field's key (the engine's:
+probe 1, nothing is inserted). An `<input>` is unchanged.
 
 - **Both modifiers on every platform.** Not taken: Cmd on Apple platforms and Ctrl elsewhere
   (Ark UI: `isApple() ? metaKey : ctrlKey`). The library has no platform detection, and its

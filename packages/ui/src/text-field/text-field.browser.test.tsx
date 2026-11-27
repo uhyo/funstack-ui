@@ -1,6 +1,7 @@
 // TextField rows that need a real engine (design/components/text-field.md 14, browser): Escape
 // with an edited draft in a modal Dialog and an `auto` Popover (the close watcher sees a cancelled
-// key), real Ctrl+Enter / Cmd+Enter in a textarea (no line, no form submission), the same for NumberField's Input (testing.md 10.1 "Draft revert"), blurs by a real Tab, a
+// key), and the same Escape rows for NumberField's Input (testing.md 10.1 "Draft revert"); real
+// Ctrl+Enter / Cmd+Enter in a textarea (no line, no form submission); blurs by a real Tab, a
 // real click on a button and focus moving into another frame, a real reset click with a draft
 // open and a save pending (#185), the IME rows (Chromium through CDP), and no document view
 // transition. The real-key rows inside a Field (#193) are in field/field-edit.browser.test.tsx.

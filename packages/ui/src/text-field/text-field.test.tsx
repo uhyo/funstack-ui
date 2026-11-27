@@ -383,21 +383,25 @@ describe("TextField", () => {
       ["alone", {}],
       ["with Shift", { shiftKey: true }],
       ["with Alt", { altKey: true }],
-    ] as const)("Enter %s is a new line: nothing dispatched, not prevented", (_label, init) => {
-      const action = vi.fn<Fn>();
-      area({}, action);
-      typeText("Line one");
-      const event = key("Enter", init);
-      expect(event.defaultPrevented).toBe(false);
-      expect(action).not.toHaveBeenCalled();
-      expect(field().value).toBe("Line one");
-    });
+    ] as const)(
+      "Enter %s is not the field's key: nothing dispatched, not prevented",
+      (_label, init) => {
+        const action = vi.fn<Fn>();
+        area({}, action);
+        typeText("Line one");
+        const event = key("Enter", init);
+        expect(event.defaultPrevented).toBe(false);
+        expect(action).not.toHaveBeenCalled();
+        expect(field().value).toBe("Line one");
+      },
+    );
 
     it.each([
       ["Ctrl", { ctrlKey: true }],
       ["Cmd", { metaKey: true }],
       ["Ctrl+Shift", { ctrlKey: true, shiftKey: true }],
       ["Cmd+Shift", { metaKey: true, shiftKey: true }],
+      ["Ctrl+Alt", { ctrlKey: true, altKey: true }],
     ] as const)("%s+Enter commits once with the keydown, prevented", async (_label, init) => {
       const action = vi.fn<Fn>();
       const seen: TextFieldState[] = [];
@@ -959,7 +963,8 @@ describe("TextField", () => {
             order.push(`submit ${String(formData.get("notes"))}`);
           }}
           onKeyDown={(event) => {
-            if (!(event.target instanceof HTMLTextAreaElement) || event.nativeEvent.isComposing)
+            const { isComposing, keyCode } = event.nativeEvent;
+            if (!(event.target instanceof HTMLTextAreaElement) || isComposing || keyCode === 229)
               return;
             if (event.key === "Enter" && (event.ctrlKey || event.metaKey))
               event.currentTarget.requestSubmit();
