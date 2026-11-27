@@ -113,8 +113,9 @@ import { Menubar } from "@funstack/ui/menubar";
           <code>tabindex</code> (the bar writes it; do not pass <code>tabIndex</code>).{" "}
           <code>disabled</code> renders <code>aria-disabled="true"</code> and{" "}
           <code>data-disabled</code> instead of the native attribute: the Trigger stays focusable
-          and announced, and never opens its menu. Owned keys add <code>role</code> and{" "}
-          <code>onPointerMove</code> (a consumer <code>onPointerMove</code> still runs first).
+          and announced, and never opens its menu (it renders no <code>popovertarget</code>, and{" "}
+          <code>aria-expanded="false"</code> instead). Owned keys add <code>role</code>. The hover
+          switch is an <code>onPointerMove</code> handler merged with yours, which runs first.
         </li>
         <li>
           <code>Menu.Root</code> keeps <code>open</code>, <code>defaultOpen</code>,{" "}
@@ -186,6 +187,12 @@ import { Menubar } from "@funstack/ui/menubar";
           ],
           ["Home / End", "Trigger", "First / last Trigger; the same rule for an open menu."],
           [
+            "ArrowRight / ArrowLeft / Home / End",
+            "a disabled Trigger a switch landed on",
+            "The bar stays in menu mode there: the Trigger reached opens its menu, with the first item focused if you came from inside a menu.",
+          ],
+          ["Escape", "that disabled Trigger", "Ends menu mode; focus stays."],
+          [
             "ArrowDown, Enter, Space",
             "Trigger",
             "Open its menu with the first item focused (unchanged from Menu).",
@@ -227,7 +234,7 @@ import { Menubar } from "@funstack/ui/menubar";
           ["`Menubar`", '`role="menubar"`; your `aria-label` / `aria-labelledby`'],
           [
             "`Menu.Trigger` in a bar",
-            '`role="menuitem"`, `aria-haspopup="menu"`, `popovertarget`, `tabindex` (written by the bar), `aria-disabled="true"` when disabled. No `aria-expanded`: the browser exposes the expanded state from `popovertarget`.',
+            '`role="menuitem"`, `aria-haspopup="menu"`, `popovertarget`, `tabindex` (written by the bar), `aria-disabled="true"` when disabled. No `aria-expanded`: the browser exposes the expanded state from `popovertarget`. A disabled Trigger is the exception: no `popovertarget` (it must not open), and `aria-expanded="false"` instead.',
           ],
           ["Popups and items", "As [Menu](/components/menu#keyboard-and-aria)."],
         ]}

@@ -23,8 +23,9 @@ probe 121), `ENGINE=... node axe.mjs` (axe-core 4.14.1 in the engine + Playwrigh
   axe result comes from CI. WebKit's own AX tree is not reachable from Playwright on Linux.
 
 Verdict: passes; the anatomy stands. The same assertions run in `menubar.browser.test.tsx` on
-the real component (Chromium tree through CDP, axe everywhere). Note: a disabled Trigger (no
-`popovertarget`, `aria-haspopup="menu"`) is exposed `expanded=false` by Chromium too.
+the real component (Chromium tree through CDP, axe everywhere). Note: a disabled Trigger is no
+invoker: no `popovertarget`, and it renders `aria-expanded="false"` itself (the probe page
+first gave it a `popovertarget`; corrected after review and re-run, same result).
 
 ## Implementation notes
 
@@ -34,8 +35,10 @@ the real component (Chromium tree through CDP, axe everywhere). Note: a disabled
   synchronously during step 1, but its `toggle` (the fact) is a task, so `intended()` is still
   true; without the check the switch would also send `openChangeAction(false, "dismiss")` to a
   menu that is already hidden.
-- A second switch while the first target's open is pending: the new target's open is entangled
-  with the pending transition and commits when it settles (jsdom row pins `data-open` meanwhile).
+- A second switch while the first target's open is pending on an async action (its
+  `openChangeAction(true)` or an item's action): the new target's open is entangled with it and
+  commits when it settles (jsdom row pins `data-open` meanwhile). Held only by suspending items:
+  nothing entangles, the next menu opens at once, the superseded one never shows.
 - `usePopoverTrigger` got `alwaysFocusable` (aria-disabled, focusable) without `submenuItem`'s
   warning text.
 - Menu.Popup provides `MenubarContext` `null` to its content (the bar's context ends there).
@@ -50,3 +53,12 @@ the real component (Chromium tree through CDP, axe everywhere). Note: a disabled
   not trigger it).
 - Left for the architect: menubar.md status line ("Not implemented yet"), and whether
   conventions 7.1's list of cross-folder contexts should name `internal/menubar-context.ts`.
+
+## Review round (2026-11-27, memo/reviewer/review-170-bar.md)
+
+- Must 1: a plain Menu.Trigger lost the consumer's onPointerMove (an `undefined` key in the owned
+  layer removes the prop). The key is only added in a bar now.
+- Menu mode held on a disabled Trigger (architect, menubar.md 2.2 step 3): `held` ref in
+  menubar.tsx; read in onKeyDown before the engine moves focus (its blur clears it).
+- `step()` returns whether it switched; the popup prevents the key only then.
+- The "no menu after mount" dev warning is dropped (false positive with suspended Roots).

@@ -14455,8 +14455,9 @@ its Trigger; axe-core 4.14.1 reports no violation (no `aria-required-children` /
 `aria-required-parent`) closed and open in Chromium and Firefox locally and in all three
 engines in CI (`menubar.browser.test.tsx` runs axe on the real component; WebKit's own tree is
 not reachable from Playwright on Linux). Probe: `memo/developer/probes/170-menubar-ax/`. A
-disabled Trigger (no `popovertarget`) is still exposed `expanded=false` in Chromium, from
-`aria-haspopup`.
+disabled Trigger is no invoker: it renders no `popovertarget` and renders
+`aria-expanded="false"` itself, which is what Chromium and Firefox expose for it (the probe page
+first gave it a `popovertarget`; corrected and re-run, same tree and axe result).
 
 Implementation details within the design:
 
@@ -14471,10 +14472,16 @@ Implementation details within the design:
   of the move), not the popup's.
 - `usePopoverTrigger` gained `alwaysFocusable` (`aria-disabled`, focusable, the ordinary
   non-button warning), which `Menu.Trigger` sets inside a bar.
-- A second switch while the first target's open is pending: the next target's open is
-  entangled with that pending transition and commits when it settles (its Trigger shows
-  `data-open` meanwhile), as walkthrough 8.3 says for an item's action.
+- A second switch while the first target's open is pending on an **async action** (its
+  `openChangeAction(true)`, or an item's action as walkthrough 8.3): the next target's open is
+  entangled with that action and commits when it settles (its Trigger shows `data-open`
+  meanwhile). When the first open is held only by **suspending items**, nothing entangles: the
+  next menu opens at once and the superseded one never shows (row in menubar.test.tsx).
 - `axe-core` is a new devDependency of `@funstack/ui` (browser test only).
+- **Deviation (review nit 7): the "no menu of the bar after mount" development warning of
+  menubar.md 6 is not implemented.** It fired falsely when every `Menu.Root` sat behind a
+  Suspense boundary showing its fallback at mount, and nothing at mount tells that case from a
+  bar with no menus. menubar.md 6 still lists it, for the architect to drop or redefine.
 
 ## 2026-11-27, #170: `Menubar`, status and the developer's deviations (architect)
 
