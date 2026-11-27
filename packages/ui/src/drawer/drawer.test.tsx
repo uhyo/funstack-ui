@@ -258,6 +258,28 @@ describe("Drawer", () => {
       expect(show).toHaveBeenCalledTimes(1);
       expect(popup()).not.toHaveAttribute("data-modal");
     });
+
+    // Conventions 15 (#191): Dialog's Escape, so an IME composition's Escape is not a dismissal.
+    it("modal={false}: an Escape of an IME composition keeps it open; the next one closes", async () => {
+      render(
+        <Drawer.Root defaultOpen modal={false}>
+          <Drawer.Popup data-testid="popup" side="inline-end" aria-label="Inspector">
+            <input data-testid="text" />
+          </Drawer.Popup>
+        </Drawer.Root>,
+      );
+      await flushTasks(2);
+      const dialog = popup() as HTMLDialogElement;
+      expect(dialog.open).toBe(true);
+      for (const init of [{ isComposing: true }, { keyCode: 229 }]) {
+        fireEvent.keyDown(screen.getByTestId("text"), { key: "Escape", ...init });
+        await flushTasks(2);
+        expect(dialog.open).toBe(true);
+      }
+      fireEvent.keyDown(screen.getByTestId("text"), { key: "Escape" });
+      await flushTasks(2);
+      expect(dialog.open).toBe(false);
+    });
   });
 
   describe("light dismiss follows modal (design 3)", () => {

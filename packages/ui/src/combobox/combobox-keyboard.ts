@@ -1,5 +1,6 @@
 "use client";
 import { flushSync } from "react-dom";
+import { isComposingKey } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { RefObject } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
@@ -100,7 +101,7 @@ export function createComboboxKeyDown({
   return (event: KeyboardEvent): boolean => {
     if (disabled || event.ctrlKey || event.metaKey) return false;
     // IME: the key belongs to the composition (Enter commits it, arrows pick a candidate).
-    if (event.isComposing || event.keyCode === 229) return false;
+    if (isComposingKey(event)) return false;
     // What the user sees, not what is intended: right after Escape the platform has hidden the
     // popup but its `toggle` (and the fact it reports) is still queued, and an open that
     // is still committing shows nothing yet. Enter must submit and arrows must open in both.

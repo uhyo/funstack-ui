@@ -15209,3 +15209,91 @@ Developer (`memo/developer/issue-185-184.md`). Implements the architect's entry 
   Input is lost (memo). Reported to the coordinator for an issue.
 - **#184 guard rows** assert their premise (focus on `<body>`, listbox closed, via `settle`)
   instead of a conditional click.
+
+## 2026-11-27, #191 and #192: one Escape rule for the JS handlers (conventions 15)
+
+Developer (`memo/developer/issue-191-192.md`). From review-177's follow-ups.
+
+- **New rule, conventions 15** (no architect entry; the coordinator's task asked for one shared
+  rule, aligned on what HoverCard already did): a JS Escape handler acts only on
+  `key === "Escape"` that is not part of an IME composition (`isComposing` or `keyCode` 229) and
+  not already `defaultPrevented`; a listener that closes something shown prevents it. One check,
+  `internal/escape-key.ts` (`isEscapeRequest`, `isComposingKey`); `internal-hooks.md` lists it.
+- **#191**: the non-modal Dialog / Drawer record step (`dialog-dismiss.ts`) skipped no IME
+  Escape; it now records none (and adds no window listener for it). dialog.md 2.6 step 1 and a
+  section 9 row say so. Also aligned: Tooltip's document and trigger listeners, HoverCard's
+  Trigger listener (it read `isComposing` only, now `keyCode` 229 and `defaultPrevented` too) and
+  document listener (`keyCode` 229 added), Toast.Root's Escape (a field inside a toast),
+  Menubar's held-Trigger Escape. Rows in tooltip.md 2.2, hover-card.md 2.2, toast.md, menubar.md.
+  Combobox, MultiSelect and NumberField key guards now call `isComposingKey` (same expression,
+  no behaviour change). Unchanged: the Combobox chip (its `keyCode` 229 / `"Process"` handover
+  runs before its Escape case, and a chip is not an editable target); OTPField and NumberField
+  handle no Escape; Popover, Menu, Combobox, Select and MultiSelect leave Escape to the `auto`
+  popover's close watcher.
+- **#192**: Tooltip's document Escape listener now ignores a prevented Escape (innermost first,
+  hover-card.md 2.6): a Combobox chip's Escape no longer hides a shown tooltip.
+- **Native close watchers**, recorded, not changed: Chromium, driven through CDP
+  (`Input.imeSetComposition`, then an Escape with `windowsVirtualKeyCode` 229), delivers
+  `key: "Escape"`, `keyCode: 229`, `isComposing: true` and runs no close request: a modal
+  dialog and an `auto` popover stay open. With virtual key code 27 (a key the IME did not take)
+  the keydown still has `isComposing: true`, the composition ends and the close watcher runs; the
+  library's rule is stricter there (it skips on `isComposing`), as HoverCard already was.
+  Firefox and WebKit cannot be driven with an IME from Playwright: not recorded.
+- **Rows**: jsdom `internal/escape-key.test.ts`; composing rows (both shapes) in
+  dialog-escape, drawer, tooltip, hover-card, toast and menubar tests; Tooltip rows for a
+  prevented Escape and a Combobox chip. Browser, three engines,
+  `src/__tests__/escape-ime.browser.test.tsx`: a real CDP composition in Chromium (synthetic
+  composing keydowns elsewhere) against a non-modal Dialog, a modal Dialog, a Tooltip and a
+  HoverCard, and a real Escape on a Combobox chip with a Tooltip shown. Mutation: with
+  `isEscapeRequest` reduced to `key === "Escape"` all new jsdom and browser rows fail.
+
+## 2026-11-27, #191 and #192: conventions 15 ratified, with two paragraphs added
+
+Architect, on the entry above. The three rules stand as written, and the rows in dialog.md
+2.6 and section 9, hover-card.md 2.2, tooltip.md 2.2, toast.md and menubar.md are confirmed.
+
+- **Against dialog.md 2.6 (#177): consistent.** The record step skipping an IME Escape and an
+  already prevented one adds nothing the decide step would not refuse, and saves the window
+  listener. What 15 did not say is that "not already prevented" means different things by
+  position: the Dialog reads `defaultPrevented` after every listener and survives
+  `stopPropagation()`, the element and document listeners (HoverCard, Tooltip, Toast,
+  Menubar) read it when they run and are not reached by an Escape stopped below them. Section
+  15 now states both, names `preventDefault()` as the only signal, and names the Dialog's
+  late path as the exception to rule 3 (it cannot prevent there).
+- **Against the native close watchers: consistent, stricter in one case, on purpose.** Rules 2
+  and 3 are the watcher's own. Rule 1 matches Chromium for the Escape an IME takes (229). For
+  `keyCode` 27 with `isComposing` true Chromium ends the composition and closes; the library
+  skips. Kept: closing a dialog on the Escape that cancels a composition loses what the user
+  was typing, the skip costs one more key press, and the native half is not the library's to
+  change. The paragraph was in the changelog only; it is now in the rule.
+- **Not decided here, an issue to file:** HoverCard's and Tooltip's document Escape listeners
+  can be starved by a `stopPropagation()` below the document, which a close watcher and (since
+  #177) the non-modal Dialog cannot. Aligning them would move them to the Dialog's record /
+  decide shape; their order against the Dialog's window listener would need working out
+  first.
+
+## 2026-11-27, #191 and #192: review fixes; Toast stands down for a layer open inside it
+
+Developer, on review-191-192 (`memo/reviewer/review-191-192.md`).
+
+- **Rule 2 amended, conventions 15**: a listener that runs before an inner layer's cannot wait
+  for it to prevent, so it stands down while a layer is open inside it. Toast's React
+  `onKeyDown` runs below the document, before a Tooltip's or HoverCard's document listener and
+  before an `auto` popover's close watcher; on this branch it prevented first, so a Tooltip or
+  HoverCard inside a toast stayed shown while the toast left (on master both closed at once;
+  an `auto` Menu inside had its close watcher cancelled on both). Toast now stands down while
+  `containsOpenLayer` (moved from HoverCard to `internal/overlay/open-layer.ts`, same logic)
+  finds a shown popover, an open modal dialog or an open non-modal dialog the event came from
+  inside its Root; the next Escape dismisses it. toast.md's Escape row says so. The review's
+  wording was "a layer that contains the event target"; I kept HoverCard's shape instead
+  (any shown popover inside), because a Tooltip's popup never contains its focused trigger.
+- **Rule 3 amended**: "or consumes it" (the Combobox chip prevents while closing nothing).
+- tooltip.md 2.2 and the Tooltip comment no longer name "a HoverCard inside" as a consumer.
+- Rows: jsdom Tooltip and HoverCard inside a Toast (fail without the stand-down); prevented
+  Escape on the HoverCard and Tooltip Trigger cancels and on the Menubar held Trigger (fail
+  with `defaultPrevented` dropped from `isEscapeRequest`). Browser: the native row is now
+  Chromium-asserting for a modal dialog **and an `auto` popover** (backing the claim in
+  section 15), and elsewhere checks only that the library leaves both composing shapes
+  unprevented; the header says the Firefox / WebKit rows replay synthetic events and assert
+  that the engine's `KeyboardEvent` init honours `isComposing` and `keyCode`; the HoverCard IME
+  row notes it also passes on master in Chromium.

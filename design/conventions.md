@@ -2300,6 +2300,54 @@ The audit, the options that were rejected and the prior art are in `design/direc
    the number of Roots that take `locale` and the cost of a provider to the directive-free
    Roots.
 
+## 15. Escape handled in JS
+
+Where the platform gives no close watcher (a non-modal dialog, a `manual` popover, the Toast
+region, a held Menubar Trigger), the library's `keydown` listener acts on an Escape only when it
+is a close request (#191, #192):
+
+1. **`key === "Escape"`, not part of an IME composition**: `isComposing` is false **and**
+   `keyCode !== 229` (WebKit fires `compositionend` before the key that ends a composition, so
+   that keydown has `isComposing === false`; NumberField's and Combobox's guard). Escape during a
+   composition cancels the composition only.
+2. **Not already prevented** (`defaultPrevented`). Innermost first: a handler or layer inside
+   that consumed the Escape (a Combobox chip, a HoverCard or Tooltip that closed on it, an input
+   that clears itself) prevented it, and nothing outside acts on it. A prevented `keydown` is
+   also no close request for a modal dialog's or an `auto` popover's close watcher. A listener
+   that runs **before** an inner layer's (Toast's React `onKeyDown`, below the document where
+   a Tooltip, a HoverCard and the `auto` close watchers act) cannot wait for that layer to
+   prevent: it stands down while a layer is open inside it (`internal/overlay/open-layer.ts`
+   `containsOpenLayer`: a shown popover, an open modal dialog, an open non-modal dialog the
+   event came from), as HoverCard does (`design/components/hover-card.md` 2.6). The inner layer
+   closes; the next Escape reaches the outer one.
+3. **A listener that closes something shown on it, or consumes it, prevents it**, so an
+   enclosing layer stays open and a second Escape reaches it (a Combobox chip consumes its
+   Escape: it moves focus to the Input). One that closes nothing shown (a Trigger cancelling a
+   coming open, a HoverCard open nobody sees yet, the Menubar ending menu mode) leaves it alone.
+
+`internal/escape-key.ts` is the one check (`isEscapeRequest`; `isComposingKey` for rule 1
+alone, the IME guard of the listbox and NumberField keys).
+
+**The signal is `preventDefault()`, never `stopPropagation()`**, as for a close watcher. How
+much of it a listener sees depends on where it sits. A listener on an element or the document
+(HoverCard, Tooltip, Toast, Menubar) reads `defaultPrevented` when it runs: it sees the
+listeners before it, and an Escape whose propagation was stopped below it does not reach it.
+The non-modal Dialog, the outermost JS layer, checks at its record step and again when it
+decides, after every listener, and is not starved by a stopped propagation
+(`design/components/dialog.md` 2.6); on its late path it closes without being able to prevent
+the event, the one exception to rule 3.
+
+**Against the native close watchers** (a modal `<dialog>`, `auto` and `hint` popovers,
+`closedby`), which are the engine's and which the library does not second-guess: rules 2 and
+3 are theirs (a canceled `keydown` is no close request). Rule 1 is theirs for the Escape an
+IME takes: Chromium, driven through CDP, delivers it as `keyCode` 229 with `isComposing` and
+runs no close request (a modal dialog and an `auto` popover stay open). It is **deliberately
+stricter** in one case: an Escape the IME did not take while a composition is active
+(`keyCode` 27, `isComposing` true) ends the composition and, in Chromium, also closes the
+modal dialog or popover; the library's listeners skip it, so text being composed is not lost
+to a close, and the next Escape closes. Firefox and WebKit could not be driven with an IME
+and are not recorded.
+
 ## Resolved questions (2026-10-15)
 
 Moved to `design/CHANGELOG.md` (part "conventions.md: status, resolved questions, open questions"), numbers unchanged: "resolved question 44" in a design document or a source comment is entry 44 there. The rules they decided are stated in sections 1 to 13.

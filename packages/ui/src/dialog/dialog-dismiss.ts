@@ -2,6 +2,7 @@
 // non-modal dialog and light dismiss (design/components/dialog.md 2.6). No "use client"
 // directive: DOM listeners only (conventions 7.1).
 import { afterDispatch } from "../internal/after-dispatch.js";
+import { isEscapeRequest } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 
 /**
@@ -106,7 +107,8 @@ export function listenDialogDismiss(
   }
   const record = (event: Event) => {
     const keyboardEvent = event as KeyboardEvent;
-    if (keyboardEvent.key !== "Escape" || !dialog.open) return;
+    // Not an Escape of an IME composition, nor one already consumed (conventions 15).
+    if (!isEscapeRequest(keyboardEvent) || !dialog.open) return;
     if (pending?.event === keyboardEvent) return;
     // A new Escape while one is pending: the old event's dispatch is over; replace it.
     clearPending();

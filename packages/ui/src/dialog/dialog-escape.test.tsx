@@ -17,12 +17,13 @@ import type { ActionFn } from "../__tests__/dialog-harness.js";
 import { Dialog } from "./index.js";
 
 /** A real-looking Escape `keydown` (bubbles, cancelable, composed) dispatched at `target`. */
-function escape(target: Element): KeyboardEvent {
+function escape(target: Element, init: KeyboardEventInit = {}): KeyboardEvent {
   const event = new KeyboardEvent("keydown", {
     key: "Escape",
     bubbles: true,
     cancelable: true,
     composed: true,
+    ...init,
   });
   act(() => {
     target.dispatchEvent(event);
@@ -145,6 +146,34 @@ describe("non-modal Dialog Escape (#177)", () => {
       expect(dialog.open).toBe(false);
     });
   });
+
+  // Conventions 15 (#191): Escape during an IME composition cancels the composition only.
+  it.each([
+    ["isComposing", { isComposing: true }],
+    ["keyCode 229 (WebKit)", { keyCode: 229 }],
+  ] as const)(
+    "an Escape of an IME composition (%s) keeps the dialog open and adds no window listener",
+    async (_, init) => {
+      const onOpenChange = vi.fn();
+      render(
+        <NonModal name="a" defaultOpen onOpenChange={onOpenChange}>
+          <input data-testid="a-text" />
+        </NonModal>,
+      );
+      await flushTasks(2);
+      const dialog = dialogOf("a");
+      const win = watchWindowKeydown();
+      cleanups.push(win.restore);
+      expect(escape(screen.getByTestId("a-text"), init).defaultPrevented).toBe(false);
+      await flushTasks(2);
+      expect(win.added()).toBe(0);
+      expect(dialog.open).toBe(true);
+      expect(onOpenChange).not.toHaveBeenCalled();
+      // The Escape after the composition closes it.
+      expect(escape(screen.getByTestId("a-text")).defaultPrevented).toBe(true);
+      expect(dialog.open).toBe(false);
+    },
+  );
 
   it("nested non-modal dialogs: Escape in the inner closes the inner only, the next the outer", async () => {
     const user = setupUser();
