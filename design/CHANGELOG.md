@@ -15487,3 +15487,31 @@ Docs owed: the Tooltip, HoverCard and Toast pages' keyboard rows ("`preventDefau
 Escape keeps it open; `stopPropagation()` does not"), the Toast page's order note, the
 Roadmap's behaviour-change list (the three starvation fixes, the toast-versus-tooltip order),
 `skills/funstack-ui-knowledge` where it describes Escape.
+
+## 2026-11-27, #194: conventions 15 follows the implementation (four deviations, all accepted)
+
+Architect, on the developer's branch (`feat/194-escape-last`, e2c0f4b6; green on the three
+engines, so the record / decide mechanism, which the design entry derived and did not probe,
+holds for real keys). Changed: conventions 15 rules 3 and 4, internal-hooks.md's file list.
+
+- **`createEscapeRecord()`**, a one-slot holder of a listener's pending decision (`record`,
+  `cancel`). The design gave each listener "the returned cancel" and left the bookkeeping to
+  five call sites; one holder is better. Now in rule 4 and in the file list.
+- **A duplicate record is skipped per listener**, in the holder. `decideEscapeLast` still
+  ignores the same `decide` function recorded twice, which the holder never produces. Same
+  result as designed.
+- **`consumeEscape` prevents only while the event is being dispatched.** The design said
+  `preventDefault()` always, as a no-op after the dispatch. It is not quite a no-op: it sets
+  `defaultPrevented` on an event whose default action already ran, and a #177 row pins
+  `defaultPrevented === false` on the late path. Rule 3 now says what the code does.
+- **All layers cancelled: the window listener and the late path go at once**, instead of
+  running an empty decision. In rule 4.
+- **The window is read through the target's document** when the listener's current target is
+  a window (jsdom's is not the global object). An implementation detail, not in the rule.
+- **One thing kept from the #177 design that I would not write again:** a new Escape recorded
+  by a listener cancels its still-pending decision for the previous one ("the old event's
+  dispatch is over"). That is only reachable on the late path, when a second key press is
+  dispatched before the first one's task; the first Escape then closes nothing. Since
+  `decideEscapeLast` keeps one entry per event, the holder could let the old decision run
+  and keep both cancels. Not a defect of the branch; a candidate for a follow-up issue, with a
+  browser row that presses Escape twice behind a `stopPropagation()`.
