@@ -15246,3 +15246,28 @@ Developer (`memo/developer/issue-191-192.md`). From review-177's follow-ups.
   composing keydowns elsewhere) against a non-modal Dialog, a modal Dialog, a Tooltip and a
   HoverCard, and a real Escape on a Combobox chip with a Tooltip shown. Mutation: with
   `isEscapeRequest` reduced to `key === "Escape"` all new jsdom and browser rows fail.
+
+## 2026-11-27, #191 and #192: conventions 15 ratified, with two paragraphs added
+
+Architect, on the entry above. The three rules stand as written, and the rows in dialog.md
+2.6 and section 9, hover-card.md 2.2, tooltip.md 2.2, toast.md and menubar.md are confirmed.
+
+- **Against dialog.md 2.6 (#177): consistent.** The record step skipping an IME Escape and an
+  already prevented one adds nothing the decide step would not refuse, and saves the window
+  listener. What 15 did not say is that "not already prevented" means different things by
+  position: the Dialog reads `defaultPrevented` after every listener and survives
+  `stopPropagation()`, the element and document listeners (HoverCard, Tooltip, Toast,
+  Menubar) read it when they run and are not reached by an Escape stopped below them. Section
+  15 now states both, names `preventDefault()` as the only signal, and names the Dialog's
+  late path as the exception to rule 3 (it cannot prevent there).
+- **Against the native close watchers: consistent, stricter in one case, on purpose.** Rules 2
+  and 3 are the watcher's own. Rule 1 matches Chromium for the Escape an IME takes (229). For
+  `keyCode` 27 with `isComposing` true Chromium ends the composition and closes; the library
+  skips. Kept: closing a dialog on the Escape that cancels a composition loses what the user
+  was typing, the skip costs one more key press, and the native half is not the library's to
+  change. The paragraph was in the changelog only; it is now in the rule.
+- **Not decided here, an issue to file:** HoverCard's and Tooltip's document Escape listeners
+  can be starved by a `stopPropagation()` below the document, which a close watcher and (since
+  #177) the non-modal Dialog cannot. Aligning them would move them to the Dialog's record /
+  decide shape; their order against the Dialog's window listener would need working out
+  first.

@@ -2319,11 +2319,27 @@ is a close request (#191, #192):
    coming open, a HoverCard open nobody sees yet, the Menubar ending menu mode) leaves it alone.
 
 `internal/escape-key.ts` is the one check (`isEscapeRequest`; `isComposingKey` for rule 1
-alone, the IME guard of the listbox and NumberField keys). Native close watchers (a modal
-`<dialog>`, `auto` and `hint` popovers, `closedby`) are the engine's: the library does not
-second-guess them. Chromium, driven through CDP, delivers the Escape an IME takes as
-`keyCode` 229 with `isComposing` and runs no close request for it (a modal dialog and an `auto`
-popover stay open); Firefox and WebKit could not be driven with an IME and are not recorded.
+alone, the IME guard of the listbox and NumberField keys).
+
+**The signal is `preventDefault()`, never `stopPropagation()`**, as for a close watcher. How
+much of it a listener sees depends on where it sits. A listener on an element or the document
+(HoverCard, Tooltip, Toast, Menubar) reads `defaultPrevented` when it runs: it sees the
+listeners before it, and an Escape whose propagation was stopped below it does not reach it.
+The non-modal Dialog, the outermost JS layer, checks at its record step and again when it
+decides, after every listener, and is not starved by a stopped propagation
+(`design/components/dialog.md` 2.6); on its late path it closes without being able to prevent
+the event, the one exception to rule 3.
+
+**Against the native close watchers** (a modal `<dialog>`, `auto` and `hint` popovers,
+`closedby`), which are the engine's and which the library does not second-guess: rules 2 and
+3 are theirs (a canceled `keydown` is no close request). Rule 1 is theirs for the Escape an
+IME takes: Chromium, driven through CDP, delivers it as `keyCode` 229 with `isComposing` and
+runs no close request (a modal dialog and an `auto` popover stay open). It is **deliberately
+stricter** in one case: an Escape the IME did not take while a composition is active
+(`keyCode` 27, `isComposing` true) ends the composition and, in Chromium, also closes the
+modal dialog or popover; the library's listeners skip it, so text being composed is not lost
+to a close, and the next Escape closes. Firefox and WebKit could not be driven with an IME
+and are not recorded.
 
 ## Resolved questions (2026-10-15)
 
