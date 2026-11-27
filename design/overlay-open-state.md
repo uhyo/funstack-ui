@@ -15,10 +15,11 @@ The `open` state of an overlay is the one state in the library that has both cha
 parts ask for a change (a request, `openChangeAction`), and the browser performs one in front
 of the user (a fact, `onOpenChange`). This section is the rule for the five overlay Roots:
 `Popover.Root`, `Menu.Root` (a context-menu Root and each submenu Root included),
-`Combobox.Root` (`open` only), `Dialog.Root` and `HoverCard.Root`. All five run on
+`Combobox.Root` (`open` only), `Dialog.Root` and `HoverCard.Root`, and for `NavigationMenu.Item`, the
+owner of one flyout with Popover's model (`navigation-menu.md` 2). All of them run on
 `internal/overlay/use-overlay-root.ts`. Each component doc has a table of which cause goes to
 which channel: `popover.md` 2.8, `menu.md` 2.4, `combobox.md` 5.6, `dialog.md` 2.7,
-`hover-card.md` 2.5. `AlertDialog.Root` is `Dialog.Root` with `modal` fixed
+`hover-card.md` 2.5, `navigation-menu.md` 3.3. `AlertDialog.Root` is `Dialog.Root` with `modal` fixed
 (`alert-dialog.md` 5), and `Drawer.Root` is `Dialog.Root` with its own transition types
 (`drawer.md` 4.4, 9): what this section says of Dialog holds for both. Tooltip has no `open` prop and no callback
 (`tooltip.md` 4.1); a toast has no open state, its fact is `onClose` (`toast.md` 9).
@@ -71,7 +72,8 @@ so a dismissal during a pending part close is a fact and not mistaken for the ec
 includes hides the library _triggers_ but cannot hold, because holding them would leave a popup
 on screen that the user has already left: Menu's Tab-out, right-click outside and scroll close,
 Combobox's focus-leaving close, the lost-interest hide (HoverCard's on both of its paths),
-HoverCard's Escape and press outside, Dialog's JS Escape and light dismiss, a Drawer's swipe
+HoverCard's Escape and press outside, NavigationMenu's focus-leaving close of a shown panel,
+Dialog's JS Escape and light dismiss, a Drawer's swipe
 (the library finishes the slide, then calls `requestClose()`; `drawer.md` 4.4).
 
 **Channel and `reason` are independent.** The channel says whether the library held the change;
@@ -239,7 +241,7 @@ button and Escape, pass both:
 
 ### 3.9.11 JS-free mode
 
-Popover and Dialog select JS-free mode when the Root has **none of** `open`, `defaultOpen`,
+Popover, Dialog and `NavigationMenu.Item` select JS-free mode when the Root has **none of** `open`, `defaultOpen`,
 `openChangeAction`, `onOpenChange`. In it the browser owns every open and close, no callback
 exists, and the CSS exit is the only animation. A Root with only `onOpenChange` is an
 uncontrolled library-mode Root; there is no "JS-free plus listener" mode (a `toggle` listener
@@ -260,7 +262,7 @@ ever called with `false`.**
 ### 3.9.13 The development warning
 
 `open !== undefined && onOpenChange === undefined`, checked once per Root instance after mount
-(`useDevWarning`), in the five Roots:
+(`useDevWarning`), in the five Roots and `NavigationMenu.Item`:
 
 ```
 Dialog.Root: `open` is set without `onOpenChange`. The browser can close this dialog without

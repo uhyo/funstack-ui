@@ -1,6 +1,6 @@
 # NavigationMenu
 
-Status: **accepted** (#170, part of #162; the user's decisions of 2026-11-27). Not implemented yet. History and the test plan:
+Status: **accepted** (#170, part of #162; the user's decisions of 2026-11-27). Implemented in `packages/ui/src/navigation-menu/`. History and the test plan:
 `design/CHANGELOG.md`, the #170 entries. Follows `design/conventions.md`; where this document
 and the conventions disagree, the conventions win. **Read `design/components/popover.md`
 first**: a NavigationMenu flyout is the Popover's two-mode model (JS-free mode, library mode,
