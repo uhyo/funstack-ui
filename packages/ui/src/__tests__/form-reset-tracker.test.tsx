@@ -4,6 +4,7 @@
 // TextField and NumberField, whose rows are in their own files.
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { checkableResetRows } from "./checkable-reset-rows.js";
 import { flushMicrotasks } from "./helpers.js";
 import { Combobox } from "../combobox/index.js";
 import { OTPField } from "../otp-field/index.js";
@@ -97,4 +98,37 @@ describe("an edit after a form reset back to the pre-reset value is heard", () =
     });
     expect(onValueChange.mock.calls.map(([v]) => v)).toEqual(["12"]);
   });
+});
+
+// The same for `checked` (#198): react-dom tracks a checkable input's `checked` the same way, and
+// the reset algorithm writes it past the setter too. Check, reset, check again: every step
+// dispatches. One row per checkable control, uncontrolled and controlled (a parent that adopts
+// every offer, the reset's included). The real reset button rows are in
+// form-reset-button.browser.test.tsx.
+describe("a check after a form reset back to the pre-reset state is heard", () => {
+  for (const row of checkableResetRows) {
+    for (const mode of ["uncontrolled", "controlled"] as const) {
+      it(`${row.name}, ${mode}`, async () => {
+        const calls: Array<[unknown, string]> = [];
+        render(<form data-testid="form">{row.render(mode, (n, r) => calls.push([n, r]))}</form>);
+        const check = async () => {
+          act(() => {
+            fireEvent.click(row.target());
+          });
+          await flushMicrotasks();
+        };
+        await check();
+        expect(row.target().checked).toBe(true);
+        await reset();
+        expect(row.target().checked).toBe(false);
+        await check();
+        expect(calls).toEqual([
+          [row.checkedValue, "activate"],
+          [row.resetValue, "platform"],
+          [row.checkedValue, "activate"],
+        ]);
+        expect(row.target().checked).toBe(true);
+      });
+    }
+  }
 });

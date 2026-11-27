@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { leaveActEnvironment, onCleanup, quietPeriod, settle } from "./browser-helpers.js";
 import { user } from "./browser-user.js";
+import { checkableResetRows } from "./checkable-reset-rows.js";
 import { afterDispatch } from "../internal/after-dispatch.js";
 import { Checkbox } from "../checkbox/index.js";
 import { CheckboxGroup } from "../checkbox-group/index.js";
@@ -346,6 +347,39 @@ describe("a real reset button", () => {
     await act(() => quietPeriod(50, "the refused reset must not stick"));
     expect(screen.getByTestId("c")).toBeChecked();
     expect([...new FormData(form())]).toEqual([["c", "on"]]);
+  });
+
+  // #198: react-dom's tracker on `checked` must not keep the pre-reset state, or the check after
+  // the reset is dropped as "no change". Same rows as form-reset-tracker.test.tsx.
+  describe("check, reset, check again: every step dispatches", () => {
+    for (const row of checkableResetRows) {
+      for (const mode of ["uncontrolled", "controlled"] as const) {
+        it(`${row.name}, ${mode}`, async () => {
+          const calls: Array<[unknown, string]> = [];
+          render(<Form>{row.render(mode, (n, r) => calls.push([n, r]))}</Form>);
+          await user.click(row.target());
+          await settle(() => expect(calls).toEqual([[row.checkedValue, "activate"]]));
+          expect(row.target().checked).toBe(true);
+          await clickReset();
+          await settle(() =>
+            expect(calls).toEqual([
+              [row.checkedValue, "activate"],
+              [row.resetValue, "platform"],
+            ]),
+          );
+          await settle(() => expect(row.target().checked).toBe(false));
+          await user.click(row.target());
+          await settle(() =>
+            expect(calls).toEqual([
+              [row.checkedValue, "activate"],
+              [row.resetValue, "platform"],
+              [row.checkedValue, "activate"],
+            ]),
+          );
+          expect(row.target().checked).toBe(true);
+        });
+      }
+    }
   });
 
   // The helper behind `useFormReset` (internal/after-dispatch.ts): after a real click the
