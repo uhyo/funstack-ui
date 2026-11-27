@@ -230,7 +230,11 @@ function clearLater<Popup extends HTMLElement>(
 }
 
 /** What the popup is called in the controlled-without-`onOpenChange` warning. */
-const nouns: Record<string, string> = { combobox: "listbox", "hover-card": "card" };
+const nouns: Record<string, string> = {
+  combobox: "listbox",
+  "hover-card": "card",
+  "navigation-menu": "panel",
+};
 
 /** The `details` of a popover-like component: `{ reason }` (and `event`). */
 export const popoverDetails = (event: Event | undefined, reason: ChangeReason): OverlayDetails =>
@@ -280,8 +284,8 @@ export function useOverlayRoot<
     isLibrary && open !== undefined && onOpenChange === undefined,
     isDev &&
       `${part}: \`open\` is set without \`onOpenChange\`. The browser can close this ${noun} ` +
-        "without asking (Escape, a click outside), and `onOpenChange` is where a controlled Root " +
-        `is told. Without it the ${noun} re-opens after every dismissal. Pass ` +
+        "without asking (Escape, a click outside), and `onOpenChange` is where a controlled " +
+        `${part} is told. Without it the ${noun} re-opens after every dismissal. Pass ` +
         "`onOpenChange={setOpen}`, or `onOpenChange={() => {}}` if re-opening is what you want.",
   );
 

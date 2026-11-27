@@ -53,6 +53,13 @@ const clientFiles = [
   "hover-card/hover-card-trigger.mjs",
   "hover-card/hover-card-popup.mjs",
   "hover-card/use-hover-card-interest.mjs",
+  // NavigationMenu's Item, Trigger, Popup, Link and their context are client modules
+  // (design/components/navigation-menu.md 8); Root and List are directive-free below.
+  "navigation-menu/navigation-menu-context.mjs",
+  "navigation-menu/navigation-menu-item.mjs",
+  "navigation-menu/navigation-menu-trigger.mjs",
+  "navigation-menu/navigation-menu-popup.mjs",
+  "navigation-menu/navigation-menu-link.mjs",
   // The resolved-placement observer shared by Tooltip, Popover and Menu (conventions 13.2).
   "internal/overlay/use-resolved-placement.mjs",
   // Switch, Checkbox and the shared native-input machinery (design/components/switch.md row 25,
@@ -280,6 +287,10 @@ const directiveFreeFiles = [
   "tabs/tabs-ids.mjs",
   "tooltip/index.mjs",
   "hover-card/index.mjs",
+  // NavigationMenu.Root and List read no context and call no hook (navigation-menu.md 8).
+  "navigation-menu/index.mjs",
+  "navigation-menu/navigation-menu-root.mjs",
+  "navigation-menu/navigation-menu-list.mjs",
   "switch/index.mjs",
   "checkbox/index.mjs",
   "dialog/index.mjs",
@@ -427,14 +438,17 @@ describe("directive-free Roots", () => {
   );
 
   // A directive-free part with no context at all (design/components/separator.md 7).
-  it.each(["separator/separator.tsx", "separator/index.ts"])(
-    "%s reaches no client module",
-    (file) => {
-      const graph = runtimeImportGraph(resolve(src, file), "");
-      const clients = [...graph]
-        .filter((path) => /^"use client";/.test(readFileSync(path, "utf8").trimStart()))
-        .map((path) => relative(src, path));
-      expect(clients).toEqual([]);
-    },
-  );
+  it.each([
+    "separator/separator.tsx",
+    "separator/index.ts",
+    // NavigationMenu.Root and List (design/components/navigation-menu.md 8).
+    "navigation-menu/navigation-menu-root.tsx",
+    "navigation-menu/navigation-menu-list.tsx",
+  ])("%s reaches no client module", (file) => {
+    const graph = runtimeImportGraph(resolve(src, file), "");
+    const clients = [...graph]
+      .filter((path) => /^"use client";/.test(readFileSync(path, "utf8").trimStart()))
+      .map((path) => relative(src, path));
+    expect(clients).toEqual([]);
+  });
 });

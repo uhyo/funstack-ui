@@ -29,6 +29,15 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          New component <a href="/components/navigation-menu">NavigationMenu</a> (
+          <a href={issue(170)}>#170</a>): a site's main navigation as the disclosure pattern, each
+          panel a <code>popover="auto"</code> next to its <code>popovertarget</code> button. It
+          needs no JavaScript by default; after hydration focus leaving a panel and a followed{" "}
+          <code>NavigationMenu.Link</code> close it. A panel whose content loads on open opts into
+          library mode (<code>openChangeAction</code>, transition types{" "}
+          <code>fsui-navigation-menu*</code>). Hover opening and arrow keys are not in this version.
+        </li>
+        <li>
           Direction and locale are decided (<a href={issue(172)}>#172</a>,{" "}
           <a href={issue(188)}>#188</a>): <code>dir</code> is the only direction switch and there is
           no provider; <code>locale</code> is a prop of each Root that formats. See{" "}

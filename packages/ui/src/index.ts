@@ -97,6 +97,25 @@ export type {
 } from "./tooltip/index.js";
 
 export { HoverCard } from "./hover-card/index.js";
+
+export { NavigationMenu } from "./navigation-menu/index.js";
+export type {
+  NavigationMenuRootProps,
+  NavigationMenuRootState,
+  NavigationMenuListProps,
+  NavigationMenuListState,
+  NavigationMenuItemProps,
+  NavigationMenuItemState,
+  NavigationMenuOpenChangeDetails,
+  NavigationMenuTriggerProps,
+  NavigationMenuTriggerState,
+  NavigationMenuPopupProps,
+  NavigationMenuPopupState,
+  NavigationMenuSide,
+  NavigationMenuAlign,
+  NavigationMenuLinkProps,
+  NavigationMenuLinkState,
+} from "./navigation-menu/index.js";
 export type {
   HoverCardRootProps,
   HoverCardRootState,

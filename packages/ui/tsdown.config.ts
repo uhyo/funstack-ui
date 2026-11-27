@@ -10,6 +10,7 @@ export default defineConfig({
     "src/tabs/index.ts",
     "src/tooltip/index.ts",
     "src/hover-card/index.ts",
+    "src/navigation-menu/index.ts",
     "src/switch/index.ts",
     "src/checkbox/index.ts",
     "src/dialog/index.ts",

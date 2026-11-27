@@ -14501,3 +14501,101 @@ By the architect, from the probe table of the #188 entry above. The rule is unch
   The line about a consumer's `dir="rtl"` notes that it brings the per-engine keys back.
 - `design/direction-locale.md`: follow-ups F2, F3 and F4 marked done (#188); the status line
   notes that the audit's G2 was written before the probe.
+
+## 2026-11-27, #170: NavigationMenu implemented
+
+Developer. `design/components/navigation-menu.md` is implemented in
+`packages/ui/src/navigation-menu/` (Root, List, Item, Trigger, Popup, Link), with jsdom and
+three-engine browser tests, a docs page (a Server Component example in JS-free mode, a
+library-mode example whose content suspends), a playground demo with FUNSTACK Router and a skill
+entry. Notes: `memo/developer/issue-170-navigation-menu.md`.
+
+Test-plan step 1 (section 11), the router probe. The example app's demo: FUNSTACK Router 1.6.0,
+plain `<a href>` links intercepted through the Navigation API, a route component that suspends
+for 800 ms with no Suspense boundary; `:popover-open`, the route and `useIsPending()` sampled
+every frame, `document.startViewTransition` wrapped. Chromium and Firefox, every run alike
+(WebKit could not run on the developer's machine):
+
+- **The panel does not wait for the new page.** A followed Link in a library-mode panel closes
+  it in its own commit about 50-100 ms after the click, as soon as `openChangeAction(false)`
+  settles; the route commits about 800 ms later. With `transition` on the Popup the close runs a
+  view transition of its own, and the route's commit a second one.
+- Why: the router applies the entry change with a nested `startTransition` after an `await`, so
+  it is not in the close's lane, and once the close's async action has settled nothing entangles
+  the two. (A close action still pending when the router starts its inner transition would be
+  entangled by React's async-action scope; not probed.)
+- Side effect: the router adds its `navigation` transition type before that `await`; the close
+  commit, the next transition to commit, sometimes carries it (Chromium both runs, Firefox one of
+  two), and the route's own commit then has no types.
+- JS-free mode: `hidePopover()` in the click; the panel goes at once.
+
+Section 9 walkthrough 3 still states the expectation; it is the architect's to amend. The docs
+page already says what was found (the panel closes right away, in a commit of its own, and the
+`navigation` type note).
+
+Enumerations extended without a change of rule: `conventions.md` Decisions 11 and 2.1 (the
+`onOpenChange` handlers name `NavigationMenu.Item`), 5.3 (the `fsui-navigation-menu` types), 7.1
+(Root and List are directive-free component files); `overlay-open-state.md` 3.9 (the Item
+alongside the five Roots, `navigation-menu.md` 3.3 in the per-component list), 3.9.2 (the
+focus-leaving close of a shown panel among the facts the library triggers), 3.9.11 (the Item's
+JS-free mode), 3.9.13; `testing.md` (the urgent-handler row); `internal-hooks.md` (the hook
+users).
+
+Shared code changed (no behaviour change for the other components):
+
+- `use-overlay-root.ts`: the controlled-without-`onOpenChange` warning calls the popup "panel"
+  for `component: "navigation-menu"`.
+- `__tests__/overlay-open-state-suite.tsx`: an optional `component` names the transition-type
+  prefix when it is not the lower-cased `name` (`fsui-navigation-menu-open`).
+
+Implementation choices the design leaves open, for review:
+
+- Root, List and Link take `className` / `style` / `children` as functions of an empty state
+  (`Record<string, never>`, as `Menu.Group`) and `render`; the design lists the element props plus
+  `render`.
+- `NavigationMenuTriggerProps` / `State` are aliases of Popover.Trigger's types.
+- The focus-leave close of a shown panel records the `focusout` as the fact's event
+  (`details.event.type === "focusout"`), not the `toggle`.
+- The Popup passes `whileShown: listenInvokerPresses` (Menu's and Combobox's guard): a press on a
+  foreign invoker of the panel outside the Item moves no focus, so the focus-leave close does not
+  hide the panel before the invoker's own toggle.
+- The Link's close does not look at `defaultPrevented`: a router link that prevents the default
+  and navigates itself still closes the panel (the listener runs before React's root listener
+  anyway). `target="_blank"` links close it too; only a modifier or a non-primary button keeps it.
+- Development warnings: "does not directly follow" (an effect after mount, Popup vs the registered
+  Trigger), a second Popup in an Item (the Popup's ref), a second Trigger (the shared
+  `registerTrigger` text).
+
+## 2026-11-27, #170: NavigationMenu, the router probe and the open choices (architect)
+
+After the developer's step 1 result and "Implementation choices the design leaves open" (the
+entry above). `design/components/navigation-menu.md` amended:
+
+- **Section 9, walkthrough 3 rewritten from the measurement.** It said the Link's close was
+  "expected" to commit with the router's navigation. It does not: the close commits when
+  `openChangeAction(false)` settles, the page later, each with its own view transition. The
+  walkthrough now states that, the conditions of the measurement (FUNSTACK Router 1.6.0,
+  Chromium and Firefox; WebKit not run), the unmeasured case (a close action still pending when
+  the router's own transition starts) and the transition-type effect below. Section 11's step 1
+  is replaced by a pointer to the result.
+- **The `navigation` transition type on the close commit**: documented, nothing to change in
+  the library. `addTransitionType` feeds the next transition commit, so a type added before
+  the adder's own update exists goes to whichever transition commits first. The Link's close
+  is one such transition; any other transition an app starts during a navigation is another.
+  The remedy is on the router's side (add the type in the same synchronous scope as the
+  location update). Text for an issue in this repository, for a human to carry to FUNSTACK
+  Router, is in `memo/architect/menubar-navmenu-notes.md`.
+- **The open choices, all accepted and now rules:**
+  - Root, List and Link take `className` / `style` / `children` as functions of an empty state
+    (section 6): conventions 1.3 applies to every part, and the design's "element props plus
+    `render`" was an omission.
+  - `NavigationMenuTriggerProps` / `State` as aliases of Popover.Trigger's: what section 6
+    says.
+  - The focus-leave fact carries the `focusout` event, not the `toggle` (3.2): the cause, as
+    HoverCard.
+  - Menu's foreign-invoker press guard on the Popup (3.2): the focus-leave close is the same
+    trap as Menu's Tab rule (#126).
+  - The Link's close ignores `defaultPrevented` (required: a router link prevents the default)
+    and `target` / `download` (section 4). The design's parenthesis "the click that navigates
+    this page" suggested a `target` test; it is removed.
+  - The development warnings as built.
