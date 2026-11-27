@@ -1,0 +1,31 @@
+chromium 156.0.8078.4
+--- closed (Playwright aria snapshot)
+- main:
+  - heading "Menubar AX probe" [level=1]
+  - menubar "Application":
+    - menuitem "File"
+    - menuitem "Edit"
+    - menuitem "View" [disabled]
+--- axe (closed)
+{
+ "violations": [],
+ "incomplete": []
+}
+--- File open (Playwright aria snapshot)
+- main:
+  - heading "Menubar AX probe" [level=1]
+  - menubar "Application":
+    - menuitem "File"
+    - menu "File":
+      - menuitem "New"
+      - menuitem "Save"
+      - separator
+      - menuitemcheckbox "Autosave" [checked]
+    - menuitem "Edit"
+    - menuitem "View" [disabled]
+file :popover-open true
+--- axe (File open)
+{
+ "violations": [],
+ "incomplete": []
+}

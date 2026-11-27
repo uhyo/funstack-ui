@@ -1,0 +1,27 @@
+chromium 156.0.8078.4
+--- closed
+RootWebArea "Menubar AX probe" focused=true
+  main "" 
+    heading "Menubar AX probe" 
+    menubar "Application" 
+      menuitem "File" expanded=false hasPopup=menu
+      menuitem "Edit" expanded=false hasPopup=menu
+      menuitem "View" expanded=false hasPopup=menu disabled=true
+--- File open
+RootWebArea "Menubar AX probe" focused=true
+  main "" 
+    heading "Menubar AX probe" 
+    menubar "Application" 
+      menuitem "File" expanded=true hasPopup=menu
+      menu "File" 
+        menuitem "New" focused=true
+        menuitem "Save" 
+        separator "" 
+        menuitemcheckbox "Autosave" checked=true
+      menuitem "Edit" expanded=false hasPopup=menu
+      menuitem "View" expanded=false hasPopup=menu disabled=true
+--- axe (File open)
+{
+ "violations": [],
+ "incomplete": []
+}

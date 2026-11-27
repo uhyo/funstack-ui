@@ -19,6 +19,7 @@ export default defineConfig({
     "src/checkbox-group/index.ts",
     "src/popover/index.ts",
     "src/menu/index.ts",
+    "src/menubar/index.ts",
     "src/select/index.ts",
     "src/combobox/index.ts",
     "src/multi-select/index.ts",

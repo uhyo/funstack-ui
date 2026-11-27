@@ -237,6 +237,7 @@ packages/ui/src/internal/
   value-set.ts            # set / order arithmetic of the set-valued components; directive-free
   dom-order.ts            # compareDocumentOrder, sortByDocumentOrder; directive-free
   toolbar-context.ts      # section 7.1: ToolbarContext, read across folders
+  menubar-context.ts      # section 7.1: MenubarContext (the registry of the bar's menus and the switch), read by Menu.Trigger and Menu.Popup
   use-roving-focus.ts     # section 7.4: DOM-written roving tabindex
   arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine; Accordion.Root uses resolveArrowKey); directive-free
   details-summary.ts      # the <details> / <summary> pair of Accordion and Collapsible: interceptSummaryClick (the Trigger click rule, accordion.md 2.2), useDetailsCheck / useSummaryCheck (the element checks)

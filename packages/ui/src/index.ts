@@ -234,6 +234,9 @@ export type {
   MenuContextTriggerState,
 } from "./menu/index.js";
 
+export { Menubar } from "./menubar/index.js";
+export type { MenubarProps, MenubarState } from "./menubar/index.js";
+
 export { RadioGroup } from "./radio-group/index.js";
 
 export { CheckboxGroup } from "./checkbox-group/index.js";

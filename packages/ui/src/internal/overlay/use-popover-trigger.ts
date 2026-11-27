@@ -119,6 +119,13 @@ export interface UsePopoverTriggerOptions<State> {
    * it.
    */
   readonly submenuItem?: boolean;
+  /**
+   * `Menu.Trigger` inside a `Menubar`: an item of the bar, so `disabled` renders
+   * `aria-disabled="true"` and the element stays focusable, as with `submenuItem`; the click
+   * still toggles and the non-button warning is the ordinary one
+   * (design/components/menubar.md 5).
+   */
+  readonly alwaysFocusable?: boolean;
 }
 
 export interface PopoverTriggerHook {
@@ -145,7 +152,15 @@ export function usePopoverTrigger<State>(
   ctx: PopoverRootValue,
   options: UsePopoverTriggerOptions<State>,
 ): PopoverTriggerHook {
-  const { part, disabled, render, handlers, onActivate, submenuItem = false } = options;
+  const {
+    part,
+    disabled,
+    render,
+    handlers,
+    onActivate,
+    submenuItem = false,
+    alwaysFocusable = false,
+  } = options;
   const isLibrary = ctx.mode === "library";
   const { ids, triggerRef, popupRef } = ctx;
 
@@ -219,7 +234,7 @@ export function usePopoverTrigger<State>(
   // native `disabled` to stop it.
   const disabledProps = disabledButton(render, disabled, {
     handlesClick: isLibrary,
-    alwaysFocusable: submenuItem,
+    alwaysFocusable: submenuItem || alwaysFocusable,
   });
   if (!isLibrary && !disabledProps.invoker) {
     // JS-free mode, disabled in the `aria-disabled` branch (a host link): nothing native stops the
