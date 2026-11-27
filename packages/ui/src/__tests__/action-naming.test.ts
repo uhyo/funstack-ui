@@ -230,6 +230,7 @@ type PublicProps = {
   TabsPanelProps: UI.TabsPanelProps;
   TabsRootProps: UI.TabsRootProps;
   TabsTabProps: UI.TabsTabProps;
+  TextFieldProps: UI.TextFieldProps;
   ToastActionProps: UI.ToastActionProps;
   ToastCloseProps: UI.ToastCloseProps;
   ToastDescriptionProps: UI.ToastDescriptionProps;
@@ -395,6 +396,7 @@ const listedKeys = {
   TabsPanelProps: true,
   TabsRootProps: true,
   TabsTabProps: true,
+  TextFieldProps: true,
   ToastActionProps: true,
   ToastCloseProps: true,
   ToastDescriptionProps: true,

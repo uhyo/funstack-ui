@@ -255,6 +255,8 @@ const clientFiles = [
   "otp-field/otp-field-root.mjs",
   "otp-field/otp-field-input.mjs",
   "otp-field/otp-field-slot.mjs",
+  // TextField is a client module (design/components/text-field.md 10).
+  "text-field/text-field.mjs",
   // Button (design/components/button.md 11, row 20).
   "button/button.mjs",
   // The context menu region (design/components/context-menu.md 7, 13.1 "Directive").
@@ -356,6 +358,7 @@ const directiveFreeFiles = [
   // The filter and the charset table (otp-field.md 10).
   "otp-field/index.mjs",
   "otp-field/otp-field-filter.mjs",
+  "text-field/index.mjs",
   "button/index.mjs",
   "avatar/index.mjs",
   // The CSP subpath's entry and data, and Tooltip's skip-delay constants (conventions 12).

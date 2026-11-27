@@ -4,7 +4,8 @@ Branch `feat/181-text-field`. Design: `design/components/text-field.md` (accepte
 
 ## First steps (text-field.md 14), probed 2026-11-27
 
-Probe file: `packages/ui/src/text-field/probe.browser.test.tsx` (temporary, a bare controlled
+Probe file: `packages/ui/src/text-field/probe.browser.test.tsx` (temporary, deleted after the
+ruling; its history is in commits d6729d57 and before on the branch; a bare controlled
 React input with a `useState` draft, blur / Enter commit, Escape revert when the draft differs).
 Chromium 156 and Firefox 157 locally; WebKit only in CI (host libraries missing here), so the
 probe throws its log on WebKit (`PROBE-OUTPUT`) to get it printed. CI run 46000186978.
@@ -39,5 +40,23 @@ probe throws its log on WebKit (`PROBE-OUTPUT`) to get it printed. CI run 460001
    clears the draft and returns the computed target, `base` `intendedValue`, `onResetEvent`
    writes `element.defaultValue`. No `onItemMounted` needed (one element, same component).
 
-Stopped after the probes per the lead's instruction (point 2, WebKit differs). The component
-draft is in `packages/ui/src/text-field/text-field.tsx` (no tests yet).
+Stopped after the probes per the lead's instruction (point 2, WebKit differs). Ruling (master
+9dd98018): `search` is not supported in v1; any type outside text / tel / url / email /
+password warns once per element and renders as given; no search-specific code.
+
+## Implementation notes
+
+- Tests: the value-action suite and the native platform suite run over
+  `__tests__/drivers/text-field.tsx`. Its gesture writes the text in one change event after a
+  script `value = ""`: a form reset writes the DOM value past React's value tracker, so a
+  change back to the text the tracker last saw would be dropped (seen in the "React's reset
+  after a form action ... in sync afterwards" row). Two change events would be two commits,
+  which the post-await row rejects.
+- `expectResetTarget` is a no-op: react-dom keeps a controlled input's `defaultValue` equal to
+  its value, and the target is written only in the `reset` event (design 4.4).
+- Browser reset row: a real click on a reset button first blurs the field, which commits the
+  draft. The row keeps focus with `onMouseDown` preventDefault so the draft is really open at
+  the reset (the #185 order) and checks it is gone afterwards.
+- Focus moving into an iframe needs `iframe.focus()` first in Firefox.
+- NumberField Escape: in the Root's `keyDown`, after the disabled / readOnly / composing
+  return, compared with `formatter.format(shownRef.current)`.

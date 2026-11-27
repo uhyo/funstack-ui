@@ -3,7 +3,7 @@ import { use, useCallback, useEffect, useId, useMemo, useRef, useState } from "r
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { announce as speak } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
-import { isComposingKey } from "../internal/escape-key.js";
+import { consumeEscape, isComposingKey, isEscapeRequest } from "../internal/escape-key.js";
 import { FieldContext } from "../internal/form/field-context.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -485,13 +485,23 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
         commitDraft(event);
         return;
       }
+      if (event.key === "Escape") {
+        // An edited draft is reverted and the key consumed (design 4.2, conventions 15): the
+        // comparison is on the text the user sees.
+        const open = draftRef.current;
+        if (!isEscapeRequest(event) || open === null) return;
+        if (open === latest.current.formatter.format(shownRef.current)) return;
+        clearDraft();
+        consumeEscape(event);
+        return;
+      }
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       const compute = keyStep(event.key, event.shiftKey, b, large);
       if (compute === null) return;
       event.preventDefault();
       oneStep(compute, "keyboard", event);
     },
-    [commitDraft, latest, oneStep],
+    [clearDraft, commitDraft, latest, oneStep, shownRef],
   );
 
   const wheel = useCallback(

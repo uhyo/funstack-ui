@@ -122,8 +122,8 @@ export interface TextFieldProps extends Omit<
   /** Inline style, or a function of the state that returns one. */
   style?: StateValue<CSSProperties | undefined, TextFieldState>;
   /**
-   * Replace the default `<input type="text">`: a text `<input>` (`text`, `search`, `tel`, `url`,
-   * `email`, `password`) or a `<textarea>` (`render={<textarea rows={4} />}`).
+   * Replace the default `<input type="text">`: a text `<input>` (`text`, `tel`, `url`, `email`,
+   * `password`) or a `<textarea>` (`render={<textarea rows={4} />}`). `search` is not supported.
    */
   render?: RenderProp<ComponentPropsWithRef<"input">, TextFieldState>;
 }
@@ -132,7 +132,7 @@ const COMMIT_TYPES = transitionTypes("text-field", "commit");
 const commitTypes = () => COMMIT_TYPES;
 
 /** The `<input>` types that hold free text (design 1, element constraints). */
-const TEXT_TYPES = new Set(["text", "search", "tel", "url", "email", "password"]);
+const TEXT_TYPES = new Set(["text", "tel", "url", "email", "password"]);
 
 type TextElement = HTMLInputElement | HTMLTextAreaElement;
 
@@ -297,10 +297,17 @@ export function TextField(props: TextFieldProps) {
           return null;
         }
         const type = element.tagName === "INPUT" ? (element as HTMLInputElement).type : "";
+        if (type === "search") {
+          return (
+            'TextField: type="search" is not supported. Engines give Escape a meaning of their ' +
+            "own in a search field and disagree on it, so the revert differs per engine. Use " +
+            'type="text" with inputMode="search" or enterKeyHint="search".'
+          );
+        }
         return (
           `TextField: rendered <${element.tagName.toLowerCase()}` +
-          `${type === "" ? "" : ` type="${type}"`}>. Render a text <input> (text, search, tel, ` +
-          "url, email, password) or a <textarea>: other inputs sanitise their value " +
+          `${type === "" ? "" : ` type="${type}"`}>. Render a text <input> (text, tel, url, ` +
+          "email, password) or a <textarea>: other inputs sanitise their value " +
           "(NumberField exists for numbers)."
         );
       }),

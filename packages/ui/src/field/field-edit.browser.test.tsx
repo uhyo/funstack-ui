@@ -5,10 +5,10 @@
 // control's previous value over the keystroke. The Field now writes the custom-validity slot in
 // the listener and its state after the dispatch (design/components/field-form.md 2.4). The keys
 // are pressed outside `act`, as in a page (inside `act`, React holds every commit until the
-// interaction is over). The flushSync model of the bug is in field.test.tsx. Runs in Chromium,
+// interaction is over). TextField (#181) runs the same scripts. The flushSync model of the bug is in field.test.tsx. Runs in Chromium,
 // Firefox and WebKit.
 import { act, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { startTransition, useState } from "react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
@@ -18,6 +18,7 @@ import { Form } from "../form/index.js";
 import { NumberField } from "../number-field/index.js";
 import { OTPField } from "../otp-field/index.js";
 import { Select } from "../select/index.js";
+import { TextField } from "../text-field/index.js";
 import { Field } from "./index.js";
 
 type Mode = "validate" | "required";
@@ -100,6 +101,20 @@ function ControlledText({ initial }: { initial: string }) {
   const [text, setText] = useState(initial);
   return (
     <Field.Control data-testid="control" value={text} onChange={(e) => setText(e.target.value)} />
+  );
+}
+
+function ControlledTextField({ initial }: { initial: string }) {
+  const [text, setText] = useState(initial);
+  return (
+    <TextField
+      data-testid="control"
+      value={text}
+      valueCommitAction={async (next) => {
+        await Promise.resolve();
+        startTransition(() => setText(next));
+      }}
+    />
   );
 }
 
@@ -190,6 +205,29 @@ describe("an edit that changes the Field's validity keeps the keystroke (#193)",
         render(
           <Harness mode={mode}>
             <Field.Control data-testid="control" defaultValue="Jap" />
+          </Harness>,
+        );
+        await run(TEXT[mode]);
+      });
+
+      // A controlled text input whose draft is library state (#181); the blur commits it.
+      it("TextField, uncontrolled", async () => {
+        render(
+          <Harness mode={mode}>
+            <TextField
+              data-testid="control"
+              defaultValue="Jap"
+              valueCommitAction={async () => {}}
+            />
+          </Harness>,
+        );
+        await run(TEXT[mode]);
+      });
+
+      it("TextField, controlled (update on success)", async () => {
+        render(
+          <Harness mode={mode}>
+            <ControlledTextField initial="Jap" />
           </Harness>,
         );
         await run(TEXT[mode]);

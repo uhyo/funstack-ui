@@ -40,12 +40,15 @@ import {
   setupUser,
   PlainButton,
   flushMicrotasks,
+  flushTasks,
   hydrateFromServer,
   silenceErrors,
 } from "../__tests__/helpers.js";
 import { capturedPointers } from "../__tests__/pointer-capture-shim.js";
+import { Dialog } from "../dialog/index.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
+import { isEscapeRequest } from "../internal/escape-key.js";
 import { NumberField } from "./index.js";
 import type {
   NumberFieldButtonState,
@@ -1034,6 +1037,95 @@ describe("NumberField", () => {
       });
       // A non-adopting controlled parent: back to `value`, once.
       expect(input().value).toBe("1");
+    });
+  });
+
+  // --- Draft revert (design 4.2, conventions 15) ---------------------------------------------------
+
+  describe("draft revert (Escape)", () => {
+    function escape(init: KeyboardEventInit = {}): KeyboardEvent {
+      const event = new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        ...init,
+      });
+      act(() => {
+        input().dispatchEvent(event);
+      });
+      return event;
+    }
+
+    eachCommitMode("Escape", (mode) => {
+      it("an edited draft: the text returns, nothing dispatched, prevented and consumed", () => {
+        const onChange = vi.fn<Fn>();
+        const onCommit = vi.fn<Fn>();
+        render(<Fixture mode={mode} onChange={onChange} onCommit={onCommit} />);
+        typeText("57");
+        const event = escape();
+        expect(input().value).toBe("1");
+        expect(hidden().value).toBe("1");
+        expect(event.defaultPrevented).toBe(true);
+        expect(isEscapeRequest(event)).toBe(false);
+        blur();
+        expect(onChange).not.toHaveBeenCalled();
+        expect(onCommit).not.toHaveBeenCalled();
+      });
+
+      it("a draft whose text differs from the shown text (1.0 over 1) is reverted", () => {
+        render(<Fixture mode={mode} />);
+        typeText("1.0");
+        expect(escape().defaultPrevented).toBe(true);
+        expect(input().value).toBe("1");
+      });
+
+      it("no draft, or a draft showing the same text: untouched", () => {
+        render(<Fixture mode={mode} />);
+        const first = escape();
+        expect(first.defaultPrevented).toBe(false);
+        expect(isEscapeRequest(first)).toBe(true);
+        typeText("1");
+        const second = escape();
+        expect(second.defaultPrevented).toBe(false);
+        expect(isEscapeRequest(second)).toBe(true);
+      });
+    });
+
+    it("already prevented, or composing: untouched", () => {
+      render(<Fixture mode="uncontrolled" />);
+      typeText("5");
+      const prevent = (e: Event) => e.preventDefault();
+      input().addEventListener("keydown", prevent);
+      escape();
+      input().removeEventListener("keydown", prevent);
+      expect(input().value).toBe("5");
+      expect(escape({ isComposing: true }).defaultPrevented).toBe(false);
+      expect(escape({ keyCode: 229 }).defaultPrevented).toBe(false);
+      expect(input().value).toBe("5");
+    });
+
+    it("inside a non-modal Dialog: the first Escape reverts and the dialog stays, the second closes", async () => {
+      render(
+        <Dialog.Root defaultOpen modal={false}>
+          <Dialog.Popup data-testid="popup" aria-label="Quantity">
+            <NumberField.Root locale="en-US" defaultValue={1}>
+              <NumberField.Input data-testid="input" aria-label="Quantity" />
+            </NumberField.Root>
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await flushTasks(2);
+      const dialog = screen.getByTestId("popup") as HTMLDialogElement;
+      expect(dialog.open).toBe(true);
+      typeText("5");
+      escape();
+      await flushTasks(1);
+      expect(input().value).toBe("1");
+      expect(dialog.open).toBe(true);
+      escape();
+      await flushTasks(1);
+      expect(dialog.open).toBe(false);
     });
   });
 
