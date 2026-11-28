@@ -24,6 +24,13 @@ export interface NumberFieldContextValue {
   /** Ids: the visible input (the Root's, or a Field's control id) and the Label. */
   readonly inputId: string;
   readonly labelId: string;
+  /** The Root's `useId`: the step buttons' default ids are `<prefix>-increment` / `-decrement`. */
+  readonly buttonIdPrefix: string;
+  /**
+   * The label ids the step buttons append to their `aria-labelledby` (design 8.4):
+   * `NumberField.Label`'s while one is mounted, then a Field's; `""` with neither.
+   */
+  readonly buttonLabelIds: string;
   readonly name: string | undefined;
   readonly form: string | undefined;
   /** `inputmode="decimal"` rather than `"numeric"` (8.5). */

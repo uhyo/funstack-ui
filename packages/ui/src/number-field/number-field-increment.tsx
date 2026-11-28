@@ -16,6 +16,9 @@ export type {
  *
  * Owned keys: `type`, `tabIndex`, `aria-controls`, `disabled`, `aria-disabled` (link or component
  * `render`), `onPointerDown`, `onClick`, `onContextMenu`, `data-pending`, `data-disabled`.
+ * Defaults the consumer's replace: `id`, `aria-label` (`"Increase"`) and `aria-labelledby`
+ * (`"<own id> <label id>"`, so the name is "Increase Quantity"; with a consumer `aria-labelledby` the
+ * default `aria-label` is omitted).
  *
  * @see https://ui.funstack.work/components/number-field
  */
