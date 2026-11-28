@@ -297,6 +297,8 @@ describe("Menu", () => {
       expect(archive).toHaveAttribute("data-disabled", "");
       expect(archive).not.toHaveAttribute("disabled");
       expect(item("sep").tagName).toBe("HR");
+      // Rendered, not left to the `<hr>` (design/components/separator.md 3).
+      expect(item("sep")).toHaveAttribute("role", "separator");
       expect(item("group")).toHaveAttribute("role", "group");
       expect(item("group")).toHaveAttribute("aria-labelledby", item("label").id);
       expect(item("label").id).not.toBe("");
@@ -324,6 +326,55 @@ describe("Menu", () => {
       unmount();
       render(<Harness root={{ loop: false }} popup={{ experimental_focusGroup: true }} />);
       expect(popup()).toHaveAttribute("focusgroup", "menu nowrap");
+    });
+
+    it("focusgroup is owned in both modes: removed from a render element without the flag", async () => {
+      const user = setupUser();
+      const { unmount } = render(<Harness popup={{ render: <div focusgroup="menu" /> }} />);
+      await openMenu(user);
+      expect(popup()).not.toHaveAttribute("focusgroup");
+      unmount();
+      render(
+        <Harness
+          popup={{ experimental_focusGroup: true, render: <div focusgroup="menu nowrap" /> }}
+        />,
+      );
+      expect(popup()).toHaveAttribute("focusgroup", "menu wrap");
+    });
+
+    it("Menu.Separator owns role: a render element of another tag is a separator, its own role loses", async () => {
+      const user = setupUser();
+      render(
+        <Harness
+          content={
+            <>
+              <Menu.Item data-testid="rename">Rename</Menu.Item>
+              <Menu.Separator data-testid="div-sep" render={<div />} />
+              <Menu.Separator data-testid="none-sep" render={<hr role="none" />} />
+              <Menu.Item data-testid="delete">Delete</Menu.Item>
+            </>
+          }
+        />,
+      );
+      await openMenu(user);
+      expect(item("div-sep").tagName).toBe("DIV");
+      expect(item("div-sep")).toHaveAttribute("role", "separator");
+      expect(item("none-sep")).toHaveAttribute("role", "separator");
+    });
+
+    it("owned keys are type errors (conventions 1.5)", () => {
+      const types = () => (
+        <Menu.Root>
+          {/* @ts-expect-error `onPointerMove` is the Trigger's (the Menubar hover switch). */}
+          <Menu.Trigger onPointerMove={() => {}}>Actions</Menu.Trigger>
+          {/* @ts-expect-error `focusgroup` is the Popup's: use `experimental_focusGroup`. */}
+          <Menu.Popup focusgroup="menu">
+            {/* @ts-expect-error `role` is the Separator's. */}
+            <Menu.Separator role="none" />
+          </Menu.Popup>
+        </Menu.Root>
+      );
+      expect(types).toBeTypeOf("function");
     });
 
     it("SubmenuTrigger is an item and a trigger", async () => {

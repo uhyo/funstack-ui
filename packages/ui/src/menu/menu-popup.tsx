@@ -81,6 +81,7 @@ export interface MenuPopupProps extends Omit<
   | "popover"
   | "role"
   | "tabIndex"
+  | "focusgroup"
   | "onKeyDown"
   | "onFocus"
   | "onBlur"
@@ -177,8 +178,8 @@ const FOCUSABLE_SELECTOR =
  * shown, those are where the browser placed it (conventions 13.2), otherwise the requested
  * values.
  *
- * Owned keys (conventions 1.2): `id`, `popover`, `role`, `tabIndex`, `focusgroup` (with the
- * flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
+ * Owned keys (conventions 1.5): `id`, `popover`, `role`, `tabIndex`, `focusgroup` (the token
+ * list with the flag, removed otherwise), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
  * non-item space keeps focus on the current item), `onContextMenu` (no native menu over this
  * one), `onPointerEnter` / `onPointerLeave`, `data-side` / `data-align` unless `side` is `null`
  * or the menu is placed at a point, `data-context` for an open from a `Menu.ContextTrigger`,
@@ -371,7 +372,9 @@ export function MenuPopup({
     "aria-labelledby": menu.triggerId,
     // The popup itself takes focus as the last resort when a menu has no items.
     tabIndex: -1,
-    ...(experimental_focusGroup && { focusgroup: `menu ${loop ? "wrap" : "nowrap"}` }),
+    // Owned in both modes (conventions 1.5): without the flag a `render` element's own
+    // `focusgroup` would put a native arrow-key handler beside the JS one.
+    focusgroup: experimental_focusGroup ? `menu ${loop ? "wrap" : "nowrap"}` : undefined,
     onKeyDown,
     onBlur,
     onMouseDown,

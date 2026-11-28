@@ -418,6 +418,17 @@ describe("ToggleGroup", () => {
         expect([withTransition, withAriaDisabled]).toHaveLength(2);
       });
 
+      it("focusgroup and focusgroupstart are owned in every mode: not props (conventions 1.5)", () => {
+        const types = () => (
+          // @ts-expect-error `focusgroup` is the Root's: use `experimental_focusGroup`.
+          <ToggleGroup.Root aria-label="x" focusgroup="toolbar">
+            {/* @ts-expect-error `focusgroupstart` is the Item's. */}
+            <ToggleGroup.Item value="a" focusgroupstart="" />
+          </ToggleGroup.Root>
+        );
+        expect(types).toBeTypeOf("function");
+      });
+
       it("the flag is spelled `experimental_focusGroup` (conventions 8)", () => {
         // @ts-expect-error The lower-case spelling was renamed.
         const old: ToggleGroupRootMultipleProps = { experimental_focusgroup: true };
@@ -1067,6 +1078,37 @@ describe("ToggleGroup", () => {
       );
       expect(root()).not.toHaveAttribute("focusgroup");
       expect(item("A")).not.toHaveAttribute("focusgroupstart");
+    });
+
+    it("without the flag, a render element's focusgroup and focusgroupstart are removed (conventions 1.5)", () => {
+      render(
+        <ToggleGroup.Root aria-label="x" defaultValue={["a"]} render={<div focusgroup="toolbar" />}>
+          <ToggleGroup.Item value="a" render={<button focusgroupstart="" />}>
+            A
+          </ToggleGroup.Item>
+        </ToggleGroup.Root>,
+      );
+      expect(root()).not.toHaveAttribute("focusgroup");
+      expect(item("A")).not.toHaveAttribute("focusgroupstart");
+    });
+
+    it("with the flag, the Root's token list and the Item's focusgroupstart win over a render element's", () => {
+      render(
+        <ToggleGroup.Root
+          aria-label="x"
+          experimental_focusGroup
+          defaultValue={["a"]}
+          render={<div focusgroup="toolbar" />}
+        >
+          <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+          <ToggleGroup.Item value="b" render={<button focusgroupstart="" />}>
+            B
+          </ToggleGroup.Item>
+        </ToggleGroup.Root>,
+      );
+      expect(root()).toHaveAttribute("focusgroup", "toolbar inline wrap nomemory");
+      expect(item("A")).toHaveAttribute("focusgroupstart", "");
+      expect(item("B")).not.toHaveAttribute("focusgroupstart");
     });
   });
 

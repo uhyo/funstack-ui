@@ -33,6 +33,7 @@ export interface ToolbarRootProps extends Omit<
   | "onFocus"
   | "onBlur"
   | "onPointerDown"
+  | "focusgroup"
   | "className"
   | "style"
   | "children"
@@ -83,7 +84,8 @@ function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
  * `aria-labelledby`.
  *
  * Owned keys (conventions 1.5): `role`, `aria-orientation`, `data-orientation`, `onKeyDown`,
- * `onFocus`, `onBlur`, `onPointerDown`, and `focusgroup` while the flag is on.
+ * `onFocus`, `onBlur`, `onPointerDown`, and `focusgroup` (the token list while the flag is on,
+ * removed otherwise).
  *
  * @see https://ui.funstack.work/components/toolbar
  */
@@ -127,7 +129,9 @@ export function ToolbarRoot({
       "aria-orientation": orientation,
       "data-orientation": orientation,
       ...roving,
-      ...(focusgroup !== undefined && { focusgroup }),
+      // Owned in both modes (conventions 1.5): without the flag a `render` element's own
+      // `focusgroup` would put a native arrow-key handler beside the JS one.
+      focusgroup,
     },
     ref: rootRef,
   });

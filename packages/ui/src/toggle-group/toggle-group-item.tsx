@@ -38,6 +38,7 @@ export interface ToggleGroupItemProps extends Omit<
   | "tabIndex"
   | "aria-pressed"
   | "aria-disabled"
+  | "focusgroupstart"
   | "className"
   | "style"
   | "children"
@@ -73,7 +74,8 @@ export interface ToggleGroupItemProps extends Omit<
  * Owned keys (conventions 1.5): `type` (on a `<button>`), `tabIndex` (the engine's),
  * `aria-pressed`, `disabled`, `aria-disabled` (inside a Toolbar, or a link or component
  * `render`), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, `onClick`, and
- * `focusgroupstart` while the Root renders `focusgroup`.
+ * `focusgroupstart` (on the first pressed Item while the Root renders `focusgroup`, removed
+ * otherwise).
  *
  * @see https://ui.funstack.work/components/toggle-group
  */
@@ -122,9 +124,8 @@ export function ToggleGroupItem({
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
       "data-orientation": ctx.orientation,
-      ...(ctx.focusgroupStartValue !== null && {
-        focusgroupstart: ctx.focusgroupStartValue === value ? "" : undefined,
-      }),
+      // Owned as `undefined` while the Root renders no `focusgroup` (conventions 1.5).
+      focusgroupstart: ctx.focusgroupStartValue === value ? "" : undefined,
       onClick: (event: MouseEvent<HTMLButtonElement>) => {
         // Native buttons do not fire `click` when disabled; the guard covers `render` elements
         // (a link must not navigate either).

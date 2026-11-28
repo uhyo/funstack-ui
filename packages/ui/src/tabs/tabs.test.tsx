@@ -1427,6 +1427,10 @@ describe("Tabs", () => {
           <Tabs.Tab value="a" tabIndex={-1} />
           {/* @ts-expect-error `role` is the Panel's. */}
           <Tabs.Panel value="a" role="region" />
+          {/* @ts-expect-error `focusgroup` is the List's in both modes: use `experimental_focusGroup`. */}
+          <Tabs.List focusgroup="tablist" />
+          {/* @ts-expect-error `focusgroupstart` is the Tab's in both modes. */}
+          <Tabs.Tab value="a" focusgroupstart="" />
           <Tabs.Tab value="a" aria-controls="x" aria-describedby="y" />
           <Tabs.Panel value="a" aria-labelledby="x" tabIndex={-1} />
         </Tabs.Root>
@@ -1495,6 +1499,36 @@ describe("Tabs", () => {
       await user.keyboard("{ArrowRight}");
       expect(tab("B")).toHaveFocus();
       expectSelected("B");
+    });
+
+    it("without the flag, a render element's focusgroup and focusgroupstart are removed (conventions 1.5)", () => {
+      render(
+        <Tabs.Root defaultValue="a">
+          <Tabs.List aria-label="x" render={<div focusgroup="tablist" />}>
+            <Tabs.Tab value="a" render={<button focusgroupstart="" />}>
+              A
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      expect(list()).not.toHaveAttribute("focusgroup");
+      expect(tab("A")).not.toHaveAttribute("focusgroupstart");
+    });
+
+    it("with the flag, the List's token list wins over a render element's", () => {
+      render(
+        <Tabs.Root defaultValue="a">
+          <Tabs.List aria-label="x" experimental_focusGroup render={<div focusgroup="toolbar" />}>
+            <Tabs.Tab value="a">A</Tabs.Tab>
+            <Tabs.Tab value="b" render={<button focusgroupstart="" />}>
+              B
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      expect(list()).toHaveAttribute("focusgroup", "tablist inline wrap nomemory");
+      expect(tab("A")).toHaveAttribute("focusgroupstart", "");
+      expect(tab("B")).not.toHaveAttribute("focusgroupstart");
     });
   });
 });

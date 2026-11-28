@@ -49,6 +49,7 @@ export interface TabsTabProps extends Omit<
   | "tabIndex"
   | "aria-selected"
   | "aria-disabled"
+  | "focusgroupstart"
   | "className"
   | "style"
   | "children"
@@ -94,8 +95,8 @@ function movedWithinList(event: FocusEvent<HTMLElement>): boolean {
  * `[data-selected]`, or wrap the content in your own `<ViewTransition>` keyed on `fsui-tabs`.
  *
  * Owned keys (conventions 1.5): `role`, `type` (on a `<button>`), `id`, `aria-selected`,
- * `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (with
- * `experimental_focusGroup`), `data-selected`, `data-pending`, `data-disabled`,
+ * `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (on the
+ * selected Tab with `experimental_focusGroup`, removed otherwise), `data-selected`, `data-pending`, `data-disabled`,
  * `data-orientation`, `onClick`, `onKeyDown`, `onFocus`.
  *
  * @see https://ui.funstack.work/components/tabs
@@ -143,8 +144,9 @@ export function TabsTab({
       // Roving tabindex, except on the native `focusgroup` path, where the browser owns the tab
       // stop and a negative tabindex would take the Tab out of the group (TabsListContextValue).
       tabIndex: selected ? 0 : listCtx?.nativeFocusgroup ? undefined : -1,
-      // Always rendered with the flag (inert where unsupported), so markup is stable.
-      ...(listCtx?.focusgroup === true && { focusgroupstart: selected ? "" : undefined }),
+      // Always rendered with the flag (inert where unsupported), so markup is stable; owned as
+      // `undefined` without it (conventions 1.5).
+      focusgroupstart: listCtx?.focusgroup === true && selected ? "" : undefined,
       "data-selected": dataAttr(selected),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),

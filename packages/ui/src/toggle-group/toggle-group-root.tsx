@@ -80,6 +80,7 @@ export interface ToggleGroupRootBaseProps extends Omit<
   | "onFocus"
   | "onBlur"
   | "onPointerDown"
+  | "focusgroup"
   | "defaultValue"
   | "className"
   | "style"
@@ -230,9 +231,10 @@ const NO_LAYOUT: ToggleGroupLayout = { order: [], disabled: [] };
  * focus over its Items (design/components/toggle-group.md 16.2). Inside a `Toolbar.Root` it runs
  * no engine of its own: its Items are members of the Toolbar's sequence.
  *
- * Owned keys (conventions 1.5): `role`, `data-orientation`, `data-pending`, `data-disabled`;
- * standalone also `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` and, with the flag,
- * `focusgroup`.
+ * Owned keys (conventions 1.5): `role`, `data-orientation`, `data-pending`, `data-disabled`,
+ * `focusgroup` (the token list standalone with the flag, removed otherwise: inside a Toolbar it
+ * would split the Toolbar's single Tab stop); standalone also `onKeyDown`, `onFocus`, `onBlur`,
+ * `onPointerDown`.
  *
  * @see https://ui.funstack.work/components/toggle-group
  */
@@ -435,7 +437,9 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
       "data-disabled": dataAttr(disabled),
       // Inside a Toolbar the group has no engine: the keys are not owned there.
       ...(!inToolbar && roving),
-      ...(focusgroup !== undefined && { focusgroup }),
+      // Owned in every mode (conventions 1.5): without the flag, or inside a Toolbar, a `render`
+      // element's own `focusgroup` would work against the JS engine or the Toolbar's.
+      focusgroup,
     },
     ref: rootRef,
   });

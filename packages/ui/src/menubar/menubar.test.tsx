@@ -182,11 +182,11 @@ describe("Menubar", () => {
       expect(el("plain")).not.toHaveAttribute("role");
     });
 
-    it("a Menu.Trigger outside a bar keeps the consumer's onPointerMove", () => {
+    it("a Menu.Trigger outside a bar keeps a render element's onPointerMove", () => {
       const onPointerMove = vi.fn();
       render(
         <Menu.Root>
-          <Menu.Trigger data-testid="plain" onPointerMove={onPointerMove}>
+          <Menu.Trigger data-testid="plain" render={<button onPointerMove={onPointerMove} />}>
             Actions
           </Menu.Trigger>
           <Menu.Popup />
@@ -1113,7 +1113,7 @@ describe("Menubar", () => {
       expect(renderFn.mock.calls[0]![1]).toEqual({ orientation: "horizontal" });
     });
 
-    it("a consumer onPointerMove on a Trigger still runs, and so does the switch", async () => {
+    it("a render element's onPointerMove on a Trigger still runs, and so does the switch", async () => {
       const onPointerMove = vi.fn();
       render(
         <Menubar aria-label="Bar">
@@ -1124,7 +1124,7 @@ describe("Menubar", () => {
             </Menu.Popup>
           </Menu.Root>
           <Menu.Root>
-            <Menu.Trigger data-testid="edit" onPointerMove={onPointerMove}>
+            <Menu.Trigger data-testid="edit" render={<button onPointerMove={onPointerMove} />}>
               Edit
             </Menu.Trigger>
             <Menu.Popup data-testid="edit-popup">

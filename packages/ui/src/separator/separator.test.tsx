@@ -1,6 +1,6 @@
 // Separator rows (design/components/separator.md, test plan in design/CHANGELOG.md, #169): the
-// default `hr`, the vertical case, `decorative` (and that it wins over a `render` element's own
-// role), a `render` element's `role="separator"` surviving while not decorative, the function
+// default `hr role="separator"`, the vertical case, `decorative`, the owned `role` (a `render`
+// element of another tag is a separator; its own role loses in both modes), the function
 // props, `ref`, and the server render. The Directive row is in src/__tests__/directives.test.ts.
 // Keyboard: none (not focusable in any case). No Async React: no state, action or pending.
 import { act, render, screen } from "@testing-library/react";
@@ -14,12 +14,13 @@ import type { SeparatorState } from "./index.js";
 
 describe("Separator", () => {
   describe("roles and ARIA", () => {
-    it("renders an hr with aria-orientation and data-orientation, horizontal by default", () => {
+    it("renders an hr with role, aria-orientation and data-orientation, horizontal by default", () => {
       render(<Separator data-testid="s" />);
       const separator = screen.getByRole("separator");
       expect(separator).toBe(screen.getByTestId("s"));
       expect(separator.tagName).toBe("HR");
-      expect(separator).not.toHaveAttribute("role");
+      // Rendered, not left to the `<hr>` (design/components/separator.md 3).
+      expect(separator).toHaveAttribute("role", "separator");
       expect(separator).toHaveAttribute("aria-orientation", "horizontal");
       expect(separator).toHaveAttribute("data-orientation", "horizontal");
       expect(separator).not.toHaveAttribute("data-decorative");
@@ -54,15 +55,19 @@ describe("Separator", () => {
   });
 
   describe("render", () => {
-    it("a render element's role=separator survives while not decorative", () => {
-      render(
-        <Separator orientation="vertical" render={<div role="separator" data-testid="s" />} />,
-      );
-      const separator = screen.getByTestId("s");
+    it("render={<div />} is a separator: the part writes the role", () => {
+      render(<Separator orientation="vertical" render={<div data-testid="s" />} />);
+      const separator = screen.getByRole("separator");
+      expect(separator).toBe(screen.getByTestId("s"));
       expect(separator.tagName).toBe("DIV");
       expect(separator).toHaveAttribute("role", "separator");
       expect(separator).toHaveAttribute("aria-orientation", "vertical");
       expect(separator).toHaveAttribute("data-orientation", "vertical");
+    });
+
+    it("a render element's own role loses while not decorative", () => {
+      render(<Separator render={<div role="presentation" data-testid="s" />} />);
+      expect(screen.getByTestId("s")).toHaveAttribute("role", "separator");
     });
 
     it("decorative wins over a render element's role and aria-orientation", () => {
@@ -153,7 +158,7 @@ describe("Separator", () => {
     it("renderToString carries every attribute before any script", () => {
       const html = renderToString(ui);
       expect(html).toContain(
-        '<hr class="sep-horizontal" aria-orientation="horizontal" data-orientation="horizontal"/>',
+        '<hr class="sep-horizontal" role="separator" aria-orientation="horizontal" data-orientation="horizontal"/>',
       );
       expect(html).toContain(
         '<hr class="d" role="none" data-orientation="vertical" data-decorative=""/>',
