@@ -1,6 +1,7 @@
 "use client";
 import { isValidElement, useMemo } from "react";
 import type { ReactNode, Ref } from "react";
+import { useCopyCheck } from "./use-copy-check.js";
 import { mergeRefs } from "./merge-props.js";
 import { renderElement } from "./render-element.js";
 import type { ElementLikeProps, RenderElementOptions } from "./render-element.js";
@@ -25,12 +26,14 @@ export interface UseRenderOptions<Props extends ElementLikeProps, State> extends
 /**
  * Resolves `render` and the function-form `className` / `style` / `children` of a part against
  * its state and produces the element (conventions 1.2, 1.3, 1.4). The pure work is
- * `renderElement` (`render-element.ts`); this hook adds the memoised ref merge.
+ * `renderElement` (`render-element.ts`); this hook adds the memoised ref merge, and in
+ * development the duplicate-copy check (`use-copy-check.ts`, conventions 9.5).
  */
 export function useRender<Props extends ElementLikeProps, State>(
   options: UseRenderOptions<Props, State>,
 ): ReactNode {
   const { render, props, ref } = options;
+  useCopyCheck();
 
   const consumerRef = (props as ElementLikeProps).ref;
   const elementRef = isValidElement<ElementLikeProps>(render) ? render.props.ref : undefined;

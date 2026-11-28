@@ -2862,6 +2862,15 @@ re-exports them.
   without a `NumberField.Label`, Select, Checkbox, Switch, a RadioGroup or CheckboxGroup without
   a `Label` or `aria-label`, `ToggleGroup.Root`, an OTPField input, a Slider thumb, the
   Combobox and MultiSelect parts that need one).
+- **Two copies of the library warn once per page** (`use-copy-check.ts`, called by `useRender`,
+  development only): when parts of two copies are mounted at the same time, `console.error`
+  names the Vite + React Server Components cause and its `optimizeDeps.exclude` workaround
+  (#219). The copies meet in a registry on `globalThis` under
+  `Symbol.for("@funstack/ui/mounted-copies")` (a `Map` of copy token to mounted-part count and
+  a `warned` flag; its shape is shared across versions, so it only grows compatibly). Nothing
+  but the warning reads it. Mounted parts are counted, not loaded copies, so a server render,
+  modules loaded again by a test and an HMR update that swaps the parts in one commit do not
+  warn; directive-free parts do not register.
 
 ---
 

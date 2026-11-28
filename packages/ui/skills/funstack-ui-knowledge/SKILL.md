@@ -42,6 +42,7 @@ Requirements: `react` and `react-dom` `>=19.3.0`. ESM only. Latest stable Chrome
 16. **No polyfills** for the Popover API, `<dialog>`, Anchor Positioning or Invoker Commands. Features not in every engine are `experimental_*` props.
 17. **A Server Function can be passed directly to any action prop**, also from a Server Component; a plain function cannot. `concepts/server-components.md`
 18. **No direction or locale provider.** Use the `dir` attribute; `locale` is a prop of `NumberField.Root`, `Progress.Root` and `Meter.Root`. `concepts/direction-and-locales.md`
+19. **Vite + React Server Components (`@vitejs/plugin-rsc`, FUNSTACK Static): add `optimizeDeps: { exclude: ["@funstack/ui"] }`** to `vite.config`. Otherwise `vite dev` loads two copies (server-rendered parts unbundled, client components' imports pre-bundled), and a part cannot see the other copy's Root or Popup: a `NavigationMenu.Link` in a client component does not close a Popup a Server Component rendered. The library logs "parts from two copies" in development. Production builds are not affected. Import from subpaths in client components; the root entry is still pre-bundled under FUNSTACK Static. `concepts/server-components.md` ("With the Vite dev server")
 
 ## Component index
 

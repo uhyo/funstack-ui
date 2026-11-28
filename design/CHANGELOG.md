@@ -17554,3 +17554,49 @@ Updated rows: `menu-context-trigger.test.tsx` (no `aria-labelledby` without a Tr
 `toast.test.tsx` (no `aria-describedby` without a Description), `popover.test.tsx` (#118 render
 count), `dialog.test.tsx` and `alert-dialog.test.tsx` (the missing-name warning is a microtask
 after the show).
+
+## 2026-11-29, #219: a development warning for two copies of the library
+
+Dogfood run 2, F5. Under `vite dev` with `@vitejs/plugin-rsc` (FUNSTACK Static) the library
+loads twice. `@vitejs/plugin-rsc` turns a `"use client"` module reached through a bare import
+into a `client-package-proxy` that the browser imports by the same bare specifier, so it goes
+through Vite's optimizer like any client import; but only when that module is the resolved
+package entry. Ours carry the directive per part file and the subpath entries have none (the
+namespaces must stay plain objects, 9.3), so the plugin reaches the parts through a
+`client-in-server-package-proxy` that imports the raw `dist/*.mjs` file, while a client
+component's `import` of the subpath resolves to `.vite/deps`. Two module instances, two sets of
+contexts: a `NavigationMenu.Link` in a client component cannot close a server-rendered Popup.
+Production builds are not affected. The workaround is `optimizeDeps: { exclude:
+["@funstack/ui"] }`; FUNSTACK Static still pre-bundles the root entry (it adds every
+`react`-peer dependency to the client `optimizeDeps.include` and ignores `exclude`).
+
+### What changed in the rules
+
+- conventions.md 9.5: the two-copies warning.
+- internal-hooks.md, the file index: `use-copy-check.ts`.
+
+### Considered and not done
+
+- **`"use client"` on the subpath entries**: the namespace objects would become client
+  references, and a Server Component cannot dot into one (`Tabs.Root`).
+- **Reaching each part through a self-referencing bare specifier** (`@funstack/ui/_parts/...`
+  exports), so that the plugin proxies it by specifier and the optimizer bundles it with the
+  subpath entry: some 185 part files (240 with the `"use client"` internals) behind new package
+  exports, and every one would be discovered at request time, forcing the re-optimization pass
+  that FUNSTACK Static avoids on purpose.
+- **Contexts kept on `globalThis` (`Symbol.for` keys)**: fixes context identity only (not
+  module state: the Escape layering of `escape-key.ts`, the modal registry, the `<details>` open
+  map), hides the duplicate bundle, and
+  ties every version's context shapes together.
+
+The fix belongs upstream (FUNSTACK Static, `@vitejs/plugin-rsc`); what to report is in
+`memo/developer/vite-rsc-duplicate-219.md`.
+
+### Test plan
+
+`internal/use-copy-check.test.tsx` (jsdom), with a token of the test's own standing in for the
+second copy: no warning for one copy (StrictMode); one warning when two copies are mounted, in
+either order, and none for a third; none when one copy unmounts before the other mounts, or when
+one commit swaps them (an HMR update); counted per part; nothing registered by a server render;
+the registry under its global key. Checked by hand on the dogfood app: without the workaround
+the warning fires and the panel stays open; with it, no warning and the Link closes the panel.

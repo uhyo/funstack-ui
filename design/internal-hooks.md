@@ -273,6 +273,7 @@ packages/ui/src/internal/
   use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
   use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2); useShownDescriptionWarning (AlertDialog's missing Description, judged over the first showing)
   dev-warn.ts             # warnOnce for directive-free parts
+  use-copy-check.ts       # useCopyCheck(): the two-copies warning, registered by useRender (conventions 9.5, #219); registerMountedCopy / resetCopyCheck for the tests
   use-item-order.ts       # section 3.8: the Items' document order in state (CheckboxGroup, ToggleGroup)
   value-set.ts            # set / order arithmetic of the set-valued components; directive-free
   dom-order.ts            # compareDocumentOrder, sortByDocumentOrder; directive-free
