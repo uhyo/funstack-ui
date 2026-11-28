@@ -39,7 +39,7 @@ export function SeparatorPage() {
 
 <nav aria-label="Breadcrumb">
   <a href="/">Home</a>
-  <Separator orientation="vertical" decorative /> {/* hr role="none" data-orientation="vertical" */}
+  <Separator orientation="vertical" decorative /> {/* hr role="none" data-orientation="vertical" data-decorative */}
   <a href="/docs">Docs</a>
 </nav>`}</CodeBlock>
       <p>
@@ -77,7 +77,7 @@ export function SeparatorPage() {
           '`SeparatorState` is `{ orientation, decorative }`, the two props (`orientation` defaults to `"horizontal"`).'
         }
         owned={
-          '`aria-orientation`, `data-orientation`, and `role` while `decorative` (`"none"`, which wins over a `render` element\'s own).'
+          '`aria-orientation`, `data-orientation`, `data-decorative`, and `role` while `decorative` (`"none"`, which wins over a `render` element\'s own).'
         }
         note={
           'Every other `<hr>` prop passes through, `ref` included. While not decorative no `role` is rendered, so `render={<div role="separator" />}` keeps the one it carries.'
@@ -90,7 +90,7 @@ export function SeparatorPage() {
         rows={[
           ["`data-orientation`", '`"horizontal"` or `"vertical"`, always (decorative too).'],
           ["`aria-orientation`", "The same value; absent while `decorative`."],
-          ['`[role="none"]`', "`decorative` (there is no `data-decorative`)."],
+          ["`data-decorative`", "Present while `decorative` (`state.decorative`)."],
         ]}
       />
 
@@ -104,7 +104,7 @@ export function SeparatorPage() {
             "`hr[aria-orientation=vertical]`",
             "separator, vertical where the screen reader says so",
           ],
-          ["`decorative`", "`hr[role=none]`", "nothing"],
+          ["`decorative`", "`hr[role=none][data-decorative]`", "nothing"],
         ]}
       />
       <ul>

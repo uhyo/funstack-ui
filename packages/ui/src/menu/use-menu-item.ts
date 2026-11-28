@@ -81,7 +81,7 @@ export function useMenuItem(options: MenuItemBaseOptions): MenuItemBase {
       // focusgroup skips natively disabled buttons.
       disabled: undefined,
       "data-disabled": dataAttr(disabled),
-      "data-typeahead": label,
+      "data-fsui-typeahead": label,
       onClick,
       onKeyDown,
       onPointerMove,

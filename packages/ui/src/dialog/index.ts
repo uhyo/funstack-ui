@@ -33,7 +33,11 @@ export const Dialog = {
 export type { DialogRootProps, DialogRootState, DialogOpenChangeDetails } from "./dialog-root.js";
 export type { DialogTriggerProps, DialogTriggerState } from "./dialog-trigger.js";
 export type { DialogPopupProps, DialogPopupState } from "./dialog-popup.js";
-export type { DialogCloseProps, DialogCloseState, DialogCloseDetails } from "./dialog-close.js";
+export type {
+  DialogCloseProps,
+  DialogCloseState,
+  DialogCloseActionDetails,
+} from "./dialog-close.js";
 export type { DialogFormProps, DialogFormState } from "./dialog-form.js";
 export type { DialogTitleProps, DialogTitleState } from "./dialog-title.js";
 export type { DialogDescriptionProps, DialogDescriptionState } from "./dialog-description.js";

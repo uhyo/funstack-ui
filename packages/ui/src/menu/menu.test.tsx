@@ -17,7 +17,8 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, use, useState } from "react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import type { ChangeReason } from "../internal/types.js";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
@@ -37,13 +38,17 @@ import {
 } from "../__tests__/helpers.js";
 import { Menu } from "./index.js";
 import type {
+  MenuCheckboxItemCheckedChangeDetails,
+  MenuCheckboxItemProps,
   MenuCheckboxItemState,
-  MenuItemDetails,
+  MenuItemActionDetails,
   MenuItemState,
   MenuOpenChangeDetails,
   MenuPopupProps,
   MenuPopupState,
+  MenuRadioGroupProps,
   MenuRadioGroupState,
+  MenuRadioGroupValueChangeDetails,
   MenuRadioItemState,
   MenuRootProps,
   MenuRootState,
@@ -108,7 +113,7 @@ function SubmenuContent({
 }: {
   sub?: Partial<MenuRootProps>;
   subPopup?: Partial<MenuPopupProps>;
-  onItem?: (details: MenuItemDetails) => unknown;
+  onItem?: (details: MenuItemActionDetails) => unknown;
 }) {
   return (
     <>
@@ -217,6 +222,7 @@ describeOverlayDisabledRenders<MenuOpenChangeDetails, object>({
   isOpen: () => isOpen(),
   spyOpen: spyShow,
   popoverTarget: true,
+  toolbar: true,
 });
 
 describe("Menu", () => {
@@ -309,14 +315,14 @@ describe("Menu", () => {
       expect(trigger()).toHaveAttribute("data-open", "");
     });
 
-    it("experimental_focusgroup renders focusgroup; items keep tabindex=-1 without focusGroup", async () => {
+    it("experimental_focusGroup renders focusgroup; items keep tabindex=-1 without focusGroup", async () => {
       const user = setupUser();
-      const { unmount } = render(<Harness popup={{ experimental_focusgroup: true }} />);
+      const { unmount } = render(<Harness popup={{ experimental_focusGroup: true }} />);
       await openMenu(user);
       expect(popup()).toHaveAttribute("focusgroup", "menu wrap");
       expect(item("rename")).toHaveAttribute("tabindex", "-1");
       unmount();
-      render(<Harness root={{ loop: false }} popup={{ experimental_focusgroup: true }} />);
+      render(<Harness root={{ loop: false }} popup={{ experimental_focusGroup: true }} />);
       expect(popup()).toHaveAttribute("focusgroup", "menu nowrap");
     });
 
@@ -754,7 +760,7 @@ describe("Menu", () => {
       item("apple").focus();
       type("c");
       expect(item("icon")).toHaveFocus();
-      expect(item("icon")).toHaveAttribute("data-typeahead", "Cherry");
+      expect(item("icon")).toHaveAttribute("data-fsui-typeahead", "Cherry");
       now += 600;
       type("z");
       expect(item("icon")).toHaveFocus();
@@ -803,7 +809,7 @@ describe("Menu", () => {
 describe("Menu.Item actions", () => {
   it("click: action receives (details) with the click; the menu closes ('activate')", async () => {
     const user = setupUser();
-    const action = vi.fn<(details: MenuItemDetails) => void>();
+    const action = vi.fn<(details: MenuItemActionDetails) => void>();
     const openChange = vi.fn<OpenAction>();
     const hide = spyHide();
     render(
@@ -833,7 +839,7 @@ describe("Menu.Item actions", () => {
 
   it("Enter and Space activate once each, through a click on the item (keydown prevented)", async () => {
     const user = setupUser();
-    const action = vi.fn<(details: MenuItemDetails) => void>();
+    const action = vi.fn<(details: MenuItemActionDetails) => void>();
     render(
       <Harness
         content={
@@ -1498,7 +1504,7 @@ describe("Menu.Item actions", () => {
 
   it("render={<a href />}: Enter clicks the link (activation through onClick)", async () => {
     const user = setupUser();
-    const action = vi.fn<(details: MenuItemDetails) => void>();
+    const action = vi.fn<(details: MenuItemActionDetails) => void>();
     render(
       <Harness
         content={
@@ -1568,6 +1574,26 @@ describe("Menu.Item actions", () => {
 });
 
 describe("Menu.CheckboxItem", () => {
+  // Conventions 9.4 (#201): a named change details type with `reason`.
+  it('passes MenuCheckboxItemCheckedChangeDetails with reason "activate" and the native event', async () => {
+    const user = setupUser();
+    const action = vi.fn<(next: boolean, details: MenuCheckboxItemCheckedChangeDetails) => void>();
+    expectTypeOf<
+      Parameters<NonNullable<MenuCheckboxItemProps["checkedChangeAction"]>>[1]
+    >().toEqualTypeOf<MenuCheckboxItemCheckedChangeDetails>();
+    expectTypeOf<MenuCheckboxItemCheckedChangeDetails["reason"]>().toEqualTypeOf<ChangeReason>();
+    render(
+      <Harness content={<Menu.CheckboxItem data-testid="box" checkedChangeAction={action} />} />,
+    );
+    await openMenu(user);
+    await user.click(item("box"));
+    await flushTasks(2);
+    const details = action.mock.calls[0]![1];
+    expect(details.reason).toBe("activate");
+    expect(details.event?.type).toBe("click");
+    expect(Object.keys(details)).toEqual(["reason"]);
+  });
+
   renderBoth("toggle", (mode) => {
     function Box({
       action,
@@ -1767,6 +1793,37 @@ describe("Menu.CheckboxItem", () => {
 });
 
 describe("Menu.RadioGroup", () => {
+  // Conventions 9.4 (#201): a named change details type with `reason`.
+  it('passes MenuRadioGroupValueChangeDetails with reason "activate" and the native event', async () => {
+    const user = setupUser();
+    const action = vi.fn<(next: string, details: MenuRadioGroupValueChangeDetails) => void>();
+    expectTypeOf<
+      Parameters<NonNullable<MenuRadioGroupProps["valueChangeAction"]>>[1]
+    >().toEqualTypeOf<MenuRadioGroupValueChangeDetails>();
+    expectTypeOf<MenuRadioGroupValueChangeDetails["reason"]>().toEqualTypeOf<ChangeReason>();
+    render(
+      <Harness
+        content={
+          <Menu.RadioGroup defaultValue="a" valueChangeAction={action}>
+            <Menu.RadioItem value="a">A</Menu.RadioItem>
+            <Menu.RadioItem data-testid="b" value="b">
+              B
+            </Menu.RadioItem>
+          </Menu.RadioGroup>
+        }
+      />,
+    );
+    await openMenu(user);
+    item("b").focus();
+    await user.keyboard("{Enter}");
+    await flushTasks(2);
+    expect(action.mock.calls[0]![0]).toBe("b");
+    const details = action.mock.calls[0]![1];
+    expect(details.reason).toBe("activate");
+    expect(details.event).toBeInstanceOf(Event);
+    expect(Object.keys(details)).toEqual(["reason"]);
+  });
+
   renderBoth("select", (mode) => {
     function Radios({
       action,
@@ -2395,6 +2452,9 @@ describe("submenus", () => {
     );
     await openSub(user);
     expect(states.at(-1)!.submenu).toBe(true);
+    // Conventions 4.1 rule 2 (#201): the state field has its attribute.
+    expect(sub()).toHaveAttribute("data-submenu", "");
+    expect(popup()).not.toHaveAttribute("data-submenu");
     const last = calls.at(-1)!;
     expect(last.popup).toBe(sub());
     expect(last.source).toBe(item("move"));

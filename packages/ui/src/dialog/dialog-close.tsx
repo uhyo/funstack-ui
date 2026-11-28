@@ -32,7 +32,7 @@ export interface DialogCloseState {
 }
 
 /** Details passed to `Dialog.Close`'s `action`. */
-export interface DialogCloseDetails extends ActionDetails {
+export interface DialogCloseActionDetails extends ActionDetails {
   /** The `value` the dialog closes with (`dialog.returnValue`); `""` without `value`. */
   readonly returnValue: string;
 }
@@ -44,7 +44,17 @@ export interface DialogCloseDetails extends ActionDetails {
  */
 export interface DialogCloseProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "value" | "className" | "style" | "children"
+  | "onClick"
+  | "value"
+  | "type"
+  | "commandfor"
+  | "command"
+  | "popoverTarget"
+  | "popoverTargetAction"
+  | "aria-disabled"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * Runs inside this part's own transition (`data-pending` on the button), then closes the
@@ -57,7 +67,7 @@ export interface DialogCloseProps extends Omit<
    * instead of closing the dialog without running the action. Without `action` in JS-free mode
    * the button is a native `command="request-close"` invoker.
    */
-  action?: Action<[details: DialogCloseDetails]>;
+  action?: Action<[details: DialogCloseActionDetails]>;
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`
@@ -100,9 +110,10 @@ export interface DialogCloseProps extends Omit<
  * meanwhile is ignored unless `whilePending="run"`); a rejection leaves the dialog open. With or
  * without `action`, the button has `data-pending` until the close it asked for has committed.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command` (neither rendered with `action`), `value`, `onClick` (library mode, or with `action`), `aria-disabled`, `data-pending`,
- * `data-disabled`.
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `commandfor`, `command` (neither rendered with `action`), `popoverTarget` and
+ * `popoverTargetAction` (never written), `value`, `onClick` (library mode, or with `action`),
+ * `aria-disabled`. Also owned: `disabled`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/dialog
  */

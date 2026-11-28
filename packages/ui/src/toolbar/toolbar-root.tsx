@@ -56,7 +56,7 @@ export interface ToolbarRootProps extends Omit<
    *
    * @defaultValue `false`
    */
-  experimental_focusgroup?: boolean;
+  experimental_focusGroup?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToolbarRootState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -82,7 +82,7 @@ function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
  * between them (design/components/toggle-group.md section 6). Name it with `aria-label` or
  * `aria-labelledby`.
  *
- * Owned keys (conventions 1.2): `role`, `aria-orientation`, `data-orientation`, `onKeyDown`,
+ * Owned keys (conventions 1.5): `role`, `aria-orientation`, `data-orientation`, `onKeyDown`,
  * `onFocus`, `onBlur`, `onPointerDown`, and `focusgroup` while the flag is on.
  *
  * @see https://ui.funstack.work/components/toolbar
@@ -90,14 +90,14 @@ function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
 export function ToolbarRoot({
   orientation = "horizontal",
   loop = true,
-  experimental_focusgroup = false,
+  experimental_focusGroup = false,
   className,
   style,
   children,
   render,
   ...rest
 }: ToolbarRootProps) {
-  const native = useNativeFocusgroup(experimental_focusgroup);
+  const native = useNativeFocusgroup(experimental_focusGroup);
   const rootRef = useRef<HTMLElement | null>(null);
   const roving = useRovingFocus(rootRef, {
     orientation,
@@ -110,7 +110,7 @@ export function ToolbarRoot({
   const context = useMemo<ToolbarContextValue>(() => ({ orientation }), [orientation]);
   const state: ToolbarRootState = { orientation };
 
-  const focusgroup = experimental_focusgroup
+  const focusgroup = experimental_focusGroup
     ? `toolbar ${orientation === "vertical" ? "block" : "inline"} ${loop ? "wrap" : "nowrap"}`
     : undefined;
 

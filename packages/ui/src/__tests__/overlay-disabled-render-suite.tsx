@@ -11,10 +11,17 @@
 // (`createOverlayHarness`); the Close rows run where the overlay has a Close part and a JS-free
 // mode (Dialog, Popover). Component-specific rows (Dialog's non-modal JS-free Trigger and its
 // owned `disabled`, Popover's own `aria-disabled` on a host render) stay in those files.
+//
+// The "Disabled in a Toolbar" rows (conventions 3.6, testing.md 10.1, #201) run where the
+// Trigger is one of the Toolbar's button-like parts (`toolbar: true`: Dialog, its AlertDialog
+// and Drawer reuse, Popover, Menu): inside a `Toolbar.Root` a disabled Trigger is
+// `aria-disabled`, focusable and in the arrow sequence, no invoker, and never opens, in library
+// and (where the overlay has one) JS-free mode.
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentPropsWithRef, ComponentType, ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
+import { Toolbar } from "../toolbar/index.js";
 import { flushTasks, PlainButton, setupUser } from "./helpers.js";
 import type { OpenChangeFn, OverlayHarnessProps } from "./overlay-open-state-suite.js";
 
@@ -44,6 +51,11 @@ export interface OverlayDisabledRenderConfig<D, P extends object> {
    * from the `shown` mirror when it is no invoker (Popover, Menu, #121; not Dialog).
    */
   readonly popoverTarget?: boolean;
+  /**
+   * The Trigger is one of the parts conventions 3.6 keeps focusable when disabled inside a
+   * `Toolbar.Root` (Dialog, Popover, Menu; not NavigationMenu).
+   */
+  readonly toolbar?: boolean;
   /** The Trigger rows run once per variant, with its extra Harness props (Dialog: `modal`). */
   readonly triggerVariants?: readonly (readonly [label: string, props: P])[];
   /** The Close part (`data-testid="close"`) and the JS-free mode, where the overlay has them. */
@@ -101,6 +113,77 @@ export function describeOverlayDisabledRenders<D, P extends object>(
     expectNoInvoker(trigger());
     if (config.popoverTarget) expect(trigger()).toHaveAttribute("aria-expanded", String(shown));
   };
+
+  /** Conventions 3.6: disabled in a Toolbar. */
+  function describeToolbarRows(): void {
+    describe("inside a Toolbar.Root (conventions 3.6)", () => {
+      const inToolbar = (node: ReactElement) => (
+        <Toolbar.Root aria-label="Tools">{node}</Toolbar.Root>
+      );
+
+      it.each(variants)(
+        "library mode%s: a disabled Trigger is aria-disabled, focusable, in the arrow sequence, no invoker, never opens",
+        async (_, extra) => {
+          const user = setupUser();
+          const action = vi.fn<OpenChangeFn<D>>();
+          const open = config.spyOpen();
+          render(
+            inToolbar(
+              <Harness
+                mode="uncontrolled"
+                action={action}
+                trigger={{ disabled: true }}
+                {...extra}
+              />,
+            ),
+          );
+          expectAriaDisabled(trigger());
+          expectTriggerNoInvoker(false);
+          expect(cancelled(trigger())).toBe(true);
+          // In the sequence: ArrowLeft leaves it for the previous item, ArrowRight comes back.
+          trigger().focus();
+          expect(trigger()).toHaveFocus();
+          await user.keyboard("{ArrowLeft}");
+          expect(trigger()).not.toHaveFocus();
+          await user.keyboard("{ArrowRight}");
+          expect(trigger()).toHaveFocus();
+          await user.keyboard("{Enter}");
+          await user.keyboard(" ");
+          await flushTasks(2);
+          expect(action).not.toHaveBeenCalled();
+          expect(open).not.toHaveBeenCalled();
+          expect(isOpen()).toBe(false);
+        },
+      );
+
+      it.each(variants)(
+        "library mode%s: an enabled Trigger inside a Toolbar is unchanged",
+        async (_, extra) => {
+          const user = setupUser();
+          render(inToolbar(<Harness mode="uncontrolled" {...extra} />));
+          expect(trigger()).not.toHaveAttribute("aria-disabled");
+          expect(trigger()).not.toBeDisabled();
+          await user.click(trigger());
+          await flushTasks(2);
+          expect(isOpen()).toBe(true);
+        },
+      );
+
+      if (!close) return;
+
+      it.each(variants)(
+        "JS-free mode%s: a disabled Trigger is aria-disabled, no invoker, its click cancelled",
+        async (_, extra) => {
+          render(inToolbar(<Harness mode="static" trigger={{ disabled: true }} {...extra} />));
+          expectAriaDisabled(trigger());
+          expectNoInvoker(trigger());
+          expect(cancelled(trigger())).toBe(true);
+          await flushTasks(2);
+          expect(isOpen()).toBe(false);
+        },
+      );
+    });
+  }
 
   describe(`${config.name} disabled on link and component renders (shared overlay suite, design/components/button.md 17.3)`, () => {
     describe.each(renders)("Trigger, %s render", (_, element) => {
@@ -198,6 +281,8 @@ export function describeOverlayDisabledRenders<D, P extends object>(
         expect(closePart()).not.toHaveAttribute("aria-disabled");
       }
     });
+
+    if (config.toolbar) describeToolbarRows();
 
     if (!close) return;
 

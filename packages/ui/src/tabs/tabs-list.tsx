@@ -7,7 +7,7 @@ import type {
   KeyboardEvent,
   ReactNode,
 } from "react";
-import { focusWithRing, resolveArrowKey } from "../internal/arrow-keys.js";
+import { focusWithRing, isPlainKey, resolveArrowKey } from "../internal/arrow-keys.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
@@ -36,7 +36,14 @@ export interface TabsListState {
  */
 export interface TabsListProps extends Omit<
   ComponentPropsWithRef<"div">,
-  "onKeyDown" | "onFocus" | "className" | "style" | "children"
+  | "onKeyDown"
+  | "onFocus"
+  | "role"
+  | "aria-orientation"
+  | "tabIndex"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * Render `focusgroup="tablist …"` and, where the browser implements it, let the browser handle
@@ -44,7 +51,7 @@ export interface TabsListProps extends Omit<
    *
    * @defaultValue `false`
    */
-  experimental_focusgroup?: boolean;
+  experimental_focusGroup?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TabsListState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -68,12 +75,12 @@ function tabsOf(list: Element): HTMLElement[] {
  *
  * Owned keys (a `render` element cannot override them, conventions 1.2): `role`,
  * `aria-orientation`, `data-orientation`, `data-disabled`, `tabIndex`, `onKeyDown`, `onFocus`,
- * and `focusgroup` when `experimental_focusgroup` is on.
+ * and `focusgroup` when `experimental_focusGroup` is on.
  *
  * @see https://ui.funstack.work/components/tabs
  */
 export function TabsList({
-  experimental_focusgroup = false,
+  experimental_focusGroup = false,
   className,
   style,
   children,
@@ -84,10 +91,10 @@ export function TabsList({
   const { orientation, loop, disabled, optimistic } = ctx;
 
   // The Tabs read it too: they drop `tabindex="-1"` on the native path (TabsListContextValue).
-  const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
+  const nativeFocusgroup = useNativeFocusgroup(experimental_focusGroup);
   const listContext = useMemo<TabsListContextValue>(
-    () => ({ focusgroup: experimental_focusgroup, nativeFocusgroup }),
-    [experimental_focusgroup, nativeFocusgroup],
+    () => ({ focusgroup: experimental_focusGroup, nativeFocusgroup }),
+    [experimental_focusGroup, nativeFocusgroup],
   );
 
   // A value that matches no Tab (a controlled `value` for a route without a tab, design 11.5)
@@ -108,7 +115,7 @@ export function TabsList({
   useDevWarning(
     unmatched,
     isDev &&
-      `Tabs: the value ${JSON.stringify(optimistic)} matches no Tabs.Tab. No tab is selected; the ` +
+      `Tabs.List: the value ${JSON.stringify(optimistic)} matches no Tabs.Tab. No tab is selected; the ` +
         "tablist itself is the tab stop. Pass null to select nothing on purpose.",
   );
   const listIsTabStop = optimistic === null || unmatched;
@@ -116,7 +123,7 @@ export function TabsList({
   const state: TabsListState = { orientation, disabled };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!isPlainKey(event)) return;
     const list = event.currentTarget;
     const target = event.target as Element;
     if (target.getAttribute("role") !== "tab" || target.closest('[role="tablist"]') !== list) {
@@ -167,7 +174,7 @@ export function TabsList({
     if (first !== undefined) focusWithRing(first);
   };
 
-  const focusgroup = experimental_focusgroup
+  const focusgroup = experimental_focusGroup
     ? // `nomemory` + `focusgroupstart` on the selected Tab: Tab always enters on the selected tab
       // (APG), not on the last focused one, which differs in manual activation.
       `tablist ${orientation === "vertical" ? "block" : "inline"} ${loop ? "wrap" : "nowrap"} nomemory`

@@ -16,6 +16,7 @@ describeOverlayDisabledRenders<DialogOpenChangeDetails, { modal?: boolean; conte
   Harness,
   isOpen: () => popup().open,
   spyOpen: spyShowModal,
+  toolbar: true,
   triggerVariants: [
     [" (modal=true)", { modal: true }],
     [" (modal=false)", { modal: false }],

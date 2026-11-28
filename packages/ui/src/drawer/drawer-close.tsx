@@ -1,7 +1,7 @@
 "use client";
 import { useDialogClose } from "../dialog/dialog-close.js";
 import type {
-  DialogCloseDetails,
+  DialogCloseActionDetails,
   DialogCloseProps,
   DialogCloseState,
 } from "../dialog/dialog-close.js";
@@ -10,7 +10,7 @@ import type {
 export type DrawerCloseState = DialogCloseState;
 
 /** Details passed to `Drawer.Close`'s `action`: Dialog's. */
-export type DrawerCloseDetails = DialogCloseDetails;
+export type DrawerCloseActionDetails = DialogCloseActionDetails;
 
 /**
  * Props of `Drawer.Close`: `Dialog.Close`'s.

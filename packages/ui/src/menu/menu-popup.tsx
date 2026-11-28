@@ -12,6 +12,7 @@ import type {
 } from "react";
 import type { AnchorAlign, AnchorSide } from "../internal/overlay/anchor-position.js";
 import { CSPContext } from "../internal/csp-context.js";
+import { dataAttr } from "../internal/data-attr.js";
 import { MenubarContext, useMenubarContext } from "../internal/menubar-context.js";
 import { listenInvokerPresses } from "../internal/overlay/invokers.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
@@ -60,7 +61,7 @@ export interface MenuPopupState {
   readonly side: MenuSide | null;
   /** While shown: the resolved alignment; otherwise the `align` prop. */
   readonly align: MenuAlign;
-  /** This popup belongs to a submenu. */
+  /** This popup belongs to a submenu, rendered as `data-submenu`. */
   readonly submenu: boolean;
   /**
    * The current open came from a `Menu.ContextTrigger`: the popup is placed at the pointer, with
@@ -79,7 +80,7 @@ export interface MenuPopupProps extends Omit<
   | "id"
   | "popover"
   | "role"
-  | "aria-labelledby"
+  | "tabIndex"
   | "onKeyDown"
   | "onFocus"
   | "onBlur"
@@ -129,15 +130,21 @@ export interface MenuPopupProps extends Omit<
    *
    * @defaultValue `false`
    */
-  experimental_focusgroup?: boolean;
+  experimental_focusGroup?: boolean;
   /**
    * Forwarded to the `<ViewTransition default>` around the popup element. Animates the opening
    * commit and every library-driven close (an item's activation, the Trigger, ArrowLeft, hover
    * leaving a submenu, controlled `open={false}`) in all engines; dismissals (Escape, a click
    * outside, Tab) animate with CSS only. Without it the part renders no `<ViewTransition>`.
-   * While a view transition runs, the popup's CSS transitions are turned off for the moment of the
-   * library's own show or hide (an inline `transition: none !important`, restored right after),
-   * so that show or hide runs no CSS transition (a `@keyframes` animation is not cut).
+   *
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal of the Popup inside a transition start a document view
+   * transition (a ~250 ms page cross-fade that the next transition waits for); a plain open
+   * starts none, as the content mounts under the already-mounted popup element. While a view
+   * transition runs, the popup's CSS transitions are cut for the moment of the library's own
+   * show or hide (an inline `transition: none !important`, restored right after), so only the
+   * view transition animates it; a `@keyframes` animation is not cut, and a dismissal, which
+   * runs no view transition, keeps its CSS exit.
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
@@ -162,7 +169,7 @@ const FOCUSABLE_SELECTOR =
  * The menu itself: `<div popover="auto" role="menu" aria-labelledby={trigger} tabindex="-1">`,
  * placed against its Trigger with CSS Anchor Positioning. Owns the keyboard model (design 5):
  * ArrowUp / ArrowDown / Home / End move focus between items (or the browser does, with
- * `experimental_focusgroup` where supported), printable characters run typeahead, ArrowLeft
+ * `experimental_focusGroup` where supported), printable characters run typeahead, ArrowLeft
  * closes a submenu. The top-level popup closes the whole menu at once when focus leaves it (Tab);
  * a press on a button of the consumer's that names it (`popovertarget`, `commandfor`) moves no
  * focus, so that button's click closes the menu as `"activate"`.
@@ -170,11 +177,13 @@ const FOCUSABLE_SELECTOR =
  * shown, those are where the browser placed it (conventions 13.2), otherwise the requested
  * values.
  *
- * Owned keys (conventions 1.2): `id`, `popover`, `role`, `aria-labelledby` (token-merged),
- * `tabIndex`, `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
+ * Owned keys (conventions 1.2): `id`, `popover`, `role`, `tabIndex`, `focusgroup` (with the
+ * flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
  * non-item space keeps focus on the current item), `onContextMenu` (no native menu over this
  * one), `onPointerEnter` / `onPointerLeave`, `data-side` / `data-align` unless `side` is `null`
- * or the menu is placed at a point, and `data-context` for an open from a `Menu.ContextTrigger`.
+ * or the menu is placed at a point, `data-context` for an open from a `Menu.ContextTrigger`,
+ * and `data-submenu` on a submenu's popup. `aria-labelledby` (the Trigger's id) is token-merged
+ * with yours, so it stays in the props type.
  * Such an open is placed at the pointer: `--menu-point-x` / `--menu-point-y` inline and, unless
  * `side` is `null`, `top` and `left` (`right` for an RTL popup) at the point with the library's
  * `@position-try` fallbacks, whose rules it renders as a hoisted `<style>`. A top-level menu
@@ -186,7 +195,7 @@ export function MenuPopup({
   side: sideProp,
   align = "start",
   keepMounted,
-  experimental_focusgroup = false,
+  experimental_focusGroup = false,
   transition,
   className,
   style,
@@ -213,7 +222,7 @@ export function MenuPopup({
   });
   const { side, align: resolvedAlign, ref: placementRef } = placement;
 
-  const nativeFocusgroup = useNativeFocusgroup(experimental_focusgroup);
+  const nativeFocusgroup = useNativeFocusgroup(experimental_focusGroup);
   const { onKeyDown: onMenuKeyDown, typingAhead } = useMenuKeyboard(menu, nativeFocusgroup);
   // A menu of a Menubar (design/components/menubar.md 2.3). `null` in a submenu: this Popup ends
   // the bar's context for its content.
@@ -362,7 +371,7 @@ export function MenuPopup({
     "aria-labelledby": menu.triggerId,
     // The popup itself takes focus as the last resort when a menu has no items.
     tabIndex: -1,
-    ...(experimental_focusgroup && { focusgroup: `menu ${loop ? "wrap" : "nowrap"}` }),
+    ...(experimental_focusGroup && { focusgroup: `menu ${loop ? "wrap" : "nowrap"}` }),
     onKeyDown,
     onBlur,
     onMouseDown,
@@ -381,6 +390,7 @@ export function MenuPopup({
     }),
     ...placement.dataAttributes,
     "data-context": point !== null ? "" : undefined,
+    "data-submenu": dataAttr(submenu),
   };
 
   // The shipped `@position-try` rules (conventions 12): hoisted into <head> and deduplicated by

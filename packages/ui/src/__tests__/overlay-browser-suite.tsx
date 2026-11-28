@@ -190,6 +190,16 @@ export interface OverlayBrowserConfig<D extends OverlayDetailsLike> {
     /** Extra checks once the open's view transition finished (Dialog: `:modal`; Menu: focus). */
     readonly afterOpen?: () => void;
   };
+  /**
+   * The JS-free mode, where the overlay has one (Dialog, Popover; not Menu): the "JS-free
+   * `data-open`" rows (conventions 7.4, #201). `Harness` renders a Root without open props, the
+   * Trigger (`trigger`, with `className={({ open }) => open ? "state-open" : "state-closed"}`),
+   * the Popup (`popup`) and an action-less Close (`close`); `withTrigger={false}` leaves the
+   * Trigger out.
+   */
+  readonly jsFree?: {
+    readonly Harness: ComponentType<{ withTrigger?: boolean }>;
+  };
 }
 
 /**
@@ -336,6 +346,47 @@ export function describeOverlayInBrowser<D extends OverlayDetailsLike>(
   const isOpen = () => config.isOpen(popup());
 
   describe(`${config.name} (shared overlay suite)`, () => {
+    if (config.jsFree !== undefined) {
+      const { Harness: Static } = config.jsFree;
+      describe("JS-free data-open on the Trigger (conventions 7.4)", () => {
+        it("follows the popup: the Trigger's open, the Close, Escape; state.open stays false", async () => {
+          render(<Static />);
+          expect(trigger()).not.toHaveAttribute("data-open");
+          await user.click(trigger());
+          expect(isOpen()).toBe(true);
+          await expect.poll(() => trigger().hasAttribute("data-open")).toBe(true);
+          // React holds no value in this mode (conventions 4.1 rule 3).
+          expect(trigger()).toHaveClass("state-closed");
+          await user.click(screen.getByTestId("close"));
+          expect(isOpen()).toBe(false);
+          await expect.poll(() => trigger().hasAttribute("data-open")).toBe(false);
+          await user.click(trigger());
+          await expect.poll(() => trigger().hasAttribute("data-open")).toBe(true);
+          await user.keyboard("{Escape}");
+          expect(isOpen()).toBe(false);
+          await expect.poll(() => trigger().hasAttribute("data-open")).toBe(false);
+          expect(trigger()).toHaveClass("state-closed");
+        });
+
+        it("a Trigger mounted while the popup is open picks the state up", async () => {
+          const { rerender } = render(<Static withTrigger={false} />);
+          const element = popup();
+          await act(async () => {
+            if (element.hasAttribute("popover")) element.showPopover();
+            else (element as HTMLDialogElement).showModal();
+          });
+          expect(isOpen()).toBe(true);
+          rerender(<Static />);
+          expect(trigger()).toHaveAttribute("data-open", "");
+          await act(async () => {
+            if (element.hasAttribute("popover")) element.hidePopover();
+            else (element as HTMLDialogElement).close();
+          });
+          await expect.poll(() => trigger().hasAttribute("data-open")).toBe(false);
+        });
+      });
+    }
+
     it("Escape closes: a 'dismiss' fact to onOpenChange, nothing pending; focus returns to the Trigger", async () => {
       const action = vi.fn<Action>();
       const fact = vi.fn<Action>();

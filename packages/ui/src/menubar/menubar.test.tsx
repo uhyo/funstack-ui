@@ -100,13 +100,18 @@ async function openFile(user: ReturnType<typeof setupUser>) {
 
 describe("Menubar", () => {
   describe("roles and ARIA", () => {
-    it("renders div[role=menubar] with the consumer's name and no aria-orientation", () => {
+    it("renders div[role=menubar] with the consumer's name and a horizontal orientation", () => {
       render(<Bar />);
       const bar = el("bar");
       expect(bar.tagName).toBe("DIV");
       expect(bar).toHaveAttribute("role", "menubar");
       expect(bar).toHaveAttribute("aria-label", "Application");
-      expect(bar).not.toHaveAttribute("aria-orientation");
+      // A fixed orientation is rendered all the same (conventions 3.10 rule 6).
+      expect(bar).toHaveAttribute("aria-orientation", "horizontal");
+      expect(bar).toHaveAttribute("data-orientation", "horizontal");
+      // @ts-expect-error `aria-orientation` is owned (conventions 1.5).
+      const owned: MenubarProps = { "aria-orientation": "vertical" };
+      expect(owned).toBeTypeOf("object");
       expect(screen.getByRole("menubar", { name: "Application" })).toBe(bar);
     });
 
@@ -469,6 +474,49 @@ describe("Menubar", () => {
       await flushTasks(2);
       expect(isOpen("file-popup")).toBe(true);
       expect(el("new")).toHaveFocus();
+    });
+
+    // Conventions 3.10 rule 2: on the bar too, a modified or prevented key is the browser's.
+    it.each(["Alt", "Control", "Meta"])(
+      "%s+arrow on a Trigger neither moves focus nor switches menus",
+      async (modifier) => {
+        render(<Bar />);
+        const user = setupUser();
+        act(() => el("file").focus());
+        await user.keyboard(`{${modifier}>}{ArrowRight}{/${modifier}}`);
+        expect(el("file")).toHaveFocus();
+
+        // Menu mode on the bar: a hover switch leaves focus on the Trigger of an open menu.
+        await openFile(user);
+        fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
+        await flushTasks(2);
+        expect(isOpen("edit-popup")).toBe(true);
+        expect(el("edit")).toHaveFocus();
+        await user.keyboard(`{${modifier}>}{ArrowRight}{/${modifier}}`);
+        await flushTasks(2);
+        expect(el("edit")).toHaveFocus();
+        expect(isOpen("edit-popup")).toBe(true);
+        expect(isOpen("view-popup")).toBe(false);
+      },
+    );
+
+    it("an arrow a consumer prevented neither moves focus nor switches menus", async () => {
+      render(<Bar />);
+      const user = setupUser();
+      const prevent = (event: KeyboardEvent) => {
+        if (event.key === "ArrowRight") event.preventDefault();
+      };
+      el("edit").addEventListener("keydown", prevent);
+      await openFile(user);
+      fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
+      await flushTasks(2);
+      expect(el("edit")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("edit")).toHaveFocus();
+      expect(isOpen("edit-popup")).toBe(true);
+      expect(isOpen("view-popup")).toBe(false);
+      el("edit").removeEventListener("keydown", prevent);
     });
   });
 
@@ -988,7 +1036,7 @@ describe("Menubar", () => {
   });
 
   describe("function props, render and ref", () => {
-    it("className, style and children receive the (empty) state", () => {
+    it("className, style and children receive the state ({ orientation })", () => {
       const seen: MenubarState[] = [];
       render(
         <Menubar
@@ -1014,7 +1062,7 @@ describe("Menubar", () => {
       expect(el("bar")).toHaveClass("bar");
       expect(el("bar")).toHaveStyle({ gap: "4px" });
       expect(seen.length).toBeGreaterThan(0);
-      for (const state of seen) expect(state).toEqual({});
+      for (const state of seen) expect(state).toEqual({ orientation: "horizontal" });
     });
 
     it("render element replaces the div, keeps the role and the keys, forwards ref", async () => {
@@ -1062,7 +1110,7 @@ describe("Menubar", () => {
         </Menubar>,
       );
       expect(el("bar")).toHaveAttribute("role", "menubar");
-      expect(renderFn.mock.calls[0]![1]).toEqual({});
+      expect(renderFn.mock.calls[0]![1]).toEqual({ orientation: "horizontal" });
     });
 
     it("a consumer onPointerMove on a Trigger still runs, and so does the switch", async () => {

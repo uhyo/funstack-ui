@@ -19,8 +19,10 @@ export interface TabsPanelState {
   readonly value: string;
   /** Committed: true only once the action has resolved and the render has committed. */
   readonly selected: boolean;
-  /** The Root's `orientation`. */
+  /** The Root's `orientation` (`data-orientation`). */
   readonly orientation: TabsOrientation;
+  /** The Root's `disabled` (`data-disabled`), as on an Accordion or Collapsible Panel. */
+  readonly disabled: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface TabsPanelState {
  */
 export interface TabsPanelProps extends Omit<
   ComponentPropsWithRef<"div">,
-  "id" | "hidden" | "className" | "style" | "children"
+  "id" | "hidden" | "role" | "className" | "style" | "children"
 > {
   /** The tab value this panel belongs to. */
   value: string;
@@ -68,8 +70,8 @@ export interface TabsPanelProps extends Omit<
  * A `div[role=tabpanel]`. Renders the **committed** selection, so a newly selected panel that
  * suspends keeps the current panel on screen while the Root shows `data-pending`.
  *
- * Owned keys (conventions 1.2): `role`, `id`, `aria-labelledby` (token-merged), `data-selected`,
- * `hidden`.
+ * Owned keys (conventions 1.5): `role`, `id`, `aria-labelledby` (token-merged), `data-selected`,
+ * `data-orientation`, `data-disabled`, `hidden`.
  *
  * @see https://ui.funstack.work/components/tabs
  */
@@ -123,7 +125,12 @@ function PanelElement({
     onMatch: (event) => ctx.select(value, event, "platform"),
   });
 
-  const state: TabsPanelState = { value, selected, orientation: ctx.orientation };
+  const state: TabsPanelState = {
+    value,
+    selected,
+    orientation: ctx.orientation,
+    disabled: ctx.disabled,
+  };
 
   const element = useRender<ComponentPropsWithRef<"div">, TabsPanelState>({
     defaultElement: "div",
@@ -139,6 +146,8 @@ function PanelElement({
       id: panelId(ctx.rootId, value),
       "aria-labelledby": tabId(ctx.rootId, value),
       "data-selected": dataAttr(selected),
+      "data-orientation": ctx.orientation,
+      "data-disabled": dataAttr(ctx.disabled),
       // Boolean form for SSR; `useUntilFound` upgrades it to "until-found" (conventions 7.4).
       hidden: untilFound ? !selected : undefined,
     },

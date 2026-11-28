@@ -36,5 +36,9 @@ export type { DrawerTriggerProps, DrawerTriggerState } from "./drawer-trigger.js
 export type { DrawerPopupProps, DrawerPopupState, DrawerSide } from "./drawer-popup.js";
 export type { DrawerTitleProps, DrawerTitleState } from "./drawer-title.js";
 export type { DrawerDescriptionProps, DrawerDescriptionState } from "./drawer-description.js";
-export type { DrawerCloseProps, DrawerCloseState, DrawerCloseDetails } from "./drawer-close.js";
+export type {
+  DrawerCloseProps,
+  DrawerCloseState,
+  DrawerCloseActionDetails,
+} from "./drawer-close.js";
 export type { DrawerFormProps, DrawerFormState } from "./drawer-form.js";

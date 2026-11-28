@@ -71,10 +71,11 @@ export function CollapsiblePage() {
           ],
           ["Works before hydration", "yes, fully", "yes; reconciled on mount"],
           [
-            "`transition`",
+            "`transition` (Root, Panel)",
             "no effect (development warning)",
             "animates the commit that ends an action",
           ],
+          ["`state.open`", "`false` (React holds no value)", "optimistic (Panel: committed)"],
         ]}
       />
       <p>
@@ -152,7 +153,7 @@ export function CollapsiblePage() {
       />
       <PartFacts
         state={
-          "`CollapsibleRootState` is `{ open, pending, disabled }`; `open` is optimistic, and `undefined` in JS-free mode (the browser owns it)."
+          "`CollapsibleRootState` is `{ open, pending, disabled }`; `open` is optimistic, and `false` in JS-free mode (the browser owns it and React holds no value; style with `:open`)."
         }
         owned={
           "`open`, `name`, `suppressHydrationWarning`, `data-open`, `data-pending`, `data-disabled`, and `onToggle` in library mode."
@@ -164,12 +165,6 @@ export function CollapsiblePage() {
       </h4>
       <PropsTable
         rows={[
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Library mode only. Animates the commit that ends an action (for example a spinner disappearing), not the optimistic data-open flip.",
-          },
           ...functionProps(
             "CollapsibleTriggerState",
             "Rendered from optimistic state; must not suspend.",
@@ -183,7 +178,7 @@ export function CollapsiblePage() {
           "`aria-disabled`, `data-open`, `data-pending`, `data-disabled`, and `onClick` in library mode (and when disabled)."
         }
         note={
-          "No `disabled` prop: the Root carries it. Links and form controls inside the summary keep their own behaviour and do not toggle."
+          "No `disabled` prop: the Root carries it, and `aria-disabled` is owned. No `transition` prop: everything the Trigger renders is optimistic, and the Root's boundary covers it; animate `data-open` with CSS. Links and form controls inside the summary keep their own behaviour and do not toggle."
         }
       />
 
@@ -207,7 +202,7 @@ export function CollapsiblePage() {
       />
       <PartFacts
         state={
-          "`CollapsiblePanelState` is `{ open, disabled }`; `open` is committed (`undefined` in JS-free mode)."
+          "`CollapsiblePanelState` is `{ open, disabled }`; `open` is committed (`false` in JS-free mode)."
         }
         owned={"`data-disabled`."}
         note={
@@ -275,7 +270,7 @@ export function CollapsiblePage() {
       <BehaviourSection
         id="transition-types"
         summary={
-          "Library mode: `fsui-collapsible` plus `fsui-collapsible-expand` or `fsui-collapsible-collapse`. JS-free mode starts no transitions."
+          "Library mode: `fsui-collapsible` plus `fsui-collapsible-open` or `fsui-collapsible-close`, the kinds of every open state in the library. JS-free mode starts no transitions."
         }
       />
 

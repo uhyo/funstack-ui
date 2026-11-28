@@ -31,8 +31,11 @@ const isDev = process.env.NODE_ENV !== "production";
 export interface AccordionItemState {
   /** The Item's `value` prop. */
   readonly value: string;
-  /** Optimistic open state. `undefined` in JS-free mode (browser-owned, unknown to React). */
-  readonly open: boolean | undefined;
+  /**
+   * Optimistic open state. `false` in JS-free mode: the browser owns it and React holds no value
+   * (conventions 4.1 rule 3); style with `:open` there.
+   */
+  readonly open: boolean;
   /** This item's open state is changing through an in-flight action. */
   readonly pending: boolean;
   /** Disabled by its own prop or by the Root. */
@@ -89,6 +92,9 @@ export interface AccordionItemProps extends Omit<
  * committed state and `data-open` / `data-pending` follow optimistic state; in JS-free mode (or
  * outside any Root, as a standalone disclosure) the browser owns `open`.
  *
+ * Owned keys (conventions 1.5): `open`, `name`, `onToggle` (library mode), `data-open`,
+ * `data-pending`, `data-disabled`.
+ *
  * @see https://ui.funstack.work/components/accordion
  */
 export function AccordionItem({
@@ -105,8 +111,9 @@ export function AccordionItem({
   const root = use(AccordionRootContext);
   const isLibrary = root?.mode === "library";
   const disabled = disabledProp || (root?.disabled ?? false);
-  const committedOpen = isLibrary ? root.committed.has(value) : undefined;
-  const optimisticOpen = isLibrary ? root.optimistic.has(value) : undefined;
+  // JS-free mode: `false`, the server-rendered closed state React knows (conventions 4.1 rule 3).
+  const committedOpen = isLibrary && root.committed.has(value);
+  const optimisticOpen = isLibrary && root.optimistic.has(value);
   const rootPending = root?.pending ?? false;
   const pending = isLibrary && rootPending && committedOpen !== optimisticOpen;
   // JS-free mode: the prop React writes never changes after the first render, so React never
@@ -146,7 +153,7 @@ export function AccordionItem({
     },
     [checkElement, registerItem, value, isLibrary],
   );
-  useCommittedOpenRecord(detailsRef, committedOpen);
+  useCommittedOpenRecord(detailsRef, isLibrary ? committedOpen : undefined);
 
   // Platform path (design 2.3): the Root reconciles pre-hydration clicks on mount and re-applies
   // committed state once nothing is in flight; this handler reports the browser's own flips.
@@ -161,7 +168,7 @@ export function AccordionItem({
         if (disabled) {
           // A disabled item cannot be opened by the browser either; close it again now or, while
           // an action is in flight, when the Root re-applies committed state.
-          if (!rootPending) writeOpen(element, committedOpen === true);
+          if (!rootPending) writeOpen(element, committedOpen);
           return;
         }
         root.dispatchFromDom(value, element.open, event.nativeEvent);
@@ -208,7 +215,7 @@ export function AccordionItem({
       // Only installed in library mode; owning the key in static mode would strip a render
       // element's own `onToggle`.
       ...(isLibrary && { onToggle }),
-      "data-open": dataAttr(optimisticOpen === true),
+      "data-open": dataAttr(optimisticOpen),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
     },

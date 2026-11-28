@@ -17,7 +17,7 @@ export interface ToggleGroupContextValue {
   readonly orientation: ToggleGroupOrientation;
   /**
    * The value whose Item renders `focusgroupstart` (standalone group with
-   * `experimental_focusgroup`): the first pressed enabled Item in document order, else `null`.
+   * `experimental_focusGroup`): the first pressed enabled Item in document order, else `null`.
    */
   readonly focusgroupStartValue: string | null;
   /** An Item was activated (stable). Computes the patch of design 5.2 against the optimistic set. */

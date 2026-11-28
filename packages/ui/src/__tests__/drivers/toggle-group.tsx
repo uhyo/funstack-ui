@@ -15,14 +15,14 @@ const root = () => screen.getByRole("group");
 
 export const toggleGroupDriver: ValueActionDriver<string[], ToggleGroupValueChangeDetails> = {
   name: "ToggleGroup.Root",
-  render: ({ value, defaultValue, changeAction, transition, extra }) => (
+  render: ({ value, defaultValue, changeAction, extra }) => (
     <ToggleGroup.Root
       aria-label="Text style"
       {...definedProps({ value, defaultValue, valueChangeAction: changeAction })}
       {...extra}
     >
       {STYLES.map((v) => (
-        <ToggleGroup.Item key={v} value={v} {...definedProps({ transition })}>
+        <ToggleGroup.Item key={v} value={v}>
           {v}
         </ToggleGroup.Item>
       ))}
@@ -33,9 +33,9 @@ export const toggleGroupDriver: ValueActionDriver<string[], ToggleGroupValueChan
   eventType: () => "click",
   detailsFields: (i) =>
     [
-      { added: ["bold"], removed: [] },
-      { added: ["italic"], removed: [] },
-      { added: [], removed: ["bold"] },
+      { reason: "activate", added: ["bold"], removed: [] },
+      { reason: "activate", added: ["italic"], removed: [] },
+      { reason: "activate", added: [], removed: ["bold"] },
     ][i]!,
   expectShown: (pressed) => {
     for (const v of STYLES) {
@@ -51,6 +51,8 @@ export const toggleGroupDriver: ValueActionDriver<string[], ToggleGroupValueChan
   pendingOff: (i) => STYLES.slice(i + 1).map(item),
   queryControl: () => screen.queryByRole("group"),
   props: { value: "value", defaultValue: "defaultValue" },
+  // All optimistic: no `transition` prop on any part (conventions 5.1).
+  transitionProp: false,
   commit: (prev, _next, details) => [
     ...prev.filter((v) => !details.removed.includes(v)),
     ...details.added.filter((v) => !prev.includes(v)),

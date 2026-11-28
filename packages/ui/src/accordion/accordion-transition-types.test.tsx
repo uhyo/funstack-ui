@@ -1,6 +1,6 @@
 // View Transition types added per Accordion dispatch (design/components/accordion.md,
-// conventions 5.3): fsui-accordion plus -expand / -collapse by `details.open`. Rows from the
-// value-action suite (drivers __tests__/drivers/accordion.tsx); see
+// conventions 5.3): fsui-accordion plus -open (`details.added` non-empty) and -close
+// (`details.removed` non-empty; an exclusive switch carries both). Rows from the value-action suite (drivers __tests__/drivers/accordion.tsx); see
 // __tests__/transition-type-spy.ts.
 import { vi } from "vitest";
 import { accordionDriver, accordionExclusiveDriver } from "../__tests__/drivers/accordion.js";

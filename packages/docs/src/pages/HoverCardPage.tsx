@@ -308,7 +308,7 @@ export function HoverCardPage() {
             name: "transition",
             type: "ViewTransitionClass",
             description:
-              "Forwarded to a `<ViewTransition>` around the popover element: animates the opening commit, content swaps (a skeleton replaced by the content) and a controlled close. Closes the user causes are facts and animate with CSS only.",
+              "Forwarded to a `<ViewTransition>` around the popover element: animates the opening commit, content swaps (a skeleton replaced by the content) and a controlled close. Closes the user causes are facts and animate with CSS only. Keep it static: changing it remounts the popup. Any value, `\"none\"` included, makes a mount or `<Activity>` reveal of the Popup inside a transition run the page cross-fade; a plain open does not. While a view transition runs, the popup's CSS transitions are cut for the library's own show or hide (a `@keyframes` animation is not, and a dismissal keeps its CSS exit).",
           },
           ...functionProps(
             "HoverCardPopupState",

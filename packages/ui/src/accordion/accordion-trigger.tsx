@@ -1,22 +1,12 @@
 "use client";
 import { use, useCallback } from "react";
-import type {
-  ComponentPropsWithRef,
-  CSSProperties,
-  MouseEvent,
-  ReactNode,
-  ViewTransitionClass,
-} from "react";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
+import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import { interceptSummaryClick, useSummaryCheck } from "../internal/details-summary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { AccordionItemContext } from "./accordion-context.js";
 import type { AccordionItemState } from "./accordion-item.js";
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /** The trigger is the item's control; it renders the item's state object. */
 export type AccordionTriggerState = AccordionItemState;
@@ -28,18 +18,8 @@ export type AccordionTriggerState = AccordionItemState;
  */
 export interface AccordionTriggerProps extends Omit<
   ComponentPropsWithRef<"summary">,
-  "onClick" | "className" | "style" | "children"
+  "onClick" | "aria-disabled" | "className" | "style" | "children"
 > {
-  /**
-   * Library mode only. Forwarded as `default` to the `<ViewTransition>` around the `<summary>`.
-   * Animates only the commit that ends an action (for example a spinner rendered from `pending`
-   * disappearing); the optimistic `data-open` flip is a CSS job.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, AccordionTriggerState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -56,10 +36,15 @@ export interface AccordionTriggerProps extends Omit<
  * element shows optimistic `data-open` and `data-pending`. The platform forbids `aria-expanded`
  * on a summary, so assistive technology hears the committed state (from `<details open>`).
  *
+ * No `transition` prop: everything it renders is optimistic (conventions 5.1). The Item's
+ * boundary covers it; animate the `data-open` flip with CSS.
+ *
+ * Owned keys (conventions 1.5): `aria-disabled`, `data-open`, `data-pending`, `data-disabled`,
+ * `onClick` (library mode, or while disabled).
+ *
  * @see https://ui.funstack.work/components/accordion
  */
 export function AccordionTrigger({
-  transition,
   className,
   style,
   children,
@@ -72,13 +57,6 @@ export function AccordionTrigger({
     throw new Error("Accordion.Trigger must be rendered inside an Accordion.Item.");
   }
   const isLibrary = item.library;
-
-  useDevWarning(
-    !isLibrary && transition !== undefined,
-    isDev &&
-      "Accordion.Trigger: `transition` has no effect in JS-free mode; the browser toggles the item " +
-        "outside any React transition.",
-  );
 
   const registerTrigger = item.registerTrigger;
   const checkElement = useSummaryCheck("Accordion.Trigger");
@@ -125,7 +103,7 @@ export function AccordionTrigger({
     // Library-controlled layer: wins over a `render` element's props (conventions 1.2).
     libraryProps: {
       "aria-disabled": item.disabled ? true : undefined,
-      "data-open": dataAttr(item.optimisticOpen === true),
+      "data-open": dataAttr(item.optimisticOpen),
       "data-pending": dataAttr(item.pending),
       "data-disabled": dataAttr(item.disabled),
       // Only owned when installed, so a render element keeps its own `onClick` in JS-free mode.
@@ -133,7 +111,7 @@ export function AccordionTrigger({
     },
   });
 
-  return useTransitionBoundary("Accordion.Trigger", isLibrary ? transition : undefined, element);
+  return element;
 }
 
 AccordionTrigger.displayName = "AccordionTrigger";

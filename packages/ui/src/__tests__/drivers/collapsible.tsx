@@ -27,9 +27,7 @@ export const collapsibleDriver: ValueActionDriver<boolean, CollapsibleOpenChange
       })}
       {...extra}
     >
-      <Collapsible.Trigger data-testid="trigger" {...definedProps({ transition })}>
-        Details
-      </Collapsible.Trigger>
+      <Collapsible.Trigger data-testid="trigger">Details</Collapsible.Trigger>
       <Collapsible.Panel data-testid="panel" {...definedProps({ transition })}>
         {({ open }) => <span data-testid="panel-open">{String(open)}</span>}
       </Collapsible.Panel>
@@ -61,8 +59,8 @@ export const collapsibleDriver: ValueActionDriver<boolean, CollapsibleOpenChange
   implicitDefault: false,
   props: { value: "open", defaultValue: "defaultOpen" },
   transitionTypes: [
-    ["fsui-collapsible", "fsui-collapsible-expand"],
-    ["fsui-collapsible", "fsui-collapsible-collapse"],
-    ["fsui-collapsible", "fsui-collapsible-expand"],
+    ["fsui-collapsible", "fsui-collapsible-open"],
+    ["fsui-collapsible", "fsui-collapsible-close"],
+    ["fsui-collapsible", "fsui-collapsible-open"],
   ],
 };

@@ -7,6 +7,12 @@ import { useToastRootContext } from "./toast-context.js";
 import type { ToastRootState } from "./toast-root.js";
 
 /**
+ * State of `Toast.Description`, passed to the function forms of `className`, `style`, `children` and
+ * `render`: the Root's state.
+ */
+export type ToastDescriptionState = ToastRootState;
+
+/**
  * Props of `Toast.Description`.
  *
  * @see https://ui.funstack.work/components/toast
@@ -21,13 +27,13 @@ export interface ToastDescriptionProps extends Omit<
    *
    * @defaultValue the toast's `description`
    */
-  children?: StateValue<ReactNode, ToastRootState>;
+  children?: StateValue<ReactNode, ToastDescriptionState>;
   /** Class name, or a function of the part's state that returns one. */
-  className?: StateValue<string | undefined, ToastRootState>;
+  className?: StateValue<string | undefined, ToastDescriptionState>;
   /** Inline style, or a function of the part's state that returns one. */
-  style?: StateValue<CSSProperties | undefined, ToastRootState>;
+  style?: StateValue<CSSProperties | undefined, ToastDescriptionState>;
   /** Replace the default `<p>` (element form) or take over rendering (function form). */
-  render?: RenderProp<ComponentPropsWithRef<"p">, ToastRootState>;
+  render?: RenderProp<ComponentPropsWithRef<"p">, ToastDescriptionState>;
 }
 
 /**
@@ -51,7 +57,7 @@ export function ToastDescription({
   // Mounted, or revealed by a Suspense boundary inside the Root: announce the text now present.
   const { contentCommitted } = root;
   useLayoutEffect(() => contentCommitted(), [contentCommitted]);
-  const element = useRender<ComponentPropsWithRef<"p">, ToastRootState>({
+  const element = useRender<ComponentPropsWithRef<"p">, ToastDescriptionState>({
     defaultElement: "p",
     render,
     state: root.state,

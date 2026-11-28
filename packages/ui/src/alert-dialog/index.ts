@@ -46,7 +46,7 @@ export type {
 export type {
   AlertDialogCancelProps,
   AlertDialogCancelState,
-  AlertDialogCancelDetails,
+  AlertDialogCancelActionDetails,
 } from "./alert-dialog-cancel.js";
 export type {
   AlertDialogActionProps,

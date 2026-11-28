@@ -74,10 +74,11 @@ export function AccordionPage() {
           ],
           ["Works before hydration", "yes, fully", "yes; reconciled on mount"],
           [
-            "`transition`",
+            "`transition` (Item, Panel)",
             "no effect (development warning)",
             "animates the commit that ends an action",
           ],
+          ["`state.open`", "`false` (React holds no value)", "optimistic (Panel: committed)"],
         ]}
       />
       <p>
@@ -100,13 +101,13 @@ export function AccordionPage() {
           },
           {
             name: "value",
-            type: "string[]  |  string | null (exclusive)",
+            type: "readonly string[]  |  string | null (exclusive)",
             description:
               "Controlled open items. undefined means uncontrolled; [] or null means none open. Selects library mode.",
           },
           {
             name: "defaultValue",
-            type: "string[]  |  string | null (exclusive)",
+            type: "readonly string[]  |  string | null (exclusive)",
             description: "Initial open items in uncontrolled library mode. Selects library mode.",
           },
           {
@@ -117,9 +118,11 @@ export function AccordionPage() {
                 Called with the next open items on every change, inside the Root's transition. Sync,
                 async or a Server Function. <code>details</code>: <code>reason</code> (a{" "}
                 <code>ChangeReason</code>; Accordion dispatches <code>"activate"</code> or{" "}
-                <code>"platform"</code>), <code>item</code> (the item that changed) and{" "}
-                <code>open</code> (its new state). In multiple mode the array lists items in the
-                order they mounted. Selects library mode.
+                <code>"platform"</code>), <code>added</code> (the items the change opened) and{" "}
+                <code>removed</code> (the items it closed), the diff every set-valued component
+                reports, in document order. With <code>exclusive</code>, opening B while A is open
+                is <code>added: ["b"]</code>, <code>removed: ["a"]</code>. In multiple mode the
+                array lists items in document order. Selects library mode.
               </>
             ),
           },
@@ -128,6 +131,13 @@ export function AccordionPage() {
             type: "boolean",
             default: "false",
             description: 'Disables every item: triggers get aria-disabled="true" and never toggle.',
+          },
+          {
+            name: "loop",
+            type: "boolean",
+            default: "true",
+            description:
+              "ArrowDown on the last trigger moves to the first and ArrowUp on the first to the last. With false the arrows stop at the ends.",
           },
           {
             name: "experimental_interpolateSize",
@@ -146,7 +156,9 @@ export function AccordionPage() {
         ]}
       />
       <PartFacts
-        state={"`AccordionRootState` is `{ pending, disabled }`."}
+        state={
+          "`AccordionRootState` is `{ value, pending, disabled }`; `value` is the optimistic open items in document order, always an array (one entry at most with `exclusive`), and `[]` in JS-free mode."
+        }
         owned={"`onKeyDown`, `data-pending`, `data-disabled`."}
       />
 
@@ -186,7 +198,7 @@ export function AccordionPage() {
       />
       <PartFacts
         state={
-          "`AccordionItemState` is `{ value, open, pending, disabled }`; `open` is optimistic, and `undefined` in JS-free mode (the browser owns it)."
+          "`AccordionItemState` is `{ value, open, pending, disabled }`; `open` is optimistic, and `false` in JS-free mode (the browser owns it and React holds no value; style with `:open`)."
         }
         owned={
           "`open`, `name`, `suppressHydrationWarning`, `data-open`, `data-pending`, `data-disabled`, and `onToggle` in library mode."
@@ -198,12 +210,6 @@ export function AccordionPage() {
       </h4>
       <PropsTable
         rows={[
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Library mode only. Animates the commit that ends an action (for example a spinner disappearing), not the optimistic data-open flip.",
-          },
           ...functionProps(
             "AccordionTriggerState",
             "Rendered from optimistic state; must not suspend. A heading inside is recommended.",
@@ -217,7 +223,7 @@ export function AccordionPage() {
           "`aria-disabled`, `data-open`, `data-pending`, `data-disabled`, and `onClick` in library mode (and on disabled items)."
         }
         note={
-          "Links and form controls inside the summary keep their own behaviour and do not toggle the item."
+          "Links and form controls inside the summary keep their own behaviour and do not toggle the item. No `transition` prop: everything the Trigger renders is optimistic, and the Item's boundary covers it; animate `data-open` with CSS. Use `disabled` on the Item or Root, not `aria-disabled`."
         }
       />
 
@@ -241,7 +247,7 @@ export function AccordionPage() {
       />
       <PartFacts
         state={
-          "`AccordionPanelState` is `{ value, open, disabled }`; `open` is committed (`undefined` in JS-free mode)."
+          "`AccordionPanelState` is `{ value, open, disabled }`; `open` is committed (`false` in JS-free mode)."
         }
         owned={"`data-disabled`."}
         note={
@@ -289,9 +295,13 @@ export function AccordionPage() {
           ["Tab / Shift+Tab", "Every trigger is a tab stop."],
           [
             "ArrowDown / ArrowUp",
-            "Next / previous trigger in the same Root, wrapping, skipping disabled triggers.",
+            "Next / previous trigger in the same Root, disabled ones included; wraps at the ends unless `loop={false}`.",
           ],
-          ["Home / End", "First / last enabled trigger."],
+          ["Home / End", "First / last trigger, disabled or not."],
+          [
+            "Any of these with Alt, Ctrl or Meta, or already default-prevented",
+            "Not handled: the key is the browser's (Ctrl+Home scrolls the page).",
+          ],
         ]}
       />
       <ul>
@@ -304,13 +314,16 @@ export function AccordionPage() {
           committed state; <code>data-open</code> is visual only. For an audible pending state,
           render an <code>aria-live</code> region from the Trigger's state.
         </li>
-        <li>Disabled triggers stay focusable. Focus never moves on open or close.</li>
+        <li>
+          Disabled triggers stay focusable and the arrow keys reach them, so they are announced as
+          unavailable. Focus never moves on open or close.
+        </li>
       </ul>
 
       <BehaviourSection
         id="transition-types"
         summary={
-          "Library mode: `fsui-accordion` plus `fsui-accordion-expand` or `fsui-accordion-collapse`. JS-free mode starts no transitions."
+          "Library mode: `fsui-accordion`, plus `fsui-accordion-open` when the change opened an item (`details.added` is non-empty) and `fsui-accordion-close` when it closed one (`details.removed` is non-empty); an exclusive switch carries both. JS-free mode starts no transitions."
         }
       />
 
@@ -328,7 +341,10 @@ export function AccordionPage() {
           <li>
             Click a trigger: the click is intercepted, the chevron flips (<code>data-open</code>),
             the item and trigger get <code>data-pending</code>, and{" "}
-            <code>valueChangeAction(next, {'{ reason: "activate", item, open: true }'})</code> runs.
+            <code>
+              valueChangeAction(next, {'{ reason: "activate", added: [item], removed: [] }'})
+            </code>{" "}
+            runs.
           </li>
           <li>
             The commit renders the Panel's function child with <code>open: true</code>; the replies

@@ -119,7 +119,7 @@ export function TabsPage() {
       <PropsTable
         rows={[
           {
-            name: "experimental_focusgroup",
+            name: "experimental_focusGroup",
             type: "boolean",
             default: "false",
             description: (
@@ -159,12 +159,6 @@ export function TabsPage() {
             default: "false",
             description: 'Focusable but inert: aria-disabled="true", never dispatches.',
           },
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Forwarded to the Tab's <ViewTransition default>. Fires only on the commit that settles the action, never on the optimistic selection.",
-          },
           ...functionProps("TabsTabState", "Rendered from optimistic state; must not suspend."),
           renderProp("button", "TabsTabState"),
         ]}
@@ -172,7 +166,10 @@ export function TabsPage() {
       <PartFacts
         state={"`TabsTabState` is `{ value, selected, pending, disabled, orientation }`."}
         owned={
-          '`role` (`"tab"`), `id`, `aria-selected`, `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (with the flag), `onClick`, `onKeyDown`, `onFocus`, `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, and `anchor-name` in `style` for the Indicator (your `style` wins).'
+          '`role` (`"tab"`), `type` (on a `<button>`), `id`, `aria-selected`, `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (with the flag), `onClick`, `onKeyDown`, `onFocus`, `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, and `anchor-name` in `style` for the Indicator (your `style` wins).'
+        }
+        note={
+          "No `transition` prop: everything a Tab renders is optimistic. Animate the selection with a CSS `transition` on `[data-selected]`; to animate a tab's content when the action settles, wrap it in your own `<ViewTransition>` keyed on `fsui-tabs`."
         }
       />
 
@@ -211,9 +208,11 @@ export function TabsPage() {
         ]}
       />
       <PartFacts
-        state={"`TabsPanelState` is `{ value, selected, orientation }`; `selected` is committed."}
+        state={
+          "`TabsPanelState` is `{ value, selected, orientation, disabled }`; `selected` is committed, `disabled` is the Root's."
+        }
         owned={
-          '`role` (`"tabpanel"`), `id`, `aria-labelledby` (token-merged), `hidden`, `data-selected`.'
+          '`role` (`"tabpanel"`), `id`, `aria-labelledby` (token-merged), `hidden`, `data-selected`, `data-orientation`, `data-disabled`.'
         }
         note={
           "Panels get `tabIndex={0}` by default (APG); pass `tabIndex={-1}` when the panel starts with focusable content."
@@ -227,9 +226,11 @@ export function TabsPage() {
         rows={[...functionProps("TabsIndicatorState"), renderProp("span", "TabsIndicatorState")]}
       />
       <PartFacts
-        state={"`TabsIndicatorState` is `{ value, pending, orientation }`."}
+        state={
+          "`TabsIndicatorState` is `{ value, selected, pending, orientation }`; `selected` is `value !== null`."
+        }
         owned={
-          "`aria-hidden`, `hidden`, `data-selected`, `data-pending`, and `position-anchor` in `style`."
+          "`aria-hidden`, `hidden`, `data-selected`, `data-pending`, `data-orientation`, and `position-anchor` in `style`."
         }
         note={
           "A decorative span that follows the optimistic tab. Give it `position: absolute` and `anchor()` insets in CSS, and a CSS `transition` on them to slide. It must come after the Tabs inside the List."
@@ -249,8 +250,8 @@ export function TabsPage() {
           ["`data-pending`", "Indicator", "Mirrors the Root."],
           ["`data-selected`", "Tab, Indicator", "Optimistic selection (immediate)."],
           ["`data-selected`", "Panel", "Committed selection (relevant with `keepMounted`)."],
-          ["`data-disabled`", "Root, List, Tab", "Disabled by prop or by the Root."],
-          ["`data-orientation`", "Root, List, Tab", '`"horizontal"` or `"vertical"`.'],
+          ["`data-disabled`", "Root, List, Tab, Panel", "Disabled by prop or by the Root."],
+          ["`data-orientation`", "every part", '`"horizontal"` or `"vertical"`.'],
           ["`aria-selected`", "Tab", "Optimistic selection."],
           ["`aria-disabled`", "Tab", '`"true"` when disabled (still focusable).'],
         ]}
@@ -268,8 +269,12 @@ export function TabsPage() {
             "ArrowRight / ArrowLeft",
             "Horizontal: next / previous tab (swapped under `direction: rtl`). Wraps when `loop`.",
           ],
-          ["ArrowDown / ArrowUp", "Vertical: next / previous tab."],
-          ["Home / End", "First / last tab."],
+          ["ArrowDown / ArrowUp", "Vertical: next / previous tab. Wraps when `loop`."],
+          ["Home / End", "First / last tab, disabled or not."],
+          [
+            "Any of these with Alt, Ctrl or Meta, or already default-prevented",
+            "Not handled: the key is the browser's.",
+          ],
           [
             "Enter / Space",
             "Selects the focused tab (the only way to select by keyboard in manual mode).",
@@ -297,7 +302,10 @@ export function TabsPage() {
           <code>aria-selected</code> follows the optimistic selection. <code>aria-orientation</code>{" "}
           is always set on the List.
         </li>
-        <li>Key presses with Alt, Ctrl or Meta are left to the browser.</li>
+        <li>
+          Key presses with Alt, Ctrl or Meta are left to the browser, and so is a key your own{" "}
+          <code>onKeyDown</code> on a Tab prevented.
+        </li>
       </ul>
 
       <BehaviourSection

@@ -2,7 +2,7 @@
 import { useCallback, useEffectEvent, useId, useLayoutEffect, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
-import { resolveArrowKey } from "../internal/arrow-keys.js";
+import { focusWithRing, isPlainKey, resolveArrowKey } from "../internal/arrow-keys.js";
 import type { ArrowMove } from "../internal/arrow-keys.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { noteOpen, writeOpen } from "../internal/details-summary.js";
@@ -19,12 +19,14 @@ import {
   intendedValue,
   useControllableAction,
 } from "../internal/action/use-controllable-action.js";
+import { useItemOrder } from "../internal/use-item-order.js";
+import type { ItemLayout } from "../internal/use-item-order.js";
 import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import { useValueSet } from "../internal/use-value-set.js";
-import { EMPTY_SET, setsEqual, sortByOrder } from "../internal/value-set.js";
-import type { ValueSet } from "../internal/value-set.js";
+import { applyPatch, EMPTY_SET, setsEqual, sortByOrder } from "../internal/value-set.js";
+import type { SetPatch, ValueSet } from "../internal/value-set.js";
 import { AccordionRootContext } from "./accordion-context.js";
 import type { AccordionMode, AccordionRootContextValue } from "./accordion-context.js";
 
@@ -35,13 +37,22 @@ const isDev = process.env.NODE_ENV !== "production";
  * `render`.
  */
 export interface AccordionRootState {
+  /**
+   * The optimistic open items in document order, always an array (one entry at most with
+   * `exclusive`), so one function of state serves both modes. `[]` in JS-free mode, where the
+   * browser owns `open` (style with `:open`). Content rendered from it must not suspend.
+   */
+  readonly value: readonly string[];
   /** An action dispatched through this Accordion is in flight (library mode only). */
   readonly pending: boolean;
   /** The Root's `disabled` prop. */
   readonly disabled: boolean;
 }
 
-/** Details passed as the second argument of `valueChangeAction`. */
+/**
+ * Details passed as the second argument of `valueChangeAction`: the set diff of every set-valued
+ * component (conventions 2.2), computed against the optimistic set, in document order.
+ */
 export interface AccordionValueChangeDetails extends ActionDetails {
   /**
    * The shared vocabulary (conventions 2.2); Accordion dispatches two of its values.
@@ -50,13 +61,21 @@ export interface AccordionValueChangeDetails extends ActionDetails {
    * event, or `undefined` when the mismatch was found on mount.
    */
   readonly reason: ChangeReason;
-  /** The item whose open state changed. */
-  readonly item: string;
-  /** That item's new open state. */
-  readonly open: boolean;
+  /** The items this change opened. */
+  readonly added: readonly string[];
+  /**
+   * The items this change closed. With `exclusive`, the item that closed because another opened
+   * is listed here: a switch from A to B is `added: ["b"]`, `removed: ["a"]`.
+   */
+  readonly removed: readonly string[];
 }
 
-interface AccordionRootBaseProps extends Omit<
+/**
+ * The props both variants of `Accordion.Root` share.
+ *
+ * @see https://ui.funstack.work/components/accordion
+ */
+export interface AccordionRootBaseProps extends Omit<
   ComponentPropsWithRef<"div">,
   // `defaultValue` is also a native HTMLAttributes member; the Accordion's own definition wins.
   "onKeyDown" | "defaultValue" | "className" | "style" | "children"
@@ -67,6 +86,13 @@ interface AccordionRootBaseProps extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
+  /**
+   * ArrowDown on the last trigger moves to the first and ArrowUp on the first to the last; with
+   * `false` the arrows stop at the ends (conventions 3.10).
+   *
+   * @defaultValue `true`
+   */
+  loop?: boolean;
   /**
    * Renders `interpolate-size: allow-keywords` on the root so `::details-content` can transition
    * `height` to `auto`. Chromium-only polish today; use the `grid-template-rows` form for a
@@ -99,9 +125,9 @@ export interface AccordionRootMultipleProps extends AccordionRootBaseProps {
    */
   exclusive?: false;
   /** Controlled open items. `undefined` means uncontrolled; `[]` means none open. */
-  value?: string[];
+  value?: readonly string[];
   /** Initial open items in uncontrolled library mode. */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Called with the next open items on every change. Runs inside the Root's transition; may be
    * sync or async (also a Server Function). Rejections reach the nearest Error Boundary.
@@ -109,6 +135,9 @@ export interface AccordionRootMultipleProps extends AccordionRootBaseProps {
    * May also be called with `details.reason === "platform"` when the browser opened an item
    * itself (find-in-page, a click before hydration); committed state is re-applied to the DOM
    * once the action settles.
+   *
+   * Persist `details.added` / `details.removed` rather than `next`: `next` is the intended set
+   * and can contain an earlier change whose action fails later.
    *
    * A `setState` placed after your own `await` is not a Transition update; wrap it in
    * `startTransition` (React limitation).
@@ -132,7 +161,18 @@ export interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
   value?: string | null;
   /** Initial open item in uncontrolled library mode. */
   defaultValue?: string | null;
-  /** See {@link AccordionRootMultipleProps.valueChangeAction}. */
+  /**
+   * Called with the next open item (or `null`) on every change, inside the Root's transition; may
+   * be sync or async (also a Server Function). Rejections reach the nearest Error Boundary. Also
+   * called with `details.reason === "platform"` when the browser opened an item itself.
+   *
+   * Persist `next`: the value is single-valued, so the latest dispatch wins and `next` is the
+   * whole intended value. `details.added` / `details.removed` say what changed (a switch from A
+   * to B is `added: ["b"]`, `removed: ["a"]`).
+   *
+   * A `setState` placed after your own `await` is not a Transition update; wrap it in
+   * `startTransition` (React limitation).
+   */
   valueChangeAction?: ChangeAction<string | null, AccordionValueChangeDetails>;
 }
 
@@ -164,7 +204,7 @@ function fromSet(set: OpenSet, exclusive: boolean, order: readonly string[]): Ac
   return sortByOrder(set, order);
 }
 
-/** The optimistic reducer of design 4.1: add/remove one item, or replace when exclusive. */
+/** The next set for one item's change: add/remove it, or replace when exclusive (design 4.1). */
 function reduce(set: OpenSet, item: string, open: boolean, exclusive: boolean): OpenSet {
   if (!open) {
     if (!set.has(item)) return set;
@@ -176,35 +216,49 @@ function reduce(set: OpenSet, item: string, open: boolean, exclusive: boolean): 
   return set.has(item) ? set : new Set(set).add(item);
 }
 
-function isEnabledTrigger(el: HTMLElement): boolean {
-  return el.getAttribute("aria-disabled") !== "true";
+/** The diff from `from` to `to` (conventions 2.2), each side in `order` (document order). */
+function diff(from: OpenSet, to: OpenSet, order: readonly string[]): SetPatch {
+  return {
+    added: sortByOrder(
+      [...to].filter((v) => !from.has(v)),
+      order,
+    ),
+    removed: sortByOrder(
+      [...from].filter((v) => !to.has(v)),
+      order,
+    ),
+  };
 }
 
 /**
  * Picks the trigger to focus for a move (ArrowDown / ArrowUp / Home / End, `resolveArrowKey` on
- * the vertical axis): `sorted` is every registered trigger in document order; disabled ones are
- * skipped; arrows wrap. Works when `current` is itself disabled (disabled triggers stay
- * focusable), which is why this is not the roving engine's index arithmetic.
+ * the vertical axis; conventions 3.10): `sorted` is every registered trigger in document order,
+ * the `aria-disabled` ones included (they are focusable and in the sequence, rule 3). The arrows
+ * wrap with `loop` and stop at the ends without it.
  */
 function nextTrigger(
   sorted: readonly HTMLElement[],
   current: HTMLElement,
   move: ArrowMove,
+  loop: boolean,
 ): HTMLElement | undefined {
-  const enabled = sorted.filter(isEnabledTrigger);
-  if (enabled.length === 0) return undefined;
-  if (move === "first") return enabled[0];
-  if (move === "last") return enabled[enabled.length - 1];
-  const position = sorted.indexOf(current);
-  if (move === "next") {
-    return enabled.find((el) => sorted.indexOf(el) > position) ?? enabled[0];
-  }
-  return enabled.findLast((el) => sorted.indexOf(el) < position) ?? enabled[enabled.length - 1];
+  const last = sorted.length - 1;
+  if (last < 0) return undefined;
+  if (move === "first") return sorted[0];
+  if (move === "last") return sorted[last];
+  const index = sorted.indexOf(current);
+  if (move === "next") return sorted[index >= last ? (loop ? 0 : last) : index + 1];
+  return sorted[index <= 0 ? (loop ? last : 0) : index - 1];
 }
+
+/** The Items' values in document order, as of the Root's last commit (`state.value`). */
+const NO_LAYOUT: ItemLayout = { order: [] };
 
 /**
  * The accordion container: a `div` that owns the open state, the transition, the context the
  * other parts read, and ArrowUp/ArrowDown/Home/End navigation between triggers.
+ *
+ * Owned keys (conventions 1.5): `data-pending`, `data-disabled`, `onKeyDown`.
  *
  * @see https://ui.funstack.work/components/accordion
  */
@@ -215,6 +269,7 @@ export function AccordionRoot(props: AccordionRootProps) {
     defaultValue,
     valueChangeAction,
     disabled = false,
+    loop = true,
     experimental_interpolateSize = false,
     className,
     style,
@@ -267,10 +322,14 @@ export function AccordionRoot(props: AccordionRootProps) {
     initialValue: EMPTY_SET,
     action:
       action && ((next, details) => action(fromSet(next, exclusive, registeredValues()), details)),
-    transitionTypes: (_next, _prev, details) =>
-      transitionTypes("accordion", details.open ? "expand" : "collapse"),
-    // Multiple: one item per dispatch, re-based on the committed set; it is also how the
-    // uncontrolled commit is folded over the resolved dispatches (#150). Exclusive is
+    // One kind per non-empty side of the diff: an exclusive switch carries both (conventions 5.3).
+    transitionTypes: (_next, _prev, details) => [
+      ...transitionTypes("accordion"),
+      ...(details.added.length > 0 ? ["fsui-accordion-open"] : []),
+      ...(details.removed.length > 0 ? ["fsui-accordion-close"] : []),
+    ],
+    // Multiple: the dispatch's diff (one item for a click or a reveal), re-based on the committed
+    // set; it is also how the uncontrolled commit is folded over the resolved dispatches (#150). Exclusive is
     // single-valued: no reducer, so the optimistic value is `next` and the latest dispatch
     // commits it, like Tabs.
     //
@@ -281,9 +340,7 @@ export function AccordionRoot(props: AccordionRootProps) {
     // event can run between a commit and its layout effects). It runs again only when an
     // `<Activity>` re-shows the Root; a pending click's item then has DOM `open` equal to the
     // optimistic value, so `next` equals the intended value and nothing is dispatched.
-    reducer: exclusive
-      ? undefined
-      : (prev, _next, details) => reduce(prev, details.item, details.open, false),
+    reducer: exclusive ? undefined : (prev, _next, details) => applyPatch(prev, details),
     warn: { component: "Accordion.Root", prop: "value" },
   });
 
@@ -301,19 +358,20 @@ export function AccordionRoot(props: AccordionRootProps) {
     };
   }, []);
 
-  const dispatchChange = useCallback(
-    (
-      next: OpenSet,
-      item: string,
-      open: boolean,
-      reason: ChangeReason,
-      event: Event | undefined,
-      whole = false,
-    ): void => {
-      dispatch(next, createActionDetails(event, { reason, item, open }), { whole });
-    },
-    [dispatch],
-  );
+  // `base` is the set `next` was built on (the optimistic or intended set): the diff is what this
+  // dispatch changes in what the user sees.
+  const dispatchChange = (
+    next: OpenSet,
+    base: OpenSet,
+    reason: ChangeReason,
+    event: Event | undefined,
+    whole = false,
+  ): void => {
+    const { added, removed } = diff(base, next, registeredValues());
+    dispatch(next, createActionDetails(event, { reason, added, removed }), { whole });
+  };
+  // Read through a ref so the two dispatchers below keep one identity.
+  const latestDispatch = useLatest(dispatchChange);
 
   // The two dispatchers below read the last committed optimistic set through `latest`, so they
   // keep one identity and the Items' contexts are reused across open-state changes: a
@@ -324,9 +382,10 @@ export function AccordionRoot(props: AccordionRootProps) {
     (item, open, event) => {
       const { optimistic, exclusive } = latest.current;
       // `next` comes from the optimistic set: what the user sees and intends (design 2.2).
-      dispatchChange(reduce(optimistic, item, open, exclusive), item, open, "activate", event);
+      const next = reduce(optimistic, item, open, exclusive);
+      latestDispatch.current(next, optimistic, "activate", event);
     },
-    [dispatchChange, latest],
+    [latestDispatch, latest],
   );
 
   const dispatchFromDom = useCallback<AccordionRootContextValue["dispatchFromDom"]>(
@@ -339,16 +398,16 @@ export function AccordionRoot(props: AccordionRootProps) {
       const base = intendedValue(latestInFlight, optimistic);
       const next = reduce(base, item, open, exclusive);
       if (setsEqual(next, base)) return;
-      dispatchChange(next, item, open, "platform", event);
+      latestDispatch.current(next, base, "platform", event);
     },
-    [dispatchChange, latestInFlight, latest],
+    [latestDispatch, latestInFlight, latest],
   );
 
   const isLibrary = mode === "library";
 
   // Mount reconciliation (design 2.3): clicks before hydration left some `<details open>` out of
   // step with committed state. Every mismatch is folded into ONE dispatch with reason "platform"
-  // and no event; disabled items are simply put back. Runs once per mount; the StrictMode re-run
+  // and no event, whose diff lists every item that changed; disabled items are simply put back. Runs once per mount; the StrictMode re-run
   // is deduplicated against the dispatch just made.
   const reconcileOnMount = useEffectEvent(() => {
     const base = intendedValue(latestInFlight, optimistic);
@@ -365,12 +424,11 @@ export function AccordionRoot(props: AccordionRootProps) {
     // Exclusive mode: the first opened item in document order wins (the others are re-closed
     // by the re-apply effect); otherwise fold every flip onto the base.
     const opened = exclusive ? mismatches.find((m) => m.open) : undefined;
-    const chosen = opened ?? mismatches[0]!;
     const next = opened
       ? new Set([opened.item])
       : mismatches.reduce((set, m) => reduce(set, m.item, m.open, exclusive), base);
     if (setsEqual(next, base)) return;
-    dispatchChange(next, chosen.item, chosen.open, "platform", undefined, true);
+    dispatchChange(next, base, "platform", undefined, true);
   });
   useLayoutEffect(() => {
     if (isLibrary) reconcileOnMount();
@@ -385,24 +443,34 @@ export function AccordionRoot(props: AccordionRootProps) {
   }, [isLibrary, pending, committed, latestInFlight]);
 
   function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    // A key with Alt, Ctrl or Meta, or one a consumer prevented, is the browser's (3.10 rule 2).
+    if (!isPlainKey(event)) return;
     // Vertical only, so no RTL mirroring: ArrowLeft / ArrowRight are not navigation keys.
     const move = resolveArrowKey(event.key, "vertical", false);
     if (move === null) return;
     const target = event.target;
     if (!(target instanceof HTMLElement) || !triggers.current.has(target)) return;
     const sorted = [...triggers.current].sort(compareDocumentOrder);
-    const next = nextTrigger(sorted, target, move);
+    const next = nextTrigger(sorted, target, move, loop);
     if (next === undefined) return;
     event.preventDefault();
     // A nested Root handles its own triggers; the outer one must not move focus again.
     event.stopPropagation();
-    next.focus();
+    if (next !== target) focusWithRing(next);
   }
+
+  // `state.value` in the Items' document order (as ToggleGroup's): read after the Root commits.
+  const { renderedValue } = useItemOrder({
+    optimistic: mode === "library" ? optimistic : EMPTY_SET,
+    initial: NO_LAYOUT,
+    read: () => ({ order: registeredValues() }),
+    duplicateMessage: false,
+  });
 
   const id = useId();
   const name = !isLibrary && exclusive ? id : undefined;
   const rootPending = isLibrary && pending;
-  const state: AccordionRootState = { pending: rootPending, disabled };
+  const state: AccordionRootState = { value: renderedValue, pending: rootPending, disabled };
   const contextCommitted = isLibrary ? committed : EMPTY_SET;
   const contextOptimistic = isLibrary ? optimistic : EMPTY_SET;
 

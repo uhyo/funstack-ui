@@ -3,6 +3,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { usePopoverTrigger } from "../internal/overlay/use-popover-trigger.js";
 import type { PopoverTriggerHookState } from "../internal/overlay/use-popover-trigger.js";
+import { useToolbarContext } from "../internal/toolbar-context.js";
 import { useRender } from "../internal/use-render.js";
 import { usePopoverContext } from "./popover-context.js";
 
@@ -20,6 +21,8 @@ export type PopoverTriggerState = PopoverTriggerHookState;
 export interface PopoverTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   | "onClick"
+  | "type"
+  | "aria-disabled"
   | "aria-expanded"
   | "commandfor"
   | "command"
@@ -31,8 +34,8 @@ export interface PopoverTriggerProps extends Omit<
 > {
   /**
    * Never dispatches. Native `disabled` on a `<button>` (no longer an invoker); in library mode
-   * with a link or component `render`, `aria-disabled="true"` instead: the element stays
-   * focusable.
+   * with a link or component `render`, and in every mode inside a `Toolbar.Root` (conventions
+   * 3.6), `aria-disabled="true"` instead: the element stays focusable, with no `popovertarget`.
    *
    * @defaultValue `false`
    */
@@ -58,10 +61,11 @@ export interface PopoverTriggerProps extends Omit<
  * The button shows optimistic `data-open` and `data-pending` until the change has landed; a
  * non-button `render` renders `aria-expanded` from the shown popup (in the top layer).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`
- * (library mode, link or component `render`), `popoverTarget`, `aria-expanded`, `onClick`
- * (library mode), `data-open`, `data-pending`, `data-disabled`; `commandfor`, `command` and
- * `popoverTargetAction` (never written; omitted from the props type). `aria-haspopup` and
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `aria-disabled` (library mode, link or component `render`, or inside a Toolbar),
+ * `popoverTarget`, `aria-expanded`, `onClick` (library mode); `commandfor`, `command` and
+ * `popoverTargetAction` (never written). Also owned: `disabled`, `data-open`, `data-pending`,
+ * `data-disabled`. `aria-haspopup` and
  * `aria-controls` pass through.
  *
  * @see https://ui.funstack.work/components/popover
@@ -75,10 +79,14 @@ export function PopoverTrigger({
   ...rest
 }: PopoverTriggerProps) {
   const ctx = usePopoverContext("Popover.Trigger");
+  // Inside a Toolbar a disabled Trigger stays focusable and in the arrow sequence (conventions
+  // 3.6).
+  const toolbar = useToolbarContext();
   const { state, libraryProps, ref } = usePopoverTrigger(ctx, {
     part: "Popover.Trigger",
     disabled,
     render,
+    alwaysFocusable: toolbar !== null,
   });
 
   return useRender<ComponentPropsWithRef<"button">, PopoverTriggerState>({

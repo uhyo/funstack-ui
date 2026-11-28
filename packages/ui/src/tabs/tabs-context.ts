@@ -27,9 +27,9 @@ export interface TabsContextValue {
 
 export const TabsContext = createContext<TabsContextValue | null>(null);
 
-/** What a Tabs.List tells its Tabs about `experimental_focusgroup`. */
+/** What a Tabs.List tells its Tabs about `experimental_focusGroup`. */
 export interface TabsListContextValue {
-  /** `experimental_focusgroup` is on: the selected Tab carries `focusgroupstart`. */
+  /** `experimental_focusGroup` is on: the selected Tab carries `focusgroupstart`. */
   readonly focusgroup: boolean;
   /**
    * The flag is on and the engine implements `focusgroup` (`useNativeFocusgroup`: false during

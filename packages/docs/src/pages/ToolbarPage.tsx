@@ -20,8 +20,8 @@ export function ToolbarPage() {
         a <a href="/components/toggle-group">ToggleGroup</a>, a{" "}
         <a href="/components/menu">Menu.Trigger</a>, a <a href="/components/toggle">Toggle</a>, a
         plain <code>&lt;button&gt;</code>, a link or an input all join the sequence without a
-        wrapper. A command button is a <a href="/components/button">Button</a>, which stays
-        focusable when disabled inside a toolbar.
+        wrapper. A command button is a <a href="/components/button">Button</a>. Every library button
+        inside a toolbar stays focusable when disabled.
       </p>
 
       <Example file="ToolbarEditor.tsx" css="toolbar.css">
@@ -57,7 +57,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
           ],
           [
             "`Toolbar.Separator`",
-            "`<hr aria-orientation>`",
+            '`<hr role="separator" aria-orientation>`',
             "A divider, perpendicular to the toolbar. Not focusable.",
           ],
         ]}
@@ -89,7 +89,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
             description: "Arrows wrap from the last item to the first.",
           },
           {
-            name: "experimental_focusgroup",
+            name: "experimental_focusGroup",
             type: "boolean",
             default: "false",
             description: (
@@ -124,7 +124,9 @@ import { Toolbar } from "@funstack/ui/toolbar";
         state={
           '`ToolbarSeparatorState` is `{ orientation }`: the separator\'s own orientation, `"vertical"` in a horizontal toolbar.'
         }
-        owned={"`aria-orientation`, `data-orientation`."}
+        owned={
+          '`role` (`"separator"`, rendered explicitly so a `render` element of another tag is one too), `aria-orientation`, `data-orientation`.'
+        }
       />
 
       <h3 id="data-attributes">Data attributes</h3>
@@ -182,7 +184,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
             "Enter / Space on a `Button`",
             "",
             "",
-            "Runs `action`, unless disabled or already pending.",
+            'Runs `action`, unless disabled, or pending with `whilePending="ignore"`.',
           ],
           [
             "A key the item handled itself",
@@ -194,8 +196,45 @@ import { Toolbar } from "@funstack/ui/toolbar";
       />
       <p>
         Natively <code>disabled</code> controls are skipped; <code>aria-disabled</code> ones are
-        reached. A popup rendered inside the toolbar (a <code>Menu.Popup</code>) is not part of the
-        sequence: its items are the menu's.
+        reached, also by Home and End. A popup rendered inside the toolbar (a{" "}
+        <code>Menu.Popup</code>) is not part of the sequence: its items are the menu's. Keys with
+        Alt, Ctrl or Meta, and keys an item's own <code>onKeyDown</code> prevented, are left to the
+        browser.
+      </p>
+
+      <h4 id="disabled-items">Disabled controls</h4>
+      <p>
+        Inside a toolbar every library button-like part stays focusable when disabled, so a
+        screen-reader user still finds it (APG Toolbar): it renders{" "}
+        <code>aria-disabled="true"</code> instead of native <code>disabled</code>, stays in the
+        arrow sequence, and its click, Enter and Space do nothing. Outside a toolbar a disabled
+        Toggle or ToggleGroup Item is natively disabled.
+      </p>
+      <Table
+        head={["Part", "Disabled inside a Toolbar", "Disabled outside one"]}
+        rows={[
+          ["`Button`", '`aria-disabled="true"`, in the sequence', "native `disabled`"],
+          ["`Toggle`", '`aria-disabled="true"`, in the sequence', "native `disabled`"],
+          [
+            "`ToggleGroup.Item` (own `disabled` or the group's)",
+            '`aria-disabled="true"`, in the sequence',
+            "native `disabled`, skipped by the group's arrows",
+          ],
+          [
+            "`Menu.Trigger`, `Popover.Trigger`, `Dialog.Trigger`, `AlertDialog.Trigger`, `Drawer.Trigger`",
+            '`aria-disabled="true"`, in the sequence; the invoker attributes are removed',
+            "native `disabled`",
+          ],
+          [
+            "Your own `<button disabled>`",
+            "native `disabled`, skipped (your choice)",
+            "native `disabled`",
+          ],
+        ]}
+      />
+      <p>
+        Style a disabled control inside a toolbar with <code>[data-disabled]</code>, not{" "}
+        <code>:disabled</code>.
       </p>
 
       <h4>A ToggleGroup inside a Toolbar</h4>
@@ -203,7 +242,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
         The group joins the toolbar's single sequence: Left / Right (or Up / Down when vertical)
         flow through its Items like any other items, and the other axis does nothing on them. The
         group's own <code>orientation</code>, <code>loop</code> and{" "}
-        <code>experimental_focusgroup</code> are ignored there (with a development warning); it
+        <code>experimental_focusGroup</code> are ignored there (with a development warning); it
         still renders <code>role="group"</code>, its label and its pending state.
       </p>
 

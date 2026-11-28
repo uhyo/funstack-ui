@@ -162,6 +162,7 @@ describeOverlayDisabledRenders<PopoverOpenChangeDetails, { close?: DisabledPartP
   isOpen: () => isOpen(),
   spyOpen: spyShow,
   popoverTarget: true,
+  toolbar: true,
   close: {
     props: (props) => ({ close: props }),
     spyClose: spyHide,

@@ -41,9 +41,17 @@ export const Menu = {
 export type { MenuRootProps, MenuRootState, MenuOpenChangeDetails } from "./menu-root.js";
 export type { MenuTriggerProps, MenuTriggerState } from "./menu-trigger.js";
 export type { MenuPopupProps, MenuPopupState, MenuSide, MenuAlign } from "./menu-popup.js";
-export type { MenuItemProps, MenuItemState, MenuItemDetails } from "./menu-item.js";
-export type { MenuCheckboxItemProps, MenuCheckboxItemState } from "./menu-checkbox-item.js";
-export type { MenuRadioGroupProps, MenuRadioGroupState } from "./menu-radio-group.js";
+export type { MenuItemProps, MenuItemState, MenuItemActionDetails } from "./menu-item.js";
+export type {
+  MenuCheckboxItemProps,
+  MenuCheckboxItemState,
+  MenuCheckboxItemCheckedChangeDetails,
+} from "./menu-checkbox-item.js";
+export type {
+  MenuRadioGroupProps,
+  MenuRadioGroupState,
+  MenuRadioGroupValueChangeDetails,
+} from "./menu-radio-group.js";
 export type { MenuRadioItemProps, MenuRadioItemState } from "./menu-radio-item.js";
 export type {
   MenuGroupProps,

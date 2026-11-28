@@ -74,8 +74,9 @@ export interface MenuRootProps {
    * Requests only. Awaited for `true` (the menu opens when it resolves and the items have
    * rendered) and for the closes the user asks a part for (Trigger toggle, an item's activation,
    * ArrowLeft in a submenu, the pointer leaving a hover-opened submenu). Never called for a
-   * dismissal: that goes to `onOpenChange`. May be a Server Function. A `setState` placed after
-   * your own `await` needs `startTransition` (React limitation).
+   * dismissal: that goes to `onOpenChange`. May be a Server Function. Rejections reach the
+   * nearest Error Boundary above the Root. A `setState` placed after your own `await` needs
+   * `startTransition` (React limitation).
    */
   openChangeAction?: ChangeAction<boolean, MenuOpenChangeDetails>;
   /**

@@ -174,7 +174,7 @@ describe("Accordion expand", () => {
     <Accordion.Root defaultValue={[]}>
       {(["a", "b"] as const).map((v) => (
         <Accordion.Item key={v} value={v} transition={transition}>
-          <Accordion.Trigger transition={transition}>{`trigger ${v}`}</Accordion.Trigger>
+          <Accordion.Trigger>{`trigger ${v}`}</Accordion.Trigger>
           <Accordion.Panel transition={transition}>{`panel ${v}`}</Accordion.Panel>
         </Accordion.Item>
       ))}

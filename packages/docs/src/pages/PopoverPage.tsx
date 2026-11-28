@@ -265,7 +265,7 @@ export function PopoverPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`: a disabled button is not an invoker and never dispatches. Owned, so a `render` element cannot re-enable it. In library mode with a link or component `render`, `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode (it cannot be natively disabled), and its click is cancelled.',
+              'Native `disabled`: a disabled button is not an invoker and never dispatches. Owned, so a `render` element cannot re-enable it. In library mode with a link or component `render`, `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode (it cannot be natively disabled), and its click is cancelled. Inside a [`Toolbar.Root`](/components/toolbar), in every mode, a disabled Trigger is `aria-disabled="true"` instead: it stays focusable and in the arrow-key sequence, renders no invoker attribute, and its click is cancelled.',
           },
           ...functionProps(
             "PopoverTriggerState",
@@ -276,10 +276,10 @@ export function PopoverPage() {
       />
       <PartFacts
         state={
-          "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open or a part's close, never a dismissal (a request still running when a dismissal superseded it keeps `pending` until that request settles)."
+          "`PopoverTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open or a part's close, never a dismissal (a request still running when a dismissal superseded it keeps `pending` until that request settles). In JS-free mode `state.open` is `false` (React holds no value) while `data-open` follows the popup, written from its `toggle` event."
         }
         owned={
-          "`type` (only on a `<button>`), `disabled`, `aria-disabled` (a host link; in library mode also a component `render`), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
+          "`type` (only on a `<button>`), `disabled`, `aria-disabled` (a host link; in library mode also a component `render`; inside a Toolbar), `popoverTarget` (only on an invoker), `aria-expanded` (only on a Trigger that is no invoker), `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `type`, `aria-disabled`, `popoverTarget` and `aria-expanded`."
         }
         note={
           'A click on a `<button>` Trigger while open is a part\'s close; a second click during a pending open cancels it (the latest intent wins). A Trigger rendered as another element (library mode only) is light-dismissed before its click; that close is a fact, `onOpenChange(false)` with `"activate"` and the click. `aria-haspopup` and `aria-controls` pass through.'
@@ -342,7 +342,7 @@ export function PopoverPage() {
             name: "transition",
             type: "ViewTransitionClass",
             description:
-              "Library mode only. Forwarded to a `<ViewTransition>` around the popover element itself: animates the opening commit, content swaps, and every library-driven close (Trigger, Close, a controlled `open={false}`) in all engines. Dismissals are the browser's and animate with CSS. Default: no boundary. Keep it static; any value makes a Root inserted by a transition run the page cross-fade.",
+              "Library mode only. Forwarded to a `<ViewTransition>` around the popover element itself: animates the opening commit, content swaps, and every library-driven close (Trigger, Close, a controlled `open={false}`) in all engines. Dismissals are the browser's and animate with CSS. Default: no boundary. Keep it static: changing it remounts the popup. Any value, `\"none\"` included, makes a mount or `<Activity>` reveal of the Popup inside a transition run the page cross-fade; a plain open does not. While a view transition runs, the popup's CSS transitions are cut for the library's own show or hide (a `@keyframes` animation is not, and a dismissal keeps its CSS exit).",
           },
           ...functionProps("PopoverPopupState"),
           renderProp("dialog", "PopoverPopupState"),
@@ -367,7 +367,7 @@ export function PopoverPage() {
         rows={[
           {
             name: "action",
-            type: "Action<[details: ActionDetails]>",
+            type: "Action<[details: PopoverCloseActionDetails]>",
             description: (
               <>
                 Runs in this button's own transition (<code>data-pending</code> on it), then closes
@@ -408,7 +408,7 @@ export function PopoverPage() {
           "`PopoverCloseState` is `{ pending, disabled }`; `pending` runs from the click until the close this part asked for has committed, with or without `action` (library mode)."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
         }
         note={
           'In library mode the click is always intercepted, so every Close goes through the Root. By default (`whilePending="ignore"`) a second click while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending` (the action and the hide); never natively disabled, so it keeps focus. To hide at once and finish the work in the background, do not return the promise: `action={() => { void apply(); }}`. If the user dismisses the popover and opens it again while the action runs, the action\'s close is dropped: it belonged to the earlier open. Popovers have no return value.'

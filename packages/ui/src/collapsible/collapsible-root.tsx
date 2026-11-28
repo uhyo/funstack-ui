@@ -42,8 +42,11 @@ const isDev = process.env.NODE_ENV !== "production";
  * and `render`.
  */
 export interface CollapsibleRootState {
-  /** Optimistic open state. `undefined` in JS-free mode (browser-owned, unknown to React). */
-  readonly open: boolean | undefined;
+  /**
+   * Optimistic open state. `false` in JS-free mode: the browser owns it and React holds no value
+   * (conventions 4.1 rule 3); style with `:open` there.
+   */
+  readonly open: boolean;
   /** An action dispatched through this Collapsible is in flight (library mode only). */
   readonly pending: boolean;
   /** The Root's `disabled` prop. */
@@ -140,6 +143,9 @@ export interface CollapsibleRootProps extends Omit<
  * library mode its `open` attribute follows committed state and `data-open` / `data-pending`
  * follow optimistic state; in JS-free mode the browser owns `open`.
  *
+ * Owned keys (conventions 1.5): `open`, `name`, `onToggle` (library mode), `data-open`,
+ * `data-pending`, `data-disabled`.
+ *
  * @see https://ui.funstack.work/components/collapsible
  */
 export function CollapsibleRoot({
@@ -174,7 +180,8 @@ export function CollapsibleRoot({
     defaultValue: defaultOpen,
     initialValue: false,
     action: openChangeAction,
-    transitionTypes: (next) => transitionTypes("collapsible", next ? "expand" : "collapse"),
+    // `open` / `close`: the kinds of every open state in the library (conventions 5.3).
+    transitionTypes: (next) => transitionTypes("collapsible", next ? "open" : "close"),
     // Single-valued: no reducer, latest dispatch wins (design 4.1).
     warn: { component: "Collapsible.Root", prop: "open" },
   });
@@ -268,8 +275,9 @@ export function CollapsibleRoot({
     if (element !== null) writeOpen(element, committed);
   }, [isLibrary, pending, committed, latestInFlight]);
 
-  const committedOpen = isLibrary ? committed : undefined;
-  const optimisticOpen = isLibrary ? optimistic : undefined;
+  // JS-free mode: `false`, the server-rendered closed state React knows (conventions 4.1 rule 3).
+  const committedOpen = isLibrary && committed;
+  const optimisticOpen = isLibrary && optimistic;
   const rootPending = isLibrary && pending;
   const state: CollapsibleRootState = { open: optimisticOpen, pending: rootPending, disabled };
 
@@ -313,7 +321,7 @@ export function CollapsibleRoot({
       // Only installed in library mode; owning the key in JS-free mode would strip a render
       // element's own `onToggle`.
       ...(isLibrary && { onToggle }),
-      "data-open": dataAttr(optimisticOpen === true),
+      "data-open": dataAttr(optimisticOpen),
       "data-pending": dataAttr(rootPending),
       "data-disabled": dataAttr(disabled),
     },

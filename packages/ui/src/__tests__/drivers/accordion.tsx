@@ -19,9 +19,7 @@ const panelOpen = (v: string) => screen.getByTestId(`panel-open-${v}`);
 function items(transition: ControlProps<unknown, unknown>["transition"]) {
   return ITEMS.map((v) => (
     <Accordion.Item key={v} value={v} data-testid={`item-${v}`} {...definedProps({ transition })}>
-      <Accordion.Trigger data-testid={`trigger-${v}`} {...definedProps({ transition })}>
-        {v.toUpperCase()}
-      </Accordion.Trigger>
+      <Accordion.Trigger data-testid={`trigger-${v}`}>{v.toUpperCase()}</Accordion.Trigger>
       <Accordion.Panel data-testid={`panel-${v}`} {...definedProps({ transition })}>
         {({ open }) => <span data-testid={`panel-open-${v}`}>{String(open)}</span>}
       </Accordion.Panel>
@@ -96,7 +94,10 @@ export const accordionDriver: ValueActionDriver<string[], AccordionValueChangeDe
   values: [[], ["a"], ["a", "b"], ["b"]],
   withoutFirstGesture: ["b"],
   gesture: (user, i) => user.click(trigger(MULTIPLE_CLICKS[i]!)),
-  detailsFields: (i) => ({ reason: "activate", item: MULTIPLE_CLICKS[i], open: i !== 2 }),
+  detailsFields: (i) =>
+    i === 2
+      ? { reason: "activate", added: [], removed: ["a"] }
+      : { reason: "activate", added: [MULTIPLE_CLICKS[i]], removed: [] },
   expectShown,
   expectCommitted,
   shown: join,
@@ -104,9 +105,9 @@ export const accordionDriver: ValueActionDriver<string[], AccordionValueChangeDe
   pendingOn: (i) => pendingParts(MULTIPLE_CHANGED[i]!),
   pendingOff: (i) => idleParts(MULTIPLE_CHANGED[i]!),
   transitionTypes: [
-    ["fsui-accordion", "fsui-accordion-expand"],
-    ["fsui-accordion", "fsui-accordion-expand"],
-    ["fsui-accordion", "fsui-accordion-collapse"],
+    ["fsui-accordion", "fsui-accordion-open"],
+    ["fsui-accordion", "fsui-accordion-open"],
+    ["fsui-accordion", "fsui-accordion-close"],
   ],
 };
 
@@ -139,7 +140,12 @@ export const accordionExclusiveDriver: ValueActionDriver<
   ),
   values: ["a", "b", "c", "a"],
   gesture: (user, i) => user.click(trigger(EXCLUSIVE_VALUES[i + 1]!)),
-  detailsFields: (i) => ({ reason: "activate", item: EXCLUSIVE_VALUES[i + 1], open: true }),
+  // An exclusive switch names the item it closed implicitly (conventions 2.2).
+  detailsFields: (i) => ({
+    reason: "activate",
+    added: [EXCLUSIVE_VALUES[i + 1]],
+    removed: [EXCLUSIVE_VALUES[i]],
+  }),
   expectShown,
   expectCommitted,
   shown: join,
@@ -147,8 +153,8 @@ export const accordionExclusiveDriver: ValueActionDriver<
   pendingOn: (i) => pendingParts(EXCLUSIVE_CHANGED[i]!),
   pendingOff: (i) => idleParts(EXCLUSIVE_CHANGED[i]!),
   transitionTypes: [
-    ["fsui-accordion", "fsui-accordion-expand"],
-    ["fsui-accordion", "fsui-accordion-expand"],
-    ["fsui-accordion", "fsui-accordion-expand"],
+    ["fsui-accordion", "fsui-accordion-open", "fsui-accordion-close"],
+    ["fsui-accordion", "fsui-accordion-open", "fsui-accordion-close"],
+    ["fsui-accordion", "fsui-accordion-open", "fsui-accordion-close"],
   ],
 };

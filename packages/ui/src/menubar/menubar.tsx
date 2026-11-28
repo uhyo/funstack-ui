@@ -7,7 +7,7 @@ import type {
   KeyboardEvent,
   ReactNode,
 } from "react";
-import { focusWithRing } from "../internal/arrow-keys.js";
+import { focusWithRing, isPlainKey } from "../internal/arrow-keys.js";
 import { sortByDocumentOrder } from "../internal/dom-order.js";
 import { isEscapeRequest } from "../internal/escape-key.js";
 import { MenubarContext } from "../internal/menubar-context.js";
@@ -24,9 +24,12 @@ import { useRovingFocus } from "../internal/use-roving-focus.js";
 
 /**
  * State of `Menubar`, passed to the function forms of `className`, `style`, `children` and
- * `render`. Empty: the bar holds no open state (each menu is its own state owner).
+ * `render`. The bar holds no open state (each menu is its own state owner).
  */
-export interface MenubarState {}
+export interface MenubarState {
+  /** Always `"horizontal"` (`data-orientation`): the bar has one orientation. */
+  readonly orientation: "horizontal";
+}
 
 /**
  * Props of `Menubar`.
@@ -35,7 +38,15 @@ export interface MenubarState {}
  */
 export interface MenubarProps extends Omit<
   ComponentPropsWithRef<"div">,
-  "role" | "onKeyDown" | "onFocus" | "onBlur" | "onPointerDown" | "className" | "style" | "children"
+  | "role"
+  | "aria-orientation"
+  | "onKeyDown"
+  | "onFocus"
+  | "onBlur"
+  | "onPointerDown"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * Arrow keys (on the bar and from inside its menus) wrap from the last menu to the first and
@@ -54,7 +65,7 @@ export interface MenubarProps extends Omit<
   render?: RenderProp<ComponentPropsWithRef<"div">, MenubarState>;
 }
 
-const STATE: MenubarState = {};
+const STATE: MenubarState = { orientation: "horizontal" };
 
 /** The roving engine's entry: the first Trigger before any was focused. */
 function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
@@ -83,7 +94,8 @@ function closeMenu(menu: MenubarMenu, event: Event): void {
  * state: each `Menu.Root` keeps its own (design/components/menubar.md). Name it with
  * `aria-label` or `aria-labelledby`.
  *
- * Owned keys (conventions 1.2): `role`, `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`.
+ * Owned keys (conventions 1.5): `role`, `aria-orientation` and `data-orientation` (both
+ * `"horizontal"`, conventions 3.10 rule 6), `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`.
  *
  * @see https://ui.funstack.work/components/menubar
  */
@@ -187,8 +199,8 @@ export function Menubar({
       held.current = null;
       return;
     }
-    const menuMode =
-      menu !== undefined && !event.defaultPrevented && (hold !== null || menu.intended());
+    // The engine acts on plain keys only (conventions 3.10 rule 2), so only those switch menus.
+    const menuMode = menu !== undefined && isPlainKey(event) && (hold !== null || menu.intended());
     roving.onKeyDown(event);
     if (!menuMode || !event.defaultPrevented) return;
     const focused = target.ownerDocument.activeElement;
@@ -218,6 +230,8 @@ export function Menubar({
     props: rest,
     libraryProps: {
       role: "menubar",
+      "aria-orientation": "horizontal",
+      "data-orientation": "horizontal",
       onKeyDown,
       onFocus: roving.onFocus,
       onBlur,

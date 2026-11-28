@@ -18,7 +18,7 @@ function Editor({ flag, rtl = false }: { flag: boolean; rtl?: boolean }) {
   return (
     <div style={rtl ? { direction: "rtl" } : undefined}>
       <button type="button">before</button>
-      <Toolbar.Root aria-label="Formatting" experimental_focusgroup={flag}>
+      <Toolbar.Root aria-label="Formatting" experimental_focusGroup={flag}>
         <Button>Cut</Button>
         <ToggleGroup.Root aria-label="Style" defaultValue={["i"]}>
           <ToggleGroup.Item value="b">Bold</ToggleGroup.Item>
@@ -37,7 +37,7 @@ function Editor({ flag, rtl = false }: { flag: boolean; rtl?: boolean }) {
 }
 
 describe.each([
-  ["with experimental_focusgroup", true],
+  ["with experimental_focusGroup", true],
   ["without the flag (JS path everywhere)", false],
 ] as const)("Toolbar keyboard %s (rows 20, 21)", (_label, flag) => {
   const native = flag && supportsFocusgroup;
@@ -106,7 +106,7 @@ describe.each([
     render(
       <>
         <button type="button">before</button>
-        <Toolbar.Root aria-label="T" experimental_focusgroup={flag}>
+        <Toolbar.Root aria-label="T" experimental_focusGroup={flag}>
           <Button disabled>Dead</Button>
           <Button>Live</Button>
         </Toolbar.Root>
@@ -128,7 +128,7 @@ describe.each([
           aria-label="Tools"
           orientation="vertical"
           loop={false}
-          experimental_focusgroup={flag}
+          experimental_focusGroup={flag}
         >
           <Button>Select</Button>
           <Button>Draw</Button>
@@ -161,7 +161,7 @@ describe.each([
     "%s: a Menu.Trigger opens on its perpendicular arrow with the first item focused; the toolbar arrows move on",
     async (orientation) => {
       render(
-        <Toolbar.Root aria-label="T" orientation={orientation} experimental_focusgroup={flag}>
+        <Toolbar.Root aria-label="T" orientation={orientation} experimental_focusGroup={flag}>
           <Button>Before</Button>
           <Menu.Root>
             <Menu.Trigger>Insert</Menu.Trigger>
@@ -200,14 +200,14 @@ describe.each([
 
 // #74
 describe.each([
-  ["with experimental_focusgroup", true],
+  ["with experimental_focusGroup", true],
   ["without the flag (JS path everywhere)", false],
 ] as const)("native radios inside a Toolbar %s (row 27)", (_label, flag) => {
   function Radios() {
     return (
       <>
         <button type="button">before</button>
-        <Toolbar.Root aria-label="T" experimental_focusgroup={flag}>
+        <Toolbar.Root aria-label="T" experimental_focusGroup={flag}>
           <Button>b1</Button>
           <input type="radio" name="align" aria-label="left" />
           <input type="radio" name="align" aria-label="center" defaultChecked />

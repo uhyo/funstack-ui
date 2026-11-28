@@ -144,7 +144,7 @@ describe("Tabs pointer activation", () => {
   );
 });
 
-describe("Tabs.List experimental_focusgroup", () => {
+describe("Tabs.List experimental_focusGroup", () => {
   // The feature check itself is pinned per engine in __tests__/environment.browser.test.tsx.
   it.each([
     ["horizontal", "ArrowRight", "ArrowLeft"],
@@ -155,7 +155,7 @@ describe("Tabs.List experimental_focusgroup", () => {
       const action = vi.fn<(next: string) => void>();
       render(
         <Tabs.Root defaultValue="a" orientation={orientation} valueChangeAction={action}>
-          <Tabs.List aria-label="x" experimental_focusgroup>
+          <Tabs.List aria-label="x" experimental_focusGroup>
             <Tabs.Tab value="a">A</Tabs.Tab>
             <Tabs.Tab value="b">B</Tabs.Tab>
             <Tabs.Tab value="c">C</Tabs.Tab>
@@ -207,7 +207,7 @@ describe("Tabs.List experimental_focusgroup", () => {
       <>
         <button type="button">before</button>
         <Tabs.Root defaultValue="b" activationMode="manual">
-          <Tabs.List aria-label="x" experimental_focusgroup>
+          <Tabs.List aria-label="x" experimental_focusGroup>
             <Tabs.Tab value="a">A</Tabs.Tab>
             <Tabs.Tab value="b">B</Tabs.Tab>
             <Tabs.Tab value="c">C</Tabs.Tab>

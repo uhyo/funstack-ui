@@ -82,6 +82,15 @@ export interface HoverCardPopupProps extends Omit<
    * Forwarded to the `<ViewTransition default>` around the popover element. Animates the opening
    * commit, content changes while open (a skeleton swapped for the content) and a controlled
    * close. Every close the user causes is a fact and animates with CSS only.
+   *
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal of the Popup inside a transition start a document view
+   * transition (a ~250 ms page cross-fade that the next transition waits for); a plain open
+   * starts none, as the content mounts under the already-mounted popup element. While a view
+   * transition runs, the popup's CSS transitions are cut for the moment of the library's own
+   * show or hide (an inline `transition: none !important`, restored right after), so only the
+   * view transition animates it; a `@keyframes` animation is not cut, and a dismissal, which
+   * runs no view transition, keeps its CSS exit.
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */

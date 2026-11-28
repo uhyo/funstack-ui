@@ -184,7 +184,9 @@ export function AlertDialogPage() {
         <code>data-pending</code> in library mode. Props: <code>disabled</code>,{" "}
         <code>className</code>, <code>style</code>, <code>children</code> (functions of{" "}
         <code>AlertDialogTriggerState</code>, <code>{"{ open, pending, disabled }"}</code>),{" "}
-        <code>render</code>. See <a href="/components/dialog#props">Dialog.Trigger</a>.
+        <code>render</code>. In JS-free mode <code>data-open</code> follows the dialog; inside a
+        <code>Toolbar.Root</code> a disabled Trigger is <code>aria-disabled</code> and stays
+        focusable. See <a href="/components/dialog#props">Dialog.Trigger</a>.
       </p>
 
       <h4>
@@ -247,7 +249,7 @@ export function AlertDialogPage() {
           },
           {
             name: "action",
-            type: "Action<[details: AlertDialogCancelDetails]>",
+            type: "Action<[details: AlertDialogCancelActionDetails]>",
             description:
               "Rarely needed. As on `Dialog.Close`: runs in this button's own transition, then closes the dialog; a rejection leaves it open.",
           },
@@ -267,7 +269,7 @@ export function AlertDialogPage() {
           "`AlertDialogCancelState` is `{ pending, disabled }`; `pending` runs from the click until the close it asked for has committed (library mode), for example while the close waits for a confirm that is still running."
         }
         owned={
-          "`Dialog.Close`'s (`type`, `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` in library mode or with `action`, `data-pending`, `data-disabled`), and `autoFocus` in the server and hydration render while it is the focus target in JS-free mode (a Cancel mounted on the client into an open dialog carries the attribute but takes no focus)."
+          "`Dialog.Close`'s (`type`, `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` in library mode or with `action`, `data-pending`, `data-disabled`; `type`, `aria-disabled` and the invoker attributes are not in the props type), and `autoFocus` in the server and hydration render while it is the focus target in JS-free mode (a Cancel mounted on the client into an open dialog carries the attribute but takes no focus)."
         }
         note={
           'JS-free mode: `<button command="request-close" autofocus>`, in the server HTML too, so the focus is right before hydration. Library mode: no attribute; the Popup writes `autofocus` on the first enabled Cancel right before `showModal()` and removes it after.'
@@ -326,7 +328,7 @@ export function AlertDialogPage() {
       <PartFacts
         state={"`AlertDialogActionState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor` and `command` (none with `action`), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor` and `command` (none with `action`), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
         }
         note={
           '`data-pending` spans the action and the close that follows. `AlertDialog.Action type="submit"` is not supported (`type` is owned): inside an `AlertDialog.Form`, confirm with a plain submit button.'
@@ -354,7 +356,12 @@ export function AlertDialogPage() {
           ["`:open`, `:modal`, `::backdrop`", "Popup", "As on a Dialog."],
           ['`[role="alertdialog"]`', "Popup", "Always."],
           ["`data-modal`", "Popup", "Always present."],
-          ["`data-open`, `data-pending`", "Trigger", "Library mode, as on a Dialog."],
+          [
+            "`data-open`",
+            "Trigger",
+            "As on a Dialog: optimistic in library mode; in JS-free mode whether the dialog is open, written from its `toggle` event.",
+          ],
+          ["`data-pending`", "Trigger", "Library mode, as on a Dialog."],
           [
             "`data-pending`",
             "Cancel, Action",
