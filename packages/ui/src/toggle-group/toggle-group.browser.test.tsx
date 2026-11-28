@@ -1,18 +1,18 @@
 // Standalone ToggleGroup rows that need a real engine (design/components/toggle-group.md 14,
-// rows 20, 21 and 23): Tab enters on the pressed Item on the native `focusgroup` path (Chromium,
-// `nomemory` + `focusgroupstart`) and on the JS path, and the ViewTransition mount cost.
+// rows 20 and 21): Tab enters on the pressed Item on the native `focusgroup` path (Chromium,
+// `nomemory` + `focusgroupstart`) and on the JS path. Row 23 (the ViewTransition mount cost) went
+// with the Item's `transition` prop (conventions 5.1: an all-optimistic part has none).
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { user } from "../__tests__/browser-user.js";
 import { supportsFocusgroup } from "../__tests__/engine.js";
 import { ToggleGroup } from "./index.js";
-import { itStartsNoViewTransitionOnMount } from "../__tests__/view-transition-mount.js";
 
 const button = (name: string) => screen.getByRole("button", { name });
 const focused = () => document.activeElement;
 
 describe.each([
-  ["with experimental_focusgroup", true],
+  ["with experimental_focusGroup", true],
   ["without the flag", false],
 ] as const)("standalone ToggleGroup %s (rows 20, 21)", (_label, flag) => {
   const native = flag && supportsFocusgroup;
@@ -26,7 +26,7 @@ describe.each([
           exclusive
           aria-label="Alignment"
           defaultValue="center"
-          experimental_focusgroup={flag}
+          experimental_focusGroup={flag}
           valueChangeAction={action}
         >
           <ToggleGroup.Item value="left">Left</ToggleGroup.Item>
@@ -56,22 +56,5 @@ describe.each([
     await expect.poll(focused).toBe(button("Center"));
     await user.keyboard("{Shift>}{Tab}{/Shift}");
     await expect.poll(focused).toBe(button("before"));
-  });
-});
-
-describe("ToggleGroup.Item view transitions (row 23)", () => {
-  itStartsNoViewTransitionOnMount({
-    late: (props) => (
-      <ToggleGroup.Item value="b" {...props}>
-        B
-      </ToggleGroup.Item>
-    ),
-    wrap: (late) => (
-      <ToggleGroup.Root aria-label="T">
-        <ToggleGroup.Item value="a">A</ToggleGroup.Item>
-        {late}
-      </ToggleGroup.Root>
-    ),
-    mounted: () => screen.queryByRole("button", { name: "B" }),
   });
 });

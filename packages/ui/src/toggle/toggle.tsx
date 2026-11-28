@@ -1,16 +1,16 @@
 "use client";
-import type {
-  ComponentPropsWithRef,
-  CSSProperties,
-  MouseEvent,
-  ReactNode,
-  ViewTransitionClass,
-} from "react";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
+import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
+import { useToolbarContext } from "../internal/toolbar-context.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  RenderProp,
+  StateValue,
+} from "../internal/types.js";
 import { useControllableAction } from "../internal/action/use-controllable-action.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 
@@ -28,8 +28,12 @@ export interface ToggleState {
 
 /** Details passed as the second argument of `pressedChangeAction`. */
 export interface TogglePressedChangeDetails extends ActionDetails {
-  // v0 adds nothing beyond `event`; the interface exists so fields can be added without a
-  // breaking change (e.g. a `reason` if a ToggleGroup ever dispatches on an item's behalf).
+  /**
+   * Always `"activate"`: a button has no platform path (no form reset, no find-in-page). The
+   * field exists because every change details type has it (conventions 2.2), so one handler
+   * types against every component.
+   */
+  readonly reason: ChangeReason;
 }
 
 /**
@@ -59,21 +63,13 @@ export interface ToggleProps extends Omit<
   pressedChangeAction?: ChangeAction<boolean, TogglePressedChangeDetails>;
   /**
    * Never dispatches. Native `disabled` on a `<button>`; with a link or component `render`,
-   * `aria-disabled="true"` instead (the element stays focusable).
+   * `aria-disabled="true"` instead (the element stays focusable). Inside a `Toolbar.Root`,
+   * `aria-disabled="true"` on every element, so the button stays in the toolbar's arrow sequence
+   * (APG Toolbar, conventions 3.6).
    *
    * @defaultValue `false`
    */
   disabled?: boolean;
-  /**
-   * Forwarded as `default` to the Toggle's `<ViewTransition>`. Default: no boundary. Animates the
-   * commit that ends an action (and rollbacks), not the optimistic flip itself; animate the flip
-   * with a CSS `transition` on `[data-pressed]`.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToggleState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -89,6 +85,14 @@ export interface ToggleProps extends Omit<
  * `<button type="button" aria-pressed>`; the pressed state flips optimistically and the element
  * carries `data-pending` while `pressedChangeAction` is in flight.
  *
+ * No `transition` prop: everything it renders is optimistic (conventions 5.1). Animate the flip
+ * with a CSS `transition` on `[data-pressed]`; to animate the commit that ends the action, wrap
+ * the content in your own `<ViewTransition>` keyed on the `fsui-toggle` types.
+ *
+ * Owned keys (conventions 1.5): `type` (on a `<button>`), `aria-pressed`, `disabled`,
+ * `aria-disabled` (inside a Toolbar, or a link or component `render`), `data-pressed`,
+ * `data-pending`, `data-disabled`, `onClick`.
+ *
  * @see https://ui.funstack.work/components/toggle
  */
 export function Toggle({
@@ -96,13 +100,13 @@ export function Toggle({
   defaultPressed,
   pressedChangeAction,
   disabled = false,
-  transition,
   className,
   style,
   children,
   render,
   ...rest
 }: ToggleProps) {
+  const toolbar = useToolbarContext();
   const { optimistic, pending, dispatch } = useControllableAction<
     boolean,
     TogglePressedChangeDetails
@@ -131,7 +135,8 @@ export function Toggle({
     libraryProps: {
       // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
       // `render` element cannot re-enable (`disabled={false}`) or disable the button on its own.
-      ...disabledButton(render, disabled).props,
+      // Inside a Toolbar a disabled Toggle stays focusable and in the arrow sequence (3.6).
+      ...disabledButton(render, disabled, { alwaysFocusable: toolbar !== null }).props,
       "aria-pressed": optimistic,
       "data-pressed": dataAttr(optimistic),
       "data-pending": dataAttr(pending),
@@ -143,12 +148,12 @@ export function Toggle({
           event.preventDefault();
           return;
         }
-        dispatch(!optimistic, createActionDetails(event.nativeEvent, {}));
+        dispatch(!optimistic, createActionDetails(event.nativeEvent, { reason: "activate" }));
       },
     },
   });
 
-  return useTransitionBoundary("Toggle", transition, element);
+  return element;
 }
 
 Toggle.displayName = "Toggle";

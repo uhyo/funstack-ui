@@ -17,8 +17,9 @@ export type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./tog
 export { ToggleGroup } from "./toggle-group/index.js";
 export type {
   ToggleGroupRootProps,
-  ToggleGroupMultipleProps,
-  ToggleGroupExclusiveProps,
+  ToggleGroupRootBaseProps,
+  ToggleGroupRootMultipleProps,
+  ToggleGroupRootExclusiveProps,
   ToggleGroupRootState,
   ToggleGroupValueChangeDetails,
   ToggleGroupOrientation,
@@ -41,6 +42,7 @@ export type {
 export { Accordion } from "./accordion/index.js";
 export type {
   AccordionRootProps,
+  AccordionRootBaseProps,
   AccordionRootMultipleProps,
   AccordionRootExclusiveProps,
   AccordionRootState,

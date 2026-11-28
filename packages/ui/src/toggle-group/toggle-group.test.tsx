@@ -20,8 +20,11 @@ import { toggleGroupDriver } from "../__tests__/drivers/toggle-group.js";
 import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { ToggleGroup } from "./index.js";
 import type {
+  ToggleGroupItemProps,
   ToggleGroupItemState,
-  ToggleGroupMultipleProps,
+  ToggleGroupRootBaseProps,
+  ToggleGroupRootExclusiveProps,
+  ToggleGroupRootMultipleProps,
   ToggleGroupRootState,
   ToggleGroupValueChangeDetails,
 } from "./index.js";
@@ -32,7 +35,7 @@ type ExclusiveActionFn = (next: string | null, details: ToggleGroupValueChangeDe
 const STYLES = ["bold", "italic", "underline"] as const;
 
 interface HarnessProps extends Omit<
-  ToggleGroupMultipleProps,
+  ToggleGroupRootMultipleProps,
   "value" | "defaultValue" | "valueChangeAction" | "exclusive"
 > {
   mode: ControlMode;
@@ -371,6 +374,54 @@ describe("ToggleGroup", () => {
         // @ts-expect-error `deselectable` exists only with `exclusive`.
         render(<ToggleGroup.Root aria-label="x" deselectable={false} />);
         expect(root()).toBeInTheDocument();
+      });
+
+      it("an exclusive switch reports the released Item, with `reason` (conventions 2.2)", async () => {
+        const action = vi.fn<ExclusiveActionFn>();
+        render(
+          <ToggleGroup.Root exclusive aria-label="x" defaultValue="a" valueChangeAction={action}>
+            <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+            <ToggleGroup.Item value="b">B</ToggleGroup.Item>
+          </ToggleGroup.Root>,
+        );
+        await setupUser().click(item("B"));
+        const [next, details] = action.mock.calls[0]!;
+        expect(next).toBe("b");
+        expect(JSON.parse(JSON.stringify(details))).toEqual({
+          reason: "activate",
+          added: ["b"],
+          removed: ["a"],
+        });
+      });
+    });
+
+    describe("types (conventions 9.4)", () => {
+      it("variant and base props are exported; set-valued props take readonly arrays", () => {
+        const value: readonly string[] = ["a"];
+        const multiple: ToggleGroupRootMultipleProps = { value, defaultValue: value };
+        const exclusive: ToggleGroupRootExclusiveProps = { exclusive: true, value: "a" };
+        const base: ToggleGroupRootBaseProps = { loop: false };
+        render(
+          <ToggleGroup.Root aria-label="x" value={value}>
+            <ToggleGroup.Item value="a">A</ToggleGroup.Item>
+          </ToggleGroup.Root>,
+        );
+        expect(item("A")).toHaveAttribute("aria-pressed", "true");
+        expect([multiple, exclusive, base]).toHaveLength(3);
+      });
+
+      it("the Item has no `transition` and does not take `aria-disabled`", () => {
+        // @ts-expect-error An Item is all optimistic: no `transition` (conventions 5.1).
+        const withTransition: ToggleGroupItemProps = { value: "a", transition: "fade" };
+        // @ts-expect-error `aria-disabled` is owned: use `disabled` (conventions 1.5).
+        const withAriaDisabled: ToggleGroupItemProps = { value: "a", "aria-disabled": true };
+        expect([withTransition, withAriaDisabled]).toHaveLength(2);
+      });
+
+      it("the flag is spelled `experimental_focusGroup` (conventions 8)", () => {
+        // @ts-expect-error The lower-case spelling was renamed.
+        const old: ToggleGroupRootMultipleProps = { experimental_focusgroup: true };
+        expect(old).toBeTypeOf("object");
       });
     });
 
@@ -939,12 +990,12 @@ describe("ToggleGroup", () => {
     });
   });
 
-  describe("experimental_focusgroup (row 16)", () => {
+  describe("experimental_focusGroup (row 16)", () => {
     it("renders the toolbar token with nomemory and focusgroupstart on the first pressed Item", async () => {
       render(
         <ToggleGroup.Root
           aria-label="x"
-          experimental_focusgroup
+          experimental_focusGroup
           orientation="vertical"
           loop={false}
           defaultValue={["c", "b"]}
@@ -967,7 +1018,7 @@ describe("ToggleGroup", () => {
 
     it("no focusgroupstart when nothing is pressed; no attribute without the flag", () => {
       const { unmount } = render(
-        <ToggleGroup.Root aria-label="x" experimental_focusgroup>
+        <ToggleGroup.Root aria-label="x" experimental_focusGroup>
           <ToggleGroup.Item value="a">A</ToggleGroup.Item>
         </ToggleGroup.Root>,
       );

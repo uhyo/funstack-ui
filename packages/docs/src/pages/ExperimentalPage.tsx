@@ -22,7 +22,10 @@ export function ExperimentalPage() {
         on the part that uses it, off by default. The prefix follows React's naming for unstable
         APIs. It is greppable, it sits at the call site where you make the browser-support decision,
         and when the feature reaches every engine the prop is removed: the type error tells you
-        exactly where to delete it.
+        exactly where to delete it. After the prefix the name is camelCase, as React spells a prop,
+        whatever the casing of the attribute or CSS property behind it:{" "}
+        <code>experimental_focusGroup</code> for <code>focusgroup</code>,{" "}
+        <code>experimental_interestFor</code> for <code>interestfor</code>.
       </p>
       <p>
         The flags today. What each one does is documented in the props table of the part that takes
@@ -32,7 +35,7 @@ export function ExperimentalPage() {
         head={["Prop", "Platform feature", "Native path today", "Documented on"]}
         rows={[
           [
-            "`experimental_focusgroup`",
+            "`experimental_focusGroup`",
             "`focusgroup`",
             "Chromium 150+",
             "[Tabs.List](/components/tabs#props), [Toolbar.Root](/components/toolbar#props), [ToggleGroup.Root](/components/toggle-group#props), [Menu.Popup](/components/menu#props)",
@@ -63,7 +66,7 @@ export function ExperimentalPage() {
           ],
         ]}
       />
-      <CodeBlock>{`<Tabs.List experimental_focusgroup aria-label="Settings">...</Tabs.List>
+      <CodeBlock>{`<Tabs.List experimental_focusGroup aria-label="Settings">...</Tabs.List>
 <Accordion.Root experimental_interpolateSize>...</Accordion.Root>
 <Tooltip.Trigger experimental_interestFor>Save</Tooltip.Trigger>
 <Tooltip.Popup experimental_hint>Saves the document</Tooltip.Popup>

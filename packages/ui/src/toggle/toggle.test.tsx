@@ -90,6 +90,20 @@ describe("Toggle", () => {
       // Even when forced through, the library's type wins at runtime.
       expect(button()).toHaveAttribute("type", "button");
     });
+
+    it("has no `transition` prop and renders no boundary (conventions 5.1)", () => {
+      // @ts-expect-error A Toggle is all optimistic: no `transition`.
+      render(<Toggle transition="fade">Favorite</Toggle>);
+      expect(button()).toBeInTheDocument();
+    });
+
+    it('details carry `reason: "activate"` (conventions 2.2)', async () => {
+      const action = vi.fn<(next: boolean, details: TogglePressedChangeDetails) => void>();
+      render(<Toggle pressedChangeAction={action}>Favorite</Toggle>);
+      fireEvent.click(button());
+      await act(async () => {});
+      expect(action.mock.calls[0]?.[1].reason).toBe("activate");
+    });
   });
 
   describe("keyboard", () => {

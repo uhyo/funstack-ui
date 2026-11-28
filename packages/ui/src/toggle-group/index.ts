@@ -14,8 +14,9 @@ export const ToggleGroup = { Root: ToggleGroupRoot, Item: ToggleGroupItem } as c
 
 export type {
   ToggleGroupRootProps,
-  ToggleGroupMultipleProps,
-  ToggleGroupExclusiveProps,
+  ToggleGroupRootBaseProps,
+  ToggleGroupRootMultipleProps,
+  ToggleGroupRootExclusiveProps,
   ToggleGroupRootState,
   ToggleGroupValueChangeDetails,
   ToggleGroupOrientation,

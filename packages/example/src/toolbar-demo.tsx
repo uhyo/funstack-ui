@@ -78,10 +78,13 @@ function EditorToolbar({ focusgroup, fail }: { focusgroup: boolean; fail: boolea
       <h3>Editor toolbar</h3>
       <p>
         One Tab stop. Left / Right walk every control: both groups, the menu button, the commands
-        and the input. ArrowDown on Insert opens its menu. Copy is <code>aria-disabled</code>: still
-        focusable. In the font-size input, the arrows move the caret and Tab moves on.
+        and the input. ArrowDown on Insert opens its menu. Justify (a disabled{" "}
+        <code>ToggleGroup.Item</code>) and Copy (a disabled <code>Button</code>) are{" "}
+        <code>aria-disabled</code> inside the toolbar: still focusable and reached by the arrows, so
+        a screen reader announces them. In the font-size input, the arrows move the caret and Tab
+        moves on.
       </p>
-      <Toolbar.Root aria-label="Formatting" className="tb" experimental_focusgroup={focusgroup}>
+      <Toolbar.Root aria-label="Formatting" className="tb" experimental_focusGroup={focusgroup}>
         <ToggleGroup.Root
           aria-label="Text style"
           className="tb-group"
@@ -119,6 +122,9 @@ function EditorToolbar({ focusgroup, fail }: { focusgroup: boolean; fail: boolea
           </ToggleGroup.Item>
           <ToggleGroup.Item value="right" className="tb-item">
             Right
+          </ToggleGroup.Item>
+          <ToggleGroup.Item value="justify" className="tb-item" disabled>
+            Justify
           </ToggleGroup.Item>
         </ToggleGroup.Root>
         <Toolbar.Separator className="tb-sep" />
@@ -172,7 +178,7 @@ function VerticalToolbar({ focusgroup }: { focusgroup: boolean }) {
         aria-label="Tools"
         orientation="vertical"
         className="tb"
-        experimental_focusgroup={focusgroup}
+        experimental_focusGroup={focusgroup}
       >
         <ToggleGroup.Root
           exclusive
@@ -244,7 +250,7 @@ export function ToolbarDemo() {
             checked={focusgroup}
             onChange={(e) => setFocusgroup(e.target.checked)}
           />{" "}
-          <code>experimental_focusgroup</code> on both Toolbars
+          <code>experimental_focusGroup</code> on both Toolbars
         </label>{" "}
         <label>
           <input type="checkbox" checked={fail} onChange={(e) => setFail(e.target.checked)} /> Make

@@ -5,7 +5,7 @@ import { useSyncExternalStore } from "react";
 const subscribeNever = () => () => {};
 
 /**
- * Whether the native `focusgroup` path is on: the `experimental_focusgroup` flag is set and the
+ * Whether the native `focusgroup` path is on: the `experimental_focusGroup` flag is set and the
  * engine implements it. Detected only with the flag, and never during SSR or hydration
  * (conventions 8): the server snapshot is `false`, so hydration markup matches the server and
  * React re-renders with the client answer afterwards. The IDL attribute is camel-cased

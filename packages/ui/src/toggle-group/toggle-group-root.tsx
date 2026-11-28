@@ -6,7 +6,13 @@ import { dataAttr } from "../internal/data-attr.js";
 import { compareDocumentOrder } from "../internal/dom-order.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  RenderProp,
+  StateValue,
+} from "../internal/types.js";
 import { useControllableAction } from "../internal/action/use-controllable-action.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useMountFixed } from "../internal/use-mount-fixed.js";
@@ -26,8 +32,17 @@ export type { ToggleGroupOrientation } from "./toggle-group-context.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-/** Details passed as the second argument of `valueChangeAction`, in both modes. */
+/**
+ * Details passed as the second argument of `valueChangeAction`, in both modes: the set diff of
+ * every set-valued component (conventions 2.2).
+ */
 export interface ToggleGroupValueChangeDetails extends ActionDetails {
+  /**
+   * Always `"activate"`: a ToggleGroup has no platform path (no form reset, no find-in-page). The
+   * field exists because every change details type has it (conventions 2.2), so one handler types
+   * against every component.
+   */
+  readonly reason: ChangeReason;
   /** Values this dispatch pressed (document order of their Items). Exclusive mode: `[next]` or `[]`. */
   readonly added: readonly string[];
   /** Values this dispatch released. Exclusive mode: `[previous]` or `[]`. */
@@ -53,7 +68,12 @@ export interface ToggleGroupRootState {
   readonly orientation: ToggleGroupOrientation;
 }
 
-interface ToggleGroupRootBaseProps extends Omit<
+/**
+ * The props both variants of `ToggleGroup.Root` share.
+ *
+ * @see https://ui.funstack.work/components/toggle-group
+ */
+export interface ToggleGroupRootBaseProps extends Omit<
   ComponentPropsWithRef<"div">,
   | "role"
   | "onKeyDown"
@@ -78,7 +98,8 @@ interface ToggleGroupRootBaseProps extends Omit<
    */
   loop?: boolean;
   /**
-   * Disables every Item (native `disabled`).
+   * Disables every Item: native `disabled` standalone, `aria-disabled="true"` inside a
+   * `Toolbar.Root`, where a disabled Item stays in the Toolbar's arrow sequence (conventions 3.6).
    *
    * @defaultValue `false`
    */
@@ -90,7 +111,7 @@ interface ToggleGroupRootBaseProps extends Omit<
    *
    * @defaultValue `false`
    */
-  experimental_focusgroup?: boolean;
+  experimental_focusGroup?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToggleGroupRootState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -107,9 +128,10 @@ interface ToggleGroupRootBaseProps extends Omit<
  *
  * @see https://ui.funstack.work/components/toggle-group
  */
-export interface ToggleGroupMultipleProps extends ToggleGroupRootBaseProps {
+export interface ToggleGroupRootMultipleProps extends ToggleGroupRootBaseProps {
   /**
-   * `true` switches to exclusive mode (at most one Item pressed; see `ToggleGroupExclusiveProps`).
+   * `true` switches to exclusive mode (at most one Item pressed; see
+   * `ToggleGroupRootExclusiveProps`).
    *
    * @defaultValue `false`
    */
@@ -118,13 +140,13 @@ export interface ToggleGroupMultipleProps extends ToggleGroupRootBaseProps {
    * Controlled pressed values. `[]` presses nothing; `undefined` means uncontrolled. Order is not
    * significant; duplicates ignored.
    */
-  value?: string[];
+  value?: readonly string[];
   /**
    * Initial pressed values in uncontrolled mode.
    *
    * @defaultValue `[]`
    */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Runs inside the Root's transition whenever the set of pressed Items changes. Sync or async (a
    * Server Function may be passed directly); rejections reach the nearest Error Boundary and roll
@@ -147,7 +169,7 @@ export interface ToggleGroupMultipleProps extends ToggleGroupRootBaseProps {
  *
  * @see https://ui.funstack.work/components/toggle-group
  */
-export interface ToggleGroupExclusiveProps extends ToggleGroupRootBaseProps {
+export interface ToggleGroupRootExclusiveProps extends ToggleGroupRootBaseProps {
   /** At most one Item is pressed; `value` is `string | null`. */
   exclusive: true;
   /** Controlled pressed value. `null` presses nothing; `undefined` means uncontrolled. */
@@ -166,7 +188,10 @@ export interface ToggleGroupExclusiveProps extends ToggleGroupRootBaseProps {
    * @defaultValue `true`
    */
   deselectable?: boolean;
-  /** See {@link ToggleGroupMultipleProps.valueChangeAction}; `next` is the pressed value or `null`. */
+  /**
+   * See {@link ToggleGroupRootMultipleProps.valueChangeAction}; `next` is the pressed value or
+   * `null`.
+   */
   valueChangeAction?: ChangeAction<string | null, ToggleGroupValueChangeDetails>;
 }
 
@@ -175,9 +200,9 @@ export interface ToggleGroupExclusiveProps extends ToggleGroupRootBaseProps {
  *
  * @see https://ui.funstack.work/components/toggle-group
  */
-export type ToggleGroupRootProps = ToggleGroupMultipleProps | ToggleGroupExclusiveProps;
+export type ToggleGroupRootProps = ToggleGroupRootMultipleProps | ToggleGroupRootExclusiveProps;
 
-type GroupValue = string[] | string | null;
+type GroupValue = readonly string[] | string | null;
 
 /** Both variants as one shape, for the implementation. */
 interface InternalProps extends ToggleGroupRootBaseProps {
@@ -185,7 +210,7 @@ interface InternalProps extends ToggleGroupRootBaseProps {
   value?: GroupValue;
   defaultValue?: GroupValue;
   deselectable?: boolean;
-  valueChangeAction?: ChangeAction<GroupValue, ToggleGroupValueChangeDetails>;
+  valueChangeAction?: ChangeAction<string[] | string | null, ToggleGroupValueChangeDetails>;
 }
 
 /** Standalone entry (design 6.2): the first pressed item, else the first item (radio-like). */
@@ -221,7 +246,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
     orientation: orientationProp,
     loop: loopProp,
     disabled = false,
-    experimental_focusgroup: focusgroupProp,
+    experimental_focusGroup: focusgroupProp,
     className,
     style,
     children,
@@ -245,7 +270,7 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
   useDevWarning(
     inToolbar && focusgroupProp === true,
     isDev &&
-      "ToggleGroup.Root: `experimental_focusgroup` is ignored inside a Toolbar.Root. A nested " +
+      "ToggleGroup.Root: `experimental_focusGroup` is ignored inside a Toolbar.Root. A nested " +
         "focusgroup would split the Toolbar's single Tab stop; set the flag on the Toolbar.Root.",
   );
   const orientation: ToggleGroupOrientation =
@@ -317,7 +342,10 @@ export function ToggleGroupRoot(props: ToggleGroupRootProps) {
       } else {
         patch = { added: [itemValue], removed: exclusive ? [...optimistic] : [] };
       }
-      dispatch(applyPatch(optimistic, patch), createActionDetails(event, patch));
+      dispatch(
+        applyPatch(optimistic, patch),
+        createActionDetails(event, { reason: "activate", ...patch }),
+      );
     },
     [dispatch, latest],
   );

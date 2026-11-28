@@ -1,4 +1,4 @@
-import { startTransition, useRef, useState } from "react";
+import { startTransition, useRef, useState, ViewTransition } from "react";
 import { Toggle } from "@funstack/ui/toggle";
 import { DemoErrorBoundary } from "./shared/DemoErrorBoundary.js";
 import { fakeSave } from "./shared/fake-backend.js";
@@ -135,28 +135,24 @@ function RejectingDemo() {
 function TransitionDemo() {
   return (
     <section>
-      <h3>
-        <code>transition</code> prop
-      </h3>
+      <h3>Your own ViewTransition</h3>
       <p>
-        The optimistic flip is a sync commit and does not start a view transition (it animates with
-        the CSS <code>transition</code> on <code>[data-pressed]</code>). The commit that ends the
-        action does: the spinner fades out through <code>::view-transition-old(.fsui-fade)</code>.
-        Open DevTools to see the <code>fsui-toggle-press</code> / <code>-release</code> types on{" "}
-        <code>&lt;html&gt;</code>.
+        A Toggle has no <code>transition</code> prop: the optimistic flip is a sync commit and
+        animates with the CSS <code>transition</code> on <code>[data-pressed]</code>. The commit
+        that ends the action can start a view transition through a boundary of your own: the spinner
+        fades out through <code>::view-transition-old(.fsui-fade)</code>. Open DevTools to see the{" "}
+        <code>fsui-toggle-press</code> / <code>-release</code> types on <code>&lt;html&gt;</code>.
       </p>
-      <Toggle
-        className="chip"
-        transition="fsui-fade"
-        pressedChangeAction={(next) => fakeSave("transition", next)}
-      >
-        {({ pressed, pending }) => (
-          <>
-            {pending ? <Spinner /> : <StarIcon filled={pressed} />}
-            Favorite
-          </>
-        )}
-      </Toggle>
+      <ViewTransition default={{ "fsui-toggle": "fsui-fade", default: "none" }}>
+        <Toggle className="chip" pressedChangeAction={(next) => fakeSave("transition", next)}>
+          {({ pressed, pending }) => (
+            <>
+              {pending ? <Spinner /> : <StarIcon filled={pressed} />}
+              Favorite
+            </>
+          )}
+        </Toggle>
+      </ViewTransition>
     </section>
   );
 }
