@@ -85,8 +85,9 @@ export interface StepCommit<T, V, S> {
    * (`valid: false`). When the commit action rejects, `onReject` runs (before the rethrow); it
    * returns whether it dropped what the commit kept, having put the form value back to the shown
    * value, and then, unless a writing commit came after this one, the preview channel hears one
-   * `"dismiss"` step of the shown value (no `live` step: the field already shows it). A stateless
-   * commit is not a later commit for a writing one's own `"dismiss"`.
+   * `"dismiss"` step of the shown value (no `live` step: the field already shows it), deferred
+   * to the settle of a writing commit still in flight (its own revert replaces it if that commit
+   * rejects). A stateless commit is not a later commit for a writing one's own `"dismiss"`.
    */
   readonly commitStateless: (
     next: V,
@@ -95,6 +96,13 @@ export interface StepCommit<T, V, S> {
     event: Event | undefined,
     onReject: () => boolean,
   ) => void;
+  /**
+   * One `"dismiss"` step of the shown value for the preview channel, with no `live` step (the
+   * control already shows it): a kept draft whose number `stepAction` heard has ended without a
+   * step of its own (number-field.md 4.1). The caller has put the form value back first, so the
+   * details read it.
+   */
+  readonly notifyDismiss: () => void;
   /** Opens a gesture at the shown value. */
   readonly openGesture: () => void;
   /** Opens a gesture at the shown value and shows it as `live` (a pointer capture begins). */
@@ -159,6 +167,13 @@ export function useStepCommit<T, V, S, F extends object>(
     new WeakMap<object, { readonly seq: number; readonly onReject: () => boolean }>(),
   );
 
+  /**
+   * A rejected stateless commit ended its kept draft while a writing commit was in flight: the
+   * `"dismiss"` notice waits for that commit (sent when it resolves; its own revert replaces it
+   * when it rejects).
+   */
+  const dismissDeferred = useRef(false);
+
   const runCommit = async (next: T, details: F & ActionDetails): Promise<void> => {
     const stateless = statelessCommits.current.get(details);
     if (stateless !== undefined) {
@@ -167,8 +182,16 @@ export function useStepCommit<T, V, S, F extends object>(
           ? undefined
           : callAction(warn.component, details, (d) => commitAction(next, d)));
       } catch (error) {
-        // `notifyDismiss` is declared below; this runs long after the render.
-        if (stateless.onReject() && stateless.seq === commitSeq.current) notifyDismiss();
+        // Yield once to leave the commit's transition, as the writing path below does
+        // (conventions 2.6): `onReject` writes urgent state (the draft).
+        await undefined;
+        // `notifyDismiss` and `commitState` are declared below; this runs long after the render.
+        if (stateless.onReject() && stateless.seq === commitSeq.current) {
+          // A writing commit still in flight reports the end itself: its own `"dismiss"` if it
+          // rejects, the deferred notice below if it resolves. One notice either way.
+          if (commitState.latestInFlight() === null) notifyDismiss();
+          else dismissDeferred.current = true;
+        }
         throw error;
       }
       return;
@@ -180,7 +203,12 @@ export function useStepCommit<T, V, S, F extends object>(
       await (commitAction === undefined
         ? undefined
         : callAction(warn.component, details, (d) => commitAction(next, d)));
+      if (dismissDeferred.current && seq === commitSeq.current) {
+        dismissDeferred.current = false;
+        notifyDismiss();
+      }
     } catch (error) {
+      if (seq === commitSeq.current) dismissDeferred.current = false;
       // In uncontrolled mode, tell the preview channel about the rollback, for the latest commit
       // only. Yield once to leave the commit's transition (conventions 2.6).
       if (controlled === undefined && seq === commitSeq.current) {
@@ -384,6 +412,7 @@ export function useStepCommit<T, V, S, F extends object>(
     step,
     commit,
     commitStateless,
+    notifyDismiss,
     openGesture,
     captureGesture,
     markGestureStart,

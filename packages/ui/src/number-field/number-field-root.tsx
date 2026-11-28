@@ -54,8 +54,11 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
    * the `focusout` / Enter `keydown` of a typed value, the `keydown` of a key, the `pointerdown` /
    * `pointerup` of a button (`undefined` for the repeats of a held button and for a hold that
    * ended at its bound), the `wheel` event). `"platform"`: a form reset (the `reset`
-   * event) or text typed before hydration (`undefined`). `"dismiss"`: the commit action rejected
-   * and the field reverted to the committed value (uncontrolled; `valueChangeAction` only).
+   * event) or text typed before hydration (`undefined`). `"dismiss"` (uncontrolled;
+   * `valueChangeAction` only): the value this action last heard is no longer shown and the field
+   * shows this one again. The commit action rejected and the field reverted to the committed
+   * value, or an invalid typed value it heard (kept as a draft) ended without a step: Escape,
+   * `disabled` / `readOnly`, a form reset to the shown value, or its own commit rejected.
    */
   readonly reason: ChangeReason;
   /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
@@ -138,8 +141,10 @@ export interface NumberFieldRootProps extends Omit<
   defaultValue?: number | null;
   /**
    * Runs inside the Root's step transition on every step: the parse of typed text at commit,
-   * each key press, each tick of a hold, each wheel event, each platform change, and the revert
-   * after a rejected commit (`reason: "dismiss"`, uncontrolled). Keep it cheap: adopt the value
+   * each key press, each tick of a hold, each wheel event, each platform change, and
+   * `reason: "dismiss"` (uncontrolled) when a value it heard is no longer shown: the revert after
+   * a rejected commit, or the end of an invalid typed value kept as a draft (Escape, `disabled` /
+   * `readOnly`, a reset to the shown value, its commit rejected). Keep it cheap: adopt the value
    * (`setValue(next)` in the sync prefix is a transition update), start a deferred render.
    */
   valueChangeAction?: ChangeAction<number | null, NumberFieldValueChangeDetails>;
@@ -428,6 +433,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     step,
     commit,
     commitStateless,
+    notifyDismiss,
     openGesture,
     captureGesture,
     takeEdit,
@@ -603,11 +609,25 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     ],
   );
 
+  /**
+   * Ends a kept draft with no step of its own (Escape, `disabled` / `readOnly`, a reset to the
+   * shown value; design 4.1): the draft is cleared, the hidden input returns to the shown value,
+   * and the preview channel, which heard the draft's number, hears one `"dismiss"` of the shown
+   * value. Returns whether a kept draft ended; otherwise nothing happens.
+   */
+  const endKept = useCallback((): boolean => {
+    if (keptRef.current === null) return false;
+    clearDraft();
+    syncHidden(shownRef.current);
+    notifyDismiss();
+    return true;
+  }, [clearDraft, notifyDismiss, shownRef, syncHidden]);
+
   // `disabled` or `readOnly` turning on ends a kept draft (conventions 3.3.1 rule 4); an open
   // draft is dropped by its commit (4.1).
   useLayoutEffect(() => {
-    if ((disabled || readOnly) && keptRef.current !== null) clearDraft();
-  }, [disabled, readOnly, clearDraft]);
+    if (disabled || readOnly) endKept();
+  }, [disabled, readOnly, endKept]);
 
   // --- Keyboard and wheel (design 4.2, 4.4) ----------------------------------------------------
 
@@ -627,7 +647,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
         const open = draftRef.current;
         if (!isEscapeRequest(event) || open === null) return;
         if (open === latest.current.formatter.format(shownRef.current)) return;
-        clearDraft();
+        if (!endKept()) clearDraft();
         consumeEscape(event);
         return;
       }
@@ -637,7 +657,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       event.preventDefault();
       oneStep(compute, "keyboard", event);
     },
-    [clearDraft, commitDraft, latest, oneStep, shownRef],
+    [clearDraft, commitDraft, endKept, latest, oneStep, shownRef],
   );
 
   const wheel = useCallback(
@@ -735,8 +755,10 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     readDefault: () => {
       // The reset algorithm wrote the text past react-dom's value tracker (rule 6).
       syncValueTracker(visibleRef.current);
-      // A reset clears an open draft whatever the target.
-      clearDraft();
+      // A reset clears an open draft whatever the target. A kept draft whose reset dispatches
+      // nothing (the target is the shown value) ends with a `"dismiss"` (design 4.1); one that
+      // dispatches is ended by the reset's own step.
+      if (!Object.is(resetTarget, shownRef.current) || !endKept()) clearDraft();
       return resetTarget;
     },
     base: () => shownRef.current,

@@ -17765,7 +17765,7 @@ Popups: one warning inside a `<p>` across a re-render, none outside; Tooltip and
 
 ## 2026-11-29, #220 implemented: implementation notes
 
-The rule of the entry above, implemented as designed, with one gap filled.
+The rule of the first #220 entry (2026-11-29), implemented as designed, with one gap filled.
 
 - `useControllableAction`: `DispatchOptions` gains `stateless` and `onReject`
   (internal-hooks.md 3.4 has the contract). Two guards now: `latest` (every dispatch, for the
@@ -17798,3 +17798,32 @@ The rule of the entry above, implemented as designed, with one gap filled.
   and `number-field.browser.test.tsx` (`:user-invalid` and the Field's error while kept,
   Escape). jsdom never flags `tooShort` (no dirty flag), so the jsdom TextField rows use
   `pattern`.
+
+## 2026-11-29, #220: review follow-up, the preview channel ends on the shown value
+
+From the review of `dev/220` (`memo/reviewer/review-220.md`), decided by the product owner.
+
+- **Amended (number-field.md 4.1, the "Called" row of the actions table and the
+  details type sketch):** a kept draft whose number `valueChangeAction` heard and that ends
+  without a step of its own sends one `"dismiss"` of the shown number: Escape, `disabled` /
+  `readOnly` turning on, a reset whose target is the shown number (it dispatches nothing), and
+  the rejection of its own dispatch (already so). An edit sends none; a step, a valid typed
+  commit and a reset that dispatches report themselves. Replaces the "not covered" note of the
+  implementation entry above: Escape, `disabled` / `readOnly` and the equal reset now send it.
+- **One notice for two rejections:** a writing commit A in flight, then a kept draft S, both
+  rejected, send exactly one `"dismiss"` (of the saved number). S's rejection defers its
+  notice while a writing commit is in flight; A's own revert replaces it if A rejects, and the
+  deferred notice is sent with A's value if A resolves. Before, S first then A sent two (the
+  shown A, then the saved number).
+- **Timing:** the stateless commit's rejection path yields once (`await undefined`) before it
+  drops the draft and sends the notice, as the writing path's revert does.
+- Code: `useStepCommit` exposes `notifyDismiss` and defers through `dismissDeferred`; the Root
+  ends a kept draft through `endKept` (clear, hidden input back to the shown value, notice).
+  The `"dismiss"` JSDoc of `NumberFieldValueChangeDetails.reason` and of `valueChangeAction`
+  is widened.
+- Docs: the NumberField page states the preview rule and says "A form reset is written
+  whatever its validity", as the TextField page does.
+- Tests (`number-field.test.tsx`): Escape, `readOnly`, `disabled`, the equal reset (one
+  `"dismiss"` each), a reset to another value (its platform step, no `"dismiss"`), an edit
+  (none) and a step (itself), controlled (none); A and S both rejected in either order (one,
+  of the saved number), S rejected then A resolved (one, of A, after A is written).

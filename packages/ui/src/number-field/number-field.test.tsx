@@ -2184,6 +2184,174 @@ describe("NumberField: an invalid typed value stays a draft (#220)", () => {
     expect(seen.at(-1)).toMatchObject({ value: 3, text: "3" });
     expect(hidden().value).toBe("3");
   });
+
+  // The preview channel ends on the shown value (design 4.1): a kept draft whose number
+  // valueChangeAction heard, ended without a step of its own, sends one "dismiss".
+  describe("the preview channel ends on the shown value", () => {
+    const heard = (change: ReturnType<typeof vi.fn<Fn>>) =>
+      change.mock.calls.map(([n, d]) => [n, d.reason, d.valid]);
+
+    async function keep(change: ReturnType<typeof vi.fn<Fn>>, props = {}) {
+      const view = render(<Inline change={change} commit={() => undefined} {...props} />);
+      input().focus();
+      typeText("0");
+      key("Enter");
+      await flushMicrotasks();
+      expect(heard(change)).toEqual([[0, "activate", false]]);
+      return view;
+    }
+
+    it("Escape: one dismiss of the saved number", async () => {
+      const change = vi.fn<Fn>();
+      await keep(change);
+      key("Escape");
+      await flushMicrotasks();
+      expect(heard(change)).toEqual([
+        [0, "activate", false],
+        [5, "dismiss", true],
+      ]);
+      expect(change.mock.calls[1]![1].source).toBeNull();
+    });
+
+    it.each(["readOnly", "disabled"] as const)("%s turning on: one dismiss", async (prop) => {
+      const change = vi.fn<Fn>();
+      const { rerender } = await keep(change);
+      rerender(<Inline change={change} commit={() => undefined} {...{ [prop]: true }} />);
+      await flushMicrotasks();
+      expect(heard(change).slice(1)).toEqual([[5, "dismiss", true]]);
+      expect(input().value).toBe("5");
+    });
+
+    it("a reset to the shown value: one dismiss", async () => {
+      const change = vi.fn<Fn>();
+      await keep(change);
+      await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+      await flushMicrotasks();
+      expect(heard(change).slice(1)).toEqual([[5, "dismiss", true]]);
+    });
+
+    it("a reset to another value: its own platform step, no dismiss", async () => {
+      const change = vi.fn<Fn>();
+      const commit = vi.fn<CommitFn>();
+      render(<Inline change={change} commit={commit} />);
+      typeText("8");
+      blur();
+      await flushMicrotasks();
+      typeText("0");
+      blur();
+      await flushMicrotasks();
+      await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+      await flushMicrotasks();
+      expect(heard(change)).toEqual([
+        [8, "activate", true],
+        [0, "activate", false],
+        [5, "platform", true],
+      ]);
+      expect(input().value).toBe("5");
+    });
+
+    it("an edit sends none; a step reports itself", async () => {
+      const change = vi.fn<Fn>();
+      await keep(change, { max: 10 });
+      typeText("2");
+      await flushMicrotasks();
+      expect(change).toHaveBeenCalledTimes(1);
+      key("Escape");
+      await flushMicrotasks();
+      // An ordinary draft was never heard: its Escape sends nothing.
+      expect(change).toHaveBeenCalledTimes(1);
+      typeText("0");
+      key("Enter");
+      await flushMicrotasks();
+      key("ArrowUp");
+      await flushMicrotasks();
+      expect(heard(change)).toEqual([
+        [0, "activate", false],
+        [0, "activate", false],
+        [1, "activate", true],
+      ]);
+    });
+
+    it("controlled: nothing kept, no dismiss", async () => {
+      const change = vi.fn<Fn>();
+      render(<Inline change={change} defaultValue={undefined} value={5} />);
+      input().focus();
+      typeText("0");
+      key("Enter");
+      await flushMicrotasks();
+      key("Escape");
+      await flushMicrotasks();
+      expect(heard(change)).toEqual([[0, "activate", false]]);
+    });
+  });
+
+  describe("a writing commit A in flight, then a kept draft S", () => {
+    function setupOverlap() {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const change = vi.fn<Fn>();
+      const a = deferred();
+      const s = deferred();
+      render(
+        <Inline
+          change={change}
+          commit={async (next, details) => {
+            if (next === 8) {
+              try {
+                await a.promise;
+              } catch {
+                details.reject();
+              }
+              return;
+            }
+            try {
+              await s.promise;
+            } catch {
+              details.reject();
+            }
+          }}
+        />,
+      );
+      typeText("8");
+      blur();
+      typeText("0");
+      blur();
+      return { change, a, s };
+    }
+    const dismisses = (change: ReturnType<typeof vi.fn<Fn>>) =>
+      change.mock.calls.filter(([, d]) => d.reason === "dismiss").map(([n]) => n);
+
+    it("S rejects, then A rejects: exactly one dismiss, of the saved number", async () => {
+      const { change, a, s } = setupOverlap();
+      await act(async () => s.reject(new Error("s")));
+      await flushMicrotasks(2);
+      await act(async () => a.reject(new Error("a")));
+      await flushMicrotasks(2);
+      expect(dismisses(change)).toEqual([5]);
+      expect(input().value).toBe("5");
+    });
+
+    it("A rejects, then S rejects: exactly one dismiss, of the saved number", async () => {
+      const { change, a, s } = setupOverlap();
+      await act(async () => a.reject(new Error("a")));
+      await flushMicrotasks(2);
+      await act(async () => s.reject(new Error("s")));
+      await flushMicrotasks(2);
+      expect(dismisses(change)).toEqual([5]);
+      expect(input().value).toBe("5");
+    });
+
+    it("S rejects, then A resolves: one dismiss, of A, once A is written", async () => {
+      const { change, a, s } = setupOverlap();
+      await act(async () => s.reject(new Error("s")));
+      await flushMicrotasks(2);
+      expect(dismisses(change)).toEqual([]);
+      await act(async () => a.resolve());
+      await flushMicrotasks(2);
+      expect(dismisses(change)).toEqual([8]);
+      expect(input().value).toBe("8");
+    });
+  });
 });
 
 // #200, the consistency alignment (conventions 3.6, 4.1 rule 5, 9.5).

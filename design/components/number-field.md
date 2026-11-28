@@ -177,7 +177,7 @@ snap the text back between ticks. So:
 
 | | `valueChangeAction` | `valueCommitAction` |
 | --- | --- | --- |
-| Called | on every step: the parse of typed text at commit, each key press, each tick of a hold, each wheel event, each platform change, the `"dismiss"` revert | once per gesture: the typed text's blur or Enter, a hold's release, each key press, each wheel event, each platform change |
+| Called | on every step: the parse of typed text at commit, each key press, each tick of a hold, each wheel event, each platform change, the `"dismiss"` notice (a revert, the end of a kept draft, 4.1) | once per gesture: the typed text's blur or Enter, a hold's release, each key press, each wheel event, each platform change |
 | Lane | transition, through the Root's step transition (`useActionTrigger`) | transition, through the Root's commit dispatch (`useControllableAction`) |
 | Awaited, pending | yes; `data-pending` while any step is in flight | yes; `data-pending` while the commit is in flight |
 | Optimistic | none of its own (the input shows `live`, 2.2) | `setOptimistic(next)`: the text and the hidden input keep the gesture's value through the save and revert on rejection |
@@ -311,7 +311,7 @@ export type NumberFieldSource = "input" | "increment" | "decrement" | "keyboard"
 export interface NumberFieldValueChangeDetails extends ActionDetails {
   /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
   readonly valid: boolean;
-  readonly reason: ChangeReason;                       // "activate" | "platform" | "dismiss" (a rollback notice)
+  readonly reason: ChangeReason;                       // "activate" | "platform" | "dismiss" (a rollback, or the end of a kept draft, 4.1)
   /** Typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
   readonly source: NumberFieldSource | null;
 }
@@ -522,9 +522,20 @@ Subpath `@funstack/ui/number-field`; the root entry re-exports the namespace.
   - a second blur or Enter on the unchanged, still invalid draft dispatches nothing;
   - Escape reverts it (4.2); a step uses it as the base and replaces it (5.5); a valid typed
     value commits normally; a reset, `disabled` or `readOnly` drops it; a rejection of the
-    invalid dispatch (a throw or `details.reject()`) drops it and shows the saved number, and
-    `valueChangeAction` (which heard the typed number) hears one `"dismiss"` step of the shown
-    number, unless the user typed again meanwhile or a writing commit came after it.
+    invalid dispatch (a throw or `details.reject()`) drops it and shows the saved number;
+  - **the preview channel ends on the shown value.** `valueChangeAction` heard the typed
+    number, so when a kept draft ends without a step of its own (Escape, `disabled` or
+    `readOnly` turning on, a reset whose target is the shown number and which therefore
+    dispatches nothing, or the rejection of its own dispatch) it hears one `"dismiss"` step
+    (`source: null`, `event: undefined`) carrying the shown number, after the hidden input has
+    returned to it. An edit sends none (the draft becomes an ordinary one, never previewed); a
+    step, a valid typed commit and a reset that dispatches report themselves. A rejection
+    sends none when the user typed again meanwhile (the draft stays) or a writing commit came
+    after it. When a writing commit is still in flight at that rejection, the notice waits
+    for it: if it rejects, its own revert is the one `"dismiss"`; if it resolves, the notice
+    carries its value then. So a writing commit and a kept draft that both reject send exactly
+    one `"dismiss"`, of the saved number. Like the writing path's revert, the notice leaves
+    the commit transition first (one `await`, conventions 2.6).
   A later commit that fails therefore rolls back to the saved number, not to the invalid one.
   Steps (keys, buttons, wheel) have no draft and are written as before. Controlled mode is
   unchanged: the draft is cleared and the parent decides. `"platform"` values (reset, mount)

@@ -188,9 +188,13 @@ export function NumberFieldPage() {
         <code>readOnly</code> drops it. A later save that fails rolls back to the{" "}
         <strong>saved</strong> number, never to the invalid one. If the commit action rejects the
         invalid commit itself (a throw, or <code>return details.reject()</code>), the draft is
-        dropped, the saved number shows and <code>valueChangeAction</code> hears one{" "}
-        <code>"dismiss"</code>. Steps have no draft and are written as before; so is a form reset.
-        Controlled, nothing of this applies: the draft is cleared and the parent decides.
+        dropped and the saved number shows. <code>valueChangeAction</code> heard the typed number,
+        so it always ends on the shown one: when the kept draft ends by Escape, by{" "}
+        <code>disabled</code> / <code>readOnly</code>, by a form reset to the shown number or by
+        that rejection, it hears one <code>"dismiss"</code> carrying the shown number; an edit sends
+        none, and a step reports itself. Steps have no draft and are written as before. A form reset
+        is written whatever its validity. Controlled, nothing of this applies: the draft is cleared
+        and the parent decides.
       </p>
 
       <h3 id="props">Props</h3>
