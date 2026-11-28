@@ -35,8 +35,8 @@ export interface ChannelDetails {
 export interface CommitRootProps<V, C, M> {
   readonly value?: V;
   readonly defaultValue?: V;
-  readonly valueChangeAction?: (next: V, details: C) => unknown;
-  readonly valueCommitAction?: (next: V, details: M) => unknown;
+  readonly valueChangeAction?: (next: V, details: C & Rejectable) => unknown;
+  readonly valueCommitAction?: (next: V, details: M & Rejectable) => unknown;
   readonly name?: string;
   readonly disabled?: boolean;
 }
@@ -96,8 +96,8 @@ export function eachCommitMode(name: string, body: (mode: CommitMode) => void): 
 export interface CommitFixtureProps<V, C, M, P> {
   readonly mode: CommitMode;
   readonly initial: V;
-  readonly onChange?: (next: V, details: C) => unknown;
-  readonly onCommit?: (next: V, details: M) => unknown;
+  readonly onChange?: (next: V, details: C & Rejectable) => unknown;
+  readonly onCommit?: (next: V, details: M & Rejectable) => unknown;
   readonly rootProps?: Partial<P>;
   /** Content under the Root, rendered from the parent's committed value. */
   readonly below?: (value: V) => ReactNode;
@@ -358,7 +358,7 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
             onChange={onChange}
             onCommit={async (_next, details) => {
               await d.promise;
-              (details as M & Rejectable).reject();
+              details.reject();
             }}
             boundary={caught}
           />,
@@ -385,7 +385,7 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
           <Fixture
             mode="uncontrolled"
             initial={values[0]}
-            onChange={(_next, details) => (details as C & Rejectable).reject()}
+            onChange={(_next, details) => details.reject()}
             onCommit={onCommit}
             boundary={caught}
           />,

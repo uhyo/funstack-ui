@@ -61,7 +61,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
     else expect(el).not.toHaveAttribute("role");
   };
 
-  type ActionFn = (next: boolean, details: Details) => unknown;
+  type ActionFn = (next: boolean, details: Details & Rejectable) => unknown;
 
   interface HarnessProps extends Omit<
     ControlProps,
@@ -105,13 +105,13 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
     const [committed, setCommitted] = useState(initial);
     const [error, setError] = useState<unknown>(null);
 
-    const checkedChangeAction = async (next: boolean, details: Details) => {
+    const checkedChangeAction = async (next: boolean, details: Details & Rejectable) => {
       try {
         await action?.(next, details);
       } catch (e) {
         if (!catchErrors) throw e;
         startTransition(() => setError(e));
-        if (rejectCaught) (details as Details & Rejectable).reject();
+        if (rejectCaught) details.reject();
         return;
       }
       if (mode === "controlled" && refusePlatform && details.reason === "platform") return;

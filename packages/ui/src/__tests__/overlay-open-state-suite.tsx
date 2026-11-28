@@ -57,7 +57,7 @@ export type OpenChangeFn<D> = (next: boolean, details: D) => unknown;
 export interface OverlayRootProps<D> {
   open?: boolean;
   defaultOpen?: boolean;
-  openChangeAction?: (next: boolean, details: D) => Promise<void>;
+  openChangeAction?: (next: boolean, details: D & Rejectable) => Promise<void>;
   onOpenChange?: (next: boolean, details: D) => void;
 }
 
@@ -66,7 +66,7 @@ export interface OverlayHarnessProps<D> {
   /** Initial committed open state. */
   initialOpen?: boolean;
   /** The consumer's work, awaited by the harness's `openChangeAction`. */
-  action?: OpenChangeFn<D>;
+  action?: OpenChangeFn<D & Rejectable>;
   /**
    * The consumer's `onOpenChange` body (a fact, #148): called by the harness's handler before it
    * adopts the value; what it returns is returned to the library (a promise's rejection goes to
@@ -126,12 +126,12 @@ export function createOverlayHarness<D, P extends object>(
   }: OverlayHarnessProps<D> & P) {
     const [open, setOpen] = useState(initialOpen);
 
-    const openChangeAction = async (next: boolean, details: D) => {
+    const openChangeAction = async (next: boolean, details: D & Rejectable) => {
       try {
         await action?.(next, details);
       } catch (error) {
         if (!catchErrors) throw error;
-        if (rejectCaught) (details as D & Rejectable).reject();
+        if (rejectCaught) details.reject();
         return;
       }
       if ((next && refuseOpen) || (!next && refuseClose)) return;

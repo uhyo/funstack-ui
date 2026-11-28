@@ -935,7 +935,7 @@ describe("Toast", () => {
   });
 
   describe("rejection", () => {
-    it("an Undo that rejects keeps the toast and reaches the boundary above the Viewport's list", async () => {
+    it("an Undo that rejects keeps the toast and reaches a boundary around the list", async () => {
       silenceErrors();
       const errors: unknown[] = [];
       const d = deferred();
@@ -1473,7 +1473,7 @@ describe("Toast", () => {
       },
     );
 
-    it('"run": the latest run rejecting reaches the boundary above the Viewport list', async () => {
+    it('"run": the latest run rejecting reaches a boundary around the list', async () => {
       silenceErrors();
       const reportError = vi.fn();
       vi.stubGlobal("reportError", reportError);
@@ -1679,7 +1679,7 @@ describe("Toast", () => {
       await act(async () => slow.resolve());
     });
 
-    it("a rejection goes to reportError, not the boundary above the Viewport", async () => {
+    it("a rejection goes to reportError, not a boundary around the list", async () => {
       silenceErrors();
       const reportError = vi.fn();
       vi.stubGlobal("reportError", reportError);

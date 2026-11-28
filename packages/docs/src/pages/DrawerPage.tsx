@@ -326,7 +326,7 @@ export function DrawerPage() {
         the action runs first in the button's own transition (<code>data-pending</code>) and a
         rejection leaves the drawer open. With or without <code>action</code>, the button has{" "}
         <code>data-pending</code> until the close it asked for has committed. Props:{" "}
-        <code>action</code> (details: <code>DrawerCloseActionDetails</code>),{" "}
+        <code>action</code> (details: <code>DrawerCloseActionDetails &amp; Rejectable</code>),{" "}
         <code>whilePending</code>, <code>value</code>, <code>disabled</code>, <code>className</code>
         , <code>style</code>, <code>children</code> (functions of <code>DrawerCloseState</code>,{" "}
         <code>{"{ pending, disabled }"}</code>), <code>render</code>. See{" "}

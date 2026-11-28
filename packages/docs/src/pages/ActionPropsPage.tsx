@@ -569,7 +569,7 @@ useEffect(() => {
       <ConceptExample component="Checkbox" href="/components/checkbox">
         <p>
           Uncontrolled checkboxes that save on change. Tick &quot;Make the next save fail&quot;,
-          then a task: the box rolls back and the message appears next to it.
+          then a task: the box rolls back and the message appears below the list.
         </p>
         <Example file="CheckboxReject.tsx" css="checkbox.css">
           <CheckboxReject />

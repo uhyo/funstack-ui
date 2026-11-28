@@ -386,7 +386,7 @@ export function MenuPage() {
             name: "action",
             type: "Action<[details: MenuItemActionDetails & Rejectable]>",
             description:
-              'Runs in the item\'s own transition (`data-pending` on the item); the menu closes when it settles. A second activation while it is pending is ignored, and the item is `aria-disabled="true"` meanwhile, unless `whilePending` is `"run"` (the default with `closeOnActivate={false}`). May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item.',
+              'Runs in the item\'s own transition (`data-pending` on the item); the menu closes when it settles. A second activation while it is pending is ignored, and the item is `aria-disabled="true"` meanwhile, unless `whilePending` is `"run"` (the default with `closeOnActivate={false}`). May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item; `details.reject()` keeps it open with no boundary (a handled failure).',
           },
           ...itemRows("MenuItemState", "true", "Close the whole menu once `action` settles."),
           {

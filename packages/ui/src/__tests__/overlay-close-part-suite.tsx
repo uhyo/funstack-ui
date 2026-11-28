@@ -35,7 +35,7 @@ import type {
 /** The props the suite renders the Close part with. */
 export interface ClosePartProps {
   readonly "data-testid": string;
-  readonly action?: (details: ActionDetails) => unknown;
+  readonly action?: (details: ActionDetails & Rejectable) => unknown;
   readonly whilePending?: WhilePending;
   readonly disabled?: boolean;
   readonly render?: ReactElement<ComponentPropsWithRef<"button">>;
@@ -177,7 +177,7 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
                   action: async (details) => {
                     if (call++ > 0) return;
                     await work.promise;
-                    (details as ActionDetails & Rejectable).reject();
+                    details.reject();
                   },
                 })}
               </ErrorCatcher>

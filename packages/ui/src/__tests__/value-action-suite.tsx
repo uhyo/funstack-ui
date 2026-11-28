@@ -34,7 +34,7 @@ export type TransitionProp = ViewTransitionClass;
 export interface ControlProps<V, D> {
   readonly value?: V;
   readonly defaultValue?: V;
-  readonly changeAction?: (next: V, details: D) => unknown;
+  readonly changeAction?: (next: V, details: D & Rejectable) => unknown;
   readonly transition?: TransitionProp;
   /** Pass-through props for the part that owns the value (a ref, `disabled`, …). */
   readonly extra?: Readonly<Record<string, unknown>>;
@@ -135,7 +135,7 @@ export interface ValueHarnessProps<V, D extends { readonly event: Event | undefi
   /** Initial committed value; defaults to `driver.values[0]`. */
   readonly initial?: V;
   /** The consumer's work; awaited by the harness's change action. */
-  readonly action?: (next: V, details: D) => unknown;
+  readonly action?: (next: V, details: D & Rejectable) => unknown;
   /** Catch errors thrown by `action` (turns a rejection into success for the library). */
   readonly catchErrors?: boolean;
   /** With `catchErrors`: call `details.reject()` after catching (conventions 2.4.1). */
@@ -186,13 +186,13 @@ export function ValueHarness<V, D extends { readonly event: Event | undefined }>
   const [error, setError] = useState<unknown>(null);
   const format = driver.format ?? JSON.stringify;
 
-  const changeAction = async (next: V, details: D) => {
+  const changeAction = async (next: V, details: D & Rejectable) => {
     try {
       await action?.(next, details);
     } catch (e) {
       if (!catchErrors) throw e;
       startTransition(() => setError(e));
-      if (rejectCaught) (details as D & Rejectable).reject();
+      if (rejectCaught) details.reject();
       return;
     }
     if (veto) return;
@@ -261,7 +261,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
   /** What the harness commits for the dispatch recorded as `call` on top of `prev`. */
   const commitOf = (prev: V, call: readonly [V, D]) =>
     driver.commit ? driver.commit(prev, call[0], call[1]) : call[0];
-  type ActionFn = (next: V, details: D) => unknown;
+  type ActionFn = (next: V, details: D & Rejectable) => unknown;
   const Harness = (props: Omit<ValueHarnessProps<V, D>, "driver">) => (
     <ValueHarness driver={driver} {...props} />
   );
@@ -522,7 +522,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
           <Harness
             mode="uncontrolled"
             action={(_next, details) => {
-              if (call++ === 0) (details as D & Rejectable).reject();
+              if (call++ === 0) details.reject();
               return ds.next();
             }}
             boundary={onError}
