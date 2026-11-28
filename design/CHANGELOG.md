@@ -17267,3 +17267,66 @@ and Combobox count a disabled control as not missing a value, as the read contro
 rows for a controlled unchecked click and RadioGroup's click-time read; the `ariaNotify` rows
 assert in every engine (a stand-in where the method lags) and check the message in Chromium's
 accessibility tree.
+
+## 2026-11-28, #216: NumberField's group has no name; the buttons carry the label
+
+From dogfood run 1 (F5) and `memo/technical-writer/numberfield-label-f5.md`. The design named
+the `role="group"` Root with the label "as React Aria does". That was wrong: React Aria
+(`useNumberField`), Base UI and Zag / Ark UI all leave the group unnamed, and React Aria puts
+the label into the button names instead. Product-owner decision: align with React Aria. Design
+only; not implemented.
+
+### What changed in the rules (number-field.md)
+
+- The Root keeps `role="group"` and has **no name**. `aria-labelledby` is no longer an owned
+  key of the Root; a consumer's `aria-label` / `aria-labelledby` passes through (section 1,
+  the part table, 3.1 owned keys, 7, 8.1).
+- Increment and Decrement render `id` (a default the consumer's replaces) and
+  `aria-labelledby="<own id> <label id>"`, so the name is "Increase Quantity" (3.3 owned keys,
+  8.1, 8.4, the HTML examples). The label is `NumberField.Label` and / or the Field's label;
+  with neither, no `aria-labelledby` and the short name.
+- A consumer `aria-label` replaces the word and keeps the label ("Erhöhen Menge"); a consumer
+  `aria-labelledby` replaces the library's whole, as before.
+
+### Checked
+
+- **An unnamed `group` is valid.** ARIA 1.2 does not require a name for `group`; screen readers
+  skip an unnamed group or say "group". The role is kept rather than dropped because all three
+  libraries keep it and it still marks the three elements as one widget. Not verified with a
+  screen reader here: the pass is a human task (checklist).
+- **Slider** names its Root only with several thumbs, where the group's name ("Price") and the
+  thumbs' names ("Minimum", "Maximum") are different texts: the APG multi-thumb pattern, no
+  double reading. Unchanged. **OTPField** has no group. Neither has the pattern.
+
+### Trade-off to know
+
+The label's text is now part of three accessible names, so a substring query by label text
+finds the input and both buttons (before: the input and the group). The docs' test advice stays
+"address the input by role and exact name". React Aria has the same property.
+
+### Checklist
+
+- `number-field/number-field-root.tsx`: drop the Root's `aria-labelledby` (and its token
+  merge); keep the Label registry and the Field label id, exposed through context.
+- `number-field/number-field-increment.tsx`, `number-field-decrement.tsx` (or their shared
+  file): default `id`, the `aria-labelledby` rule, the consumer-override rows of 8.4.
+- Docs: the NumberField page ("The label names two elements" becomes the new rule and the
+  query advice; the ARIA table; the localisation example); the skill if it mentions the group.
+- Screen-reader pass (NVDA, JAWS, VoiceOver): the label is read once on entering the field and
+  the buttons read "Increase Quantity" in browse mode. Human task.
+
+### Test plan
+
+| Row | Assert |
+| --- | --- |
+| Root | `role="group"`, no `aria-labelledby`, no `aria-label`; a consumer's `aria-label` and `aria-labelledby` pass through unchanged |
+| Buttons, `NumberField.Label` | each has an `id` and `aria-labelledby` = own id + Label id; accessible name "Increase Quantity" / "Decrease Quantity" (browser row: the computed name in the three engines) |
+| Buttons, inside a Field | the Field's label id is the second token; with a `NumberField.Label` as well, part first, Field second |
+| No label | no `aria-labelledby`; name "Increase" |
+| Label mounted later / unmounted | the token appears and leaves |
+| Consumer `aria-label` | replaces the word, label kept |
+| Consumer `aria-labelledby` | only the consumer's; no default `aria-label` |
+| Consumer `id` | used in the self-reference |
+| `aria-label=""` | the dev warning, unchanged |
+| Server render | ids and `aria-labelledby` in the HTML; hydrates without a warning |
+| Existing rows | the ones that assert the Root's `aria-labelledby` are replaced, not deleted |

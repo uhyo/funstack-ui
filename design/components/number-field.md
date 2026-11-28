@@ -47,7 +47,7 @@ in Slider.
 | 6 | Value shape | `value: number \| null` (`null` is empty; `undefined` is uncontrolled). Typed values are **neither clamped nor snapped** (the platform's rule for `type=number`): `min` / `max` / `step` are native constraints on the hidden input (`rangeUnderflow`, `rangeOverflow`, `stepMismatch`, the browser's message). **Stepping** clamps and snaps with the spec's `stepUp()` semantics (5.5). Every value the field commits or steps to is rounded to the format's `maximumFractionDigits`, so the text, the value and `FormData` agree (5.4; typed and stepped values alike). |
 | 7 | Numbers | `format: Intl.NumberFormatOptions` (`decimal`, `percent`, `currency`, `unit`), `locale` (default: the runtime's locale, with a dev warning when the document's `lang` disagrees and no `locale` was given). Parsing is library code driven by `formatToParts`: the locale's decimal, group, sign, percent, currency, unit and literal symbols and its digits; full-width digits accepted; **strict grouping** (a group separator must sit before the decimal separator and be followed by a whole group, so `1,5` under `en` is unparsable, not `15`); accounting parentheses and U+2212 as minus; percent scales by 100. Affixes (currency, unit, percent, literals) are stripped **at the edges only**, in every display the formatter has (`EUR`, `€`, `euros`, `km`, `kilometers`), case-insensitively; the number core stays strict (section 5.3). |
 | 8 | Keyboard | ArrowUp / ArrowDown `± step`; PageUp / PageDown and Shift+Arrow `± largeStep` (default `10 × step`); Home / End to `min` / the **largest on-grid value `≤ max`**, **only when that bound is set** and only without Shift (Shift+Home / Shift+End stay text selection); Ctrl / Meta / Alt combinations are the browser's; Enter commits (and lets the form's implicit submission post the committed value, which needs a submit button in the form, 4.1); Escape reverts an edited draft and consumes the key (4.2); every other key is native text editing. Each key press is a one-step gesture (step + commit), auto-repeat included (4.2). |
-| 9 | Buttons | `tabindex="-1"` (the input is the only Tab stop, APG), `aria-controls` → the input, built-in `aria-label` `"Increase"` / `"Decrease"` (static strings, overridden by the ordinary `aria-label` / `aria-labelledby` pass-through, Toast's rule), natively `disabled` when the next step from the **step base** (the parsed draft while one is open, else the shown value) would change nothing (at the bound, `readOnly`, `disabled`). **Press-and-hold**: one step on `pointerdown`, repeat after 400 ms then every 60 ms, commit at release; the press is `preventDefault()`ed so focus stays where it is and touch opens no keyboard; a `click` with no pointer gesture (assistive technology) steps once. `details.event` is `undefined` for the repeats of a hold and for a hold its bound ended (4.3). |
+| 9 | Buttons | `tabindex="-1"` (the input is the only Tab stop, APG), `aria-controls` → the input, built-in `aria-label` `"Increase"` / `"Decrease"` (static strings, overridden by the ordinary `aria-label` / `aria-labelledby` pass-through, Toast's rule), and the field's label appended to the name through `aria-labelledby` ("Increase Quantity", 8.4), natively `disabled` when the next step from the **step base** (the parsed draft while one is open, else the shown value) would change nothing (at the bound, `readOnly`, `disabled`). **Press-and-hold**: one step on `pointerdown`, repeat after 400 ms then every 60 ms, commit at release; the press is `preventDefault()`ed so focus stays where it is and touch opens no keyboard; a `click` with no pointer gesture (assistive technology) steps once. `details.event` is `undefined` for the repeats of a hold and for a hold its bound ended (4.3). |
 | 10 | Wheel | **Off by default**; `stepOnWheel` enables it **only while the input is focused**, through a native non-passive `wheel` listener (React's `onWheel` is passive and cannot stop the page scroll). Each wheel event with a vertical delta is a one-step gesture; `deltaY === 0` (a horizontal scroll) is ignored and not prevented (4.4). |
 | 11 | Hidden native input | `<input type="number">` right after the visible input, `aria-hidden="true" tabindex="-1" autocomplete="off"`, visually hidden; carries `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readOnly` and the canonical value (`String(number)`, `""` for empty). **Uncontrolled**: its `defaultValue` prop is the reset target (uncontrolled: the latest `defaultValue`; controlled: the mount-time value), which react-dom keeps in the `value` attribute, so the platform's own reset applies to it; the library writes its `.value` synchronously at every step and re-applies the shown value after every commit. The library always cancels its `invalid` event, so the browser never reports on an `aria-hidden` element (section 6). |
 | 12 | The validity mirror | After every write to the hidden input, `visible.setCustomValidity(hidden.validationMessage)`: the visible input is invalid exactly when the hidden one is, with the browser-localised message, so `invalid`, the native bubble, the browser's focus move and `:user-invalid` all land on the visible input in every engine (research finding 5). Inside a Field the Field writes its slot (`validate`, server errors) on the **hidden** input and mirrors the same way (section 7). |
@@ -93,20 +93,20 @@ Rendered HTML for the first example (ids from one `useId` in Root; the hidden in
 abbreviated):
 
 ```html
-<div role="group" aria-labelledby="_r_1_-label">
+<div role="group">
   <label id="_r_1_-label" for="_r_1_-input">Quantity</label>
-  <button type="button" tabindex="-1" aria-label="Decrease" aria-controls="_r_1_-input" class="step" disabled>−</button>
+  <button type="button" tabindex="-1" id="_r_1_-decrement" aria-label="Decrease" aria-labelledby="_r_1_-decrement _r_1_-label" aria-controls="_r_1_-input" class="step" disabled>−</button>
   <input type="text" id="_r_1_-input" class="input" inputmode="numeric" autocomplete="off" autocorrect="off" spellcheck="false" value="1">
   <input type="number" name="quantity" min="1" max="99" step="1" value="1" aria-hidden="true" tabindex="-1"
          style="position: absolute; width: 1px; height: 1px; margin: -1px; opacity: 0; overflow: hidden; clip-path: inset(50%); pointer-events: none">
-  <button type="button" tabindex="-1" aria-label="Increase" aria-controls="_r_1_-input" class="step">+</button>
+  <button type="button" tabindex="-1" id="_r_1_-increment" aria-label="Increase" aria-labelledby="_r_1_-increment _r_1_-label" aria-controls="_r_1_-input" class="step">+</button>
 </div>
 ```
 
 | Part | Element | Role | Renders from | Notes |
 | --- | --- | --- | --- | --- |
-| `Root` | `div` | `group` | shown value, pending | Owns `useId`, the commit hook, the step transition, the draft text, `live`, the hold, the Label registry, the formatter and parser, form reset and mount reconciliation (through the Input's registration of the hidden input). `aria-labelledby` → the `Label` id while one is mounted, else a Field's label id, token-merged with the consumer's. `data-pending`, `data-disabled`, `data-invalid` (Field). |
-| `Label` | `label` | | | `for` → the visible input's id; registers its id with the Root from a layout effect (Combobox's Label), so the group is named by it. |
+| `Root` | `div` | `group` | shown value, pending | Owns `useId`, the commit hook, the step transition, the draft text, `live`, the hold, the Label registry, the formatter and parser, form reset and mount reconciliation (through the Input's registration of the hidden input). No name of its own (section 1 below; a consumer's `aria-label` / `aria-labelledby` passes through). `data-pending`, `data-disabled`, `data-invalid` (Field). |
+| `Label` | `label` | | | `for` → the visible input's id; registers its id with the Root from a layout effect (Combobox's Label), so the Increment and Decrement buttons can add it to their names (8.4). |
 | `Input` | `input[type=text]` **followed by** `input[type=number]` | `textbox` (the visible); the hidden one is `aria-hidden` | shown text, pending | The visible input: `id`, `value` (the shown text: the draft while editing, else the formatted value), `inputmode` (`decimal` when fractions are allowed, else `numeric`; a consumer's `inputMode` replaces it), `autocomplete="off"`, `autocorrect="off"`, `spellcheck="false"`, `disabled`, `readonly`, the Field's `aria-describedby` / `aria-invalid`, the library's `onChange`, `onKeyDown`, `onBlur` (composition is judged from the keydown's `isComposing` / `keyCode 229`, so the composition handlers pass through), a native non-passive `wheel` listener when `stepOnWheel`. The hidden input: `name`, `form`, `min`, `max`, `step`, `required`, `disabled`, `readonly`, `defaultValue` (the reset target), `autocomplete="off"`, `aria-hidden="true"`, `tabindex="-1"`, the hidden-input style, a native `invalid` listener that cancels. `ref` → the visible input; `hiddenInputRef` → the hidden one. `data-pending`, `data-disabled`, `data-invalid`. |
 | `Increment`, `Decrement` | `button` | `button` | shown value, pending | `type="button"`, `tabindex="-1"`, `aria-controls` → the input id, `aria-label` (`"Increase"` / `"Decrease"` unless the consumer passes one), `disabled` when the prop, the Root, `readOnly` or the bound says so (`state.disabled`), the library's `onPointerDown`, `onClick`, `onContextMenu`; the hold's `pointerup` / `pointercancel` / `lostpointercapture` listeners are attached during a hold. `data-pending` when the latest step or commit came from this button, `data-disabled`. |
 
@@ -122,15 +122,17 @@ Why this shape:
   input instead (Combobox's Root renders one when `name` is given), but the Input part owns both
   refs that the Field contract and the validity mirror need (section 7), and a Root that renders
   a `div` *and* an input is two elements as well. The exception is proposal 2.
-- **`Root` is a `div[role=group]`** named by the Label (research §2.2, React Aria): the two
-  `tabindex="-1"` buttons are reached by a screen reader's browse mode, and the group tells the
-  user what "Increase" increases ("Quantity, group: Decrease, button; Quantity, edit text, 1;
-  Increase, button"). The buttons therefore carry the short built-in name only, not
-  "Increase Quantity" (React Aria concatenates with `aria-labelledby`; Base UI uses the short
-  name). Cost: the label is read twice when the group is entered (the group's name and the
-  input's); accepted, as React Aria does.
-- **`Label` is a part** so a standalone field has `label[for]` and a name for the group from
-  one element; inside a Field, `Field.Label` plays the role (section 7) and `NumberField.Label`
+- **`Root` is a `div[role=group]` with no name**, as in React Aria (`useNumberField`), Base UI
+  and Zag / Ark UI. The role stays: it tells assistive technology that the input and the two
+  buttons are one widget, and `group` does not require a name (ARIA 1.2: accessible name not
+  required; an unnamed group is skipped or read as "group", never an error). Naming it with the
+  Label made the label the name of two elements, so it was read twice on entering the field.
+  Instead the **buttons** carry the label, which is where browse mode needs it: "Decrease
+  Quantity, button; Quantity, edit text, 1; Increase Quantity, button" (8.4, React Aria's
+  construction). A consumer who wants a named group passes `aria-label` or `aria-labelledby`
+  to the Root; they pass through.
+- **`Label` is a part** so a standalone field has `label[for]` and the buttons a label to
+  reference, from one element; inside a Field, `Field.Label` plays the role (section 7) and `NumberField.Label`
   stays usable.
 - **No `Group` part** (Base UI nests `Group` in `Root`): the Root is the group. **No
   `ScrubArea`** (Base UI's drag-to-change label): a pointer gesture on the label that changes a
@@ -373,8 +375,7 @@ export interface NumberFieldRootProps
 }
 ```
 
-Owned keys: `role`, `aria-labelledby` (token-merged: the consumer's tokens, then
-`NumberField.Label`'s id, then a Field's label id), `data-pending`, `data-disabled`,
+Owned keys: `role`, `data-pending`, `data-disabled`,
 `data-invalid`. `id` on the Root is the `div`'s and passes through; the input's id is the Root's
 `useId` or, inside a Field, the Field's control id. `transition` is not a prop. A `value` that is
 not a finite number (`NaN`, `Infinity`) warns in development and is treated as `null`; a
@@ -436,10 +437,12 @@ export type NumberFieldDecrementProps = NumberFieldIncrementProps;
 ```
 
 Owned keys: `type="button"` (on a `<button>`), `tabIndex={-1}`, `aria-controls`, `disabled`,
-the three handlers, `data-pending`, `data-disabled`. `aria-label` is a default (`"Increase"` /
-`"Decrease"`, section 8.4) that the consumer's `aria-label` replaces; with a consumer
-`aria-labelledby` the default is **omitted**, so the referenced element is the
-whole name. `state.disabled` is computed from the step base (the parsed draft while one is
+the three handlers, `data-pending`, `data-disabled`. `id` is a default (derived from the Root's
+`useId`) that the consumer's `id` replaces. `aria-label` is a default (`"Increase"` /
+`"Decrease"`, section 8.4) that the consumer's `aria-label` replaces. `aria-labelledby` is the
+library's (`"<the button's id> <the label's id>"`, 8.4) unless the consumer passes one; with a
+consumer `aria-labelledby` the library's is not rendered and the default `aria-label` is
+**omitted**, so the referenced element is the whole name. `state.disabled` is computed from the step base (the parsed draft while one is
 open), so a field showing `99` with `max 99` whose user has typed `50` has an enabled `+`.
 
 ### 3.4 `NumberField.Label`
@@ -860,11 +863,11 @@ Rendered (idle):
 ```html
 <div>                                                                     <!-- Field.Root -->
   <label id="_f_-label" for="_f_-control">Quantity</label>
-  <div role="group" aria-labelledby="_f_-label">                           <!-- NumberField.Root; data-invalid while shown -->
-    <button type="button" tabindex="-1" aria-label="Decrease" aria-controls="_f_-control" disabled>−</button>
+  <div role="group">                                                       <!-- NumberField.Root; data-invalid while shown -->
+    <button type="button" tabindex="-1" id="_n_-decrement" aria-label="Decrease" aria-labelledby="_n_-decrement _f_-label" aria-controls="_f_-control" disabled>−</button>
     <input type="text" id="_f_-control" inputmode="numeric" value="6" aria-describedby="_f_-description" aria-invalid="false">
     <input type="number" name="quantity" min="6" max="120" step="6" value="6" aria-hidden="true" tabindex="-1" style="…">
-    <button type="button" tabindex="-1" aria-label="Increase" aria-controls="_f_-control">+</button>
+    <button type="button" tabindex="-1" id="_n_-increment" aria-label="Increase" aria-labelledby="_n_-increment _f_-label" aria-controls="_f_-control">+</button>
   </div>
   <p id="_f_-description">Packs of six, up to 120.</p>
 </div>
@@ -900,7 +903,7 @@ What the Field does with it (the only Field-side changes):
 | `invalid` listener, bubble cancellation, focus target | `element` | unchanged: the visible input fires `invalid` (it is invalid by the mirror), the Field cancels it when a `Field.Error` is mounted, and focuses the visible input; the hidden input's `invalid` is cancelled by the library regardless (6.3) |
 | `name`, `required`, `disabled` | returned, spread on the control | returned; the part puts `name` and `required` on the **hidden** input, `disabled` on both and the buttons |
 | `id`, `aria-describedby`, `aria-invalid`, `data-invalid` | `attributes` | on the visible input (owned; `aria-describedby` token-merged); `data-invalid` also on the Root (through context) |
-| `aria-labelledby` | groups only | the Root reads `FieldContext.ids.label` directly for its own `aria-labelledby` (Combobox's Root reads the context directly too) |
+| `aria-labelledby` | groups only | not used on the Root (the group has no name). The Root reads `FieldContext.ids.label` directly and gives it to the Increment and Decrement buttons for their `aria-labelledby` (8.4) |
 
 The Field's slot holds `validate`'s result or a shown server error, as for any control; typing
 in the visible input is an `input` event the Field hears, so a server error is dismissed at
@@ -974,15 +977,15 @@ the next click submits with `quantity=12` in `FormData`.
 
 | Element | Attributes |
 | --- | --- |
-| Root `div` | `role="group"`, `aria-labelledby` (Label / Field label / consumer tokens) |
+| Root `div` | `role="group"`, no name (a consumer's `aria-label` / `aria-labelledby` passes through) |
 | Label | `for` → the visible input |
 | Visible input | `type="text"`, `id`, `inputmode`, `aria-describedby` / `aria-invalid` (Field), `readonly`, `disabled`; **no `role`**, no `aria-valuenow` / `-min` / `-max` / `-valuetext`, no `aria-roledescription` (8.2) |
 | Hidden input | `aria-hidden="true"`, `tabindex="-1"` |
-| Buttons | `type="button"`, `tabindex="-1"`, `aria-label` `"Increase"` / `"Decrease"`, `aria-controls` → the visible input, `disabled` at the bound |
+| Buttons | `type="button"`, `tabindex="-1"`, `id`, `aria-label` `"Increase"` / `"Decrease"`, `aria-labelledby` → the button itself, then the label (8.4), `aria-controls` → the visible input, `disabled` at the bound |
 
-What a screen reader hears: entering the group "Quantity, group"; on the input "Quantity, edit
+What a screen reader hears: on the input "Quantity, edit
 text, 1" (with a description "Packs of six, up to 120." inside a Field); after ArrowUp, the
-announcement "2" (8.3); browsing to a button "Increase, button" (the group gives the context);
+announcement "2" (8.3); browsing to a button "Increase Quantity, button";
 an error "Quantity, edit text, 7, invalid entry, Enter a multiple of six." (`aria-invalid` plus
 `aria-describedby` → `Field.Error`).
 
@@ -994,7 +997,7 @@ product owner accepted the research's deviation: on a text input, VoiceOver anno
 rewrite the text (250380); React Aria and Base UI both render a plain textbox. The component
 page documents the deviation and what replaces it: the formatted text (the role's "value"), the
 `inputmode` keyboard, and the step announcements. Windows screen readers lose the words "spin
-button"; the Increase / Decrease buttons in the group and the Arrow announcements tell the
+button"; the "Increase Quantity" / "Decrease Quantity" buttons and the Arrow announcements tell the
 user the same thing.
 
 `aria-roledescription` (Base UI: `"Number field"`; React Aria: localised `"number field"`) is
@@ -1043,6 +1046,35 @@ still gets the default label, which overrides its content for assistive technolo
 documented way to let the content name the button is to pass the same text as `aria-label`
 (the default is replaced, never removed: `aria-label=""` would leave the button nameless and is
 a dev warning). Product-owner item 8.
+
+**The label is part of the name** (#216, React Aria's construction). Each button renders
+`aria-labelledby="<its own id> <label id>"`: accessible-name computation takes the button's own
+`aria-label` for the self-reference and the label's text for the second token, so the name is
+"Increase Quantity". No string is built in JS, so nothing needs translating beyond the two
+words, and the name follows a label that changes.
+
+| Consumer passes | Rendered | Name |
+| --- | --- | --- |
+| nothing | `aria-label="Increase"`, `aria-labelledby="<button> <label>"` | "Increase Quantity" |
+| `aria-label="Erhöhen"` | that `aria-label`, the same `aria-labelledby` | "Erhöhen Menge" (the label is the consumer's own text) |
+| `aria-labelledby="x"` | only that; no default `aria-label` | the text of `x` |
+| `id="plus"` | the self-reference uses `plus` | unchanged |
+
+- **The label** is `NumberField.Label` while one is mounted, and inside a Field the Field's
+  label id; with both, both tokens, the part's first (the order the Root's name had). With
+  neither (the Input named by the consumer's `aria-label`) no `aria-labelledby` is rendered
+  and the name is the short one: the library has no label to refer to, and it does not compose
+  a sentence from an attribute. Such a field passes full names to the buttons
+  (`aria-label="Increase quantity"`).
+- **Word order is "verb, label"**, which is all a list of id references can express. A consumer's
+  `aria-labelledby` replaces the library's whole, so a language that needs another order
+  passes an `aria-label` with the full text and `aria-labelledby` pointing at the button's own
+  `id`; the same with the short text gives the short name back.
+- **Cost.** The label's text is now part of three names. A query by label text that matches
+  substrings (Playwright's `getByLabel("Quantity")`, Testing Library's `getByLabelText`) finds
+  the input and both buttons; tests address the input by role and exact name
+  (`getByRole("textbox", { name: "Quantity", exact: true })`). React Aria has the same
+  property. What is gone is the double reading in a screen reader.
 
 ### 8.5 `inputmode` and the keyboard
 
