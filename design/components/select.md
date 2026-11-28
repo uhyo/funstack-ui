@@ -176,7 +176,13 @@ export interface SelectRootState {
   /** An action dispatched through this Select is in flight. */
   readonly pending: boolean;
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
 }
+
+// Every part has an exported state type (conventions 9.4); the parts that receive the Root's state alias it.
+export type SelectTriggerState = SelectRootState;
+export type SelectValueState = SelectRootState;
 
 export interface SelectRootProps
   extends Omit<

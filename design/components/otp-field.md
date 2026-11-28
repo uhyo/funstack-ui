@@ -151,6 +151,8 @@ export interface OTPFieldState {
   readonly readOnly: boolean;
   /** Inside a `Field.Root`: an error is shown for the field. `false` outside. */
   readonly invalid: boolean;
+  /** Own `required` or the Field's (conventions 4.1 rule 5). */
+  readonly required: boolean;
 }
 
 export interface OTPFieldSlotState extends OTPFieldState {

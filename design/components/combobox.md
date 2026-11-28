@@ -52,7 +52,7 @@ and a hidden input that follows the optimistic value.
 | 9 | Form | `name` / `form` on Root render `<input type="hidden" name value={optimistic ?? ""}>`; `required` goes on `Combobox.Input` and is native (empty text is `valueMissing`). No `setCustomValidity` (conventions 3.6). Form reset dispatches `"platform"` for both states, with reset targets computed in JS (a hidden input has no reset behaviour, 11.1); a pre-hydration typed text is reconciled at mount for `inputValue`. |
 | 10 | Positioning | Inline `position-area: self-block-end span-self-inline-end; position-try-fallbacks: flip-block; min-width: anchor-size(width)` on Popup (`self-*` logical keywords: the listbox follows the popup's own inherited direction, so a `dir="rtl"` container flips it as a page-level `dir="rtl"` does, 7.2; v1 used the plain `block-end span-inline-end`, which resolves against the root). No `side` / `align`: a listbox goes below or above its input. No `data-side`. `style` overrides. |
 | 11 | Announcements | `ariaNotify()` on the List when results settle (not while stale or loading; the counts are read through refs, 6.4); no live region. **A default English message ships** (`"No results"`, `"1 result"`, `"N results"`; user decision on question 6), overridable through `announce(count, state)` for localisation. The library's first built-in UI string; the convention it sets (built-in strings are English defaults, always overridable) is in conventions 11. |
-| 12 | Pending and state exposure | `data-pending` on Input (value or open in flight), Trigger (open in flight), the optimistic target Option; `data-open` on Input and Trigger; `data-selected`, `data-active`, `data-disabled` on Option; `data-stale` on Popup and List; `aria-busy` on the List while stale or loading; `data-empty` on List. |
+| 12 | Pending and state exposure | `data-pending` on Input (value or open in flight), Trigger (open in flight), the optimistic target Option; `data-open` on Input and Trigger; `data-selected`, `data-active`, `data-disabled` on Option; `data-stale` on Popup, List and Input; `aria-busy` on the List while stale or loading; `data-empty` on the List (no options), on the Input (no selection) and on `Chips` (no chips): the one word for "empty" (conventions 4.1). `data-invalid` on the Input inside a Field. Every attribute has its state field. |
 | 13 | ViewTransition | `transition` on `Combobox.Popup`, wrapping the `<div popover>` itself (conventions 5.1): library-driven opens and closes animate in every engine. A deferred results render also activates the boundary (React rule), so the docs recommend a type map with `default: "none"`. Types `fsui-combobox`, `fsui-combobox-open` / `-close`, `fsui-combobox-select`. |
 | 14 | Not in v1 | Inline autocompletion (`aria-autocomplete="both"`), virtualization, a built-in filter, `Separator`, `Combobox.Input` inside the popup (searchable select), context-menu-style anchors. Section 13. |
 | 15 | Files | Every part file is `"use client"`. Before hydration the Input is a plain text field (typing works and is adopted at mount); nothing opens. |
@@ -90,7 +90,7 @@ Rendered HTML (closed, `value` is `"jp"`, text "Japan"; ids come from one `useId
 <label for="_r_1_-input">Country</label>
 <input id="_r_1_-input" type="text" role="combobox" autocomplete="off" required
        aria-autocomplete="list" aria-expanded="false" aria-controls="_r_1_-list"
-       value="Japan" data-selected="">
+       value="Japan">
 <button type="button" tabindex="-1" aria-label="Show all countries" aria-expanded="false" aria-controls="_r_1_-list"></button>
 <button type="button" tabindex="-1" aria-label="Clear"></button>
 <div id="_r_1_-popup" popover="auto"
@@ -106,10 +106,10 @@ Rendered HTML (closed, `value` is `"jp"`, text "Japan"; ids come from one `useId
 | Part | Element | Role | Renders from | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none, or `input[type=hidden]` when `name` is given | | `state` in `children(state)` | Owns `useId`, both state hooks, the deferred query, the active option, the open state (`usePopoverRoot`), the Option and Status registries, the label cache, the form-reset listener. No `ref`, `className`, `style`. |
-| `Label` | `label` | | | `htmlFor` → the Input's id (owned); `id` → the List's `aria-labelledby`. |
-| `Input` | `input` | `combobox` | **urgent** text, optimistic `value` for `data-selected`, optimistic open for `data-open`, shown open (the Root's `shown` mirror) for `aria-expanded` | `aria-autocomplete="list"`, `aria-controls`, `aria-activedescendant`, `autocomplete="off"`, `data-open`, `data-pending`, `data-selected`, `data-disabled`. The Root's `pending` lands here (the owner renders no element). |
+| `Label` | `label` | | Root disabled and pending | `htmlFor` → the Input's id (owned); `id` → the List's `aria-labelledby`. `data-disabled`, `data-pending` (the owner's, conventions 4.1 rule 4). |
+| `Input` | `input` | `combobox` | **urgent** text, optimistic `value` for `data-empty`, optimistic open for `data-open`, shown open (the Root's `shown` mirror) for `aria-expanded` | `aria-autocomplete="list"`, `aria-controls`, `aria-activedescendant`, `autocomplete="off"`, `data-open`, `data-pending`, `data-empty` (nothing is selected), `data-stale`, `data-disabled`, `data-invalid` (inside a Field). The Root's `pending` lands here (the owner renders no element). |
 | `Trigger` | `button` | button | optimistic open (`data-open`); no `aria-expanded` on a `<button>` (the browser exposes the listbox's state once `popovertarget` is written) | Optional. `tabindex="-1"` (APG: not in the Tab sequence), `aria-controls`; click toggles and focuses the input. `popovertarget` written through the ref after hydration, never server-rendered, every click cancelled (section 1, 3.3). |
-| `Clear` | `button` | button | | Optional. `tabindex="-1"`; click empties the text (urgent) and dispatches `valueChangeAction(null)`. Rendered only while there is text or a value? No: always rendered; consumers hide it with `:has(input[data-selected])` or `state`. |
+| `Clear` | `button` | button | | Optional. `tabindex="-1"`; click empties the text (urgent) and dispatches `valueChangeAction(null)`. Rendered only while there is text or a value? No: always rendered; consumers hide it with `:has(input[data-empty])` or `state`. |
 | `Popup` | `div` | none (a container) | committed open | `popover="auto"`, `id`, inline placement, `data-stale`, `data-open` never (`:popover-open`). The content region; children render from committed open. Must be a DOM sibling of the Input where possible (section 7). |
 | `List` | `div` | `listbox` | `query` (deferred) | `id`, `aria-labelledby` → Label while one is mounted (token-merged), `data-stale` while stale, `aria-busy="true"` while stale or loading, `data-empty`. Function `children` receive `{ query }`. Its accessibility children are `Option`s and `Group`s only (ARIA content model): `Empty` lives in the Popup, outside it, and a `Status` rendered inside it (the Suspense fallback) is role-less and marks the List as loading (6.3). |
 | `Option` | `div` | `option` | optimistic `value`, urgent active | `value` required; `label` optional (the text written into the input; default the element's `textContent` at the time of the pick); `disabled` → `aria-disabled`. `id` derived from `value`. `aria-selected`, `data-selected`, `data-active`, `data-pending`, `data-disabled`. `pointerdown` is `preventDefault()`ed so the input keeps focus. |
@@ -148,7 +148,8 @@ Why this shape:
   conventions 3.5). Without the attributes the browser hid the listbox at `pointerup`, before
   the click's `openChangeAction(false)` could run (section 3.3).
 - **`Clear` exists** because "clear the selection" has no keyboard-free spelling otherwise
-  (Escape closes; it does not clear, section 8), and prior art agrees (Base UI, Ark).
+  (Escape closes the listbox, then reverts edited text to the selection's; it never clears the
+  selection, section 8), and prior art agrees (Base UI, Ark).
 - **No `Separator`** in v1: `role="separator"` is not in a listbox's content model; a visual
   divider is a `Group` boundary styled in CSS, or the standalone `<Separator decorative />`
   (`role="none"`, which a listbox allows; `design/components/separator.md` 4).
@@ -206,6 +207,7 @@ reason given) in exactly these cases, and nowhere else:
 | An option is accepted (Enter, click) | the option's `label` prop, else its `textContent` trimmed, read **at that moment** from the DOM | `"activate"` | the `keydown` / `click` |
 | The accepted option's action rejects, or a controlled parent does not adopt the value | the text of the previous committed value (the label cache, 2.3) | `"dismiss"` | `undefined` |
 | Focus leaves with unmatched text and `allowCustomValue` is off | the committed value's label (cache), or `""` when `value` is `null` | `"dismiss"` | the `focusout` |
+| Escape while the listbox is closed and the text differs from the selection's (single selection, section 8) | the optimistic selection's label (cache), the committed custom value with `allowCustomValue`, or `""` when `value` is `null` | `"dismiss"` | the `keydown` |
 | `Clear` | `""` | `"activate"` | the `click` |
 | Form reset | the Input's `defaultValue` (the mirror of `defaultInputValue` / the mount-time `inputValue`, written into the attribute in the `reset` event itself, 11.1) | `"platform"` | the `reset` event |
 | Mount reconciliation (typed before hydration; Firefox restoration) | the DOM value | `"platform"` | `undefined` |
@@ -390,7 +392,10 @@ export interface ComboboxInputState {
   readonly open: boolean;            // optimistic
   readonly pending: boolean;         // Root pending
   readonly stale: boolean;
+  readonly empty: boolean;           // nothing is selected: `value === null`, or no values with `multiple` (`data-empty`)
   readonly disabled: boolean;
+  readonly invalid: boolean;         // the Field shows an error (`data-invalid`); `false` outside a Field
+  readonly required: boolean;        // own `required` or the Field's
 }
 
 export interface ComboboxInputProps
@@ -399,7 +404,7 @@ export interface ComboboxInputProps
     | "value" | "defaultValue" | "onChange" | "onInput" | "onKeyDown" | "onFocus" | "onBlur" | "onClick"
     | "onPointerDown"
     | "role" | "aria-autocomplete" | "aria-expanded" | "aria-controls" | "aria-activedescendant"
-    | "autoComplete" | "disabled" | "className" | "style" | "children"
+    | "autoComplete" | "disabled" | "readOnly" | "className" | "style" | "children"
   > {
   /** Native `required`: empty text is `valueMissing`. Pass-through, documented here because it is where validation lives. */
   required?: boolean;
@@ -416,8 +421,13 @@ suggestion list would sit over the listbox), `aria-autocomplete` (`"list"`), `ar
 `disabled`, the handlers listed in the `Omit` (`onPointerDown`: a primary-button
 press while the listbox is shown captures the pointer to the Popup, so the release is not a light
 dismiss, 5.4; `onFocus`: it starts the press watch that `onBlur` relies on, so the
-pair is owned together, conventions 1.5), `data-open`, `data-pending`, `data-selected`
-(optimistic `value !== null`), `data-stale`, `data-disabled`. `name` passes through (a second,
+pair is owned together, conventions 1.5), `data-open`, `data-pending`, `data-empty`
+(the optimistic selection is empty: `value === null`, or no values with `multiple`; the same
+attribute `Chips` and `MultiSelect.Value` carry, and "has a value" is `:not([data-empty])`),
+`data-stale`, `data-disabled`, `data-invalid`. **`readOnly` is not in the props type**
+(conventions 3.6): the attribute would block typing while the options, the Trigger and `Clear`
+still changed the value, so a prop that cannot work is a type error; a read-only Combobox is a
+feature of its own. `name` passes through (a second,
 visible field for the raw text; the selection's `name` is the Root's). `placeholder`,
 `aria-describedby`, `inputMode`, `onCompositionStart`, the capture-phase handlers
 (`onFocusCapture`, `onBlurCapture`) and the rest pass through; a consumer who needs to react to
@@ -1044,7 +1054,8 @@ and is accepted: Enter during an open that has not committed yet submits a form 
 | Enter | open, no active option | `allowCustomValue`: commit the text (5.3) and close; else nothing | yes |
 | Enter | closed | `allowCustomValue`: commit the text if it changed (in `flushSync`, 5.3); the form may submit | no |
 | Escape | open | **platform**: the auto popover's close watcher closes it; focus stays in the input; a `"dismiss"` fact. The active option is forgotten; the text is kept | no (the platform cancels the close request itself) |
-| Escape | closed | nothing; reaches an enclosing Dialog / Popover | no |
+| Escape | closed, the text differs from the text of the selection (single selection) | **revert** (conventions 15): the text is written back to what a blur would leave (the optimistic selection's label, the committed custom value with `allowCustomValue`, `""` with no selection), urgently, through `onInputValueChange` with `reason: "dismiss"`; no value is dispatched and the selection stays. The key is consumed (`consumeEscape`), so an enclosing Dialog or Popover stays open and the next Escape closes it | yes |
+| Escape | closed, the text is the selection's (or `multiple`, whose text is a search and not an edit of a value) | nothing; reaches an enclosing Dialog / Popover | no |
 | Tab / Shift+Tab | open | focus moves on; `focusout` closes the listbox (5.4); the text reverts or, with `allowCustomValue`, commits. **Tab does not accept the active option** (question 5) | no |
 | Space | any | a character (the input's own) | no |
 
@@ -1138,7 +1149,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
    ("Jamaica"); with it, `valueChangeAction("Jamaicax", { custom: true })` is dispatched with
    the `focusout` event.
 8. **Clear.** Click → `pointerdown` prevented, the input keeps focus; `T=""`;
-   `valueChangeAction(null)`; `data-selected` leaves the Input; hidden input `value=""`.
+   `valueChangeAction(null)`; the Input gains `data-empty`; hidden input `value=""`.
 9. **Overlap: accept A, then accept B before A settles.** `O="a"` then `O="b"`; `data-pending`
    moves to B; A's resolution is superseded (no close from it: not the latest); B's resolution
    closes. `T` is B's label throughout after the second accept. A superseded rejection (A's) is
@@ -1222,10 +1233,10 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
   be one of the options" needs no constraint: without `allowCustomValue` the text is always a
   selection's label or empty when focus is elsewhere. No `setCustomValidity` (conventions 3.6).
 - `useFormStatus` is not folded into `pending` (conventions 2.7).
-- `disabled` on Root disables the Input (so it is not submitted? No: a disabled *visible*
-  input is not submitted, but the hidden input is not disabled, so the selection still posts;
-  consumers who want the field dropped from submission wrap the whole thing in a `<fieldset
-  disabled>`). Never disabled while pending.
+- `disabled` on Root (its own prop or the Field's) disables the Input **and the hidden
+  input**: a disabled Combobox is not submitted, the HTML rule for every control (conventions
+  3.6). A disabled hidden input is still form-associated, so the reset listener and the Field
+  registration are unaffected. Never disabled while pending.
 
 ### 11.2 Server rendering and before hydration
 
@@ -1407,7 +1418,6 @@ Rendered HTML (closed, the value is `["jp", "fr"]`, no text):
     aria-expanded="false"
     aria-controls="_r_1_-list"
     value=""
-    data-selected=""
   />
 </div>
 <div id="_r_1_-popup" popover="auto" style="…">
@@ -1475,9 +1485,9 @@ export interface ComboboxMultipleRootState extends Omit<ComboboxRootState, "valu
   readonly value: readonly string[];
 }
 
-interface ComboboxRootBaseProps { /* every prop of 3.1 except the five below */ }
+export interface ComboboxRootBaseProps { /* every prop of 3.1 except the five below */ }
 
-export interface ComboboxSingleProps extends ComboboxRootBaseProps {
+export interface ComboboxRootSingleProps extends ComboboxRootBaseProps {
   multiple?: false;
   value?: string | null;
   defaultValue?: string | null;
@@ -1486,13 +1496,13 @@ export interface ComboboxSingleProps extends ComboboxRootBaseProps {
   children?: StateValue<ReactNode, ComboboxRootState>;
 }
 
-export interface ComboboxMultipleProps extends ComboboxRootBaseProps {
+export interface ComboboxRootMultipleProps extends ComboboxRootBaseProps {
   /** The selection is a list of values, shown as chips. */
   multiple: true;
   /** Controlled selection. `[]`: nothing selected. `undefined`: uncontrolled. The order is the chip order; duplicates are ignored. */
-  value?: string[];
+  value?: readonly string[];
   /** Initial selection in uncontrolled mode. Default `[]`. Also the form-reset target (latest value). */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Runs inside the Root's transition for every change of the selection. `next` is the whole
    * intended selection as a fresh array; `details.added` / `details.removed` say what this
@@ -1511,7 +1521,7 @@ export interface ComboboxMultipleProps extends ComboboxRootBaseProps {
   children?: StateValue<ReactNode, ComboboxMultipleRootState>;
 }
 
-export type ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps;
+export type ComboboxRootProps = ComboboxRootSingleProps | ComboboxRootMultipleProps; // <Component><Part><Variant>Props, conventions 9.4
 
 export interface ComboboxChipsState { readonly value: readonly string[]; readonly pending: boolean; readonly disabled: boolean; }
 export interface ComboboxChipsProps
@@ -1560,6 +1570,8 @@ export interface ComboboxChipRemoveProps
   selection as a list; `[value]` or `[]` in single mode), and their `value: string | null`
   is always `null` with `multiple`. Trade-off: two fields for one thing on these two parts,
   instead of a `value` whose type no caller could narrow. `ComboboxOptionState` is unchanged.
+  `ComboboxChipsState` has `empty` (`data-empty`), and `ComboboxInputState.empty` is
+  `values.length === 0`.
 - `Chips`, `Chip` and `ChipRemove` under a Root without `multiple` warn in development; `Chips`
   then renders its element with an empty value. A `Chip` whose `value` is not in the optimistic
   selection warns too.
@@ -1769,8 +1781,8 @@ change).
   `formData.getAll(name)`. Every value dispatch is an edit for the Field.
 - **`disabled`** on the Root also disables every `ChipRemove` (native) and marks `Chips` and
   each `Chip` `data-disabled`; chips are then not focusable by the keys (the Input that owns
-  them is disabled) and nothing dispatches. The hidden inputs still post, as in 11.1. Nothing
-  is disabled while pending.
+  them is disabled) and nothing dispatches. The hidden inputs are `disabled` too and post
+  nothing, as in 11.1. Nothing is disabled while pending.
 - **Before hydration** the chips of the default selection are in the server HTML and the
   hidden inputs post it; `ChipRemove` buttons do nothing yet.
 

@@ -18,6 +18,9 @@ keep their numbers, and this document keeps each heading as a stub that names th
 | 10 | `design/testing.md` |
 | 12, 13 | `design/placement.md` |
 
+Each component has a design document in `design/components/`, except two that are designed in
+another's: Toolbar in `toggle-group.md` and Meter in `progress.md`.
+
 Inputs: `docs/vision.md`, `docs/research/react-async-apis.md`, `docs/research/popover-anchor-tooltip.md`,
 `docs/research/modern-platform-survey.md`, `docs/research/form-controls.md` prior art (Base UI, React Aria Components, Radix,
 Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
@@ -30,14 +33,14 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
 | 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. What a pure trigger does with an activation that arrives while its own action is pending is the prop `whilePending` (`"run"` | `"ignore"`); the default follows who owns the action: `"run"` for a user-owned trigger (`Button`), `"ignore"` for a part whose activation the library owns (a Close part); an ignoring part renders `aria-disabled="true"` while pending (2.5.1). **`fooAction` always means a handler the component runs in a transition**, and a **request**: a change the library can still roll back. A change the library cannot hold is reported to an `on*` handler instead (row 11): `on<State>Change` or `on<Event>`, never an action. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), not an event prop. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins, and set-valued state without `exclusive` commits the changes whose actions resolved (3.3). "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. An overlay's `open` has both: requests through `openChangeAction`, and facts (a dismissal) adopted urgently and reported to `onOpenChange`, which supersede every request in flight (3.4 `adoptFact`, 3.9). |
-| 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
+| 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Every data attribute a part emits has a same-named member in that part's state (4.1). Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says. `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine. Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
 | 6 | Suspense | Consumers own Suspense boundaries. Library content regions are keyed off committed state so suspending children keep the old UI and show as `data-pending`. |
 | 7 | RSC and platform attributes | `"use client"` per source file; unbundled build (`tsdown` `unbundle: true`, verified to keep the directive); "JS-free" means no behaviour JS runs for the interaction and the markup works before hydration (the `<details>` Accordion); whether a part file is directive-free is a per-component fact recorded in its design doc. **There is no second, directive-free anatomy; "JS-free" means no behaviour JS on the native path and works before and without hydration, never "no client bundle"** (7.3). Attributes react-dom cannot express use lowercase pass-through, one module augmentation file, and a ref-based upgrade for `hidden="until-found"`. **Overlay Triggers render `popoverTarget`** (typed by `@types/react`, serialised camelCase by react-dom and lowercased by the DOM), not `commandfor` / `command`, **and no `aria-expanded` on an invoker**; JS-free mode DOM-writes `data-open`. |
-| 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`, customizable `<select>`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
+| 8 | Experimental | `experimental_<feature>` props on the part that uses the feature (first customers: `popover="hint"`, `interestfor`, `focusgroup`, `interpolate-size`, `closedby`), spelled camelCase after the prefix (`experimental_focusGroup`); whole components that cannot exist without a flagged feature ship from `@funstack/ui/experimental`. No provider. |
 | 9 | Layout | `src/<component>/` folders, kebab-case files, `index.ts` per component without a directive. Root entry plus per-component subpaths (`@funstack/ui/tabs`). Flat public type names (`TabsTabProps`, `TabsTabState`). |
 | 10 | Tests | Every component test file covers: ARIA/roles, keyboard, sync action, async action with `data-pending`, optimistic + rollback, overlapping actions, suspending content, controlled/uncontrolled parity, `render`/function props. Shared helpers in `src/__tests__/helpers.tsx`. |
-| 11 | Handlers (facts) and strings | A change the library cannot hold (the browser performed it before the library heard: a keystroke in a controlled text input, a dismissed popup, a toast that left) is reported to a **handler**, `on<State>Change: UrgentChangeHandler` or `on<Event>: UrgentHandler`, named as a handler precisely because it is not an action. **One rule for every `on*` handler the library defines**: called synchronously, outside any transition, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. The handlers: `onInputValueChange` (Combobox), `onValueChange` (OTPField), `onOpenChange` (Popover, Menu, Combobox, Dialog, AlertDialog, Drawer, HoverCard Roots; `NavigationMenu.Item`), `onClose` (a toast). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
+| 11 | Handlers (facts) and strings | A change the library cannot hold (the browser performed it before the library heard: a keystroke in a controlled text input, a dismissed popup, a toast that left) is reported to a **handler**, `on<State>Change: UrgentChangeHandler` or `on<Event>: UrgentHandler`, named as a handler precisely because it is not an action. **One rule for every `on*` handler the library defines**: called synchronously, outside any transition, not awaited, no pending state; it may return a promise; a returned promise's rejection and a synchronous throw go to `reportError`; no dev warning for a returned promise. The handlers: `onInputValueChange` (Combobox), `onValueChange` (OTPField), `onOpenChange` (the owners of an overlay's `open`, listed in 2.1), `onClose` (a toast). A state that is urgent **by design** (the Toast queue) is written through an imperative command dispatched from a microtask (section 2.6); a **mirror of a browser-owned validity fact** (`:user-invalid`, `validity`, Field) is urgent as well, with no consumer-facing action. Built-in UI strings are English defaults, always overridable through a function prop (section 11). |
 | 12 | Anchored placement | Top-layer popups are placed by CSS Anchor Positioning through one shared helper (`internal/overlay/anchor-position.ts`): `side` is physical (`top` / `bottom` / `left` / `right`) or inline-logical (`inline-start` / `inline-end`, through `self-x-*`), `align` `start` / `end` is **inline-relative** on a horizontal side (`span-self-x-*`) and physical on a vertical one; **never a plain logical keyword** (it resolves against the root, not the popup's container) and **never a JS direction read to pick keywords**. `data-side` / `data-align` / `state.side` / `state.align` are the **resolved** placement while the popup is shown, read from `getComputedStyle(popup).positionArea` by a shared observer (`internal/overlay/use-resolved-placement.ts`), and the requested values otherwise. A point-placed popup (no anchor) reads the popup's computed `direction` once per open to mirror its insets (section 13). |
 | 13 | Shipped CSS and CSP | Shipped functional CSS (section 12) may, besides selector-less at-rules, carry a rule whose selector matches only elements the library marks (`[data-fsui-…]`) and that sets only a `--fsui-` custom property (Tooltip's skip-delay): shipped CSS covers placement and interaction timing, never visuals. A client-inserted `<style>` is **not** covered by the directive that allows inline `style` attributes: the library exports the SHA-256 of every shipped stylesheet (`@funstack/ui/csp`, `STYLE_SHA256`) for hash-based policies and one provider, `<CSPProvider nonce>`, for nonce-based ones, read by every part that renders a hoisted `<style>`. |
 | 14 | Direction and locale | **Direction is the computed CSS `direction` of an element, read at the event**: no direction provider, no library `dir` prop (the native `dir` attribute passes through), no default. Only ArrowLeft / ArrowRight of a horizontal orientation mirror. Keys the browser handles on a native control stay native, engine differences included (RadioGroup in WebKit); Slider is the recorded exception. **Locale is a `locale` prop on the Root** of a component that formats or parses, `string \| readonly string[]`, default the runtime's locale: no locale provider, no `lang` or `navigator.language` detection. Locale never sets direction. The first date or time component reopens the locale rule (section 14). |
@@ -88,7 +91,14 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Trigger` / `Tab` | The interactive element the user acts on. MultiSelect's is the combobox itself, `button[role=combobox]`: the one Tab stop, the owner surface for `data-pending`, DOM focus with `aria-activedescendant` while the listbox is open. | `button` |
 | `ContextTrigger` | A region whose `contextmenu` (right-click, the keyboard's context-menu keys, a library long-press for touch) opens the owner's `Popup` at the pointer (Menu). A plain element with **no role and no ARIA**; may share a Root with a `Trigger`. | `div` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion, Collapsible). | `div` |
-| `Popup` | Content that lives in the top layer. | `div[popover]` (Tooltip, Menu) or `dialog[popover]` (Popover) |
+| `Popup` | Content that lives in the top layer. An overlay's content region: its children render from committed state in library mode. | `div[popover]` (Tooltip, HoverCard, Menu, NavigationMenu, Combobox, MultiSelect), `dialog[popover]` (Popover) or `dialog` (Dialog, AlertDialog, Drawer) |
+| `Title` | Names a popup through `aria-labelledby`: an `h2[id]` whose level `render` changes (Dialog, AlertDialog, Drawer, Popover). Toast's is a `div[id]`, not a heading: a transient notification stays out of heading navigation. | `h2` / `div` |
+| `Close` | A button that asks its owner to close. In an overlay (Dialog, Drawer, Popover) it is a pure trigger: an optional `action` runs first, and the close is `"activate"` (2.5.1). Toast's has no `action`, and its close is `"dismiss"` (2.2). | `button` |
+| `Viewport` | The owner of a queue that a command fills (Toast): the region the queued entries render into. It plays the Root's role for the component, whose `Root` is one entry. | `section[popover=manual]` |
+| `Link` | A navigation link the component knows about (NavigationMenu): inside a `Popup`, following it closes the panel (`closeOnActivate`, 2.5.1); anywhere else it is a plain link. | `a` |
+| `SubmenuTrigger` | An `Item` of one menu that is also the `Trigger` of a nested Root (Menu). | `button[role=menuitem]` |
+| `CheckboxItem` / `RadioItem` / `RadioGroup` | Checkable entries of a menu: a `CheckboxItem` owns a `checked` state, a `RadioGroup` owns a `value` that its `RadioItem`s select (Menu). State owners, not pure triggers: no `whilePending` (2.5.1). | `button[role=menuitemcheckbox]` / `button[role=menuitemradio]` / `div[role=group]` |
+| `Chips` / `Chip` / `ChipRemove` | The selected values of a set-valued text control shown as removable entries (Combobox `multiple`): the list, one entry per value (`value` required), and the button inside an entry that removes it. | `div` / `div` / `button` |
 | `Indicator` | Purely visual element that tracks state: the active tab marker; the fill of a Slider, Progress or Meter, sized by the consumer's CSS from the Root's custom properties. | `span` |
 | `Label` | Names the owner, in the form the owner's element needs: `<legend>` as the first child of a `<fieldset>` Root (RadioGroup, CheckboxGroup); `label[for]` for an input surface (Combobox, NumberField, a one-thumb Slider, Field's control) or a button surface whose forwarded click it turns into focus (MultiSelect's Trigger, as a label on a `<select>` focuses it); `label[id]` or `span[id]` referenced through `aria-labelledby` where the owner is a group or is not labelable (a multi-thumb Slider, a Field's group control, Progress, Meter). | `label` / `legend` / `span` |
 | `Input` | A text field that is the owner's surface for `data-pending` and holds an urgent state (2.6): Combobox's `input[role=combobox]` (`inputValue`), NumberField's visible `input[type=text][inputmode]` (the draft text), which renders the hidden native number input right after it; OTPField's one `input[type=text][autocomplete=one-time-code]` (the code's text), which is also the form control and covers its Root with transparent text. | `input` |
@@ -110,10 +120,10 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown and referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
-| `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending`. The general one is the single-element `Button` (`@funstack/ui/button`; `whilePending`, 2.5.1), which is also a Toolbar's command button: the Toolbar has no button part, and `Button` reads `ToolbarContext` so that a disabled one stays focusable there (3.6). | `button` |
+| `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending`. The general one is the single-element `Button` (`@funstack/ui/button`; `whilePending`, 2.5.1), which is also a Toolbar's command button: the Toolbar has no button part, and every library button-like part reads `ToolbarContext` so that a disabled one stays focusable there (3.6). | `button` |
 | `Image` | A picture the owner shows while it is available, mirrored as a load `status` (Avatar): an `<img alt="">` rendered from the server render on, unmounted once its source failed; the owner carries the name. Never an `onLoad` prop of the library's (react-dom's commit wait, `design/components/avatar.md` 5). | `img` |
 | `Fallback` | What the owner shows in an `Image`'s place: rendered until the image has loaded, **under** it (the consumer's CSS stacks them), so nothing is swapped while it loads (Avatar). | `span` |
-| `Header`, `Group`, `Separator`, `Arrow` | Structural or decorative. `Separator` is an `<hr>` by default; inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. The standalone single-element `Separator` (`@funstack/ui/separator`, directive-free) takes `orientation` and `decorative` (`role="none"`, no `aria-orientation`; the one spelling allowed inside a listbox). | as named |
+| `Group`, `Separator`, `Arrow` | Structural or decorative. There is no `Header` part: a heading goes inside the `Trigger` (Accordion). `Separator` is an `<hr>` by default; inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. The standalone single-element `Separator` (`@funstack/ui/separator`, directive-free) takes `orientation` and `decorative` (`role="none"`, no `aria-orientation`, `data-decorative`; the one spelling allowed inside a listbox). | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
 top layer and CSS Anchor Positioning places it, so the platform does both jobs (see
@@ -212,9 +222,10 @@ Rules for the element passed to `render` (same as Base UI):
     or component render of `Button` with `action`, Toggle, ToggleGroup.Item, Menu.Trigger,
     Combobox.Trigger / Clear, NumberField.Increment / Decrement, Toast.Action / Close, and the
     Close and Trigger parts of Dialog and Popover in the modes where they handle the click); or
-    the consumer **opts into** a focusable disabled control (`alwaysFocusable`: a `Button`
-    inside a Toolbar or with `focusableWhenDisabled`, a menu item, `SubmenuTrigger` through
-    `usePopoverTrigger`'s `submenuItem`). The handler is what makes `aria-disabled` safe: it
+    the pattern or the consumer asks for a focusable disabled control (`alwaysFocusable`:
+    every library button-like part inside a Toolbar, 3.6; a `Button` with
+    `focusableWhenDisabled`; a menu item; `SubmenuTrigger` through `usePopoverTrigger`'s
+    `submenuItem`). The handler is what makes `aria-disabled` safe: it
     returns before dispatch and `preventDefault()`s.
   - A part with no click handler of its own (`Form.Submit`, a JS-free command Trigger / Close)
     that lands in the `aria-disabled` branch on a host link installs one while disabled that
@@ -311,6 +322,28 @@ export interface TabsTabProps
 }
 ```
 
+**Owned keys are omitted from the props type, in every part.** A key the part writes itself in
+at least one mode (1.2: its `role`, the ARIA state it computes such as `aria-selected`,
+`aria-pressed`, `aria-expanded`, `aria-orientation`, `aria-disabled` on a part that takes
+`disabled`, `type`, a roving `tabIndex`, the invoker attributes `commandfor` / `command` /
+`popoverTarget` / `popoverTargetAction` of a Trigger or Close part, `popover` and `open` on a
+Popup, `name` and `open` on a `<details>`) is removed from the type **in every mode**, so
+passing it is a type error rather than a prop that is silently overwritten or removed. One
+props type per part: a key owned in one mode only is still omitted. Three kinds of key stay in
+the type:
+
+- an ARIA id-reference list the part **token-merges** (`aria-labelledby`, `aria-describedby`,
+  `aria-controls`, `aria-owns`; 1.2), because the consumer's tokens take effect;
+- a key the part only **removes** in one branch and otherwise passes through (`Button`'s
+  `commandfor` / `popoverTarget`, which are the consumer's own and are dropped while disabled);
+- a key owned only in a context the type cannot see (a control's `id` inside a `Field.Root`,
+  which warns in development instead).
+
+A part never omits a key it does not own (`Avatar.Root` owns `aria-labelledby`, always absent:
+the name is `alt`). What a `render` **element** carries is not the part's props and follows
+1.2. Each part's JSDoc has an "Owned keys" line, and the list equals the `Omit` of its props
+type plus the `data-*` attributes and the three kinds above.
+
 DOM event props the part does *not* use (say `onPointerEnter` on a `Tab`) pass through untouched.
 They are the platform's API, not the library's; the library neither documents nor wraps them. See
 section 2.6 for what this means for the "no handlers" rule.
@@ -327,7 +360,7 @@ section 2.6 for what this means for the "no handlers" rule.
 | Pure trigger (nothing to change) | `action` | `(details)` | `<Button action>`, `<Menu.Item action>` |
 | Pure trigger that carries a value, named after its event | `<event>Action` | `(value, details)` | `completeAction` (`OTPField.Root`): the code became complete. Nothing changes that could be rolled back (the value is already the state's, urgent); the action is a request about that value, run in the owner's transition, awaited, with `data-pending`. Used where a bare `action` would read as a form's `action` or where the trigger is not a part the user presses. No `whilePending` (2.5.1). |
 | Commit of a continuous state | `<state>CommitAction` | `(next, details)` | `valueCommitAction` (Slider): once per gesture (pointer release, key press, platform change), awaited in the owner's transition like a change action; the step action `<state>ChangeAction` runs per step. For a continuous control the commit action is the state owner's dispatch (section 3.3). **A text control has the commit alone** (`TextField`): one edit, from the first keystroke to the blur or the commit key (Enter in an `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`), is the gesture; its steps are keystrokes, which are facts and have no action, so there is no `valueChangeAction` there. |
-| Fact about a state (the library cannot hold the change) | `on<State>Change` | `(next, details) => void` | `onInputValueChange` (Combobox), `onValueChange` (OTPField): a controlled text input's text, which React requires to be urgent. `onOpenChange` (Popover, Menu, Combobox, Dialog, HoverCard Roots; `NavigationMenu.Item`): the popup was closed without the library performing the close. **Not an action** (the handler rule below). Type `UrgentChangeHandler`. |
+| Fact about a state (the library cannot hold the change) | `on<State>Change` | `(next, details) => void` | `onInputValueChange` (Combobox), `onValueChange` (OTPField): a controlled text input's text, which React requires to be urgent. `onOpenChange` (the owners of an overlay's `open`, listed below): the popup was closed without the library performing the close. **Not an action** (the handler rule below). Type `UrgentChangeHandler`. |
 | Fact with no state | `on<Event>` | `(details) => void` | `onClose` (a toast, `toast({ onClose })`): the toast left. Same rule. Type `UrgentHandler`. A callback for something that already happened is never an action. |
 
 The state name in `<state>ChangeAction` is exactly the controlled prop's name, so the three props
@@ -367,13 +400,23 @@ prop, section 1.5):
 | --- | --- | --- |
 | `onInputValueChange` | `Combobox.Root` | the text of the input changed (2.6) |
 | `onValueChange` | `OTPField.Root` | the text of its input changed (2.6): an edit, a reset, text adopted at hydration, a WebOTP fill. The state is called `value` because it is the field's only state and its form value |
-| `onOpenChange` | `Popover.Root`, `Menu.Root`, `Combobox.Root`, `Dialog.Root`, `AlertDialog.Root`, `Drawer.Root` | the popup was closed by something other than a request: Escape, light dismiss, focus leaving, script, … (always `false`; `design/components/overlay-open-change.md`) |
+| `onOpenChange` | the nine owners of an overlay's `open`: `Popover.Root`, `Menu.Root`, `Combobox.Root`, `MultiSelect.Root`, `Dialog.Root`, `AlertDialog.Root`, `Drawer.Root`, `HoverCard.Root`, `NavigationMenu.Item` | the popup was closed by something other than a request: Escape, light dismiss, focus leaving, script, … (always `false`; 3.9) |
 | `onClose` | a toast (`ToastOptions`) | the toast left, with `details.reason` |
 
 For a state with a handler the triple reads `inputValue` / `defaultInputValue` /
 `onInputValueChange`; a state that has both requests and facts (an overlay's `open`) has four
 props: `open` / `defaultOpen` / `openChangeAction` / `onOpenChange`. The pair exists **only on
-overlay Roots**; no form control gets a second prop.
+the owner of an overlay's `open`**: a Root, or `NavigationMenu.Item`, which owns one flyout. No
+form control gets a second prop for its value.
+
+**This table is the one list of `onOpenChange` owners.** It equals the allow-list of the type
+guard (10.1, "Action naming": the nine props types `PopoverRootProps`, `MenuRootProps`,
+`ComboboxRootProps`, `MultiSelectRootProps`, `DialogRootProps`, `AlertDialogRootProps`,
+`DrawerRootProps`, `HoverCardRootProps`, `NavigationMenuItemProps`). Every other document, the
+docs site and the agent skill included, says "the owners listed in conventions 2.1" or copies
+this row whole; none keeps a shorter list of its own. Tooltip has no `open` prop and no
+handler; a toast's fact is `onClose`; Collapsible and Accordion have no `onOpenChange`, because
+a `<details>` toggle is a request the library can still roll back (`reason: "platform"`).
 
 A new `on*` prop needs the component's design doc to show who performs the change and why the
 library cannot hold it, and a conventions amendment adding it to the list above. The type guard
@@ -398,13 +441,21 @@ export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Act
 export type ChangeReason = "activate" | "platform" | "dismiss" | "timeout";
 ```
 
-`ChangeReason` is **one public type**, exported from the root entry; every
-`<Component><State>ChangeDetails` that exposes `reason` declares it as `readonly reason:
-ChangeReason` rather than a local union, so the vocabulary cannot drift per component.
+`ChangeReason` is **one public type**, exported from the root entry; every change details type
+declares `readonly reason: ChangeReason` rather than a local union, so the vocabulary cannot
+drift per component.
 
 `details` is the native DOM event (not React's synthetic one) plus component-specific fields,
-typed per component as `<Component><State>ChangeDetails` (for example `TabsValueChangeDetails`
-adds `reason`).
+typed per component with a **named, exported type** (9.4 has the naming): no public action prop
+is typed with the bare `ActionDetails`.
+
+**Every change details type carries `reason`.** The details of a `<state>ChangeAction`, of a
+`<state>CommitAction` and of an `on<State>Change` handler all have `reason`, including where
+only one value can occur: Toggle, ToggleGroup, `Menu.CheckboxItem` and `Menu.RadioGroup` have no
+platform path and always report `"activate"`. One consumer function
+(`(next, { reason }) => …`) therefore types against every change action in the library. A pure
+trigger's details (`action`, `completeAction`) carry `reason` only where the component defines
+more than one cause (`OTPFieldCompleteDetails`).
 
 **`details.reason` vocabulary is library-wide**: a component that
 exposes `reason` uses exactly these values and no synonyms:
@@ -431,10 +482,14 @@ Components whose close carries a platform result add it as a serialisable field 
 or form submitter, or the string passed to `requestClose()`), `undefined` on open.
 
 Components with a **set-valued state** describe what changed as a diff, `added: readonly
-string[]` and `removed: readonly string[]` (CheckboxGroup), so that one shape covers a single
-item, a multi-item trigger and a platform path, and a controlled "update on success" parent can
-apply it as a functional update instead of writing the whole set (section 2.5). Accordion's
-earlier `item` / `open` pair stays as is; a new set-valued component uses the diff form.
+string[]` and `removed: readonly string[]`, so that one shape covers a single item, a
+multi-item trigger and a platform path, and a controlled "update on success" parent can apply
+it as a functional update instead of writing the whole set (section 2.5). **Every set-valued
+component uses it, with no other shape**: CheckboxGroup, ToggleGroup, Accordion, MultiSelect,
+Combobox with `multiple`. A component with an `exclusive` mode (ToggleGroup, Accordion) reports
+the diff in that mode too, and there it names the item the change **implicitly** closed or
+released: a switch from A to B is `added: ["b"]`, `removed: ["a"]`. A platform dispatch that
+carries several changes at once (mount reconciliation, a form reset) lists them all.
 
 Adding a value is a change to this document, not to one component. The first argument is always the next value, so the
 common case stays short:
@@ -696,7 +751,7 @@ React neither cancels nor orders overlapping actions. The library's stance:
   only. Consequence for the consumer: the `next` an action receives is the *intended* value
   (B's action is called with `[A, B]`), which may contain a change that fails later. An app that
   persists `next` whole can end out of step with the group; persist `details.added` /
-  `details.removed` (or the one `details.item`) instead. Component docs say so.
+  `details.removed` instead. Component docs say so.
 - **Controlled parents are not guarded.** The latest-intent guard protects uncontrolled state
   only. A controlled "update on success" parent that writes the *whole value*
   (`startTransition(() => setChecked(next))` after its `await`) lands writes in completion order,
@@ -761,8 +816,19 @@ changes, 2.5).
   part, there is nothing to count, and a second run can only repeat a side effect.
 - **Mixed** (the consumer's `action`, then a library-owned step): `"ignore"` exactly when a
   resolved run makes the library act on the part's container (close it), `"run"` when the
-  library-owned step is switched off (`closeOnActivate={false}`, `closeOnSettle={false}`),
-  because the part is then a user-owned trigger that happens to live in a menu or a toast.
+  library-owned step is switched off (`closeOnActivate={false}`), because the part is then a
+  user-owned trigger that happens to live in a menu or a toast.
+
+**One prop name for "activating this part closes its container": `closeOnActivate`.** It is the
+prop of every button-like part whose activation the library follows with a close of the
+container: `Menu.Item` and `Toast.Action` (default `true`), `Menu.CheckboxItem` and
+`Menu.RadioItem` (default `false`), `NavigationMenu.Link` (default `true`; no action, the close
+happens at the click). Where the part has an `action`, the close waits for it and happens only
+if the latest run resolved (below); the name states which activation closes, not the moment.
+**`closeOnSettle` is a different prop and exists on `Dialog.Form` (and its aliases) only**: a
+form has no activation of a part, and "settled" there means more than "the action resolved"
+(the submission did not throw **and** no `Form.Root` field error came back,
+`design/components/dialog.md` 8.1). No other part takes `closeOnSettle`, and no part takes both.
 
 | Part | What one activation does | Owner | Default |
 | --- | --- | --- | --- |
@@ -770,19 +836,19 @@ changes, 2.5).
 | `Button` with a function `formAction` | React submits the form with the consumer's function | user (React runs it) | `"run"` |
 | `Button` with neither (plain, URL `formAction`, `command`, link) | the native default action | – | nothing is ever pending: the prop has no effect |
 | `Dialog.Close`, `Popover.Close`, `Drawer.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` without `action` | the library closes the overlay | library | the prop has no effect: there is no run of the part's own to guard, and a repeated click is a no-op (2.3 item 8). The part still shows `data-pending` while the close it asked for waits (4.3), without `aria-disabled` |
-| `Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` |
+| `Dialog.Close`, `Popover.Close`, `Drawer.Close`, `AlertDialog.Cancel`, `AlertDialog.Action` with `action` | the consumer's `action`, then the library's close | mixed | `"ignore"` |
 | `Menu.Item` with `action`, `closeOnActivate` (default `true`) | the consumer's `action`, then the library closes the menu | mixed | `"ignore"` |
 | `Menu.Item` with `action`, `closeOnActivate={false}` | the consumer's `action`; the menu stays | user | `"run"` |
 | `Menu.Item` without `action` | the library closes the menu | library | no effect, as a Close part without `action`: `data-pending` while the close waits, no `aria-disabled` |
-| `Toast.Action`, `closeOnSettle` (default `true`) | the consumer's `action` (the part's or the toast's), then the library closes the toast; the timer is paused meanwhile | mixed | `"ignore"` |
-| `Toast.Action`, `closeOnSettle={false}` | the consumer's `action`; the toast stays | user | `"run"` |
+| `Toast.Action`, `closeOnActivate` (default `true`) | the consumer's `action` (the part's or the toast's), then the library closes the toast; the timer is paused meanwhile | mixed | `"ignore"` |
+| `Toast.Action`, `closeOnActivate={false}` | the consumer's `action`; the toast stays | user | `"run"` |
 | `Menu.CheckboxItem`, `Menu.RadioItem` | a state change (`useControllableAction`) | state owner | no prop: latest intent wins |
 | `Slider.Root`, `NumberField.Root` steps (`valueChangeAction`; `NumberField.Increment` / `Decrement` request them) | a state change, one step of a gesture | state owner's second channel | no prop: every step runs |
 | `Form.Submit`, `Dialog.Form`, `AlertDialog.Form` | the form channel (2.7) | React's form | no prop, never guarded |
 | a toast's `onClose` | a handler, not an action (2.1): runs once when the toast leaves, by construction | – | no prop |
 | `OTPField.Root` `completeAction` | a pure trigger that carries a value (2.1): each edit that leaves the code complete | user | no prop: every completion runs. A second completion while one is pending is a different code (or the same code entered again to retry); `"ignore"` would drop what the user typed |
 
-A default that depends on another prop (`closeOnActivate`, `closeOnSettle`) is a cost each
+A default that depends on another prop (`closeOnActivate`) is a cost each
 page's props table has to spell out; it was chosen over a fixed `"ignore"` for every part of an
 overlay, which would leave the counter case (a "Zoom in" item that stays open) needing the
 prop. `toast({ action: { label, action } })` (`ToastActionOptions`) carries no `whilePending`:
@@ -821,7 +887,7 @@ is `Button`'s function `formAction`, whose only source is React's form status, a
 - **`data-pending` / `state.pending` only, no `aria-disabled`** from pending: the part still
   acts, and telling assistive technology it is unavailable would be false. `pending` stays true
   until every run has settled and the result has committed;
-- **the continuation (a Close part's close, an item's menu close, a toast's close on settle)
+- **the continuation (a Close part's close, an item's menu close, a toast's close)
   runs once, when the last run in flight settles, and only if the latest run resolved**, still
   under that run's open-generation guard (3.4). So "a rejection leaves the overlay / menu /
   toast open" holds in both modes, and the part stays (pending) until its last run is done. An
@@ -988,7 +1054,30 @@ Every controllable state `x` of type `T` comes as a triple:
 | `xChangeAction` | `ChangeAction<T, ...>` | Called on every user-initiated change (and automatic fallbacks, with `details.event === undefined`). |
 
 "None selected" is `null`, never `undefined`, so that `undefined` always means uncontrolled.
-Switching between modes after mount is unsupported (dev warning).
+Switching between modes after mount is unsupported (dev warning), and so is setting both `x`
+and `defaultX`. **Every controllable state warns, the urgent ones included** (`OTPField.Root`'s
+`value`, Combobox's `inputValue`): one helper in `internal/`, `useModeWarnings`, called by `useControllableAction`, `useStepCommit`
+and the two urgent owners.
+
+**A set-valued prop accepts a readonly array**: `value` / `defaultValue` (Accordion,
+CheckboxGroup, ToggleGroup, MultiSelect, Combobox with `multiple`) and `CheckboxGroup.Parent`'s
+`values` are typed `readonly string[]`, so an `as const` list or a value read from a `State`
+type-checks. The action still receives a fresh, mutable `string[]`.
+
+**Single or many: the flag names the non-default mode, in the platform's word.** A component
+that holds either one value or a set has one boolean prop for the mode it does not default to,
+and the value type is a union discriminated on it:
+
+| Component | Default | Flag | The platform's word |
+| --- | --- | --- | --- |
+| `Accordion.Root`, `ToggleGroup.Root` | many (`string[]`) | `exclusive` → `string \| null` | exclusive `<details name>` groups |
+| `Combobox.Root` | one (`string \| null`) | `multiple` → `string[]` | `<select multiple>` |
+
+The flag is never inverted to make the components look alike (no `multiple` on Accordion, no
+`exclusive` on Combobox): each keeps the default of its pattern. **A component whose two modes
+need a different anatomy is two components** (`Select` and `MultiSelect`; `RadioGroup` and
+`CheckboxGroup`), not a flag. The variants of such a union are named `<Component><Part><Mode>Props`
+(9.4).
 
 One accepted exception to the third name (TextField): its triple is `value` / `defaultValue` /
 `valueCommitAction`. The saved text changes once per edit, at the commit, and
@@ -1307,11 +1396,41 @@ light-dismiss traps".
 ### 3.6 `disabled`
 
 `disabled` is a boolean prop on the owner and on individual triggers. Native `disabled` is used
-where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs; a `Button` inside a Toolbar, whose APG example
-keeps disabled commands focusable so screen-reader users still find them), the
-part sets `aria-disabled` instead. In both cases the part emits `data-disabled` and never
-dispatches for user interaction (platform dispatches from the form owner are the exception,
-section 2.3 item 7). **Inherited `disabled`** (an ancestor `<fieldset disabled>`) is a platform
+where the APG pattern allows it; where the pattern wants a focusable disabled control (Tabs,
+Accordion, a menu, a Toolbar), the part sets `aria-disabled` instead.
+
+**Inside a Toolbar every library button-like part stays focusable when disabled.** The APG
+Toolbar keeps disabled commands in the arrow sequence so that screen-reader users still find
+them, and that holds for whatever library part the control is: `Button`, `Toggle`,
+`ToggleGroup.Item` (its own `disabled` or the group's), and the overlay Triggers (`Menu.Trigger`,
+`Popover.Trigger`, `Dialog.Trigger`, `AlertDialog.Trigger`, `Drawer.Trigger`). Each reads
+`ToolbarContext` and passes `alwaysFocusable` to `disabledButton` (1.2): inside a
+`Toolbar.Root` a disabled one renders `aria-disabled="true"`, never native `disabled`, with its
+click cancelled and its invoker attributes removed. Outside a Toolbar nothing changes: a
+standalone `Toggle` or `ToggleGroup.Item` is natively disabled. A consumer's own natively
+disabled element inside a Toolbar is the consumer's choice and is not an item (3.10).
+
+**Disabled is not submitted.** A disabled form control contributes nothing to `FormData`, the
+HTML rule, whatever element carries its value: a component that submits through hidden inputs
+(Combobox, one per value with `multiple`; MultiSelect) renders them `disabled` while the owner
+is disabled, by its own prop or by `Field.Root disabled`, as a hidden native input does
+(NumberField). A disabled hidden input is still form-associated: it still receives `reset`
+and still registers with the Field.
+
+**`readOnly` exists only where it is honoured.** The text controls honour it (TextField,
+NumberField, OTPField: focusable, no dispatch for user input, still submitted,
+`state.readOnly`). A part that renders a native input but would not honour the attribute omits
+`readOnly` from its props type, so that passing it is a type error and not a silent no-op:
+`Combobox.Input` (the attribute would block typing while the options, the Trigger and `Clear`
+still changed the value), and the checkable inputs `Checkbox`, `Switch`, `RadioGroup.Item`,
+`CheckboxGroup.Item` and `CheckboxGroup.Parent` (HTML's `readonly` does not apply to them). A
+library `readOnly` for those components is a feature of its own, not designed.
+
+However a part is disabled, natively or through `aria-disabled`, it emits `data-disabled` and
+never dispatches for user interaction (platform dispatches from the form owner are the
+exception, section 2.3 item 7).
+
+**Inherited `disabled`** (an ancestor `<fieldset disabled>`) is a platform
 fact that `data-disabled` and `state.disabled` do not see; where a part handles a pointer itself
 (a Slider's Track and Thumb, NumberField's Increment / Decrement), the handler also bails when
 the part's native control matches `:disabled`, read at the press: pointer events still reach a
@@ -1336,8 +1455,8 @@ selects `[data-pending][aria-disabled="true"]`; no extra attribute or state fiel
 latest-intent rule covers it. No `aria-busy` (its meaning is "my content is being modified",
 NVDA and VoiceOver ignore it and JAWS may hide the element's content; pass-through for consumers
 who want it) and no built-in announcement of pending (the outcome is the consumer's).
-`focusableWhenDisabled` (`Button`) joins Tabs and the Toolbar as a source of `aria-disabled` for a
-consumer-disabled control, as does a `render` element that cannot be natively disabled or whose
+`focusableWhenDisabled` (`Button`) joins the composites of 3.10 and the Toolbar as a source of
+`aria-disabled` for a consumer-disabled control, as does a `render` element that cannot be natively disabled or whose
 part handles the click itself (section 1.2). A natively disabled part that is also pending
 renders no `aria-disabled`: native `disabled` wins (section 1.2).
 
@@ -1365,8 +1484,9 @@ collector, and the message is `Field.Error`'s (`design/components/multi-select.m
 
 ### 3.7 `keepMounted` on content regions
 
-Content regions whose visibility is driven by library state (`Tabs.Panel` today) share one prop
-shape:
+Content regions whose visibility is driven by library state share one prop: `Tabs.Panel` with
+the full shape below, and every overlay `Popup` with a library mode (Dialog, AlertDialog,
+Drawer, Popover, Menu, HoverCard, `NavigationMenu.Popup`) with `boolean` only.
 
 ```ts
 keepMounted?: boolean | "until-found";
@@ -1398,6 +1518,37 @@ overlay Root's `open` has two channels, requests through `openChangeAction` (a t
 awaited, can be refused) and facts through `onOpenChange` (a dismissal the browser performed:
 adopted urgently, never pending, superseding every request in flight).
 
+### 3.10 Arrow keys between items
+
+One set of rules for every component in which arrow keys move focus between items the library
+knows (Tabs, Accordion, Toolbar, a standalone ToggleGroup, Menubar, a menu's items). The
+roving engine (`internal/use-roving-focus.ts`) implements them for the components built on it;
+Tabs and Accordion, which keep their own handler, follow the same rules through the same
+helpers in `internal/arrow-keys.ts`.
+
+1. **Which keys.** The arrows of the component's orientation, mirrored for a horizontal one
+   under `rtl` (`resolveArrowKey`, 14.1), plus Home and End.
+2. **A key with a modifier is the browser's.** The handler returns without acting when the
+   event is `defaultPrevented` or has Alt, Ctrl or Meta held (`isPlainKey(event)`, next to
+   `resolveArrowKey`): Ctrl+Home scrolls the page, Alt+ArrowLeft goes back, and a consumer's own
+   `onKeyDown` on an item opts out with `preventDefault()`. Shift is not a modifier for this
+   rule.
+3. **An `aria-disabled` item is in the sequence.** Arrows, Home and End reach it like any
+   other item, so a keyboard or screen-reader user finds it and hears "unavailable"; it never
+   dispatches. Home goes to the first item and End to the last, disabled or not. A **natively
+   disabled** element is not an item at all: it cannot hold focus.
+4. **`loop`.** Every such component takes `loop?: boolean`, default `true`: at an end the
+   arrow wraps to the other end; with `loop={false}` it stops. The prop is on the Root
+   (`Tabs.Root`, `Accordion.Root`, `Toolbar.Root`, `ToggleGroup.Root`, `Menu.Root`; `Menubar`),
+   as it is for a listbox's virtual focus (`Combobox.Root`, `MultiSelect.Root`).
+5. **Focus moves with the focus ring.** The handler focuses through `focusWithRing`, so a
+   keyboard move shows `:focus-visible` in every engine.
+6. **`orientation`** is a prop only where the component has two (Tabs, Toolbar, ToggleGroup).
+   A component with one orientation (Accordion: vertical; Menubar: horizontal) has no prop.
+   Where the role has `aria-orientation` and the element is the keys' owner, the part renders
+   it together with `data-orientation`, also for a fixed orientation (Menubar renders
+   `aria-orientation="horizontal"`), so a stylesheet has one hook for every composite.
+
 ---
 
 ## 4. Pending and state exposure
@@ -1408,37 +1559,84 @@ A state has one name. It appears as `data-<name>` on the element, as `state.<nam
 function props and `render`, and under that name in docs. No `is` prefix (`pressed`, not
 `isPressed`), matching the prop names.
 
-| Name | Kind | Where | Meaning |
-| --- | --- | --- | --- |
-| `pending` | boolean | owner + initiating trigger; Toast `Root` and `Action`; `Slider.Thumb` (the thumb the latest step or commit moved); `ToggleGroup.Root` and each `ToggleGroup.Item` whose optimistic pressed state differs from its committed one; `Button` (its own `action`, or a submission it started through its own function `formAction`); `NumberField.Root`, `NumberField.Input` and the `Increment` / `Decrement` button the latest step or commit came from; `OTPField.Root` and `OTPField.Input` (a `completeAction` in flight); `TextField` (a `valueCommitAction` in flight); `Field.Root` and every Field part, `Form.Root`, `Form.Submit` (the enclosing form's submission, `useFormStatus`: the form channel, section 2.7) | An action dispatched through this component is in flight (including the Suspense wait of the resulting render). For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. |
-| `disabled` | boolean | any | Disabled by prop or inherited from the owner; also a NumberField `Increment` / `Decrement` button whose next step would change nothing (at its bound, `readOnly`). Emitted in **every mode** in which the part renders `disabled` or `aria-disabled` (the JS-free Dialog and Popover Triggers included), so the styling hook and the ARIA state never disagree. |
-| `pressed` | boolean | Toggle, `ToggleGroup.Item` | Optimistic pressed state. |
-| `selected` | boolean | Tab, Item, `Select.Option` (optimistic; identical to the platform's `:checked` on the option, since the `<select>` renders `value={optimistic}`), `Combobox.Option` (optimistic `aria-selected`; distinct from `active`), `Combobox.Input` (a non-null optimistic value) | Optimistic selection on triggers; committed on panels. |
-| `active` | boolean | `Combobox.Option`; `OTPField.Slot` | Combobox: virtual focus, `aria-activedescendant` points here. OTPField: the input is focused and its caret, or part of its selection, is at this slot's position (the last slot for a caret at the end of a complete code). Urgent (section 3.2), never a transition. |
-| `filled` | boolean | `OTPField.Slot` | A character is at this slot's position (`state.char !== null`). |
-| `stale` | boolean | `Combobox.Popup`, `Combobox.List` (with `aria-busy="true"` on the listbox while stale **or loading**: a `Status` mounted inside the List; loading itself is not a data attribute in v1) | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile. |
-| `empty` | boolean | `Combobox.List`; `Toast.Viewport` | List: no mounted options, not stale and not loading; the same condition under which `Empty` renders. Viewport: no toasts in the queue, the `ending` ones kept mounted included (the region is hidden under it; Toast decision 7), so a layout can collapse the region's reserved space. |
-| `open` | boolean | Popup, Trigger, Accordion `Item` and `Trigger` (the Accordion `Panel` emits only `data-disabled`; its visibility is the native `<details open>` / `:open`); Collapsible `Root` and `Trigger` (optimistic, library mode; the Panel likewise emits only `data-disabled`); Dialog `Trigger` (optimistic, library mode) while the `<dialog>` itself emits no `data-open` (only `data-modal`, below) because `:open` / `:modal` are exact and written by the same commit; Popover `Trigger` (optimistic `data-open` in library mode; in JS-free mode `data-open` kept current by a DOM write from the popup's `toggle` listener, section 7.4; a `<button>` Trigger is a `popovertarget` invoker and renders **no `aria-expanded`**, only a non-button `render` renders it, from the Root's urgent `shown` mirror, section 3.2) while its Popup emits none (`:popover-open`); Menu `Trigger` and `SubmenuTrigger` likewise (optimistic `data-open`, no `aria-expanded` on the invoker), Menu `ContextTrigger` (optimistic `data-open`, no ARIA); Combobox `Trigger` likewise and Combobox `Input` (optimistic `data-open`, plus `aria-expanded` from `shown`: it is a `role="combobox"` input, not an invoker), its Popup none | Disclosure and open state, following the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. Emitted for library-owned open state; purely browser-owned open state (Tooltip in the top layer) is styled with `:popover-open` / `:open` and emits no attribute (section 7.4); `Select.Root` emits none at all, because a native select's picker has no open event and is styled with `:open` only. |
-| `checked` | boolean | Checkbox, Switch, `RadioGroup.Item` (radio items use `checked`, the platform word, not `selected`), sibling `Indicator` parts; `Menu.CheckboxItem` and `Menu.RadioItem` (optimistic, as `aria-checked` and `data-checked` on a `button`) | Optimistic checked state. On the input itself the DOM holds the optimistic value (section 3.2), so `:checked` matches it, with the caveats in section 4.2 (`preventDefault()` misuse; Chromium's checked+indeterminate quirk). |
-| `indeterminate` | boolean | Checkbox (controlled-only prop, "consumer-owned, mirrored" in section 3.5's terms; never Switch); Progress, every part (`value` is `null`: derived, not a DOM property, never suspended) | Mixed state. Emitted from render as `data-indeterminate` because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`) so the attribute, the DOM property and `:indeterminate` agree in every phase, since the browser clears it on the click and the parent may not have recomputed yet. `CheckboxGroup.Parent` also emits it, but there the value is **library-derived** from the group's optimistic set (`some && !all` over the Parent's `values`) in the same sync render that follows a click, so it is **not** suspended while pending; the suspension rule is specific to the consumer-owned prop. |
-| `modal` | boolean | `Dialog.Popup` (and `AlertDialog.Popup`, `Drawer.Popup`, which run its code) | The Root's `modal` prop (default `true`): the dialog is opened with `showModal()` (library mode) or the invoker's `show-modal` command (JS-free). A prop echo, not a state: rendered in every mode, server HTML included, so a stylesheet can lay out a non-modal panel (`.dialog:not([data-modal])`) before hydration and while closed, where `:modal` is false either way. |
-| `index` | number (stringified) | `Slider.Thumb`; `OTPField.Slot` | The part's `index` prop: which entry of the value array a thumb edits (default `0`), which character position a slot shows (required). The attributes whose value is a consumer-chosen number, so a stylesheet can address a part by position (`[data-index="1"]`); `state.index` is the same number. |
-| `orientation` | `"horizontal" \| "vertical"` | Root, List, Tab; every Slider part; `ToggleGroup.Root` and `Item` (the enclosing Toolbar's when inside one); `Toolbar.Root` and `Toolbar.Separator` (the separator's own, perpendicular to the toolbar's) | Enum attribute with value. |
-| `invalid` | boolean | every Field part; `OTPField.Root` and `OTPField.Input` inside a Field; `NumberField.Root` and `NumberField.Input`, and `TextField`, inside a Field | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). The control also carries an explicit `aria-invalid="true" \| "false"`. |
-| `required` | boolean | every Field part | `Field.Root required` or the control's own `required` (reported through its registration). |
-| `dragging` | boolean | Slider `Root` and the captured `Thumb` | A pointer is captured on a thumb (urgent state; keyboard never sets it). Style motion off under it (`[data-dragging] { transition: none }`). |
-| `swiping` | boolean | `Drawer.Popup` | A pointer is dragging the drawer toward its edge (from the drag's start to its release or abort), while `--drawer-swipe-x` / `-y` / `-progress` follow it. **Attribute only, no `state.swiping`**, like `data-instant`: a DOM write from the gesture's listeners in both modes (JS-free mode has no React state for it, and a render per gesture buys nothing), never server-rendered (`design/components/drawer.md` 4.3). Style motion off under it (`[data-swiping] { transition: none }`). |
-| `ending` | boolean | Toast `Root` | Closed, kept mounted (and `inert`) until the animations the ending state started finish (`exitAnimations` filtered by a baseline of the animations already running before the close, Toast 10.2; a paused progress bar does not hold the exit); CSS animates on it. |
-| `paused` | boolean | Toast `Viewport` | A viewport-wide timer pause holds (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
-| `type` | string | Toast `Root` | The toast's consumer-defined `type` (`"error"`, `"success"`, …), an enum whose vocabulary is the consumer's. |
-| `complete` | boolean | Progress, every part; `OTPField.Root` and `OTPField.Input` | Progress: the clamped value reached `max`. OTPField: the text has `length` characters. |
-| `context` | boolean | `Menu.Popup` | The current open came from a `Menu.ContextTrigger` and the popup is placed at a point: `--menu-point-x` / `--menu-point-y` are set inline and `data-side` / `data-align` are absent. Written urgently with the placement (geometry, not a dispatch): present from the point open's request until the popup is hidden and its exit is over (`design/components/context-menu.md` 3.1). |
-| `region` | `"optimum" \| "suboptimum" \| "even-less-good"` | Meter, every part | HTML's meter region for the value against `low` / `high` / `optimum`, the platform's words. |
-| `side` | `"top" \| "bottom" \| "left" \| "right"` while shown; the requested `side` (which may be `"inline-start"` / `"inline-end"`) otherwise | Tooltip, Popover and Menu `Popup`; Tooltip `Arrow` | **The resolved side** (section 13): while the popup is shown, the side of the anchor the browser actually placed it on, read from the computed `position-area` after `position-try-fallbacks` chose an option, so it changes after a flip (on open, on scroll, on resize); on the server, while closed, and when the computed value cannot be read (a vertical writing mode, a consumer `position-area` the parser does not know), the value of the `side` prop. Absent with `side={null}` and on a point-placed menu (`context`). Written urgently (geometry, observed; conventions 3.5). |
-| `side` | `"top" \| "bottom" \| "left" \| "right" \| "inline-start" \| "inline-end"` | `Drawer.Popup` | **A prop echo**, not a resolved side: the `side` prop (default `"bottom"`), the edge the drawer is attached to and swipes toward. Rendered in every mode, server HTML included, like `data-modal`; nothing flips a drawer and the library places nothing (`design/components/drawer.md` 2). `state.side` is the same value. |
-| `align` | `"start" \| "center" \| "end"` | same parts | The resolved alignment along that side, same rules. `start` / `end` are **inline-relative** on a top / bottom side (`start`: the popup's inline-start edge meets the anchor's; mirrored under `direction: rtl`) and block-relative on a left / right / inline side (`start`: top edges meet). |
-| `status` | `"idle" \| "loading" \| "loaded" \| "error"` | Avatar, every part | The load state of the avatar's image, an urgent mirror (2.6): `"idle"` until an image with a source reports (the server render and the hydration render too), `"loading"` while it is not complete, `"loaded"` once available, `"error"` when its current source failed (`design/components/avatar.md` 4). |
-| `instant` | boolean | `Tooltip.Popup` | The tooltip is shown by an open that began while another `[role="tooltip"]:popover-open` existed in the document (the skip-delay condition, `design/components/tooltip.md` 6), so a stylesheet can skip the entry animation of a warm open and keep a cold one's. **Attribute only, no `state.instant`**: browser-owned, like the open state it qualifies (no `state.open` exists), written by a DOM write from the popup's synchronous `beforetoggle` on both paths, before the open's first style recalc, and removed at the close's (section 7.4). Never server-rendered. |
+**The forms agree, part by part.**
+
+1. **An attribute implies a state field.** Every `data-<name>` a part emits has a member of
+   the same name in that part's `State`, with the same value: `data-invalid` and
+   `state.invalid`, `data-empty` and `state.empty`, `data-side="top"` and
+   `state.side === "top"`. Whatever a stylesheet can select, `className={(state) => …}` can
+   read. The recorded exceptions are DOM writes with no React state behind them:
+   `data-swiping` and `data-instant` (attribute only, in the table), and an overlay Trigger's
+   `data-open` in JS-free mode (rule 3).
+2. **A state field implies an attribute, where a stylesheet would select on it.** A boolean
+   or enum member of a part's `State` is emitted as `data-<name>` on that part's element. Not
+   required for: a member that is neither (`value`, `values`, `char`, `query`, `toast`); a part
+   that renders no element (a Root without DOM shows its state through `children(state)` only);
+   and a fact the component's **native control** already carries, which a stylesheet reaches
+   with a pseudo-class on the control or `:has()` from a wrapper: `readOnly` (`:read-only`) and
+   `required` (`:required`) have no attribute on a component whose control is a native input
+   or a group of them. A control with no such element emits `data-required`
+   (`MultiSelect.Trigger`), as the Field parts do.
+3. **In JS-free mode `state.open` is `false`.** Where the browser owns an open state and React
+   holds no value for it (Accordion and Collapsible without their state props; the JS-free
+   mode of Popover, Dialog, AlertDialog, Drawer and `NavigationMenu.Item`, 3.9.11), every
+   part's `state.open` is `false`, and the type is `boolean`, never `boolean | undefined`: the
+   function props describe what React knows, which is the server-rendered closed state. The
+   truth is the platform's (`:open`, `:popover-open`). An **overlay** Trigger's `data-open` is
+   kept current there by a DOM write from the `toggle` event of its popup or `<dialog>` (7.4),
+   in every overlay with a JS-free mode: that attribute is the one styling hook that works in
+   both modes, the state field is not, and each such Trigger's docs row says so. A `<summary>`
+   Trigger (Accordion, Collapsible) renders no `data-open` in JS-free mode and needs none: it
+   is a child of the `<details>` the browser opens, so `details[open] > summary` selects it.
+4. **A `Label` part carries its owner's `data-disabled`, and `data-pending` where the owner has
+   one**, with the matching state fields, so a label can be dimmed or show progress without a
+   wrapper selector. A `<legend>` Label (RadioGroup, CheckboxGroup) is the exception: it sits
+   inside the `<fieldset>` that carries both, and CSS reaches it from there.
+5. **`state.invalid` and `state.required` exist wherever the fact does.** Every control part
+   that renders `data-invalid` inside a `Field.Root` has `state.invalid` (`false` outside a
+   Field). Every part that takes or inherits `required` has `state.required` (its own prop or
+   the Field's).
+
+**This table fixes each name and its meaning.** It names a part only where the meaning is
+specific to that part. Which parts emit an attribute is listed in each component's design doc
+(the anatomy table) and on its docs page; a new emitter of an existing name needs no change
+here, a new name or a new meaning does.
+
+| Name | Kind | Meaning |
+| --- | --- | --- |
+| `pending` | boolean | An action dispatched through this part's owner is in flight, including the Suspense wait of the resulting render. Which parts carry it is 4.3. For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. For a form-channel part (every Field part, `Form.Root`, `Form.Submit`): the enclosing form's submission (`useFormStatus`, 2.7). |
+| `disabled` | boolean | Disabled by prop or inherited from the owner; not by an ancestor `<fieldset disabled>` (3.6). Also a step button whose next step would change nothing (NumberField's `Increment` / `Decrement` at a bound or under `readOnly`). Emitted in **every mode** in which the part renders `disabled` or `aria-disabled` (the JS-free Triggers included), so the styling hook and the ARIA state never disagree. |
+| `pressed` | boolean | Optimistic pressed state of a toggle button. |
+| `selected` | boolean | This part is, or belongs to, the selected choice: optimistic on the element the user picks (a Tab; an option, with `aria-selected`; on a native `<option>` identical to `:checked`, since the `<select>` renders `value={optimistic}`) and on `Tabs.Indicator` (a tab is selected); committed on a content region (`Tabs.Panel`). Never "the owner has a value", which is `:not([data-empty])`. Radio-like and checkbox-like parts use `checked`. |
+| `checked` | boolean | Optimistic checked state, the platform's word for a checkbox, a switch, a radio (not `selected`) and a menu's checkable items (there as `aria-checked` on a `button`). On a native input the DOM holds the optimistic value (3.2), so `:checked` matches it, with the caveats in 4.2. |
+| `indeterminate` | boolean | Mixed state. On `Checkbox` it is a controlled-only prop ("consumer-owned, mirrored", 3.5; never Switch), emitted from render because the DOM property cannot be server-rendered and `aria-checked` is forbidden on native inputs: the attribute is what lets CSS draw the dash before hydration. The property is set through the ref and re-applied after every commit; it is **suspended while an action is pending** (`state.indeterminate = indeterminate && !pending`) so the attribute, the DOM property and `:indeterminate` agree in every phase. On `CheckboxGroup.Parent` the value is **library-derived** from the group's optimistic set (`some && !all`) and is not suspended. On Progress: `value` is `null` (derived, never suspended). |
+| `open` | boolean | Disclosure and open state, in the platform's word (`<details open>`, `:open`, `ToggleEvent.newState`); `expanded` is not used. **Optimistic on the part the user acts on** (a Trigger, an Accordion `Item`, a Collapsible `Root`, `NavigationMenu.Item`, the Combobox `Input`), where it is the attribute to style. **Not emitted on the element the browser opens**: a Popup, a `<dialog>`, a `<details>` Panel are styled with `:popover-open` / `:open`, which are exact and written by the same commit (7.4); their `state.open` is the committed value. Tooltip, whose open state is purely browser-owned, and `Select.Root`, whose picker has no open event, emit none and have no `state.open`. In JS-free mode: rule 3. ARIA is separate: a `<button>` Trigger is a `popovertarget` invoker and renders **no `aria-expanded`**; a non-button `render` and the Combobox `Input` render it from the Root's urgent `shown` mirror (3.2). |
+| `empty` | boolean | **The part's collection or value is empty**, the one word for it. A listbox (`Combobox.List`, `MultiSelect.List`): no mounted options, not stale and not loading, the condition under which `Empty` renders. A part that shows or holds the owner's value: nothing is selected (`MultiSelect.Value`, which shows its `placeholder` then; `Combobox.Input`: the optimistic value is `null`, or has no entries with `multiple`; `Combobox.Chips`: no chips). `Toast.Viewport`: no toasts in the queue, the `ending` ones kept mounted included (the region is hidden under it), so a layout can collapse the reserved space. There is no `data-placeholder` and no attribute for the inverse: "has a value" is `:not([data-empty])`. |
+| `active` | boolean | Urgent (3.2), never a transition. Two recorded meanings: **virtual focus** in a listbox (`Combobox.Option`, `MultiSelect.Option`: `aria-activedescendant` points here), and **the caret is here** (`OTPField.Slot`: the input is focused and its caret, or part of its selection, is at this slot's position; the last slot for a caret at the end of a complete code). Not `:active` (4.2). |
+| `filled` | boolean | A character is at this position of a code (`OTPField.Slot`, `state.char !== null`). |
+| `complete` | boolean | The value reached its end: Progress, the clamped value reached `max`; OTPField, the text has `length` characters. |
+| `stale` | boolean | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile (Combobox `Popup`, `List`, `Input`). The listbox also has `aria-busy="true"` while stale **or loading** (a `Status` mounted inside the List); loading itself is not a data attribute. |
+| `invalid` | boolean | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). On every Field part and on every control part inside a `Field.Root` (rule 5); the control also carries an explicit `aria-invalid="true" \| "false"`. |
+| `required` | boolean | `Field.Root required` or the control's own `required`. As an attribute: on every Field part, and on a control with no native element to carry `:required` (rule 2). |
+| `readOnly` | boolean | State field only (rule 2: `:read-only` on the input). The text controls (3.6). |
+| `modal` | boolean | The Root's `modal` prop of a Dialog (default `true`), on its Popup: the dialog is opened with `showModal()` (library mode) or the invoker's `show-modal` command (JS-free). **A prop echo**, not a state: rendered in every mode, server HTML included, so a stylesheet can lay out a non-modal panel (`.dialog:not([data-modal])`) before hydration and while closed, where `:modal` is false either way. |
+| `orientation` | `"horizontal" \| "vertical"` | The axis of a composite or a line, on the part that owns it and on each part laid out along it (3.10 rule 6). A `ToggleGroup` inside a Toolbar reports the Toolbar's; a `Toolbar.Separator` its own, perpendicular to the toolbar's. Enum attribute with value. |
+| `decorative` | boolean | `Separator`'s `decorative` prop: a line with `role="none"`, not a thematic break. A prop echo. |
+| `index` | number (stringified) | The part's `index` prop: which entry of the value array a `Slider.Thumb` edits (default `0`), which character position an `OTPField.Slot` shows (required). A consumer-chosen number, so a stylesheet can address a part by position (`[data-index="1"]`). |
+| `dragging` | boolean | A pointer is captured on a thumb of this Slider (urgent state; keyboard never sets it), on every Slider part whose state has it and on the captured `Thumb`. Style motion off under it (`[data-dragging] { transition: none }`). |
+| `swiping` | boolean | A pointer is dragging a Drawer toward its edge (from the drag's start to its release or abort), while `--drawer-swipe-x` / `-y` / `-progress` follow it. **Attribute only, no `state.swiping`**: a DOM write from the gesture's listeners in both modes (JS-free mode has no React state for it, and a render per gesture buys nothing), never server-rendered (`design/components/drawer.md` 4.3). Style motion off under it. |
+| `instant` | boolean | A Tooltip shown by an open that began while another `[role="tooltip"]:popover-open` existed in the document (the skip-delay condition, `design/components/tooltip.md` 6), so a stylesheet can skip the entry animation of a warm open and keep a cold one's. **Attribute only, no `state.instant`**: browser-owned, like the open state it qualifies, written by a DOM write from the popup's synchronous `beforetoggle` on both paths and removed at the close's (7.4). Never server-rendered. |
+| `context` | boolean | The current open of a `Menu.Popup` came from a `Menu.ContextTrigger` and the popup is placed at a point: `--menu-point-x` / `--menu-point-y` are set inline and `data-side` / `data-align` are absent. Written urgently with the placement (geometry, not a dispatch): present from the point open's request until the popup is hidden and its exit is over (`design/components/context-menu.md` 3.1). |
+| `submenu` | boolean | This `Menu.Popup` belongs to a nested Root (a submenu), so a stylesheet can tell it from the top-level menu. |
+| `side` | `"top" \| "bottom" \| "left" \| "right"` while shown; the requested `side` (which may be `"inline-start"` / `"inline-end"`) otherwise | On an anchored Popup (and `Tooltip.Arrow`): **the resolved side** (section 13). While the popup is shown, the side of the anchor the browser actually placed it on, read from the computed `position-area` after `position-try-fallbacks` chose an option, so it changes after a flip (on open, on scroll, on resize); on the server, while closed, and when the computed value cannot be read (a vertical writing mode, a consumer `position-area` the parser does not know), the value of the `side` prop. Absent with `side={null}` and on a point-placed menu (`context`). Written urgently (geometry, observed; 3.5). |
+| `side` | `"top" \| "bottom" \| "left" \| "right" \| "inline-start" \| "inline-end"` | On `Drawer.Popup`: **a prop echo**, not a resolved side: the `side` prop (default `"bottom"`), the edge the drawer is attached to and swipes toward. Rendered in every mode, server HTML included; nothing flips a drawer and the library places nothing (`design/components/drawer.md` 2). |
+| `align` | `"start" \| "center" \| "end"` | On an anchored Popup: the resolved alignment along that side, same rules. `start` / `end` are **inline-relative** on a top / bottom side (`start`: the popup's inline-start edge meets the anchor's; mirrored under `direction: rtl`) and block-relative on a left / right / inline side (`start`: top edges meet). |
+| `region` | `"optimum" \| "suboptimum" \| "even-less-good"` | HTML's meter region for a Meter's value against `low` / `high` / `optimum`, the platform's words. |
+| `status` | `"idle" \| "loading" \| "loaded" \| "error"` | The load state of an Avatar's image, an urgent mirror (2.6): `"idle"` until an image with a source reports (the server render and the hydration render too), `"loading"` while it is not complete, `"loaded"` once available, `"error"` when its current source failed (`design/components/avatar.md` 4). |
+| `type` | string | A toast's consumer-defined `type` (`"error"`, `"success"`, …), an enum whose vocabulary is the consumer's. |
+| `priority` | `"normal" \| "high"` | A toast's `priority`, which also decides its role (`alertdialog` when `"high"`). |
+| `ending` | boolean | A toast that is closed and kept mounted (and `inert`) until the animations the ending state started finish (`exitAnimations` filtered by a baseline of the animations already running before the close, Toast 10.2; a paused progress bar does not hold the exit); CSS animates on it. |
+| `paused` | boolean | A viewport-wide timer pause holds on the Toast `Viewport` (pointer over the region, focus inside, hidden document, blurred window), so a visual progress indicator can pause with the real timer. |
 
 Booleans are emitted by **presence**: `data-pending=""` when true, absent when false. Enums carry
 their value. Negative pairs (`data-closed`, `data-unchecked`) are not emitted; use `:not([data-open])`.
@@ -1475,7 +1673,7 @@ For native inputs the equivalence is exact, because the DOM holds the optimistic
 | `:checked` | `data-checked` | Identical except under the unsupported `preventDefault()` misuse (2.3) and in one engine quirk: Chromium 156 does **not** match `:checked` on a checkbox that is both checked and indeterminate (Firefox does). Where `indeterminate` is in play, select on `[data-checked]`. |
 | `:indeterminate` | `data-indeterminate` | Only the attribute works before hydration; `:indeterminate` also matches every radio in a group with no selection. |
 | `:disabled` | `data-disabled` | Only the pseudo-class sees `<fieldset disabled>` inheritance. |
-| `:user-invalid`, `:required` | none on the input; `data-invalid` / `data-required` on Field parts | On a bare control: platform only. Inside a `Field.Root` the Field parts emit `data-invalid` (which also covers server errors, where no pseudo-class exists) and `data-required`; `:user-invalid` / `:user-valid` on the control and `:has(:user-invalid)` on the Root remain the zero-JS, pre-hydration styling hooks for the native half. |
+| `:user-invalid`, `:required` | `data-invalid` on the control and the Field parts inside a `Field.Root`; `data-required` on the Field parts | On a bare control: platform only (`state.invalid` is `false`). Inside a `Field.Root` the control and the Field parts emit `data-invalid` (which also covers server errors, where no pseudo-class exists) and the Field parts `data-required`; `:user-invalid` / `:user-valid` on the control and `:has(:user-invalid)` on the Root remain the zero-JS, pre-hydration styling hooks for the native half. |
 
 The data attributes are still emitted, because sibling or wrapper parts (an `Indicator`, a label
 Root) cannot use `:checked` on themselves; `:has(:checked)` on a wrapper is the zero-JS
@@ -1485,7 +1683,10 @@ alternative.
 
 - The **owner** (`Root`, or the single component): while its transition is pending. When the
   owner renders no element (Dialog's Root), `pending` is exposed through its `children` function
-  and on the trigger part only.
+  and on the trigger part only. An owner that is not a Root follows the same rule:
+  `NavigationMenu.Item` renders `data-open` (optimistic) and `data-pending` on its `li` in
+  library mode, as `Accordion.Item` does.
+- A **`Label`** part carries the owner's `data-pending` (4.1 rule 4).
 - The **trigger the user acted on**: while the owner is pending and this trigger is the optimistic
   target (for Tabs: `optimistic === tab.value`; for Toggle: always the element).
 - **A part that asks the owner for a change and is not its trigger** (an overlay's Close
@@ -1522,8 +1723,8 @@ The state object given to function props on the owner includes `pending`; on tri
 
 ### 5.1 Default wiring
 
-Every part whose mount, unmount or content is driven by library state (Panel, library-driven
-Popup, Toggle's own element when its children can change) renders
+Every part whose mount, unmount or content is driven by **committed** library state (a Panel,
+a library-driven Popup) renders
 `<ViewTransition default={transition}>` as the **outermost node of its output**, before any DOM
 element, **only when `transition !== undefined`**. With the prop absent the part renders no
 boundary at all (`internal/transition-boundary.tsx`).
@@ -1571,11 +1772,17 @@ have none and animate in CSS instead:
 1. **Browser-owned visibility** (3.5: Tooltip's `Popup`, the Accordion's `<details>` in static
    mode, which ignores the prop with a dev warning): the open/close happens outside any React
    transition; `@starting-style` and `transition-behavior: allow-discrete`.
-2. **Only an optimistic flip that never animates**: Menu's items (their `aria-checked` lands in
-   a sync render and the settle shows nothing); every Select part (the picker is a UA
-   pseudo-element, `<selectedcontent>` is written by the browser, every library attribute is
-   optimistic); every Slider and NumberField part (the value is urgent or optimistic; a
-   Slider's rollback animates with a CSS transition on a registered custom property).
+2. **A value control whose attributes are all optimistic.** Nothing in it mounts from library
+   state, and the flip lands in a sync render, so the settle commit shows nothing a boundary
+   could animate. This is one rule for every value control: the checkables (`Toggle`,
+   `Checkbox`, `Switch`, `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent`,
+   `ToggleGroup.Item`); Menu's items (their `aria-checked` lands in a sync render); every Select
+   part (the picker is a UA pseudo-element, `<selectedcontent>` is written by the browser);
+   the options of a listbox (`Combobox.Option`, `MultiSelect.Option`); every Slider,
+   NumberField, TextField and OTPField part (the value is urgent or optimistic; a Slider's
+   rollback animates with a CSS transition on a registered custom property). Such a component
+   still **emits its transition types** (5.3), so a consumer who wants the settle of one to
+   animate something wraps that content in their own `<ViewTransition>` keyed on the type.
 3. **Every commit on the urgent lane by design** (Toast, 2.6; Field and Form, whose state is an
    urgent mirror of browser-owned validity and whose own commits display nothing; Avatar, whose
    status is an urgent mirror of its image's load state): react-dom
@@ -1587,10 +1794,11 @@ have none and animate in CSS instead:
    arrive in the consumer's lane (usually urgent, 2.6) and animate through a CSS transition on
    a registered custom property.
 
-Toggle keeps the prop although its own flip cannot use it (product-owner decision): its
-element's content can change with the settled action, and it animates the end of the action
-and content keyed on `pending`. A part without the prop renders no boundary, so the prop costs
-nothing for consumers who do not set it.
+The parts that render optimistic state and **keep** `transition` are not value controls: the
+pure trigger `Button`, whose only state is `pending` and whose content is keyed on it, and the
+triggers of a content region (`Tabs.Tab`, `Accordion.Trigger`, `Collapsible.Trigger`), next to
+the Panel whose swap the same commit animates. A part without the prop renders no boundary, so
+the prop costs nothing for consumers who do not set it.
 
 **Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
 (the `vt-popover` probe in `docs/research/popover-menu.md`). A boundary inside a `[popover]` or
@@ -1637,7 +1845,7 @@ Per kind of part:
 
 | Part renders | Animate with | Why |
 | --- | --- | --- |
-| Optimistic state (Toggle's element, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
+| Optimistic state (a checkable, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
 | Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. A boundary that mounts *under a new DOM element* is shielded: Dialog's children mount under the `<dialog>` element on a plain open, so a plain open starts no view transition even with `transition` set; only a nested Popup mounting together with outer content, or a Root inserted by a transition, pays. |
 | `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
 | Any part with `transition` absent | nothing (no boundary rendered) | Baseline timing; a switch or open calls no `startViewTransition`. |
@@ -1681,37 +1889,63 @@ full props object through; it is not designed now.
 ### 5.3 Library-emitted transition types
 
 Each dispatch adds `fsui-<component>` and, when the change has a direction or kind,
-`fsui-<component>-<change>`:
+`fsui-<component>-<change>`.
+
+**One change name per meaning.** The kind is derived from the name of the state that changed,
+never from a synonym:
+
+| State or event | Kinds | Used by |
+| --- | --- | --- |
+| `open` | `open` / `close` | every open state: the overlays, Collapsible, and Accordion (per item: `open` when `details.added` is non-empty, `close` when `details.removed` is) |
+| `checked` | `check` / `uncheck` | Checkbox, Switch, CheckboxGroup, `Menu.CheckboxItem` |
+| `pressed` | `press` / `release` | Toggle, ToggleGroup |
+| a selection among options (`value`) | `select` / `deselect` | where the component has another dispatch to tell it from, or the value is a set: `Menu.RadioGroup`, Combobox, MultiSelect. A component whose only dispatch is a single selection has no kind (RadioGroup, Select) |
+| a position among siblings | `next` / `prev` | Tabs |
+| the step and the commit of a continuous or text control | `change` / `commit` | Slider, NumberField; TextField (commit only) |
+| a pure trigger named after its event | the event | `complete` (OTPField) |
+
+A set-valued dispatch carries one kind per non-empty side of its diff (`details.added`,
+`details.removed`), so a reset or an exclusive switch may carry both.
+
+Every component has a row:
 
 | Component | Types |
 | --- | --- |
+| Button | none (`useActionTrigger`; `transition` animates the commit that ends the action) |
 | Toggle | `fsui-toggle`, `fsui-toggle-press`, `fsui-toggle-release` |
+| ToggleGroup | `fsui-toggle-group`, `fsui-toggle-group-press` (when `details.added` is non-empty), `fsui-toggle-group-release` (when `details.removed` is non-empty; an exclusive switch carries both) |
+| Toolbar | none (no state) |
+| Separator | none (no state) |
 | Tabs | `fsui-tabs`, `fsui-tabs-next`, `fsui-tabs-prev` (by DOM order of the target tab relative to the committed tab) |
-| Accordion | `fsui-accordion`, `fsui-accordion-expand`, `fsui-accordion-collapse` |
-| Collapsible | `fsui-collapsible`, `fsui-collapsible-expand`, `fsui-collapsible-collapse` (Accordion's change names) |
-| Switch | `fsui-switch`, `fsui-switch-on`, `fsui-switch-off` |
+| Accordion | `fsui-accordion`, `fsui-accordion-open` (when `details.added` is non-empty), `fsui-accordion-close` (when `details.removed` is non-empty; an exclusive switch carries both) |
+| Collapsible | `fsui-collapsible`, `fsui-collapsible-open`, `fsui-collapsible-close` |
+| Switch | `fsui-switch`, `fsui-switch-check`, `fsui-switch-uncheck` |
 | Checkbox | `fsui-checkbox`, `fsui-checkbox-check`, `fsui-checkbox-uncheck` |
-| RadioGroup | `fsui-radio-group` (no direction variants) |
 | CheckboxGroup | `fsui-checkbox-group`, `fsui-checkbox-group-check` (when `details.added` is non-empty), `fsui-checkbox-group-uncheck` (when `details.removed` is non-empty; a reset may carry both) |
-| Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
-| AlertDialog | Dialog's: `fsui-dialog`, `fsui-dialog-open`, `fsui-dialog-close` (no types of its own, so one stylesheet styles both; `alert-dialog.md` 8) |
-| Drawer | `fsui-drawer`, `fsui-drawer-open`, `fsui-drawer-close` (its own, not Dialog's: a drawer slides where a dialog fades; a swipe is a fact and carries none; `drawer.md` decision 14) |
-| HoverCard | `fsui-hover-card`, `fsui-hover-card-open`, `fsui-hover-card-close` (the close is only the cancel of a pending open; every close of a shown card is a fact) |
-| NavigationMenu | `fsui-navigation-menu`, `fsui-navigation-menu-open`, `fsui-navigation-menu-close` (per `Item`, library mode: the Trigger and a followed Link; dismissals, the focus-leave close of a shown panel included, are facts and carry none) |
-| Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
-| Select | `fsui-select` (no direction variants) |
+| RadioGroup | `fsui-radio-group` (no kind) |
+| Select | `fsui-select` (no kind) |
 | Combobox | `fsui-combobox`, `fsui-combobox-open`, `fsui-combobox-close` (Root open state); `fsui-combobox-select` (every value dispatch; with `multiple` only when `details.added` is non-empty) and, with `multiple`, `fsui-combobox-deselect` (when `details.removed` is non-empty) |
 | MultiSelect | `fsui-multi-select`, `fsui-multi-select-open`, `fsui-multi-select-close` (Root open state); `fsui-multi-select-select` (a value dispatch whose `details.added` is non-empty), `fsui-multi-select-deselect` (`details.removed` non-empty; a reset may carry both) |
-| Toast | none (no `transition` prop; every commit is urgent, section 5.1) |
-| Field, Form | none (no `transition` prop: an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
-| Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit); no `transition` prop on any part, the types serve consumers' own boundaries |
-| ToggleGroup | `fsui-toggle-group`, `fsui-toggle-group-press` (when `details.added` is non-empty), `fsui-toggle-group-release` (when `details.removed` is non-empty; an exclusive switch carries both) |
-| Toolbar | none |
-| Button | none (`useActionTrigger`; `transition` animates the commit that ends the action) |
-| Progress, Meter | none (no `transition` prop: a consumer-owned value in the consumer's lane, section 5.1) |
-| NumberField | `fsui-number-field`, `fsui-number-field-change` (each step), `fsui-number-field-commit` (each gesture's commit); no `transition` prop on any part |
-| Avatar | none (no `transition` prop: the status is an urgent mirror, 2.6; a consumer `<ViewTransition>` around it gets react-dom's commit wait for the image, `design/components/avatar.md` 5) |
-| OTPField | `fsui-otp-field`, `fsui-otp-field-complete` (each `completeAction` run); no `transition` prop on any part (the text is urgent), the types serve consumers' own boundaries |
+| Slider | `fsui-slider`, `fsui-slider-change` (each step), `fsui-slider-commit` (each gesture's commit) |
+| NumberField | `fsui-number-field`, `fsui-number-field-change` (each step), `fsui-number-field-commit` (each gesture's commit) |
+| TextField | `fsui-text-field`, `fsui-text-field-commit` (each `valueCommitAction` run) |
+| OTPField | `fsui-otp-field`, `fsui-otp-field-complete` (each `completeAction` run) |
+| Field, Form | none (an urgent validity mirror and a form whose own commits display nothing, section 5.1) |
+| Dialog | `fsui-dialog`, `fsui-dialog-open`, `fsui-dialog-close` |
+| AlertDialog | Dialog's: `fsui-dialog`, `fsui-dialog-open`, `fsui-dialog-close` (no types of its own, so one stylesheet styles both; `alert-dialog.md` 8) |
+| Drawer | `fsui-drawer`, `fsui-drawer-open`, `fsui-drawer-close` (its own, not Dialog's: a drawer slides where a dialog fades; a swipe is a fact and carries none; `drawer.md` decision 14) |
+| Popover | `fsui-popover`, `fsui-popover-open`, `fsui-popover-close` |
+| HoverCard | `fsui-hover-card`, `fsui-hover-card-open`, `fsui-hover-card-close` (the close is only the cancel of a pending open; every close of a shown card is a fact) |
+| Tooltip | none (browser-owned open state, no dispatch, section 5.1) |
+| Menu | `fsui-menu`, `fsui-menu-open`, `fsui-menu-close` (Root); `fsui-menu-check` / `fsui-menu-uncheck` (CheckboxItem); `fsui-menu-select` (RadioGroup) |
+| Menubar | none of its own (each menu emits Menu's) |
+| NavigationMenu | `fsui-navigation-menu`, `fsui-navigation-menu-open`, `fsui-navigation-menu-close` (per `Item`, library mode: the Trigger and a followed Link; dismissals, the focus-leave close of a shown panel included, are facts and carry none) |
+| Toast | none (every commit is urgent, section 5.1) |
+| Progress, Meter | none (a consumer-owned value in the consumer's lane, section 5.1) |
+| Avatar | none (the status is an urgent mirror, 2.6; a consumer `<ViewTransition>` around it gets react-dom's commit wait for the image, `design/components/avatar.md` 5) |
+
+A component that emits types and has no `transition` prop on any part (the value controls of
+5.1) emits them for consumers' own boundaries.
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -1957,8 +2191,8 @@ Component" coincide at the Root, so function props (`getAriaValueText`, `childre
 `render`) may be passed from a Server Component and run on the server.
 
 **A closing part with an action is no native invoker** (#182). A part that runs a consumer
-`action` and then closes its popup (`Dialog.Close`, `Popover.Close`, `AlertDialog.Cancel` and
-`AlertDialog.Action` with `action`) renders no `commandfor` / `command` (and no
+`action` and then closes its popup (`Dialog.Close`, `Popover.Close`, `Drawer.Close`,
+`AlertDialog.Cancel` and `AlertDialog.Action` with `action`) renders no `commandfor` / `command` (and no
 `popovertarget`): before hydration a native command would close the popup **without running
 the action**, which reads as if the work had been done. Such a part is a plain
 `<button type="button">` until hydration (a click does nothing) and its click handler is the
@@ -1990,14 +2224,14 @@ notes"):
 | Gap | Convention |
 | --- | --- |
 | Attribute unknown to react-dom (`command`, `commandfor`, `interestfor`, `focusgroup`, `closedby`, `switch`, `name` on `<details>`) | Write it **lowercase** in JSX; react-dom passes unknown lowercase attributes through verbatim on client and server. Never camelCase (`interestFor` renders the wrong attribute and warns). `popovertarget` / `popovertargetaction` are **not** in this row: react-dom 19.3 knows them as `popoverTarget` / `popoverTargetAction` (the lowercase spelling warns "Invalid DOM property"), serialises them camelCase in server HTML (HTML parses attribute names case-insensitively) and lowercases them through `setAttribute` on the client; write the camelCase prop. |
-| Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from every subpath `index.ts`, so each public entry carries it. tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. `popoverTarget` / `popoverTargetAction` are typed upstream, so the overlay Triggers are not in this row; `command` / `commandfor` are in it for `Popover.Close`, the Dialog parts and consumers' `Button`s. |
+| Attribute or element untyped in `@types/react` (`command`, `commandfor`, `interestfor`, `focusgroup`, `switch`; the `selectedcontent` element) | One module augmentation module, `src/internal/platform-attributes.ts` (`declare module "react" { ... }` plus `export {}` so it is a module), augmenting `React.HTMLAttributes` / `ButtonHTMLAttributes` / `AnchorHTMLAttributes` with the typed values from the research docs, and `JSX.IntrinsicElements` with `selectedcontent`. It is imported **for side effects** (`import "./internal/platform-attributes.js"`) from the package entry and from **every** component's subpath `index.ts` (a component that uses none of the attributes included, so the rule needs no judgement), so each public entry carries it. tsdown emits `dist/internal/platform-attributes.d.mts` and an `import` of it in each entry's `.d.mts`, with no runtime import in the JS. A `.d.ts` source would not work: it is typecheck-only and never reaches `dist`. Each entry carries a comment with the DefinitelyTyped issue so it can be deleted when upstream lands. `popoverTarget` / `popoverTargetAction` are typed upstream, so the overlay Triggers are not in this row; `command` / `commandfor` are in it for `Popover.Close`, the Dialog parts and consumers' `Button`s. |
 | Attribute react-dom serialises wrongly (`hidden="until-found"` becomes `hidden=""` on both client and server) | Render the boolean form so SSR output is correct, then upgrade in a layout effect through the part's ref (`el.setAttribute("hidden", "until-found")`), and listen to the platform event that the browser uses to undo it (`beforematch`) to dispatch the matching change action. Encapsulate each such case in one internal hook (`use-until-found.ts`) so the workaround has exactly one home. |
 | Attribute that must act on the client but must not be in the server HTML (Combobox Trigger's and MultiSelect Trigger's `popovertarget`: the invoker relationship exempts its press from light dismiss, but a pre-hydration activation would open an empty, button-anchored popup) | Not rendered; written with `setAttribute` from the part's ref callback once the element is known to be a `<button>` (removed in the cleanup), so hydration never sees it and the click handler that cancels the activation is installed before the attribute exists. The key is still owned (omitted from the props type). Named in the component design (section 3.5 lists the parts that use it). |
 | Event React does not synthesize (`command`, `interest`, `loseinterest`, `beforematch`, `scrollsnapchange`) | `addEventListener` through the part's ref (or a Fragment ref for sibling groups), inside an effect that uses `useEffectEvent` for the handler body, dispatching into the component's transition like any other interaction. Never expose these as `on*` props (section 2.6: `on*` is reserved for the urgent lane, and these are interactions, not an urgent state). |
 | Event React does synthesize, but the handler must be feature-detected away (Tooltip's `pointerenter` / `focus` when `interestfor` is native) | Same `addEventListener`-in-effect pattern: the effect subscribes only when the JS path is needed, so markup is identical on server and client. Because no prop-form handler is installed, none is omitted from the part's type and the consumer's `on*` props pass through (section 1.5). |
 | Element whose children the **parser writes before hydration** (`<selectedcontent>`: Chromium and Safari clone the selected option's children into it at parse time, so a plain element fails hydration and client-renders the whole root) | Render it with `suppressHydrationWarning` and `dangerouslySetInnerHTML={{ __html: "" }}`, so React treats the children as opaque and the attribute mismatch is silenced (verified in `docs/research/select-combobox.md` §4: hydrates with no recoverable error, later browser writes keep working); the part has no `children` prop. One such element per component at most, named in its design doc (`Select.Value`). |
 | Pseudo-class the platform already provides (`:open`, `:popover-open`, `:disabled`) | Document it next to the equivalent data attribute; do not emit a duplicate attribute when the pseudo-class carries the same meaning and the state is browser-owned. |
-| Styling state for a browser-owned open that a static part cannot render (`data-open` on a Popover Trigger in JS-free mode, where no React state exists) | Keep it current with a DOM write from the platform event through the ref (`toggle`, reading `:popover-open`), never React state. The attribute is owned and React renders no value for it in that mode, so the DOM write is never overwritten. A page that never hydrates has `:has(+ :popover-open)` instead, shown on the docs page. One attribute per component at most, named in its design doc. |
+| Styling state for a browser-owned open that a static part cannot render (`data-open` on a Trigger in JS-free mode, where no React state exists: Popover, `NavigationMenu.Trigger`, and the Dialog, AlertDialog and Drawer Triggers) | Keep it current with a DOM write from the platform event through the ref (the popup's or the `<dialog>`'s `toggle`, reading `:popover-open` / `dialog.open`), never React state. **Every Trigger with a JS-free mode does this**, so `[data-open]` on a Trigger is the styling hook in both modes of every overlay; `state.open` stays `false` there (4.1 rule 3). The attribute is owned and React renders no value for it in that mode, so the DOM write is never overwritten. A page that never hydrates has `:has(+ :popover-open)` / `:has(+ :open)` instead, shown on the docs page. One attribute per component at most, named in its design doc. |
 | Styling state for a browser-owned open that CSS must see **at the open's first style recalc** and no pseudo-class carries (Tooltip's `data-instant`, a warm open) | A DOM write from the platform's **synchronous** `beforetoggle` through the ref (`syncPresence`), on every path that can open the element (the native `interestfor` path included, as the interaction hook's only listener there; the placement observer's `toggle`, section 13.2, is separate), never from `toggle` (a task later: the entry transition has started and the write cancels it mid-flight, `design/components/tooltip.md` 6) and never React state (a render cannot be placed before that recalc short of `flushSync` inside the show algorithm). Classified from the DOM at that moment (`beforetoggle` precedes the `auto` / `hint` stacking that hides other popovers), cleared at the close's `beforetoggle`, never rendered by the part (so never in server markup), no `state.<name>` counterpart. One attribute per component at most, named in its design doc. |
 | Roving `tabindex` over children the library did not render (`Toolbar.Root`; a standalone `ToggleGroup.Root`) | The container's engine (`internal/use-roving-focus.ts`) finds the focusable descendants in the DOM and writes `tabindex` (`0` on the current stop, `-1` elsewhere) from a layout effect after each of its commits, a `MutationObserver` on its subtree and its `focusin` / `pointerdown` handlers. Items render no `tabindex` (library item parts omit the prop from their types; a consumer's `tabIndex` on a toolbar item is unsupported), an element whose own `tabindex="-1"` the engine did not write is not an item, the engine records each element's original `tabindex` and restores it when it lets go (the native path after hydration, an element that left the container), and on the native `focusgroup` path nothing is written. Server HTML carries no `tabindex`, so before hydration every item is a Tab stop; after the first layout effect, one. |
 
@@ -2023,11 +2257,15 @@ a flag (`docs/vision.md`). Mechanism:
 
    ```tsx
    <Tooltip.Trigger experimental_interestFor>Save</Tooltip.Trigger>
-   <Tabs.List experimental_focusgroup>...</Tabs.List>
+   <Tabs.List experimental_focusGroup>...</Tabs.List>
    <Accordion.Root experimental_interpolateSize>...</Accordion.Root>
    ```
 
-   The prefix follows React's own naming for unstable APIs. It is greppable, visible at the call
+   The prefix follows React's own naming for unstable APIs. **After the prefix the name is
+   camelCase, as React would spell the prop**, whatever the casing of the HTML attribute or CSS
+   property behind it: `experimental_focusGroup` (`focusgroup`), `experimental_interestFor`
+   (`interestfor`), `experimental_closedBy` (`closedby`), `experimental_interpolateSize`
+   (`interpolate-size`), `experimental_webOTP`. It is greppable, visible at the call
    site where the browser-support decision is made, typed, and tree-shakeable. When the feature
    reaches all engines the prop is removed and the behaviour becomes default; the removal is a type
    error that tells every consumer exactly where to delete it.
@@ -2038,9 +2276,9 @@ a flag (`docs/vision.md`). Mechanism:
    | --- | --- | --- | --- |
    | `popover="hint"` | Safari 27.0 (TP only) | `Tooltip.Popup experimental_hint`, `HoverCard.Popup experimental_hint` | Popup renders `popover="hint"` instead of the baseline type plus JS Escape/outside-click handling (HoverCard keeps its own Escape and outside-press listeners next to the native ones). |
    | `interestfor` | Gecko, WebKit | `Tooltip.Trigger experimental_interestFor`, `HoverCard.Trigger experimental_interestFor` (written through the ref after hydration; the browser supplies the interest signal, the library still owns the open, Escape and a press outside) | Trigger renders `interestfor`; JS hover/focus handlers are skipped where the browser supports it. |
-   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusgroup`, `Menu.Popup experimental_focusgroup` (renders `focusgroup="menu wrap\|nowrap"`; items render no `tabindex` on the native path; typeahead, activation, submenu keys and Tab stay JS), `Toolbar.Root experimental_focusgroup` (`focusgroup="toolbar inline\|block wrap\|nowrap"`; the engine writes no `tabindex` and handles no navigation key where native), standalone `ToggleGroup.Root experimental_focusgroup` (the `toolbar` token under an explicit `role="group"`, plus `nomemory` and `focusgroupstart` on the first pressed Item; a ToggleGroup **inside** a Toolbar renders no `focusgroup` whatever its prop says, with a dev warning, because a nested focusgroup splits the Toolbar's single Tab stop) | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex`. |
+   | `focusgroup` | Gecko, WebKit | `Tabs.List experimental_focusGroup`, `Menu.Popup experimental_focusGroup` (renders `focusgroup="menu wrap\|nowrap"`; items render no `tabindex` on the native path; typeahead, activation, submenu keys and Tab stay JS), `Toolbar.Root experimental_focusGroup` (`focusgroup="toolbar inline\|block wrap\|nowrap"`; the engine writes no `tabindex` and handles no navigation key where native), standalone `ToggleGroup.Root experimental_focusGroup` (the `toolbar` token under an explicit `role="group"`, plus `nomemory` and `focusgroupstart` on the first pressed Item; a ToggleGroup **inside** a Toolbar renders no `focusgroup` whatever its prop says, with a dev warning, because a nested focusgroup splits the Toolbar's single Tab stop) | The List renders `focusgroup="tablist inline\|block wrap\|nowrap nomemory"` and the selected Tab `focusgroupstart`; where `focusGroup` is implemented the JS arrow-key handling steps aside and unselected Tabs render no `tabindex`. |
    | `interpolate-size` / `calc-size()` | Gecko, WebKit (TP) | `Accordion.Root experimental_interpolateSize`, `Collapsible.Root experimental_interpolateSize` (the `<details>` itself) | Inherited property set on the root; `::details-content` height animates to `auto` natively. |
-   | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute; camelCase like `experimental_interestFor`) | Native light dismiss instead of JS. |
+   | `<dialog closedby>` | WebKit (TP) | `Dialog.Popup experimental_closedBy` (the part that renders the attribute) | Native light dismiss instead of JS. |
    | Customizable `<select>` | Gecko (pref) | **none** (Select design) | The markup (`<button>` + `<selectedcontent>`, rich options, `<legend>` in `<optgroup>`) is parsed everywhere and degrades to the native select; the opt-in is the consumer's CSS (`appearance: base-select`), so no library flag exists. |
    | WebOTP (`navigator.credentials.get({ otp })`) | Gecko | `OTPField.Root experimental_webOTP` | The Input's mount effect requests the code of an origin-bound SMS; a resolved code of `length` characters fills the field (`"platform"`) and completes it. Where the API is missing the flag does nothing; `autocomplete="one-time-code"` is the baseline everywhere. |
    | `<input type="checkbox" switch>` | Blink (proposed), Gecko | `Switch experimental_switch` (future; not added while WebKit-only) | Native switch rendering and semantics; `role="switch"` already gives the semantics everywhere. |
@@ -2110,7 +2348,10 @@ packages/ui/src/
 ```
 
 - Folders and files: kebab-case. Components and types: PascalCase. Hooks: `use-*.ts`.
-- One part per file. Tests are colocated; a multi-part component has one test file per namespace
+- One part per file. Parts that exist only together and share their helpers may share one
+  file, named after the first (`combobox-chips.tsx`: `Chips`, `Chip`, `ChipRemove`; the
+  `*-group.tsx` files of Combobox, MultiSelect and Menu: `Group`, `GroupLabel` and the parts
+  beside them). Tests are colocated; a multi-part component has one test file per namespace
   (`tabs.test.tsx`), split only when it grows past a few hundred lines.
 - Relative imports carry `.js` extensions (repo convention).
 - Shared helpers live in `internal/`; a helper only one component's parts use lives in that
@@ -2166,23 +2407,67 @@ re-exports them.
 
 - `<Component><Part>Props`, `<Component><Part>State`; single-part components drop the part:
   `ToggleProps`, `ToggleState`.
-- `<Component><State>ChangeDetails` extends `ActionDetails`; when it exposes `reason`, the
-  member is `readonly reason: ChangeReason` (never a local union). The urgent handler's details
-  type keeps the same name (`ComboboxInputValueChangeDetails`): it describes the change, not
-  the lane.
-- Shared: `Action`, `ActionDetails`, `ChangeAction`, `UrgentChangeHandler` (section 2.6),
-  `ChangeReason`, `RenderProp<Props, State>`, `StateValue<T, State> = T | ((state: State) => T)`,
-  `ViewTransitionClass` (the `transition` prop's type, section 5.2),
+- **Every part has an exported `<Component><Part>State`.** A part that reuses another part's
+  state object exports an alias (`AccordionTriggerState = AccordionItemState`,
+  `SelectTriggerState = SelectRootState`), so a consumer can always name the state of the part
+  they are styling. A state object shared by the Root and some parts may keep a
+  `<Component>State` name next to the per-part aliases (`NumberFieldState` with
+  `NumberFieldRootState`, `NumberFieldInputState`, `NumberFieldLabelState`; `OTPFieldState`). A
+  component whose parts **all** share one state object exports the single `<Component>State`
+  and no aliases (`FieldState`; `ProgressState` / `MeterState`, with `MeterRegion` exported;
+  `AvatarState`). A state with no members is `Record<string, never>`, never an empty
+  `interface`.
+- **A details type is named after its prop**: `<Component>[<Part>]` followed by the prop's
+  name with the `Action` suffix (or the `on` prefix) replaced by `Details`. The part is named
+  when the prop is not on the Root or the single element.
+
+  | Prop | Details type | Examples |
+  | --- | --- | --- |
+  | `<state>ChangeAction`, `on<State>Change` | `<Component>[<Part>]<State>ChangeDetails` | `TabsValueChangeDetails`, `TogglePressedChangeDetails`, `MenuCheckboxItemCheckedChangeDetails`, `MenuRadioGroupValueChangeDetails`, `ComboboxInputValueChangeDetails` (the urgent handler's type keeps the name: it describes the change, not the lane) |
+  | `<state>CommitAction` | `<Component><State>CommitDetails` | `SliderValueCommitDetails`, `NumberFieldValueCommitDetails`, `TextFieldValueCommitDetails`. A commit action is never typed with the change details type; a component with the commit alone (TextField) has no `…ChangeDetails` |
+  | `<event>Action`, `on<Event>` | `<Component><Event>Details` | `OTPFieldCompleteDetails`, `ToastCloseDetails` |
+  | `action` (a pure trigger) | `<Component>[<Part>]ActionDetails` | `ButtonActionDetails`, `MenuItemActionDetails`, `DialogCloseActionDetails`, `PopoverCloseActionDetails`, `DrawerCloseActionDetails`, `AlertDialogCancelActionDetails`. A part that is itself named `Action` does not repeat the word: `AlertDialogActionDetails`, `ToastActionDetails` |
+
+  Every one extends `ActionDetails` and is exported, also when it adds no field. A change or
+  commit details type has `readonly reason: ChangeReason` (2.2; never a local union). A
+  component that reuses another's parts re-exports the types under its own name
+  (`DrawerCloseActionDetails = DialogCloseActionDetails`).
+- **The variants of a props union** are `<Component><Part><Variant>Props`
+  (`AccordionRootMultipleProps` / `AccordionRootExclusiveProps`,
+  `ToggleGroupRootMultipleProps` / `ToggleGroupRootExclusiveProps`,
+  `ComboboxRootSingleProps` / `ComboboxRootMultipleProps`), with the shared base as
+  `<Component><Part>BaseProps`.
+- Shared: `Action`, `ActionDetails`, `ChangeAction`, `UrgentChangeHandler` and `UrgentHandler`
+  (section 2.6), `ChangeReason`, `RenderProp<Props, State>`,
+  `StateValue<T, State> = T | ((state: State) => T)`,
   `WhilePending` (`"run" | "ignore"`, the pure triggers' `whilePending` prop, section 2.5.1,
-  one shared union, never a per-part one, so a later mode is added in one place).
+  one shared union, never a per-part one, so a later mode is added in one place). They are
+  exported from the root entry. The `transition` prop's type is React's own
+  `ViewTransitionClass` (section 5.2), which the library does not re-export.
 - Props interfaces are `interface`s extending the element props (section 1.5); state objects are
-  `interface`s with readonly members. A component whose parts **all share one state object**
-  may export a single `<Component>State` (`FieldState`; `ProgressState` / `MeterState`, with
-  `MeterRegion` exported) instead of one alias per part.
+  `interface`s with readonly members. A set-valued prop is a `readonly string[]` (3.1).
 - A component whose value has two shapes may be **generic** with a default
   (`SliderRootProps<T extends SliderValue = number>`, inferred from `value` / `defaultValue`);
   the shape is fixed at mount (a switch warns in development, like a mode switch).
-- Everything public is exported with `export type`; nothing from `internal/` is public.
+- **Everything a public type names is exported**, with `export type`, from the component's
+  `index.ts` and the root entry: the base and variant interfaces of a props union, and the type
+  of every member (`NumberFieldSource`). Nothing from `internal/` is public.
+
+### 9.5 Errors and development warnings
+
+- **A missing owner throws; a misplaced part warns.** A part rendered outside its Root throws,
+  in every build, one sentence: `` `<Component>.<Part> must be rendered inside a
+  <Component>.Root.` `` (the owner's name where it is not a Root). A part inside its Root but in
+  the wrong container (`MultiSelect.Option` outside the `List`, `Menu.Trigger` in a submenu)
+  still renders and warns in development.
+- **A warning names the part**: the prefix is `<Component>.<Part>: ` (the component alone for a
+  single-element one), never the bare component name for a multi-part component.
+- **A part the consumer must name warns when it has no accessible name** (`use-name-warning.ts`,
+  resolving `aria-label`, `aria-labelledby`, a `<label for>` and a wrapping `<label>`): every
+  form control and every group that has no `Label` part to do it (TextField, `NumberField.Input`
+  without a `NumberField.Label`, Select, Checkbox, Switch, a RadioGroup or CheckboxGroup without
+  a `Label` or `aria-label`, `ToggleGroup.Root`, an OTPField input, a Slider thumb, the
+  Combobox and MultiSelect parts that need one).
 
 ---
 
@@ -2321,8 +2606,8 @@ is a close request:
    composition cancels the composition only.
 2. **Not already consumed**: not `defaultPrevented`, and not taken by another layer of the
    library (rule 3). Innermost first: a handler or layer inside that consumed the Escape (a
-   Combobox chip, a Tooltip that closed on it, an input that clears itself, a TextField or
-   NumberField input that reverted its edited draft) prevented it, and
+   Combobox chip, a Tooltip that closed on it, an input that clears itself, a TextField,
+   NumberField or Combobox input that reverted its edited text) prevented it, and
    nothing outside acts on it. A prevented `keydown` is also no close request for a modal
    dialog's or an `auto` popover's close watcher.
 3. **A listener that closes something shown on it, or consumes it, prevents it**
@@ -2377,21 +2662,35 @@ is a close request:
      dialog inside, `design/components/hover-card.md` 2.6).
 
    A part that handles a key **on itself** (the Combobox chip that has focus, the Menubar's
-   held Trigger, a disabled button with nothing inside to stop the event, a TextField or the
-   NumberField Input with an edited draft) acts in its own handler: it is the innermost by
+   held Trigger, a disabled button with nothing inside to stop the event, a TextField, the
+   NumberField Input or the Combobox Input with edited text) acts in its own handler: it is the innermost by
    construction. So a draft is reverted before any recorded layer decides, a hint that is
    showing included: the Tooltip stays for that Escape and closes on the next.
 
-**A draft reverted on Escape** (TextField, NumberField). An input whose text is a library
-draft reverts it on an Escape request (rules 1 and 2) when the draft's text differs from the
-text of the shown value, and consumes the key (rule 3). With no draft, or one that shows the
-same text, the Escape is not the input's: nothing is consumed and the enclosing layer closes.
-The revert dispatches nothing and cancels nothing in flight.
+**Edited text reverted on Escape** (TextField, NumberField, Combobox). An input whose text is
+the user's unsaved edit of a value reverts it on an Escape request (rules 1 and 2) when the
+text differs from the text of the shown value, and consumes the key (rule 3). With no edit, or
+one that shows the same text, the Escape is not the input's: nothing is consumed and the
+enclosing layer closes. The revert cancels nothing in flight.
+
+- **TextField, NumberField**: the text is a library draft. The revert drops the draft and
+  dispatches nothing.
+- **Combobox** (single selection): the text is the urgent `inputValue`, and "the text of the
+  shown value" is what a blur would leave: the label of the optimistic selection, the committed
+  custom value with `allowCustomValue`, or `""` with no selection. The rule applies **while the
+  listbox is closed**; while it is open, Escape is the listbox's (its close watcher closes it
+  and the text stays), so the first Escape closes the listbox and the second reverts the text.
+  The revert is an urgent write reported to `onInputValueChange` with `reason: "dismiss"`, the
+  reason the blur revert uses, and no value is dispatched. It is not a clear: the selection
+  stays. With `multiple` the text is a search, not an edit of a value, and Escape does not
+  touch it (`design/components/combobox.md` 8).
 
 `internal/escape-key.ts` holds all of it: `isEscapeRequest` (rules 1 and 2),
 `consumeEscape` (rule 3), `decideEscapeLast` and `createEscapeRecord` (rule 4), and
 `isComposingKey` for rule 1
-alone, the IME guard of the listbox and NumberField keys.
+alone: the **one** IME guard of every key handler in the library (the listbox, chip, TextField
+and NumberField keys). It covers `isComposing`, `keyCode === 229` and `key === "Process"`; no
+handler spells the test itself.
 
 Two limits, which a page cannot do better on without a close watcher. On the late path
 (propagation was stopped) the event can no longer be prevented, so a layer **with a close

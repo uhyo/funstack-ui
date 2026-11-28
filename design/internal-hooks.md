@@ -260,17 +260,17 @@ packages/ui/src/internal/
   escape-key.ts           # the Escape rule of the JS handlers (section 15): isEscapeRequest(event) (no IME composition, not prevented, not consumed; an Escape first decides the earlier pending Escapes whose dispatch is over, #195), consumeEscape(event), decideEscapeLast(event, decide, options?) (record, then decide after every listener or after the dispatch; global layers first, then innermost first), createEscapeRecord() (a listener's holder of its pending decisions: record, cancel; a new Escape does not cancel an earlier one), isComposingKey(event); directive-free
   after-dispatch.ts       # afterDispatch(event, callback): after the event's dispatch and default action, a microtask or a task (section 3.8 rule 5, dialog.md 2.6, field-form.md 2.4); returns its cancel; directive-free
   use-latest.ts           # useLatest(value): a ref written in an insertion effect
-  use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2)
+  use-dev-warning.ts      # useDevWarning(condition, isDev && message) (7.2); useModeWarnings(controlled, hasDefault, name): the both-set and mode-switch warnings of every controllable state, urgent ones included (conventions 3.1)
   use-element-check.ts    # useElementCheck(isDev && (el) => ...): the rendered-element dev check, once per instance (7.2)
   use-name-warning.ts     # useNameWarning / useShownNameWarning: the accessible-name dev checks; BUTTON_NAME / TEXT_NAME (7.2); useShownDescriptionWarning (AlertDialog's missing Description, judged over the first showing)
   dev-warn.ts             # warnOnce for directive-free parts
   use-item-order.ts       # section 3.8: the Items' document order in state (CheckboxGroup, ToggleGroup)
   value-set.ts            # set / order arithmetic of the set-valued components; directive-free
   dom-order.ts            # compareDocumentOrder, sortByDocumentOrder; directive-free
-  toolbar-context.ts      # section 7.1: ToolbarContext, read across folders
+  toolbar-context.ts      # section 7.1: ToolbarContext, read across folders: by every library button-like part, for `alwaysFocusable` (conventions 3.6)
   menubar-context.ts      # section 7.1: MenubarContext (the registry of the bar's menus and the switch), read by Menu.Trigger and Menu.Popup
   use-roving-focus.ts     # section 7.4: DOM-written roving tabindex
-  arrow-keys.ts           # resolveArrowKey, focusWithRing (Tabs.List, the roving engine; Accordion.Root uses resolveArrowKey); directive-free
+  arrow-keys.ts           # resolveArrowKey, isPlainKey (the modifier and `defaultPrevented` guard of conventions 3.10), focusWithRing: used by Tabs.List, Accordion.Root, the Menubar and the roving engine alike; directive-free
   details-summary.ts      # the <details> / <summary> pair of Accordion and Collapsible: interceptSummaryClick (the Trigger click rule, accordion.md 2.2), useDetailsCheck / useSummaryCheck (the element checks)
   use-native-focusgroup.ts  # useNativeFocusgroup(flag): the native `focusgroup` detection (section 8)
   announce.ts             # announce(target, message, priority?), canAnnounce(target) (section 8, number-field.md 8.3); directive-free
@@ -314,7 +314,7 @@ packages/ui/src/internal/
     use-field-control.ts  # useFieldControl, useFieldValueChange, fieldInputProps, resolveFieldDefaults (3.8)
     validity.ts, focus-first-invalid.ts # Field helpers; directive-free
     form-status-watcher.tsx # the useFormStatus edge watcher of Form.Root and Dialog.Form
-    hidden-values.tsx     # HiddenValues: one hidden input per value of a set-valued Root (Combobox `multiple`, MultiSelect); directive-free
+    hidden-values.tsx     # HiddenValues: one hidden input per value of a set-valued Root (Combobox `multiple`, MultiSelect), `disabled` while the owner is (conventions 3.6); directive-free
   overlay/                # open state, popups, placement, the modal stack (3.9, 13); imports action/ and flat modules
     use-overlay-root.ts   # useOverlayRoot, OverlayRootValue (section 3.9; Dialog), usePopoverRoot, PopoverRootValue (plus the `shown` mirror; Popover, Menu, Combobox, HoverCard, NavigationMenu.Item), popoverDetails
     use-popover-popup.ts, use-popover-trigger.ts # the shared Popup and Trigger of Popover, Menu, Combobox, NavigationMenu (its Popup passes `elements: ["DIV"]` and `whileShown: listenInvokerPresses`, for its focus-leave close); toggleFromTrigger, the Trigger click rule (popover.md 2.8), also called by Combobox.Trigger. HoverCard uses the Popup hook only, with `quietShow` (every show a no-focus show), `allowOpen` (its "no open until fresh interest" at the `beforetoggle` interception), `elements` (a `<span>` card), `beforeInterestHide` (passed on to `useInterestDismiss`: blur before the lost-interest hide) and `onRoutedOpen`; hover-card.md 12

@@ -28,14 +28,14 @@ Moved to `design/CHANGELOG.md` (part "button.md"). Not part of the contract: the
 | 2 | Action | Bare `action(details)` in the Button's own transition through `useActionTrigger` (conventions 3.4). `data-pending` / `state.pending` while it runs. Without `action` the Button is a plain native button (a `formAction` submitter, an Invoker Command, a link). |
 | 3 | Re-entry | The prop **`whilePending`** (`"run"` \| `"ignore"`, section 18). Default **`"run"`**: every activation runs, nothing is cancelled. With `"ignore"`, a click, Enter or Space while the Button's own `action` (or its own `formAction` submission) is in flight starts nothing and is `preventDefault()`ed, so a link does not navigate, a form does not submit and a command does not run twice. The guard is the Button's **own synchronous in-flight counter only** (section 5.2; the rendered `pending` is not a guard source). |
 | 4 | AT state while pending | Under `whilePending="ignore"`: `aria-disabled="true"` (owned), `data-disabled` **not** set, `state.disabled` unchanged. Under `"run"`: nothing. Never native `disabled`, never `inert`, no `aria-busy`, no announcement. |
-| 5 | Library-wide rule | Every pure trigger has `whilePending`; the default follows who owns the action (conventions 2.5.1): `"run"` for `Button`, `"ignore"` for `Dialog.Close` / `Popover.Close`, `closeOnActivate ? "ignore" : "run"` for `Menu.Item`, `closeOnSettle ? "ignore" : "run"` for `Toast.Action` (sections 16 and 18.4). `Form.Submit` has no guard (section 6.4). |
+| 5 | Library-wide rule | Every pure trigger has `whilePending`; the default follows who owns the action (conventions 2.5.1): `"run"` for `Button`, `"ignore"` for `Dialog.Close` / `Popover.Close`, `closeOnActivate ? "ignore" : "run"` for `Menu.Item` and `Toast.Action` (sections 16 and 18.4). `Form.Submit` has no guard (section 6.4). |
 | 6 | `type` | Default `"button"`; `"submit"` when `formAction` is given. The Button's own `type` prop wins (`"submit"` / `"reset"` allowed); the computed value is owned on a `<button>` and on a **component** `render` element (assumed to render a `<button>`; library-wide in `rendersButton`), and omitted only for a host element of another tag (`<a href>`). `action` with a submitting `type` warns in development. |
 | 7 | `formAction` | First-class pass-through with **per-submitter pending**: latched once `useFormStatus().pending && status.action === <the function this Button submitted with>` has rendered, held until the form status is idle (6.2, #154). `action` and `formAction` together is a development error. Progressive enhancement is React's (a Server Function submits before hydration). |
 | 8 | `disabled` | Native `disabled` (owned) plus `data-disabled`, like `Dialog.Close` / `Form.Submit`. `focusableWhenDisabled` renders `aria-disabled="true"` instead (Base UI's name); it is implied `true` inside a `Toolbar.Root` (APG Toolbar). A host element of another tag (`<a href>`) and a component `render` whose click only the Button's handler acts on take the same `aria-disabled` branch (native `disabled` means nothing on a link and would expose an enabled link to AT). A component or host `<input>` `render` whose click the browser also acts on (a submit or reset `type`, the `formAction` default, `commandfor` / `popoverTarget`; with or without `action`) keeps native `disabled`, the only thing that stops it before hydration (conventions 1.2). Never dispatches either way; a disabled link does not navigate. Native `disabled` wins over the pending `aria-disabled`. |
 | 9 | Toolbar | `Button` reads `ToolbarContext`: a Toolbar's command button is `<Button>`, focusable when disabled there (`aria-disabled`, APG Toolbar). The Toolbar has no button part of its own. One implementation, one name. |
 | 10 | Composition | Button does **not** treat a `defaultPrevented` click as a veto (a Trigger-wrapped Button runs its action); its guard cannot stop an outer part's handler that ran first; `command` / `commandfor` pass through untouched (both the action and the command run on one click). |
 | 11 | Announcement | None in v1; the outcome is the consumer's (toast, Field error, `ariaNotify` in the action). `aria-busy` is pass-through. |
-| 12 | ViewTransition | `transition` on the Button (content keyed on `pending`, the Toggle rule); no `fsui-*` types (as Toolbar). |
+| 12 | ViewTransition | `transition` on the Button: it is a pure trigger, not a value control, and its content is keyed on `pending`, its only state (conventions 5.1); no `fsui-*` types (as Toolbar). |
 | 13 | Directive | `button.tsx` is `"use client"`; no directive-free variant (section 11). |
 | 14 | Types | `ButtonProps`, `ButtonState`, `ButtonActionDetails`. |
 
@@ -629,8 +629,10 @@ a Button inside a Toolbar has the engine's `tabindex`, which the check already a
 ### 7.3 Toolbar: `Button` reads `ToolbarContext`
 
 `Button` reads `ToolbarContext` (`useToolbarContext()`, also read by `ToggleGroup.Root`,
-`Toolbar.Separator` and `Menu.Trigger`), and the Toolbar has no button part of its own: one
-implementation, one name. Inside a `Toolbar.Root` the rule is `focusableWhenDisabled` forced
+`Toolbar.Separator` and by every other library button-like part: `Toggle`, `ToggleGroup.Item`
+and the Triggers of Menu, Popover, Dialog, AlertDialog and Drawer, which are focusable when
+disabled inside a Toolbar exactly as `Button` is, conventions 3.6), and the Toolbar has no
+button part of its own: one implementation, one name. Inside a `Toolbar.Root` the rule is `focusableWhenDisabled` forced
 on, which is why the prop exists: the context only flips its default. A `Button disabled` in a
 toolbar therefore renders `aria-disabled` (APG), stays in the arrow-key sequence and in AT
 discovery, and never dispatches; `action`, `formAction`, `whilePending`, `type` and `data-*`
@@ -705,7 +707,7 @@ already provides, overridable through `announce(state)` (conventions 11).
 `transition` wraps the Button's element in `<ViewTransition default={transition}>` through
 `useTransitionBoundary("Button", …)`, only when given (conventions 5.1). What it animates: the
 commit that ends the action, where `children(state)` keyed on `pending` swaps a spinner for the
-label (the Toggle rule), and a mount / unmount of the Button inside a transition. The click itself
+label (a pure trigger's only state, conventions 5.1), and a mount / unmount of the Button inside a transition. The click itself
 commits nothing. No `fsui-button` types: `useActionTrigger` attaches none, as for Toolbar
 (conventions 5.3). Reduced motion is the consumer's CSS.
 
@@ -819,7 +821,7 @@ defaults are in 18.4 and conventions 2.5.1.
 | `Dialog.Close` | `action`, then the close | yes | prop, default `"ignore"` |
 | `Popover.Close` | `action`, then the hide | yes | prop, default `"ignore"` |
 | `Menu.Item` | `action`, then the menu close | yes | prop, default `closeOnActivate ? "ignore" : "run"` |
-| `Toast.Action` | `action`, then the toast close | yes: an Undo / Retry / View run twice is a duplicate side effect | prop, default `closeOnSettle ? "ignore" : "run"` |
+| `Toast.Action` | `action`, then the toast close | yes: an Undo / Retry / View run twice is a duplicate side effect | prop, default `closeOnActivate ? "ignore" : "run"` |
 | `Slider.Root` (`runStep`) | each step's `valueChangeAction` | **no**: a continuous control dispatches one step per pointer move or key press and every step must run (conventions 2.1, 10.1 "Continuous control"); the hook is used for per-step `pending` and superseded-rejection reporting (`reportError`, conventions 2.4) only | none: every step runs |
 | `NumberField.Root` (`runStep`) | each step's `valueChangeAction` (press-and-hold) | **no**, as Slider | none: every step runs |
 
@@ -890,15 +892,15 @@ part that owns `disabled` and accepts an arbitrary `render`.
 | --- | --- | --- | --- |
 | `Dialog.Close` | native `disabled`, owned | library mode or with `action`; JS-free mode without `action` is the browser's `request-close` command | **yes, when a click handler is installed** (`handlesClick: installClick`). In JS-free command mode a component render must render a `<button>` anyway (dev warning), and native `disabled` is what stops the command; a host link there is `aria-disabled` (it cannot be natively disabled, and it is no invoker), and while disabled the part installs a click handler that only cancels the click (`cancelClick`), so the link does not navigate after hydration. |
 | `Popover.Close` | same | same | same |
-| `Dialog.Trigger` | native `disabled`, owned | library mode or non-modal; JS-free modal mode is the `show-modal` command | same condition (`installClick`) |
-| `Popover.Trigger` | native `disabled`, owned | library mode only; JS-free mode is `toggle-popover` | same condition (library mode) |
-| `Menu.Trigger` | native `disabled`, owned | always (`onClick` + `onKeyDown`) | **yes** |
-| `Toggle` | native `disabled`, owned | always | **yes** |
-| `ToggleGroup.Item` | native `disabled`, owned; roving skips `:disabled` | always | **yes**; a link / component Item that is disabled is then **reachable by the arrows** (the engine skips `:disabled` only), which is the APG Toolbar behaviour and acceptable for the rare non-button Item; row below records it |
+| `Dialog.Trigger` (and AlertDialog's, Drawer's) | native `disabled`, owned; **inside a Toolbar `aria-disabled`** (`alwaysFocusable`, conventions 3.6), with a `cancelClick` handler in JS-free mode | library mode or non-modal; JS-free modal mode is the `show-modal` command | same condition (`installClick`) |
+| `Popover.Trigger` | native `disabled`, owned; inside a Toolbar `aria-disabled`, likewise | library mode only; JS-free mode is `toggle-popover` | same condition (library mode) |
+| `Menu.Trigger` | native `disabled`, owned; inside a Toolbar or a Menubar `aria-disabled` | always (`onClick` + `onKeyDown`) | **yes** |
+| `Toggle` | native `disabled`, owned; inside a Toolbar `aria-disabled` | always | **yes** |
+| `ToggleGroup.Item` | native `disabled`, owned, and no item of the roving engine; inside a Toolbar `aria-disabled` and reached by the arrows | always | **yes**; a link / component Item that is disabled is **reachable by the arrows** in a standalone group too (the engine leaves out `:disabled` only), which is the rule for an `aria-disabled` item (conventions 3.10) |
 | `Combobox.Trigger`, `Combobox.Clear` | native `disabled`, owned (`tabIndex` owned too) | always | **yes** |
 | `NumberField.Increment` / `Decrement` | native `disabled` (also at bound / `readOnly`), owned | always (`useStepButton`) | **yes**; the at-bound case follows the same branch |
 | `Form.Submit` | native `disabled`, owned | only while `disabled` (it cancels the click; an enabled submitter's click is the browser's) | **no** for anything that may be a submitter: no `render`, a host `<button>` or `<input>`, or a component render. With `aria-disabled` alone it would still submit before hydration and on implicit submission, so native `disabled` is the only correct disabled state for a submitter. A host element of another tag (`<a>`, `<div>`) takes the `aria-disabled` branch with the cancelled click (`field-form.md` 4). |
-| `Button` | native `disabled`, owned | always (it cancels the click while disabled) | **yes** when only the Button acts on the click, inside a Toolbar or with `focusableWhenDisabled`; **no** for a component or host `<input>` render whose click the browser acts on (a submit or reset `type`, the `formAction` default, `commandfor` / `popoverTarget`; with or without `action`), as `Form.Submit`; a host element of another tag is always `aria-disabled` (section 4) |
+| `Button` | native `disabled`, owned; inside a Toolbar `aria-disabled` | always (it cancels the click while disabled) | **yes** when only the Button acts on the click, inside a Toolbar or with `focusableWhenDisabled`; **no** for a component or host `<input>` render whose click the browser acts on (a submit or reset `type`, the `formAction` default, `commandfor` / `popoverTarget`; with or without `action`), as `Form.Submit`; a host element of another tag is always `aria-disabled` (section 4) |
 | `Select.Trigger` | native | must stay a `<button>` (conventions 1.2) | no (host button by contract) |
 | `Tabs.Tab`, `Accordion.Trigger`, `Menu.Item`, `Menu.CheckboxItem` / `RadioItem` / `SubmenuTrigger` | `aria-disabled` already | | no change |
 | `Toast.Action`, `Toast.Close` | see `toast.md` (the library `disabled` rule, #157) | always | see `toast.md` |
@@ -944,8 +946,13 @@ so a link does not navigate), exactly as `Button` does.
   never an invoker).
 - The `onClick` guard is `if (disabled) { event.preventDefault(); return; }` in `Toggle`, the
   Close parts and the Triggers, so a disabled link render does not navigate, as `Button`.
-- No new prop: `focusableWhenDisabled` stays Button-only (the Toolbar context read is also
-  Button-only; a Toggle inside a Toolbar keeps native `disabled`, toggle-group.md decision 13).
+- No new prop: `focusableWhenDisabled` stays Button-only. The Toolbar context read is not:
+  every part of this table that can be a Toolbar item (`Button`, `Toggle`, `ToggleGroup.Item`,
+  the Menu, Popover, Dialog, AlertDialog and Drawer Triggers) passes
+  `alwaysFocusable: toolbar !== null`, so all of them are focusable when disabled inside a
+  Toolbar (conventions 3.6, toggle-group.md decision 13). `usePopoverTrigger` already has the
+  option (`Menu.Trigger` uses it in a Menubar); Dialog's Trigger passes it to `disabledButton`
+  itself.
 
 ### 17.3 Test rows per part
 
@@ -1026,8 +1033,8 @@ submission): Enter in a field submits again under `"run"`, is cancelled under `"
 Conventions 2.5.1 has the table. `Dialog.Close`, `Popover.Close` (`useOverlayClose`),
 `Menu.Item` and `Toast.Action` each have `whilePending?: WhilePending` and pass it with their
 default to `usePureTrigger` (16.2), which renders `aria-disabled` from `pending && ignoring`.
-Defaults: Close parts `"ignore"`; `Menu.Item` `closeOnActivate ? "ignore" : "run"`;
-`Toast.Action` `closeOnSettle ? "ignore" : "run"`. Slider and NumberField have no prop: every
+Defaults: Close parts `"ignore"`; `Menu.Item` and `Toast.Action`
+`closeOnActivate ? "ignore" : "run"`. Slider and NumberField have no prop: every
 step runs.
 
 ### 18.5 Tests

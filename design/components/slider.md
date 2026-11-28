@@ -107,9 +107,9 @@ inline styles abbreviated):
 | Part | Element | Role | Renders from | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | `div` | `group` when `values.length > 1`, none otherwise | shown value (section 2.2), pending, dragging | Owns `useId`, the commit hook, the step transition, `live` and `stepHeld`, the gesture, the Thumb registry, form reset and mount reconciliation. `aria-labelledby` → the `Label` id while one is mounted (token-merged with the consumer's). Custom properties `--slider-start`, `--slider-end`, `--slider-value-<i>`. `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`. |
-| `Label` | `label` | | | `id` → the Root's `aria-labelledby` (several thumbs); `for` → the only thumb's input (one thumb). Registers with the Root from a layout effect, as Combobox's Label. |
-| `Track` | `div` | none | orientation | The rail. Owns `onPointerDown` (a press moves the nearest thumb and starts its drag); inline `touch-action`. Its box is the geometry reference for pointer math. `data-orientation`, `data-disabled`. |
-| `Indicator` | `span` | none | | The fill between the first and last thumb (from `min` to the value for one thumb). Renders no inline position: it is placed by the consumer's CSS from `--slider-start` / `--slider-end`. `data-orientation`, `data-disabled`. |
+| `Label` | `label` | | Root disabled and pending | `id` → the Root's `aria-labelledby` (several thumbs); `for` → the only thumb's input (one thumb). Registers with the Root from a layout effect, as Combobox's Label. `data-disabled`, `data-pending` (the owner's, conventions 4.1 rule 4). |
+| `Track` | `div` | none | orientation | The rail. Owns `onPointerDown` (a press moves the nearest thumb and starts its drag); inline `touch-action`. Its box is the geometry reference for pointer math. `data-orientation`, `data-dragging`, `data-disabled` (every boolean and enum of its state, conventions 4.1 rule 2). |
+| `Indicator` | `span` | none | | The fill between the first and last thumb (from `min` to the value for one thumb). Renders no inline position: it is placed by the consumer's CSS from `--slider-start` / `--slider-end`. `data-orientation`, `data-dragging`, `data-disabled`. |
 | `Thumb` | `span` **containing** `input[type=range]` | the input is the `slider` | shown value for its `index` | `index` (default `0`). The span: `data-index`, `data-orientation`, `data-dragging`, `data-pending`, `data-disabled`, `--slider-value`, inline `touch-action`, `onPointerDown`. The input: `id`, `name`, `form`, `min` / `max` (neighbours), `step`, `value` (shown), `disabled`, `aria-label` / `aria-labelledby` / `aria-describedby` (forwarded from the Thumb's props), `aria-valuetext`, the vertical `writing-mode`, the hidden-input style, the library's `onChange`, native `change` and `keydown` listeners. `inputRef` reaches it. |
 | `Value` | `span` | none | shown value | Displays the value: `children(state)`, or the thumb at `index`, or the single value as text. Not `<output>` (research §2: a `status` live region that updates per step chatters). |
 
@@ -349,6 +349,8 @@ export interface SliderRootState<T extends SliderValue = number> {
   readonly dragging: boolean;
   readonly orientation: SliderOrientation;
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid` on Root and Thumb). `false` outside. */
+  readonly invalid: boolean;
   readonly min: number;
   readonly max: number;
   readonly step: number;
@@ -477,6 +479,7 @@ export interface SliderTrackProps
 }
 
 export type SliderIndicatorState = SliderTrackState;
+export type SliderLabelState<T extends SliderValue = SliderValue> = SliderRootState<T>; // every part has a state type (conventions 9.4)
 export interface SliderIndicatorProps
   extends Omit<ComponentPropsWithRef<"span">, "className" | "style" | "children"> { … }
 

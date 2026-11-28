@@ -217,9 +217,9 @@ Rendered HTML (closed, the value is `["ham", "olive"]`; ids come from one `useId
 | Part | Element | Role | Renders from | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none; one `input[type=hidden]` per value when `name` is given | | optimistic value | Owns `useId`, the value (set-valued `useControllableAction`), the open state (`usePopoverRoot`, library mode), the active option, the Option and Status registries, the label cache, the form-reset listener. No `ref`, `className`, `style`. Hidden inputs as combobox.md 15.8. |
-| `Label` | `label` | | | `for` → the Trigger's id; `id` → the List's `aria-labelledby`. Its click focuses the Trigger and does **not** open the listbox (B.8). |
+| `Label` | `label` | | Root disabled and pending | `for` → the Trigger's id; `id` → the List's `aria-labelledby`. `data-disabled`, `data-pending` (the owner's, conventions 4.1 rule 4). Its click focuses the Trigger and does **not** open the listbox (B.8). |
 | `Trigger` | `button` | `combobox` | optimistic value and open; shown open for `aria-expanded` | The one Tab stop and the owner surface. `type="button"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `aria-required`, `popovertarget` after hydration, `data-open`, `data-pending`, `data-disabled`. Content must not be interactive. With `required` it renders the validity element right after itself (B.10). |
-| `Value` | `span` | none | optimistic value, label cache | Inside `Trigger`. Shows the selection, or `placeholder` while it is empty; `data-placeholder` while the selection is empty, with or without `children`. Optional: any Trigger content rendered from state works. |
+| `Value` | `span` | none | optimistic value, label cache | Inside `Trigger`. Shows the selection, or `placeholder` while it is empty; `data-empty` (`state.empty`) while the selection is empty, with or without `children`; `data-disabled`. Optional: any Trigger content rendered from state works. |
 | `Popup` | `div` | none | committed open | `popover="auto"`, inline placement; the content region; `keepMounted`, `transition`. As `Combobox.Popup`. |
 | `List` | `div` | `listbox` | registries | `aria-multiselectable="true"`, `aria-labelledby`, `aria-busy="true"` while loading, `data-empty`. Owns only `Option`s and `Group`s. |
 | `Option` | `div` | `option` | optimistic and committed value, urgent active | `value` required; `label` optional (typeahead text and the label cache; default the trimmed `textContent`); `disabled` → `aria-disabled`. `aria-selected` on every option, `data-selected`, `data-active`, `data-pending`, `data-disabled`. Never focused. |
@@ -306,9 +306,9 @@ export interface MultiSelectRootState {
 
 export interface MultiSelectRootProps {
   /** Controlled selection. `[]`: nothing selected. `undefined`: uncontrolled. Duplicates are ignored. */
-  value?: string[];
+  value?: readonly string[];
   /** Initial selection in uncontrolled mode. Default `[]`. Also the form-reset target (latest value). */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Runs inside the Root's transition for every change of the selection. `next` is the whole
    * intended selection as a fresh array; `details.added` / `details.removed` say what this
@@ -341,6 +341,8 @@ export interface MultiSelectTriggerState {
   readonly open: boolean;      // optimistic
   readonly pending: boolean;   // Root pending
   readonly disabled: boolean;
+  readonly invalid: boolean;   // the Field shows an error (`data-invalid`); `false` outside a Field
+  readonly required: boolean;  // own or the Field's (`data-required`: a button has no `:required`)
 }
 export interface MultiSelectTriggerProps
   extends Omit<
@@ -362,7 +364,8 @@ export interface MultiSelectValueState {
   readonly value: readonly string[];
   /** For each value, the text of its option as the library last saw it; `undefined` if it never saw one. */
   readonly labels: readonly (string | undefined)[];
-  readonly disabled: boolean;
+  readonly empty: boolean;     // `value.length === 0` (`data-empty`)
+  readonly disabled: boolean;  // `data-disabled`
 }
 export interface MultiSelectValueProps
   extends Omit<ComponentPropsWithRef<"span">, "className" | "style" | "children"> {
@@ -485,8 +488,10 @@ function, where it has its own list. Every comparison the library makes is set e
 ```
 
 - **Default content**: `placeholder` while the selection is empty, else each value's label
-  joined with `", "`. The span carries `data-placeholder` whenever the selection is empty, also
-  with function `children` (a styling hook for "nothing chosen"). The separator is
+  joined with `", "`. The span carries `data-empty` whenever the selection is empty, also
+  with function `children`: the library's one word for "the value is empty" (conventions 4.1),
+  the attribute `Combobox.Input` and `Combobox.Chips` carry for the same condition. There is no
+  `data-placeholder`. The separator is
   punctuation, not a word, and is replaced by passing `children`; it is not a built-in string
   under conventions 11.
 - **Labels come from the label cache** (combobox.md 2.3): the text of every Option the Root
@@ -630,9 +635,11 @@ No announcement is built in. Toggling changes `aria-selected` on the element
   outside the registered element (field-form.md 7.1), and `Field.Error` shows the message in
   the page. `Field.Label` focuses a `<button>` control without activating it, as `Label`
   does (field-form.md 4.2). `name`, `disabled` and `required` default from the Field.
-- **`disabled`** on the Root disables the Trigger natively; nothing opens or dispatches. The
-  hidden inputs still post, as Combobox's (combobox.md 11.1). Trade-off: a disabled native
-  select posts nothing; a consumer who wants that wraps the component in `<fieldset disabled>`.
+- **`disabled`** on the Root (its own prop or the Field's) disables the Trigger natively;
+  nothing opens or dispatches. **A disabled MultiSelect is not submitted** (conventions 3.6):
+  every hidden input renders `disabled`, the unnamed one of an empty selection included, as a
+  disabled native `<select multiple>` posts nothing. A disabled input is still form-associated,
+  so the reset listener and the Field registration are unaffected.
   The validity element is disabled with the Trigger, so a disabled MultiSelect is never
   `valueMissing`.
 - **Without `name`** the form reset still reaches the Root: the reset listener follows the
@@ -690,7 +697,7 @@ No announcement is built in. Toggling changes `aria-selected` on the element
   ```css
   .select[data-open] { outline: 2px solid Highlight; }
   .select[data-pending] { cursor: progress; }
-  .select [data-placeholder] { color: GrayText; }
+  .select [data-empty] { color: GrayText; }               /* MultiSelect.Value: nothing chosen */
   .select[data-invalid] { border-color: var(--danger); }   /* inside a Field */
   ```
 

@@ -97,7 +97,7 @@ Rendered HTML (JS-free mode; the id comes from one `useId` per Item):
 | --- | --- | --- | --- |
 | `Root` | `nav` | none | Structure only. Name it (`aria-label`) when the page has more than one `nav`. |
 | `List` | `ul` | none | Renders `role="list"`, so the list semantics survive `list-style: none` in Safari. |
-| `Item` | `li` | `state.open` (optimistic), `state.pending` in the function props; no attributes | The owner of one flyout: `useId`, the open state (`usePopoverRoot`), the focus-leave rule. An Item with only a `Link` in it is a plain `li`. |
+| `Item` | `li` | `data-open` (optimistic) and `data-pending` in library mode, with `state.open` / `state.pending` (the owner carries its state as attributes, as `Accordion.Item` and `Collapsible.Root` do; conventions 4.1, 4.3). JS-free mode: neither attribute, `state.open` `false` (style with `:has(:popover-open)`) | The owner of one flyout: `useId`, the open state (`usePopoverRoot`), the focus-leave rule. An Item with only a `Link` in it is a plain `li`. |
 | `Trigger` | `button` | `data-open` (optimistic in library mode; DOM-synced from `toggle` in JS-free mode), `data-pending` (library mode), `data-disabled` | `usePopoverTrigger`: `popovertarget`, no `aria-expanded`. |
 | `Popup` | `div` | `data-side`, `data-align` (resolved while shown); no `data-open` (`:popover-open`) | `usePopoverPopup`: `id`, `popover="auto"`, inline placement. No role. Children from committed state in library mode. |
 | `Link` | `a` | none | Inside a Popup, following it closes the panel (section 4). Anywhere else it is a plain `a`. `render` substitutes a router link. |
@@ -307,8 +307,8 @@ export interface NavigationMenuOpenChangeDetails extends ActionDetails {
 }
 
 export interface NavigationMenuItemState {
-  readonly open: boolean;     // optimistic (library mode); `false` in JS-free mode
-  readonly pending: boolean;  // library mode
+  readonly open: boolean;     // optimistic, `data-open` (library mode); `false` in JS-free mode (conventions 4.1 rule 3)
+  readonly pending: boolean;  // `data-pending` (library mode)
 }
 
 export interface NavigationMenuItemProps
@@ -342,7 +342,8 @@ export interface NavigationMenuItemProps
   `true`), `render`, and the function props of an empty state. No owned keys.
 
 An `Item`'s own `focusout` listener is attached through the ref as well, so `onBlur` is not
-owned.
+owned. Its owned keys are `data-open` and `data-pending`. Every part's JSDoc has its "Owned
+keys" line, `Item` and `List` included (conventions 1.5).
 
 ---
 

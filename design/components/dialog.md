@@ -79,7 +79,7 @@ Rendered HTML (JS-free mode; ids come from one `useId` in Root):
 | Part | Element | Role (native) | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.pending`, `state.open` (optimistic), `state.modal` in `children(state)` | Owns `useId`, mode, `modal`, the state hook and context. No `ref`, `className`, `style`. |
-| `Trigger` | `button` | button | `data-open` (optimistic), `data-pending` (library mode); `data-disabled` whenever disabled, in every mode (wave 9, 5fc05d5: the styling hook agrees with `disabled` / `aria-disabled` in JS-free mode too); otherwise nothing in JS-free mode | `commandfor` + `command="show-modal"`. Not an `aria-expanded` invoker (APG does not require one; research "Invoker state"). |
+| `Trigger` | `button` | button | `data-open` (optimistic in library mode; DOM-synced from the dialog's `toggle` in JS-free mode), `data-pending` (library mode); `data-disabled` whenever disabled, in every mode (the styling hook agrees with `disabled` / `aria-disabled` in JS-free mode too) | `commandfor` + `command="show-modal"`. Not an `aria-expanded` invoker (APG does not require one; research "Invoker state"). |
 | `Popup` | `dialog` | `dialog` (`aria-modal` from `showModal()`) | `data-modal`; no `data-open` (`:open`, `:modal`) | Carries `id`, `aria-labelledby`, `aria-describedby`, `closedby` (flag). The content region: children render from committed state in library mode. |
 | `Close` | `button` | button | `data-pending` (when `action` runs) | `command="request-close"`; `value` becomes `returnValue`. |
 | `Form` | `form` | form | none | `method="dialog"` or `action` + watcher. |
@@ -134,7 +134,8 @@ committed content. One anatomy, two modes, chosen by the Root's props (research,
 | Close by a part (Close, Form, foreign close command, controlled `open={false}`) | Browser | Library: click / submit / command intercepted, dispatch inside the Root's transition, `close(returnValue)` in a layout effect of the commit that ends it (2.3) |
 | Dismissal (Escape, back, AT dismiss, light dismiss) | Browser | Browser; a fact: committed `false` urgently and `onOpenChange(false)` called from the `close` event (2.7) |
 | Content | Always mounted | Rendered from committed `open`; unmounted while closed unless `keepMounted` |
-| `data-open`, `data-pending` on Trigger | never emitted (use `:open` on the dialog) | emitted |
+| `data-open` on Trigger | **DOM-synced**: written from the `<dialog>`'s `toggle` event (reading `dialog.open`), as Popover's and NavigationMenu's Triggers do from their popup's (conventions 7.4), so `[data-open]` on a Trigger styles both modes. `state.open` stays `false` (conventions 4.1 rule 3) | optimistic, rendered |
+| `data-pending` on Trigger | never emitted (nothing pends) | emitted |
 | `openChangeAction` | n/a | requests only: awaited for `true` and for a part-initiated `false` |
 | `onOpenChange` | n/a | facts only: called synchronously for a dismissal, not awaited |
 | Works before hydration | yes | the native open happens; the library reconciles on mount (2.4) |
@@ -625,7 +626,10 @@ and a boolean is what every consumer will branch on; see open question 4).
 
 ```ts
 export interface DialogTriggerState {
-  /** Optimistic open state (library mode); `false` in JS-free mode. */
+  /**
+   * Optimistic open state (library mode); `false` in JS-free mode, where React holds no value
+   * (conventions 4.1 rule 3) while the `data-open` attribute follows the dialog's `toggle`.
+   */
   readonly open: boolean;
   /**
    * The Root's transition is pending: an open or a part-initiated close in flight (section 4.2).
@@ -635,8 +639,15 @@ export interface DialogTriggerState {
 }
 
 export interface DialogTriggerProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "className" | "style" | "children"> {
-  /** Native `disabled`: a disabled button is not a valid invoker and never dispatches. */
+  extends Omit<
+    ComponentPropsWithRef<"button">,
+    "onClick" | "type" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "aria-disabled" | "className" | "style" | "children"
+  > {
+  /**
+   * Native `disabled`: a disabled button is not a valid invoker and never dispatches. Inside a
+   * `Toolbar.Root`: `aria-disabled="true"` instead, focusable and in the arrow sequence, with
+   * no invoker attribute (conventions 3.6).
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, DialogTriggerState>;
   style?: StateValue<CSSProperties | undefined, DialogTriggerState>;
@@ -654,9 +665,18 @@ mode, #116), and `onClick` **only when installed**
 installs no handler, owns no `onClick`, and a `render` element's own `onClick` passes through.
 `onClick` is still omitted from the props type because the library installs it in the other
 modes (prop form, as Accordion's Trigger; the handler is not feature-detected away, so the
-Tooltip `addEventListener` route buys nothing here). Native `disabled` is used, not `aria-disabled`: the APG dialog pattern
+Tooltip `addEventListener` route buys nothing here). **Every owned key is omitted from the
+props type** (conventions 1.5): `type`, `commandfor`, `command`, the `popoverTarget` pair (a
+dialog Trigger is a command invoker, never a popover one) and `aria-disabled`, as on
+`Popover.Trigger`; passing one is a type error, not a silently overwritten prop. In JS-free
+mode the Trigger also keeps `data-open` current with a DOM write from the dialog's `toggle`
+event through its ref (the `<dialog>` is found by the `commandfor` id; conventions 7.4).
+Native `disabled` is used, not `aria-disabled`: the APG dialog pattern
 has no focusable-disabled requirement for the opener, and a natively disabled button is already
-not an invoker, so the JS-free mode gets `disabled` for free. `disabled` is owned (conventions
+not an invoker, so the JS-free mode gets `disabled` for free. The exception is a Trigger inside
+a `Toolbar.Root`, which is `aria-disabled` (the APG Toolbar's requirement, conventions 3.6):
+`disabledButton(..., { alwaysFocusable: toolbar !== null })`, which removes the invoker
+attributes and, in JS-free mode, installs the click canceller. `disabled` is owned (conventions
 1.2): a `render` element can neither re-enable a disabled Trigger (in JS-free mode the browser
 would run its command) nor disable an enabled one. Conventions 3.6 ("never disabled while
 pending") still holds: the library never sets `disabled` itself.
@@ -673,7 +693,7 @@ export interface DialogPopupState {
 export interface DialogPopupProps
   extends Omit<
     ComponentPropsWithRef<"dialog">,
-    "id" | "open" | "closedby" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"
+    "id" | "open" | "popover" | "closedby" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"
   > {
   /**
    * Library mode: what happens to the children while the dialog is closed.
@@ -751,7 +771,7 @@ export interface DialogCloseState {
 export interface DialogCloseProps
   extends Omit<
     ComponentPropsWithRef<"button">,
-    "onClick" | "value" | "className" | "style" | "children"
+    "onClick" | "value" | "type" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "aria-disabled" | "className" | "style" | "children"
   > {
   /**
    * Runs inside this part's own transition (`data-pending` on the button), then closes the
@@ -764,7 +784,7 @@ export interface DialogCloseProps
    * nothing. Without `action` in JS-free mode the button is a native `command="request-close"`
    * invoker.
    */
-  action?: Action<[details: DialogCloseDetails]>;
+  action?: Action<[details: DialogCloseActionDetails]>;
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the dialog
@@ -783,15 +803,16 @@ export interface DialogCloseProps
   render?: RenderProp<ComponentPropsWithRef<"button">, DialogCloseState>;
 }
 
-export interface DialogCloseDetails extends ActionDetails {
+/** A pure trigger's details: `<Component><Part>ActionDetails` (conventions 9.4). */
+export interface DialogCloseActionDetails extends ActionDetails {
   /** The `value` the dialog closes with (`dialog.returnValue`); `""` without `value`. */
   readonly returnValue: string;
 }
 ```
 
 Owned keys: `type`, `commandfor`, `command` (neither rendered with `action`), `value`,
-`disabled`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled` (`disabled` is owned on every part that takes
-the prop, conventions 1.2). In library mode the click is always `preventDefault()`ed (which
+`disabled`, `aria-disabled`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled` (`disabled` is owned on every part that takes
+the prop, conventions 1.2). All of them are omitted from the props type (conventions 1.5). In library mode the click is always `preventDefault()`ed (which
 cancels the `request-close` command) and the close goes through the Root (2.3), always from
 inside the part's own transition (the shared `useActionTrigger`, conventions 3.4): without
 `action`, `run(() => requestClose(event, "activate", value ?? ""))`, the request made

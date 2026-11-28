@@ -25,7 +25,7 @@ called out.
 | 4 | Next value | `next = !optimistic`, not `!committed`, so a second click while pending reverses the first (verified). |
 | 5 | Disabled while pending | **No.** The button stays enabled; repeated clicks are latest-wins. Consumers who want it use `render` or CSS (section 6.6). |
 | 6 | Errors | Reach the nearest Error Boundary above the `Toggle`; a superseded (non-latest) dispatch's rejection is passed to `reportError` by the shared hook instead, because React would drop it (conventions 2.4, #145). Optimistic state reverts; uncontrolled committed state untouched. |
-| 7 | ViewTransition | `<ViewTransition default={transition}>` outermost, **only when `transition` is given** (conventions 5.1, #35); no boundary otherwise; types `fsui-toggle` plus `fsui-toggle-press` / `fsui-toggle-release`. It animates the *settling* of an action and rollbacks, **not the optimistic flip** (section 7, verified). |
+| 7 | ViewTransition | **No `transition` prop and no boundary**: a Toggle is a value control whose attributes are all optimistic (conventions 5.1). The flip animates with CSS on `[data-pressed]`. Every dispatch still adds the types `fsui-toggle` plus `fsui-toggle-press` / `fsui-toggle-release`, for a consumer's own `<ViewTransition>` (section 7). |
 | 8 | ARIA | `aria-pressed="true" \| "false"` only; never `"mixed"`. Native Space/Enter. Accessible name must stay stable across states. |
 | 9 | Forms | `type="button"` always; no `name`/`value` submission in v0. |
 | 10 | Files | `src/toggle/{index.ts,toggle.tsx,toggle.test.tsx}`; `toggle.tsx` is `"use client"`. Exports `Toggle`, `ToggleProps`, `ToggleState`, `TogglePressedChangeDetails`. |
@@ -35,8 +35,7 @@ called out.
 ## 1. Anatomy
 
 ```
-<ViewTransition default={transition}>    React boundary, no DOM; rendered only when `transition` is set
-  <button type="button" aria-pressed>    the only element; consumer's children inside
+<button type="button" aria-pressed>    the only element; consumer's children inside
 ```
 
 Toggle renders exactly one DOM element. It is simultaneously the state owner, the trigger, and
@@ -189,13 +188,20 @@ a `<div>` or `<a>` behave like one, and there is no legitimate "toggle link".
 form so that selectors look the same across components (`data-selected`, `data-expanded`).
 Tailwind: `data-pressed:bg-accent data-pending:animate-pulse`.
 
-### 2.8 `transition` and transition types
+### 2.8 Transition types, and no `transition` prop
+
+A Toggle has no `transition` prop (section 7). The flip is animated with a plain CSS
+`transition` on `[data-pressed]`, as in 2.7. What a view transition can animate is the commit
+that **ends** the action, and the consumer who wants that wraps the content in their own
+boundary, keyed on the types every dispatch adds:
 
 ```tsx
-<Toggle pressedChangeAction={save} transition="fsui-fade">
-  {({ pending }) => (pending ? <Spinner aria-hidden /> : <StarIcon aria-hidden />)}
-  Favorite
-</Toggle>
+<ViewTransition default={{ "fsui-toggle": "fsui-fade", default: "none" }}>
+  <Toggle pressedChangeAction={save}>
+    {({ pending }) => (pending ? <Spinner aria-hidden /> : <StarIcon aria-hidden />)}
+    Favorite
+  </Toggle>
+</ViewTransition>
 ```
 
 ```css
@@ -212,17 +218,13 @@ Tailwind: `data-pressed:bg-accent data-pending:animate-pulse`.
 }
 ```
 
-Read section 7 before reaching for this: on a Toggle, `<ViewTransition>` animates the commit
-that ends the action (the spinner going away, a rollback), not the initial flip. The flip itself
-is best animated with a plain CSS `transition` on `[data-pressed]` as in 2.7.
-
 ---
 
 ## 3. Props
 
 ```ts
 // packages/ui/src/toggle/toggle.tsx
-import type { ComponentPropsWithRef, CSSProperties, ReactNode, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { ActionDetails, ChangeAction, RenderProp, StateValue } from "../internal/types.js";
 
 export interface ToggleState {
@@ -236,8 +238,12 @@ export interface ToggleState {
 
 /** Details passed as the second argument of `pressedChangeAction`. */
 export interface TogglePressedChangeDetails extends ActionDetails {
-  // v0 adds nothing beyond `event`; the interface exists so fields can be added without a
-  // breaking change (e.g. a `reason` if a ToggleGroup ever dispatches on an item's behalf).
+  /**
+   * Always `"activate"`: a button has no platform path (no form reset, no find-in-page). The
+   * field exists because every change details type has it (conventions 2.2), so one handler
+   * types against every component.
+   */
+  readonly reason: ChangeReason;
 }
 
 export interface ToggleProps
@@ -254,10 +260,11 @@ export interface ToggleProps
    * transition; may be sync or async. Rejections reach the nearest Error Boundary.
    */
   pressedChangeAction?: ChangeAction<boolean, TogglePressedChangeDetails>;
-  /** Renders a native disabled button; never dispatches. Default `false`. */
+  /**
+   * Never dispatches. A native disabled button; inside a `Toolbar.Root`, `aria-disabled="true"`
+   * instead, so the button stays in the toolbar's arrow sequence (conventions 3.6). Default `false`.
+   */
   disabled?: boolean;
-  /** Forwarded as `default` to the Toggle's `<ViewTransition>`. Default `"none"`. */
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, ToggleState>;
   style?: StateValue<CSSProperties | undefined, ToggleState>;
   children?: StateValue<ReactNode, ToggleState>;
@@ -511,7 +518,7 @@ Consumers who want it anyway have two supported spellings:
 | Case | Behaviour |
 | --- | --- |
 | `pressed` prop changes externally while an action is pending | The optimistic reducer rebases onto the new committed value and still returns `next`; after settle the Toggle shows whatever `pressed` is then. No error. |
-| Controlled parent never updates `pressed` (veto, or forgot to) | After the action settles the button snaps back to `pressed`. This is the intended veto path. The snap-back commit is a transition commit and animates if `transition` is set (section 7). |
+| Controlled parent never updates `pressed` (veto, or forgot to) | After the action settles the button snaps back to `pressed`. This is the intended veto path. The snap-back commit is a transition commit: a consumer's own boundary around the Toggle animates it (section 7). |
 | Controlled parent updates after `await` **without** `startTransition` | The update still happens (it is an urgent update), so the value is right. Lost: ViewTransition for that commit, and the update is not held with the action, so it can commit one frame earlier than `data-pending` clears. Documented as the post-await rule. |
 | Toggle unmounts while pending | The action keeps running; the post-await write targets an unmounted component and React ignores it. Nothing to clean up. |
 | Action throws synchronously | Same path as a rejection (the async wrapper turns it into one). |
@@ -523,21 +530,21 @@ Consumers who want it anyway have two supported spellings:
 
 ## 7. ViewTransition
 
-### 7.1 Wiring
+### 7.1 No boundary, types only
 
-```tsx
-// conventions 5.1 (#35): no boundary unless the consumer asked for one
-return transition === undefined
-  ? element /* the <button> */
-  : <ViewTransition default={transition}>{element}</ViewTransition>;
-```
+The Toggle renders its `<button>` and nothing around it. It has **no `transition` prop**: it is
+a value control whose attributes are all optimistic, so nothing in it mounts from library state
+and the flip lands in a sync render that no view transition sees (7.2). That is the library's
+one rule for value controls (conventions 5.1): Checkbox, Switch, the radio and checkbox group
+items, `ToggleGroup.Item`, Select, Slider and the text controls have none either.
 
 Types added on every dispatch: `fsui-toggle` and `fsui-toggle-press` (`next === true`) or
 `fsui-toggle-release` (`next === false`), per conventions 5.3.
 
 ### 7.2 What actually animates (verified, React 19.3.1)
 
-The probe polyfills `document.startViewTransition` in jsdom and counts calls per commit:
+What a consumer's own `<ViewTransition>` around a Toggle sees. The probe polyfills
+`document.startViewTransition` in jsdom and counts calls per commit:
 
 | Commit | Lane | View transition started? | Types on it |
 | --- | --- | --- | --- |
@@ -559,20 +566,18 @@ Consequences for Toggle's docs:
 
 - **The flip is a CSS-transition job.** `[data-pressed] { transition: ... }` animates it on the
   sync commit, and also on the rollback. This is the natural tool for a button's own visuals.
-- **`transition` is for the end of the action**: the pending indicator disappearing, content
-  rendered from `pending` swapping back, a snap-back after a veto, and any content change the
-  parent makes in the same transition. Documented with 2.8's example, which keys the content on
-  `pending`, not on `pressed`.
-- Type-map users must supply a `default` entry if they want rollbacks animated, because the
+- **A view transition is for the end of the action**: the pending indicator disappearing,
+  content rendered from `pending` swapping back, a snap-back after a veto, and any content
+  change the parent makes in the same transition. The consumer's own boundary does it, as in
+  2.8's example, which keys the content on `pending`, not on `pressed`.
+- A type map on that boundary needs a `default` entry if rollbacks should animate, because the
   snap-back commit carries no types.
-- With `transition` unset no boundary is rendered, so nothing changes and no document view
-  transition can start, even when the Toggle itself mounts in a transition (`{show && <Toggle/>}`).
-  With any value set, such a mount runs the page cross-fade (conventions 5.1); `transition` is
-  static (switching between unset and set remounts the button).
+- The Toggle itself never starts a document view transition, also when it mounts in a
+  transition (`{show && <Toggle/>}`): it renders no boundary.
 
 ### 7.3 Reduced motion
 
-The library ships no animation; every `transition` example in the Toggle docs carries the
+The library ships no animation; every view-transition example in the Toggle docs carries the
 `prefers-reduced-motion` block from conventions 5.4.
 
 ---
@@ -595,8 +600,8 @@ Toggle has no content region, so the Suspense story is entirely on the consumer'
 ## 9. Server Components
 
 `toggle.tsx` is a `"use client"` file. A Server Component may render `<Toggle>` with
-serializable props (`defaultPressed`, `disabled`, `className` as a string, `children` as JSX,
-`transition`) and a Server Function as `pressedChangeAction`:
+serializable props (`defaultPressed`, `disabled`, `className` as a string, `children` as JSX)
+and a Server Function as `pressedChangeAction`:
 
 ```tsx
 // Server Component

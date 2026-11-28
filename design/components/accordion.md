@@ -14,11 +14,11 @@ find-in-page, `interpolate-size`, `@starting-style`), probes in `memo/architect/
 | --- | --- | --- |
 | 1 | Primitive | `<details>`/`<summary>`. `Accordion.Item` is the `<details>`, `Accordion.Trigger` the `<summary>`, `Accordion.Panel` a `<div>` inside. No `Header` part: a heading goes *inside* the Trigger (`<summary><h3>`), the only valid place. |
 | 2 | Two modes, one anatomy | **JS-free mode** (Root has none of `value`/`defaultValue`/`valueChangeAction`): the browser owns `open`, no handler runs on toggle, `exclusive` renders `name`. **Library mode** (any of the three present): the library intercepts the summary click (`preventDefault`), `open` is driven by React committed state inside a transition, triggers render optimistic `data-open`, `valueChangeAction` is awaited. |
-| 3 | Value type | Discriminated on `exclusive`: `exclusive` → `string \| null`; otherwise `string[]`. |
+| 3 | Value type | Discriminated on `exclusive`: `exclusive` → `string \| null`; otherwise `string[]` (the flag names the non-default mode, conventions 3.1). `details` is the set diff `{ reason, added, removed }` in both modes (conventions 2.2); in exclusive mode `removed` names the item the change closed implicitly. |
 | 4 | Pending UI | Trigger and Item: `data-open` (optimistic) and `data-pending`. The `<details open>` attribute, `:open`, `::details-content` and the native marker follow committed state. Consumers draw their own chevron from `data-open`. |
 | 5 | Platform-initiated opens | Find-in-page and text fragments open a closed `<details>` natively in all engines. Library mode listens to `toggle`, dispatches `valueChangeAction` with `reason: "platform"`, and re-applies committed state to the DOM once the action settles. No `hidden="until-found"` needed. |
-| 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item, Trigger and Panel in library mode, animating only the settling commit (layout/cross-fade of the whole list); the optimistic `data-open` flip is a CSS transition; not both on the same change. No `keepMounted`: `<details>` keeps content mounted and auto-opens on find-in-page natively. `experimental_interpolateSize` on Root. |
-| 7 | Keyboard | Enter/Space native on `<summary>`. Up/Down/Home/End between triggers is implemented by Root in both modes (APG: optional; we ship it). No `focusgroup` flag (it would collapse the Tab stops). |
+| 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item, Trigger and Panel in library mode (types `fsui-accordion-open` / `-close`), animating only the settling commit (layout/cross-fade of the whole list); the optimistic `data-open` flip is a CSS transition; not both on the same change. No `keepMounted`: `<details>` keeps content mounted and auto-opens on find-in-page natively. `experimental_interpolateSize` on Root. |
+| 7 | Keyboard | Enter/Space native on `<summary>`. Up/Down/Home/End between triggers is implemented by Root in both modes (APG: optional; we ship it), under the rules of conventions 3.10: disabled (`aria-disabled`) triggers are in the sequence, keys with Alt / Ctrl / Meta are the browser's, `loop` (default `true`). No `focusgroup` flag (it would collapse the Tab stops). |
 | 8 | RSC | All four parts are `"use client"` files (Flight cannot read context in a Server Component). A Server Component renders them freely; JS-free mode needs no interaction JS, works before hydration and with JS off, but the parts' code is in the client bundle. One anatomy: "JS-free" means no behaviour JS and works without hydration; a directive-free `@funstack/ui/accordion/native` is a recorded, unscheduled plan (conventions 7.3). |
 
 ---
@@ -42,7 +42,7 @@ import { Accordion } from "@funstack/ui/accordion";
 
 | Part | Element | Role (native) | Library state rendered |
 | --- | --- | --- | --- |
-| `Root` | `div` | none | `data-pending`, `data-disabled` |
+| `Root` | `div` | none | `data-pending`, `data-disabled`; `state.value` (optimistic) |
 | `Item` | `details` | `group` | `data-open` (optimistic), `data-pending`, `data-disabled`; `open` attribute (committed, library mode) |
 | `Trigger` | `summary` | disclosure button (engine-specific role; expanded state derived from `details.open`) | `data-open` (optimistic), `data-pending`, `data-disabled`, `aria-disabled` |
 | `Panel` | `div` | none | `data-disabled` |
@@ -168,19 +168,20 @@ after its own `await` lands those writes in *completion* order, so two overlappi
 A, then open B) can end with the slower one's stale set winning and a change lost. Prefer a
 functional update keyed by the item that changed, or stay uncontrolled (where the Root commits
 the changes whose actions resolved, 4.1). For the same reason an action in multiple mode should
-persist `details.item` / `details.open`, not `next`: `next` is the intended set and can contain
-an earlier change whose action fails later (conventions 2.5):
+persist `details.added` / `details.removed`, not `next`: `next` is the intended set and can
+contain an earlier change whose action fails later (conventions 2.5):
 
 ```tsx
 valueChangeAction={async (_next, details) => {
-  await save(details.item, details.open);
+  await save({ opened: details.added, closed: details.removed });
   startTransition(() =>
-    setOpen((prev) =>
-      details.open ? [...new Set([...prev, details.item])] : prev.filter((v) => v !== details.item),
-    ),
+    setOpen((prev) => [...prev.filter((v) => !details.removed.includes(v)), ...details.added]),
   );
 }}
 ```
+
+The same function works on a ToggleGroup, a CheckboxGroup or a MultiSelect: every set-valued
+component reports the same diff.
 
 How the click is intercepted. The `<summary>` activation behaviour (toggle `open`) runs after the
 `click` event finishes dispatching and only if the event was not cancelled. Enter and Space on a
@@ -202,7 +203,8 @@ and the Root's dispatch is the conventions' shape:
 ```ts
 startOwnTransition(async () => {
   addTransitionType("fsui-accordion");
-  addTransitionType(open ? "fsui-accordion-expand" : "fsui-accordion-collapse");
+  if (details.added.length > 0) addTransitionType("fsui-accordion-open");
+  if (details.removed.length > 0) addTransitionType("fsui-accordion-close"); // an exclusive switch adds both
   setOptimistic({ value: item, open });         // multiple: reducer add/remove; exclusive: `next`
   await valueChangeAction?.(next, details);
   // exclusive (no reducer): the latest dispatch commits `next`
@@ -330,10 +332,12 @@ flips in one task fire once with the final state) and jsdom dispatches a plain `
 ### 3.1 `Accordion.Root`
 
 ```ts
-interface AccordionRootBaseProps
+export interface AccordionRootBaseProps
   extends Omit<ComponentPropsWithRef<"div">, "onKeyDown" | "className" | "style" | "children"> {
   /** Disables every item. */
   disabled?: boolean;
+  /** ArrowDown on the last trigger goes to the first, and ArrowUp on the first to the last (conventions 3.10). Default `true`. */
+  loop?: boolean;
   /** Renders `interpolate-size: allow-keywords` on the root so `::details-content` can animate to `height: auto`. Chromium only today. */
   experimental_interpolateSize?: boolean;
   className?: StateValue<string | undefined, AccordionRootState>;
@@ -342,14 +346,14 @@ interface AccordionRootBaseProps
   render?: RenderProp<ComponentPropsWithRef<"div">, AccordionRootState>;
 }
 
-interface AccordionRootMultipleProps extends AccordionRootBaseProps {
+export interface AccordionRootMultipleProps extends AccordionRootBaseProps {
   exclusive?: false;
-  value?: string[];
-  defaultValue?: string[];
+  value?: readonly string[];
+  defaultValue?: readonly string[];
   valueChangeAction?: ChangeAction<string[], AccordionValueChangeDetails>;
 }
 
-interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
+export interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
   /** At most one item open. JS-free mode: `name` on each details. Library mode: value is a single id or null. */
   exclusive: true;
   value?: string | null;
@@ -360,6 +364,8 @@ interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
 export type AccordionRootProps = AccordionRootMultipleProps | AccordionRootExclusiveProps;
 
 export interface AccordionRootState {
+  /** The optimistic set of open items, always an array (one entry at most with `exclusive`), in document order. `[]` in JS-free mode. */
+  readonly value: readonly string[];
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -367,12 +373,31 @@ export interface AccordionRootState {
 export interface AccordionValueChangeDetails extends ActionDetails {
   /** Library-wide vocabulary (conventions 2.2). "activate": the user activated a Trigger. "platform": the browser changed `open` (find-in-page, pre-hydration click). */
   readonly reason: ChangeReason; // shared public type, conventions 2.2
-  /** The item whose open state changed. */
-  readonly item: string;
-  /** That item's new open state. */
-  readonly open: boolean;
+  /** The items this change opened. */
+  readonly added: readonly string[];
+  /** The items this change closed. With `exclusive`, the item that closed because another opened is listed here. */
+  readonly removed: readonly string[];
 }
 ```
+
+**`details` is the set diff of conventions 2.2**, the shape of every set-valued component
+(CheckboxGroup, ToggleGroup, MultiSelect), and it has no other field for the changed item.
+
+| Change | `added` | `removed` |
+| --- | --- | --- |
+| Open B (multiple, or exclusive with nothing open) | `["b"]` | `[]` |
+| Close B | `[]` | `["b"]` |
+| Exclusive, A open, open B | `["b"]` | `["a"]` |
+| Mount reconciliation after several clicks before hydration | every item now open that was not | every item now closed that was open |
+
+`added` and `removed` are computed against the **optimistic** set at dispatch time, as `next`
+is, and are in document order. The three base and variant interfaces are exported (conventions
+9.4). `state.value` on the Root has ToggleGroup's shape: always an array, whatever the mode, so
+one function of state serves both.
+
+**No `deselectable`** (ToggleGroup's prop for "an exclusive group may be empty", default
+`true`): a native `name` group can always be closed by the user in JS-free mode, so a `false`
+could not hold before hydration.
 
 Value type decision. The alternative, `string[]` always with `exclusive` restricting the length,
 is simpler internally (Base UI does this) but reads worse at the call site for the most common
@@ -401,8 +426,8 @@ export interface AccordionItemProps
 
 export interface AccordionItemState {
   readonly value: string;
-  /** Optimistic open state. `undefined` in JS-free mode (browser-owned, unknown to React). */
-  readonly open: boolean | undefined;
+  /** Optimistic open state. `false` in JS-free mode: the browser owns it and React holds no value (conventions 4.1 rule 3); style with `:open`. */
+  readonly open: boolean;
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -416,7 +441,7 @@ because `open` would read as controlled to a React developer.
 
 ```ts
 export interface AccordionTriggerProps
-  extends Omit<ComponentPropsWithRef<"summary">, "onClick" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"summary">, "onClick" | "aria-disabled" | "className" | "style" | "children"> {
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionTriggerState>;
   style?: StateValue<CSSProperties | undefined, AccordionTriggerState>;
@@ -444,8 +469,8 @@ export interface AccordionPanelProps
 
 export interface AccordionPanelState {
   readonly value: string;
-  /** Committed open state. `undefined` in JS-free mode. */
-  readonly open: boolean | undefined;
+  /** Committed open state. `false` in JS-free mode (conventions 4.1 rule 3). */
+  readonly open: boolean;
   readonly disabled: boolean;
 }
 ```
@@ -476,8 +501,11 @@ function reduce(set: ReadonlySet<string>, patch: Patch, exclusive: boolean): Rea
 }
 
 // Root, multiple mode only
+// a click or a find-in-page reveal is one item's change: one entry in `added` or in `removed`
 reducer: (prev, _next, details) =>
-  reduce(prev, { value: details.item, open: details.open }, false),
+  details.added.length > 0
+    ? reduce(prev, { value: details.added[0], open: true }, false)
+    : reduce(prev, { value: details.removed[0], open: false }, false),
 
 // mount reconciliation (2.3): adopted whole, bypassing the reducer
 dispatch(next, details, { whole: true });
@@ -494,7 +522,8 @@ The reducer does two jobs (conventions 3.3, #150):
   open (hidden then by the Error Boundary that a superseded rejection used to reach).
 
 The **mount reconciliation** dispatch (2.3: `reason: "platform"`, no event) carries all
-pre-hydration clicks as one `next` and names only one of the items in `details`, so it is
+pre-hydration clicks as one `next` (its `details.added` / `details.removed` list every item
+that differs from the initial value), so it is
 dispatched with the internal `whole` option of `useControllableAction`'s `dispatch`: its `next`
 bypasses the reducer, in the optimistic step and in the uncontrolled replay (#153; before, the
 reducer recognised it as "`reason: "platform"` without an event", which rested on which platform
@@ -576,22 +605,29 @@ opened.
 | --- | --- | --- |
 | Enter, Space on Trigger | toggle (JS-free: native; library: synthesized click → intercepted) | browser |
 | Tab / Shift+Tab | moves between triggers and any focusable content; every trigger is a Tab stop (APG) | browser |
-| ArrowDown / ArrowUp | focus next / previous trigger in the same Root, wrapping; skips disabled triggers | Root |
-| Home / End | first / last enabled trigger | Root |
+| ArrowDown / ArrowUp | focus next / previous trigger in the same Root, disabled ones included; wraps at the ends unless `loop={false}` | Root |
+| Home / End | first / last trigger, disabled or not | Root |
+| any of the four with Alt, Ctrl or Meta, or already `defaultPrevented` | not handled (Ctrl+Home scrolls the page) | browser |
 
 Arrow navigation is optional in the APG; the library ships it because every prior-art accordion
 does and consumers expect it. It is implemented once, on the Root's `div` `onKeyDown`, against a
 registry of Trigger elements that Items register through context (sorted by
 `compareDocumentPosition` on use, so wrappers between Root and Item and nested accordions are
-fine; a nested Root stops propagation for the keys it handles). Vertical only in v0; an
-`orientation` prop can be added when a horizontal accordion is designed.
+fine; a nested Root stops propagation for the keys it handles). It follows the library's one
+rule for arrow keys between items (conventions 3.10), through the shared helpers of
+`internal/arrow-keys.ts` (`isPlainKey`, `focusWithRing`): a **disabled trigger is in the
+sequence**, because it is `aria-disabled` and focusable, so a keyboard user reaches it exactly
+as Tab does and as in Tabs, a Toolbar and a menu; a key with a modifier or one a consumer's
+`onKeyDown` prevented is left alone; `loop` (default `true`) decides the wrap. Vertical only in
+v0; an `orientation` prop can be added when a horizontal accordion is designed, and the Root
+renders no `aria-orientation` (a `div` with no role has none).
 
-`experimental_focusgroup` is **not** offered. `focusgroup` collapses its participants to a single
+`experimental_focusGroup` is **not** offered. `focusgroup` collapses its participants to a single
 Tab stop with arrow keys inside, which is the Tabs/Toolbar model; the APG accordion wants each
 header to be a Tab stop. The two are incompatible, so the flag has no correct meaning here.
 
-Focus never moves on open/close. Disabled triggers stay focusable (`aria-disabled`), matching the
-Tabs convention and keeping them perceivable to AT.
+Focus never moves on open/close. Disabled triggers stay focusable (`aria-disabled`) and
+reachable with the arrows, matching Tabs and keeping them perceivable to AT.
 
 ---
 
@@ -721,8 +757,10 @@ boundary wraps the `<details>`, the Trigger's wraps the `<summary>`, the Panel's
 `<div>`; none of them adds DOM, so the summary stays the first child of the details). Static mode
 renders no boundary at all. Without the prop a Panel mounting in a transition, or an Item inserted
 by an action, starts no document view transition; with it, every such mount runs the page
-cross-fade (see the conventions for the consumer-side CSS). Transition types per the conventions: `fsui-accordion`,
-`fsui-accordion-expand`, `fsui-accordion-collapse`.
+cross-fade (see the conventions for the consumer-side CSS). Transition types per the conventions
+(5.3: an `open` state's kinds are `open` / `close`, as on every overlay and on Collapsible):
+`fsui-accordion`, `fsui-accordion-open` (the dispatch opened an item), `fsui-accordion-close`
+(it closed one; an exclusive switch from A to B carries both).
 
 **Only the settling commit animates** (conventions 5.1). The optimistic flip of `data-open` on
 Trigger and Item is a sync-lane commit and never starts a view transition, on click or on
@@ -737,8 +775,9 @@ What `<ViewTransition>` sees is the transition-lane commit that ends the action:
 attribute flip on the Item (Item boundary: `update`, the box grows or shrinks), the Panel content
 that mounts or changes in that commit (Panel boundary), and `pending` leaving on the Trigger.
 So `transition` on the Trigger animates only the end of the action (a spinner rendered from
-`pending` disappearing); it is kept for parity with Toggle and documented as such, not as the
-chevron animation.
+`pending` disappearing). The Trigger keeps the prop as the trigger of a content region, next
+to the Panel whose swap the same commit animates (conventions 5.1); it is documented as such,
+not as the chevron animation.
 
 ```tsx
 <Accordion.Item value="a" transition="fsui-grow">
@@ -807,7 +846,7 @@ Setup: exclusive, uncontrolled, `defaultValue={null}`, `valueChangeAction={async
    the current value → no dispatch, and the layout effect would close what the user just searched
    for. Hence the rule in 2.3: the **toggled** item wins when it is open (`next = "b"`), otherwise
    the first open item. Dispatch `"b"` with `reason: "platform"`,
-   `item: "b"`, `open: true` → parent sets `"b"` → commit: A closes, B stays open. Parent refuses
+   `added: ["b"]`, `removed: ["a"]` → parent sets `"b"` → commit: A closes, B stays open. Parent refuses
    → B is re-closed by the layout effect when the transition ends.
 
 ---

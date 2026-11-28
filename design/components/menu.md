@@ -14,7 +14,7 @@ the APG keyboard model, typeahead, submenus with hover intent, and the `focusgro
 
 Inputs: `docs/vision.md`, `design/conventions.md`, `docs/research/popover-menu.md` (primary; its
 verdicts are binding), `design/components/popover.md`, `design/components/tabs.md` (roving
-focus and keyboard conventions, `experimental_focusgroup`), `design/components/toggle.md` and
+focus and keyboard conventions, `experimental_focusGroup`), `design/components/toggle.md` and
 `design/components/radio-group.md` (single-value optimistic state shapes),
 `memo/developer/cross-engine.md` (#43: `focusGroup`, `tabindex="-1"` outside a focusgroup), the
 WAI-ARIA APG Menu Button and Menu patterns, the Open UI menu-elements explainer (as a naming and
@@ -43,7 +43,7 @@ with a view transition in every engine.
 | 6 | Focus model | Real DOM focus on items (roving: `tabindex="-1"` on every item, focus moved by script), never `aria-activedescendant`. On every open the first item is focused (last for ArrowUp) through the Popover hook's `autofocus` write; a hover-opened submenu keeps focus on its trigger. Pointer movement over an item focuses it, so keyboard and pointer always agree on the current item; pressing non-item space (padding, a separator) never moves focus off it. Whether the item shows a ring after a pointer open is the engine's `:focus-visible` heuristic (WebKit may show one; 6.1). |
 | 7 | Submenus | A nested `Menu.Root` whose `Menu.SubmenuTrigger` is an item of the parent menu. Opened with `showPopover({ source: submenuTrigger })` (nested auto popover: the parent stays open, siblings close each other), placed `side="inline-end" align="start"` (`self-x-end span-bottom`: the right of the item in LTR, its left in RTL, the side the mirrored arrow keys point to; wave 11, #53; `side="right"` before) with `position-try-fallbacks: flip-inline`. Opened by ArrowRight / Enter / Space / click (first item focused) or by hover intent (`delay` 100 ms, no focus move); closed by ArrowLeft, Escape (innermost only), hover leaving to a sibling item (`closeDelay` 150 ms), or the stack closing. Focus returns to the SubmenuTrigger through Popover 6.2's rule (the platform restores nothing for nested popovers). |
 | 8 | Hover intent (research Q5) | Timers only: `delay` / `closeDelay` on the submenu's `Menu.Root`, defaults 100 / 150 ms, implemented with the same small internal timer helper Tooltip's interaction uses for its delays, **not** Tooltip's interaction hook (focus, blur, document listeners and `interestfor` do not apply). No "safe triangle" in v0; `closeDelay` covers a diagonal move into the submenu. `interestfor` is not used (research: opens on focus and collapses the stack on Escape). |
-| 9 | `experimental_focusgroup` | On `Menu.Popup`: renders `focusgroup="menu wrap|nowrap"` (`wrap` from `loop`), detected with `"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore` (#43); on the native path items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out of the group) and the JS Up / Down / Home / End branch steps aside. Typeahead, Enter / Space, submenu keys and Tab-closes-stack stay JS everywhere. |
+| 9 | `experimental_focusGroup` | On `Menu.Popup`: renders `focusgroup="menu wrap|nowrap"` (`wrap` from `loop`), detected with `"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore` (#43); on the native path items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out of the group) and the JS Up / Down / Home / End branch steps aside. Typeahead, Enter / Space, submenu keys and Tab-closes-stack stay JS everywhere. |
 | 10 | Closing the stack on Tab | A `focusout` listener on the **root** menu's Popup: when `relatedTarget` is outside the menu tree (the root Popup's subtree, which contains every submenu as a DOM descendant, since nothing portals), the root Popup hides itself (`hidePopover()`, the platform hides nested popovers) and every Root is notified with `reason: "dismiss"`. A null `relatedTarget` (window blur) closes nothing. A press on the Trigger of an open menu is not a focus-out: `Menu.Trigger` prevents the `mousedown` default while `intended()` is `true`, so focus stays on the current item in every engine and the click's library-owned close is the one source of the close (#110). Nor is a press on a **foreign invoker** of the root popup (a consumer `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names it): the root Popup prevents its primary `mousedown` while shown, so the click's native toggle closes the menu and #125 names it `"activate"` (#126). The Trigger is itself a `popovertarget` invoker of the root popup (#121), so that guard also covers it whenever the menu is shown, including a pending close where `intended()` is `false`: a second press then keeps focus on the item and the menu shown, and its click re-opens through `requestOpen` with no hide and re-show (#126 review). |
 | 11 | ARIA | Trigger: `aria-haspopup="menu"`, `aria-expanded` (shown: the Root's mirror of the Popup's `toggle`, #118), `id`. Popup: `role="menu"`, `aria-labelledby` → the Trigger (or SubmenuTrigger) id. Items: explicit `role`s, `aria-disabled`, `aria-checked` from optimistic state. `Menu.Group` / `Menu.RadioGroup`: `role="group"` + `aria-labelledby` → `GroupLabel`. `Separator`: `<hr>` (implicit `separator`). |
 | 12 | Pending UI | Trigger: `data-open`, `data-pending` (Root pending: open or close in flight). Item: `data-pending` while its action runs. CheckboxItem / RadioItem: `data-checked` (optimistic), `data-pending`; `RadioGroup`: `data-pending` (owner). Popup: nothing (`:popover-open`). |
@@ -78,7 +78,7 @@ import { Menu } from "@funstack/ui/menu";
     <Menu.Separator />
     <Menu.Root>                                             {/* a submenu: a Root inside a Popup */}
       <Menu.SubmenuTrigger>Move to</Menu.SubmenuTrigger>    {/* button[role=menuitem][aria-haspopup=menu] */}
-      <Menu.Popup>                                          {/* side="right" align="start" by default */}
+      <Menu.Popup>                                          {/* side="inline-end" align="start" by default */}
         <Menu.Item action={() => move(id, "inbox")}>Inbox</Menu.Item>
         <Menu.Item action={() => move(id, "later")}>Later</Menu.Item>
       </Menu.Popup>
@@ -125,8 +125,8 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 | Part | Element | Role | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Root` | none | | `state.open` (optimistic), `state.pending`, `state.submenu` in `children(state)` | `usePopoverRoot({ component: "menu", mode: "library", details: popoverDetails })`. A Root under a `MenuContext` is a submenu. |
-| `Trigger` | `button` | button | `data-open` (optimistic), `data-pending`, `data-disabled`; no `aria-expanded` (a `popovertarget` invoker, #121) | `usePopoverTrigger` plus `id`, `aria-haspopup="menu"` and the open-with-focus keys. Only valid in a top-level Root (dev warning otherwise). |
-| `Popup` | `div` | `menu` | `data-side`, `data-align` (the resolved placement while shown, conventions 13.2) | `usePopoverPopup` with Menu's initial-focus resolver, keyboard handling, typeahead, `focusout`, `focusgroup`; `useResolvedPlacement` for the attributes. |
+| `Trigger` | `button` | button | `data-open` (optimistic), `data-pending`, `data-disabled`; no `aria-expanded` (a `popovertarget` invoker, #121) | `usePopoverTrigger` plus `id`, `aria-haspopup="menu"` and the open-with-focus keys. Only valid in a top-level Root (dev warning otherwise). Disabled: native `disabled`; inside a `Toolbar.Root` or a `Menubar`, `aria-disabled="true"` and in the arrow sequence (`alwaysFocusable`, conventions 3.6). |
+| `Popup` | `div` | `menu` | `data-side`, `data-align` (the resolved placement while shown, conventions 13.2), `data-submenu` (a nested Root's popup), `data-context` (a point-placed open, `design/components/context-menu.md`) | `usePopoverPopup` with Menu's initial-focus resolver, keyboard handling, typeahead, `focusout`, `focusgroup`; `useResolvedPlacement` for the attributes. |
 | `Item` | `button` | `menuitem` | `data-pending`, `data-disabled` | `action`, `closeOnActivate` (default `true`). |
 | `CheckboxItem` | `button` | `menuitemcheckbox` | `aria-checked`, `data-checked` (optimistic), `data-pending`, `data-disabled` | `checked` triple; `closeOnActivate` default `false`. |
 | `RadioGroup` | `div` | `group` | `data-pending` | `value` triple; `aria-labelledby` → a `GroupLabel` child. |
@@ -478,7 +478,7 @@ export interface MenuPopupState {
   readonly open: boolean;        // committed
   readonly side: MenuSide | null; // resolved (physical) while shown; the prop otherwise; null with side={null} and during a context open
   readonly align: MenuAlign;      // resolved while shown; the prop otherwise
-  readonly submenu: boolean;
+  readonly submenu: boolean;      // also `data-submenu` (conventions 4.1 rule 2), as `context` has `data-context`
 }
 
 export interface MenuPopupProps
@@ -498,7 +498,7 @@ export interface MenuPopupProps
    * render no `tabindex`, and the JS arrow branch steps aside. Typeahead, activation, submenu
    * keys and Tab handling stay in JS. No effect in other engines. Default `false`.
    */
-  experimental_focusgroup?: boolean;
+  experimental_focusGroup?: boolean;
   /** Library-driven opens and closes animate through a `<ViewTransition>` around this element (Popover 10.2). */
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, MenuPopupState>;
@@ -512,7 +512,7 @@ Owned keys: `id`, `popover` (`"auto"`), `role` (`"menu"`; owned here, unlike Pop
 keyboard model assumes it), `aria-labelledby` (the Trigger's id, token-merged with the
 consumer's), `focusgroup` (with the flag), `tabIndex` (`-1`, so the popup itself can take focus
 as a last resort when a menu has no items; when it has focus the arrow keys enter the items,
-section 5), `data-side` / `data-align` (anchored opens) or `data-context` (a context open,
+section 5), `data-submenu` (a submenu's popup), `data-side` / `data-align` (anchored opens) or `data-context` (a context open,
 #45: then the inline style is the point placement, `--menu-point-x` / `--menu-point-y`, `inset:
 auto`, `left` / `top`, `position-area: none` and the library's `@position-try` fallbacks, and
 `state.side` is `null`; `side={null}` opts out of inline placement on both paths and leaves the
@@ -529,7 +529,8 @@ props on its own element (deviation 1). No `aria-orientation` (vertical is the d
 ### 3.4 `Menu.Item`
 
 ```ts
-export interface MenuItemDetails extends ActionDetails {}
+/** A pure trigger's details are `<Component><Part>ActionDetails` (conventions 9.4). */
+export interface MenuItemActionDetails extends ActionDetails {}
 
 export interface MenuItemState {
   /** This item's `action` is in flight. */
@@ -544,7 +545,7 @@ export interface MenuItemProps
    * Function (`details.event` is virtual, conventions 2.2). A rejection leaves the menu open and
    * reaches the nearest Error Boundary above the item. With no `action`, activation only closes.
    */
-  action?: Action<[details: MenuItemDetails]>;
+  action?: Action<[details: MenuItemActionDetails]>;
   /** Close the whole menu once `action` settles. Default `true`. */
   closeOnActivate?: boolean;
   /**
@@ -579,11 +580,16 @@ export interface MenuCheckboxItemState {
   readonly disabled: boolean;
 }
 
+/** Named and with `reason`, as every change details type (conventions 2.2, 9.4). Always `"activate"`: a menu item has no platform path. */
+export interface MenuCheckboxItemCheckedChangeDetails extends ActionDetails {
+  readonly reason: ChangeReason;
+}
+
 export interface MenuCheckboxItemProps extends Omit<MenuItemProps, "action" | "className" | "style" | "children" | "render"> {
   checked?: boolean;
   defaultChecked?: boolean;
   /** Awaited inside the item's transition; `aria-checked` flips optimistically and rolls back on rejection. May be a Server Function. */
-  checkedChangeAction?: ChangeAction<boolean>;
+  checkedChangeAction?: ChangeAction<boolean, MenuCheckboxItemCheckedChangeDetails>;
   /** Default `false`: the menu stays open after toggling. */
   closeOnActivate?: boolean;
   className?: StateValue<string | undefined, MenuCheckboxItemState>;
@@ -602,11 +608,16 @@ platform word), `role="menuitemcheckbox"`, `aria-checked={optimistic}`, `data-ch
 ```ts
 export interface MenuRadioGroupState { readonly value: string | null; readonly pending: boolean; }
 
+/** Always `"activate"`. */
+export interface MenuRadioGroupValueChangeDetails extends ActionDetails {
+  readonly reason: ChangeReason;
+}
+
 export interface MenuRadioGroupProps extends Omit<ComponentPropsWithRef<"div">, "role" | "className" | "style" | "children"> {
   value?: string | null;          // `null`: none selected; `undefined`: uncontrolled
   defaultValue?: string | null;
   /** Receives the chosen item's `value`; a selected item re-activated dispatches nothing (with `closeOnActivate` the menu still closes). */
-  valueChangeAction?: ChangeAction<string>;
+  valueChangeAction?: ChangeAction<string, MenuRadioGroupValueChangeDetails>;
   className?: StateValue<string | undefined, MenuRadioGroupState>;
   style?: StateValue<CSSProperties | undefined, MenuRadioGroupState>;
   children?: StateValue<ReactNode, MenuRadioGroupState>;
@@ -730,18 +741,22 @@ Printable characters (`event.key.length === 1`, no modifiers) accumulate in a bu
 typeahead text (`label` prop, else `textContent` trimmed) starting from the item **after** the
 focused one and wrapping, so repeated presses of the same letter cycle through items starting
 with it (the APG's "next item that starts with the character"); a multi-character buffer matches
-a prefix. Disabled items are included (they are focusable). Space is a character only while the
+a prefix. Disabled items are included (they are focusable). An item's `label` prop is rendered
+as `data-fsui-typeahead` on its element, where the Popup's handler reads it: a **library
+marker**, not a state, so it carries the `data-fsui-` prefix of every element the library marks
+for itself (conventions decision 13; `data-fsui-tooltip-trigger` is the other) and is not a
+styling hook. Space is a character only while the
 buffer is non-empty. Submenu items are not searched from the parent. The `focusgroup` native
 path does not provide typeahead, so this is JS on both paths.
 
-### 5.2 `experimental_focusgroup` (native arrows)
+### 5.2 `experimental_focusGroup` (native arrows)
 
 ```tsx
-<Menu.Popup experimental_focusgroup>…</Menu.Popup>
+<Menu.Popup experimental_focusGroup>…</Menu.Popup>
 ```
 
 Renders `focusgroup="menu wrap"` (`nowrap` with `loop={false}`) on the popup in every engine.
-Detection, as Tabs after #43: `useSyncExternalStore(subscribeNever, () => experimental_focusgroup
+Detection, as Tabs after #43: `useSyncExternalStore(subscribeNever, () => experimental_focusGroup
 && "focusGroup" in HTMLElement.prototype, () => false)` in the Popup, passed to items by
 context. Where true: items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out
 of the group; the probe's items were plain buttons and the group collapsed them to one Tab stop),
@@ -839,7 +854,7 @@ No `returnFocus` prop.
 ```tsx
 <Menu.Root delay={100} closeDelay={150}>              {/* a submenu: Root inside a Popup */}
   <Menu.SubmenuTrigger>Move to</Menu.SubmenuTrigger>
-  <Menu.Popup>…</Menu.Popup>                          {/* side="right" align="start"; flip-inline */}
+  <Menu.Popup>…</Menu.Popup>                          {/* side="inline-end" align="start"; flip-inline */}
 </Menu.Root>
 ```
 
@@ -849,7 +864,7 @@ No `returnFocus` prop.
   `onOpenChange(false, "dismiss")`), Escape closes the innermost, an outside click closes the stack. `popovertarget` on
   the SubmenuTrigger keeps the declarative nesting for a pre-hydration click (#121: the platform's
   "topmost popover ancestor" reads the invoker that "show popover" sets for either attribute).
-- **Placement.** `side="inline-end"`, `align="start"` (wave 11, #53; `side="right"` in v0):
+- **Placement.** `side="inline-end"`, `align="start"`:
   `position-area: self-x-end span-bottom` (the submenu's top edge aligns with the item's top,
   its inline-start edge with the item's inline-end edge: to the right in LTR, to the left in
   RTL, where ArrowLeft is already the open key; research `rtl-point-and-submenu.mjs` verified
@@ -1137,7 +1152,7 @@ server responds, then closes.
 ### 11.4 Native arrows in Chromium
 
 ```tsx
-<Menu.Popup experimental_focusgroup loop={false}>…</Menu.Popup>
+<Menu.Popup experimental_focusGroup loop={false}>…</Menu.Popup>
 ```
 
 ---

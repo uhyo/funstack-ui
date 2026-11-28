@@ -57,7 +57,7 @@ Rendered HTML:
 
 | Part | Element | Role | Library state rendered |
 | --- | --- | --- | --- |
-| `Separator` | `hr` | `separator` (implicit); `none` when `decorative` | `aria-orientation` (not when `decorative`), `data-orientation` |
+| `Separator` | `hr` | `separator` (implicit); `none` when `decorative` | `aria-orientation` (not when `decorative`), `data-orientation`, `data-decorative` |
 
 ## 2. Why a part at all
 
@@ -114,7 +114,10 @@ export interface SeparatorProps
 }
 ```
 
-Owned keys (conventions 1.2): `aria-orientation`, `data-orientation`, and `role` **only while
+Owned keys (conventions 1.2): `aria-orientation`, `data-orientation`, `data-decorative`
+(present while `decorative`: every boolean of a part's state is also an attribute, conventions
+4.1 rule 2, so a stylesheet selects `[data-decorative]` as it selects `[data-orientation]`,
+without knowing which role the part renders), and `role` **only while
 `decorative`** (`"none"`, which then wins over a `render` element's own). While not decorative
 the part renders no `role`, so `render={<div role="separator" />}` keeps the one it carries;
 this is `Menu.Separator`'s rule. `role` is not in the props type: the two meanings the part
@@ -132,7 +135,6 @@ that matters.
 Not offered:
 
 - **A `label` or text slot.** Above.
-- **`data-decorative`.** `[role="none"]` selects it.
 - **Reading `ToolbarContext`.** The part would have to become a client module to flip its
   orientation inside a Toolbar. `Toolbar.Separator` does that. A `Separator` placed in a Toolbar
   works (the Toolbar finds its items by focusability, and an `<hr>` is not one) but is horizontal
@@ -145,7 +147,7 @@ Not offered:
 | --- | --- | --- |
 | default | `hr[aria-orientation=horizontal]` | "separator" (wording varies by screen reader) |
 | `orientation="vertical"` | `hr[aria-orientation=vertical]` | "separator", vertical where the screen reader says so |
-| `decorative` | `hr[role=none]` | nothing |
+| `decorative` | `hr[role=none][data-decorative]` | nothing |
 
 - Not focusable, no keyboard interaction, in every case.
 - When to choose which: semantic for a break a sighted reader would describe ("the comments

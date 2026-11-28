@@ -33,7 +33,7 @@ on itself, closes the dialog when the action resolves and leaves it open when it
 | 8 | `Action` | `Dialog.Close` with an `action` under another name: the action runs in the part's own transition, `data-pending` and (by default) `aria-disabled` meanwhile, then the close goes through the Root; a rejection leaves the dialog open. With `action` it is not a native close invoker (section 3.2), as every Close part with an `action` (conventions 7.3). |
 | 9 | No-JS path | JS-free mode as Dialog's. The Trigger and Cancel are Invoker Commands; the confirm that works without JS is `AlertDialog.Form action={serverFunction}` with a submit button (section 6). |
 | 10 | Requests and facts | Unchanged from `dialog.md` 2.7, minus the rows that cannot occur (light dismiss, non-modal). |
-| 11 | Styling surface | The same as a Dialog's: `:open`, `:modal`, `::backdrop`, `data-modal`, `data-open` / `data-pending` on the Trigger, `data-pending` on Cancel and Action, the `fsui-dialog*` transition types. One stylesheet styles both. |
+| 11 | Styling surface | The same as a Dialog's: `:open`, `:modal`, `::backdrop`, `data-modal`, `data-open` (both modes: DOM-synced in JS-free mode, `dialog.md` 2) / `data-pending` on the Trigger, `data-pending` on Cancel and Action, the `fsui-dialog*` transition types. One stylesheet styles both. |
 
 ---
 
@@ -188,7 +188,7 @@ mode (conventions 3.9.11).
 ```ts
 export type AlertDialogCancelProps = DialogCloseProps;   // action, whilePending, value, disabled, …
 export type AlertDialogCancelState = DialogCloseState;   // pending, disabled
-export type AlertDialogCancelDetails = DialogCloseDetails;
+export type AlertDialogCancelActionDetails = DialogCloseActionDetails;   // conventions 9.4: <Component><Part>ActionDetails
 ```
 
 Everything `dialog.md` 3.4 says of `Dialog.Close` holds: a native `request-close` invoker in
@@ -209,7 +209,10 @@ What it adds: it is the default initial focus target (section 3.4).
 
 ```ts
 export interface AlertDialogActionProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "value" | "className" | "style" | "children"> {
+  extends Omit<
+    ComponentPropsWithRef<"button">,
+    "onClick" | "value" | "type" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "aria-disabled" | "className" | "style" | "children"
+  > {
   /**
    * The confirmed work. Runs inside this part's own transition (`data-pending` on the button),
    * then closes the dialog with `value` as `returnValue`: in library mode through the Root
@@ -234,7 +237,7 @@ export interface AlertDialogActionProps
   render?: RenderProp<ComponentPropsWithRef<"button">, AlertDialogActionState>;
 }
 export type AlertDialogActionState = DialogCloseState;      // pending, disabled
-export type AlertDialogActionDetails = DialogCloseDetails;  // event, returnValue
+export type AlertDialogActionDetails = DialogCloseActionDetails;  // event, returnValue; the part is named `Action`, so the word is not repeated (conventions 9.4)
 ```
 
 This is `Dialog.Close` with an `action`, rule for rule (`dialog.md` 3.4; conventions 2.5.1, the

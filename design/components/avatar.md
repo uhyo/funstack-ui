@@ -163,7 +163,8 @@ export const Avatar: {
 };
 ```
 
-Owned keys (conventions 1.2): on the Root `role`, `aria-label`, `aria-hidden`, `data-status`;
+Owned keys (conventions 1.2): on the Root `role`, `aria-label`, `aria-labelledby` (always
+absent: the avatar has one naming route, `alt`, and a second name would win over it), `aria-hidden`, `data-status`;
 on the Image `alt`, `data-status`; on the Fallback `data-status`. Everything else passes
 through, so `width`, `height`, `srcSet`, `sizes`, `loading`, `decoding`, `fetchPriority`,
 `crossOrigin` and `referrerPolicy` on the Image are the element's own.

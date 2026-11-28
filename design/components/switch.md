@@ -30,7 +30,7 @@ form reset). Read this document before the Checkbox one.
 | 6 | Next value | `next = !optimistic`, as in Toggle; equal to the DOM's post-click value in every supported case. |
 | 7 | Disabled while pending | **No** (conventions 3.6). Native `disabled` only from the prop. |
 | 8 | `preventDefault()` | Not a veto and **unsupported** on checkable inputs: it desyncs the DOM while the action is pending. Dev warning. Veto = controlled mode. |
-| 9 | ViewTransition | `<ViewTransition default={transition}>` outermost, only when `transition` is given (conventions 5.1, #35); types `fsui-switch` plus `fsui-switch-on` / `fsui-switch-off`. Animates the settling of an action, never the optimistic flip (conventions 5.1). |
+| 9 | ViewTransition | No `transition` prop and no boundary (a value control whose attributes are all optimistic, conventions 5.1). Types `fsui-switch` plus `fsui-switch-check` / `fsui-switch-uncheck` on every dispatch (the kinds of every `checked` state, conventions 5.3), for a consumer's own boundary. The flip animates with CSS on `:checked`. |
 | 10 | ARIA | `role="switch"` on the input; the native `checked` state is the ARIA state. `aria-checked` is **owned and always removed** (forbidden on native inputs by ARIA in HTML). No key handling: native Space. |
 | 11 | `render` | Must keep an `<input type="checkbox">`; `type`, `checked`, `role`, `onChange` and the state attributes are owned. Dev warning when the mounted node is anything else. |
 | 12 | `switch` attribute | Not used (WebKit-only). Reserved as `experimental_switch` for when Chromium ships it. |
@@ -41,8 +41,7 @@ form reset). Read this document before the Checkbox one.
 ## 1. Anatomy
 
 ```
-<ViewTransition default={transition}>                 React boundary, no DOM; only when `transition` is set
-  <input type="checkbox" role="switch" checked …>     the only element
+<input type="checkbox" role="switch" checked …>     the only element
 ```
 
 Switch renders exactly one DOM element, a void one. As with Toggle, owner, trigger and the thing
@@ -243,17 +242,21 @@ There is no `children` prop: the element is void.
 data attribute exists so selectors look the same across components and so wrapper parts can use
 `:has([data-checked])`. Tailwind: `checked:bg-accent data-pending:animate-pulse`.
 
-### 2.8 `transition`
+### 2.8 Transition types
+
+A Switch has no `transition` prop (section 8). The flip is a CSS `transition` on `:checked` as
+in 2.7. A view transition can animate only the commit that **ends** the action (`data-pending`
+leaving, a controlled snap-back, content the parent changes in the same transition), and a
+consumer who wants that wraps the content in their own boundary, keyed on the Switch's types:
 
 ```tsx
-<Switch checkedChangeAction={save} transition="fsui-fade" />
+<ViewTransition default={{ "fsui-switch": "fsui-fade", default: "none" }}>
+  <Switch checkedChangeAction={save} />
+  <SavedBadge />
+</ViewTransition>
 ```
 
-As on Toggle (its section 7), `<ViewTransition>` animates the commit that **ends** the action
-(`data-pending` leaving, a controlled snap-back, content the parent changes in the same
-transition), not the optimistic flip, which is a sync-lane commit. The flip is a CSS `transition`
-on `:checked` as in 2.7. Every `transition` example carries the reduced-motion block from
-conventions 5.4.
+Every such example carries the reduced-motion block from conventions 5.4.
 
 ---
 
@@ -261,7 +264,7 @@ conventions 5.4.
 
 ```ts
 // packages/ui/src/switch/switch.tsx
-import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, CSSProperties } from "react";
 import type { ActionDetails, ChangeAction, ChangeReason, RenderProp, StateValue } from "../internal/types.js";
 
 export interface SwitchState {
@@ -310,11 +313,6 @@ export interface SwitchProps
   disabled?: boolean;
   /** Submitted as the input's value when checked. Default `"on"` (platform). */
   value?: string;
-  /**
-   * Forwarded as `default` to the Switch's `<ViewTransition>`. Default `"none"`. Animates the
-   * commit that ends an action, not the optimistic flip; animate the flip with CSS on `:checked`.
-   */
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, SwitchState>;
   style?: StateValue<CSSProperties | undefined, SwitchState>;
   /** Replace the rendered element (element form) or take over rendering (function form). Must keep an `<input type="checkbox">`. */
@@ -331,6 +329,7 @@ Omissions from the native prop set:
 | `checked`, `defaultChecked` | Re-declared as the controllable triple. The DOM `checked` is `optimistic`; the DOM `defaultChecked` is managed by the hook (section 7). |
 | `onChange` | The library's own handler (conventions 1.5). React drives it from the native `click`, so `details.event` is a `PointerEvent`/`MouseEvent` for mouse, keyboard and label activation alike. |
 | `aria-checked` | Forbidden on native inputs (ARIA in HTML); owned with value `undefined` so a `render` element cannot add it. `Omit` cannot exclude a hyphenated prop at the type level (Toggle row 3); the runtime removal is the guarantee. |
+| `readOnly` | HTML's `readonly` does not apply to a checkbox input: the switch would still toggle. A prop that cannot work is a type error (conventions 3.6); a library read-only switch is a feature of its own. |
 | `children` | Void element. |
 | `className`, `style` | Re-declared with the function-of-state form. |
 
@@ -340,8 +339,10 @@ Everything else on `<input>` passes through: `id`, `name`, `value`, `required`, 
 use it; a consumer `onClick` that calls `preventDefault()` runs before the library's `onChange`,
 so the click is an **already-cancelled click**: no dispatch, no warning, and the browser reverts
 the DOM after dispatch (conventions 2.3 item 3). Only a `preventDefault()` *inside the action*
-desyncs and warns (section 6.7). `readOnly` passes through but has no effect on checkable inputs
-(platform).
+desyncs and warns (section 6.7).
+
+`SwitchState` has `invalid`: `true` while the enclosing Field shows an error for the switch
+(the element then renders `data-invalid`), `false` outside a Field (conventions 4.1 rule 5).
 
 `checked` and `defaultChecked` both set, or `checked` flipping between `undefined` and a boolean
 after mount, log a dev warning (shared hook, conventions 3.1). `defaultChecked` is read once for
@@ -598,7 +599,7 @@ hydration) never dispatches here: `initInput` writes `el.checked` from the prop.
 | Case | Behaviour |
 | --- | --- |
 | `checked` prop changes externally while an action is pending | Optimistic rebases and still shows `next`; after settle the Switch shows whatever `checked` is then; React writes the DOM. |
-| Controlled parent never updates `checked` (veto) | After settle the switch snaps back; React writes `el.checked = checked`. Snap-back commit animates if `transition` is set (no `fsui-*` types). |
+| Controlled parent never updates `checked` (veto) | After settle the switch snaps back; React writes `el.checked = checked`. The snap-back commit is a transition commit with no `fsui-*` types; a consumer's own boundary animates it through its `default` entry. |
 | Controlled parent updates after `await` without `startTransition` | Value right; the update is urgent and not held with the action (post-await rule). |
 | Switch unmounts while pending | Action keeps running; the post-await write is ignored; the hook's listeners are removed by effect cleanup. |
 | The input is moved to another form or its `form` attribute changes | The hook re-checks the form owner after every commit and moves the `reset` listener. |
@@ -708,24 +709,20 @@ The hook does not know about transitions, `reason` values or dispatch; the part 
 
 ## 8. ViewTransition
 
-```tsx
-return transition === undefined
-  ? element /* the <input> */
-  : <ViewTransition default={transition}>{element}</ViewTransition>; // conventions 5.1 (#35)
-```
+The Switch renders its `<input>` and nothing around it: **no `transition` prop, no boundary**.
+It is a value control whose attributes are all optimistic, so the flip lands in a sync render
+that no view transition sees, and nothing in it mounts from library state (conventions 5.1, the
+one rule for Toggle, Checkbox, Switch, the group items, Select, Slider and the text controls).
 
 Types added on every dispatch (`"activate"` and `"platform"` alike): `fsui-switch` and
-`fsui-switch-on` (`next === true`) or `fsui-switch-off` (`next === false`), per conventions 5.3;
-the platform's words for a switch are on/off, where Toggle's are press/release.
+`fsui-switch-check` (`next === true`) or `fsui-switch-uncheck` (`next === false`), per
+conventions 5.3: the kind follows the state's name, `checked`, as on Checkbox, CheckboxGroup
+and `Menu.CheckboxItem`, so one type map or selector covers every checked state.
 
-What animates is exactly Toggle's table (its 7.2): the settling commit, a controlled snap-back
-(no types), a boundary swap (no types); never the optimistic flip. The product-owner decision that
-`transition` stays on Toggle (conventions 5.1) applies unchanged: with the prop unset no boundary
-is rendered (so a Switch mounting in a transition starts no document view transition), and the
-"every animatable part" rule keeps no exceptions. Honest expectation setting
-in the docs: on a bare input the visible effect of `transition` is limited to cross-fading the
-input's own rendering when `data-pending` leaves; the `render` function form with siblings (2.6)
-is where it does visible work.
+What a consumer's own `<ViewTransition>` around a Switch can animate is exactly Toggle's table
+(its 7.2): the settling commit, a controlled snap-back (no types), a boundary swap (no types);
+never the optimistic flip. The `render` function form with siblings (2.6), or content next to
+the Switch that the action changes, is where it does visible work.
 
 ---
 

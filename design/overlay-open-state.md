@@ -13,10 +13,11 @@ section of `design/conventions.md`, or of the document its stub there names.
 
 The `open` state of an overlay is the one state in the library that has both channels of 2.1:
 parts ask for a change (a request, `openChangeAction`), and the browser performs one in front
-of the user (a fact, `onOpenChange`). This section is the rule for the five overlay Roots:
-`Popover.Root`, `Menu.Root` (a context-menu Root and each submenu Root included),
-`Combobox.Root` (`open` only), `Dialog.Root` and `HoverCard.Root`, and for `NavigationMenu.Item`, the
-owner of one flyout with Popover's model (`navigation-menu.md` 2). All of them run on
+of the user (a fact, `onOpenChange`). This section is the rule for **every owner listed in
+conventions 2.1** (the one list of `onOpenChange` owners): `Popover.Root`, `Menu.Root` (a
+context-menu Root and each submenu Root included), `Combobox.Root` and `MultiSelect.Root`
+(their `open` only), `Dialog.Root`, `HoverCard.Root`, and `NavigationMenu.Item`, the owner of
+one flyout with Popover's model (`navigation-menu.md` 2). All of them run on
 `internal/overlay/use-overlay-root.ts`. Each component doc has a table of which cause goes to
 which channel: `popover.md` 2.8, `menu.md` 2.4, `combobox.md` 5.6, `dialog.md` 2.7,
 `hover-card.md` 2.5, `navigation-menu.md` 3.3. `AlertDialog.Root` is `Dialog.Root` with `modal` fixed
@@ -241,9 +242,13 @@ button and Escape, pass both:
 
 ### 3.9.11 JS-free mode
 
-Popover, Dialog and `NavigationMenu.Item` select JS-free mode when the Root has **none of** `open`, `defaultOpen`,
-`openChangeAction`, `onOpenChange`. In it the browser owns every open and close, no callback
-exists, and the CSS exit is the only animation. A Root with only `onOpenChange` is an
+Popover, Dialog (with AlertDialog and Drawer) and `NavigationMenu.Item` select JS-free mode when
+the Root has **none of** `open`, `defaultOpen`, `openChangeAction`, `onOpenChange`. In it the
+browser owns every open and close, no callback exists, and the CSS exit is the only animation.
+React holds no value for the open state there, so **`state.open` is `false` on every part**
+(typed `boolean`; conventions 4.1 rule 3), and **every Trigger's `data-open` is kept current by
+a DOM write** from the `toggle` event of its popup or `<dialog>` (conventions 7.4): `[data-open]`
+on a Trigger is the styling hook in both modes of every overlay, Dialog's included. A Root with only `onOpenChange` is an
 uncontrolled library-mode Root; there is no "JS-free plus listener" mode (a `toggle` listener
 on a `ref` covers the need). Menu, Combobox and HoverCard have no JS-free mode.
 
@@ -262,7 +267,7 @@ ever called with `false`.**
 ### 3.9.13 The development warning
 
 `open !== undefined && onOpenChange === undefined`, checked once per Root instance after mount
-(`useDevWarning`), in the five Roots and `NavigationMenu.Item`:
+(`useDevWarning`), in every owner listed in conventions 2.1:
 
 ```
 Dialog.Root: `open` is set without `onOpenChange`. The browser can close this dialog without

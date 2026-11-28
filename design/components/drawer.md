@@ -435,6 +435,7 @@ export interface DrawerPopupProps
 
 export type DrawerCloseProps = DialogCloseProps;
 export type DrawerCloseState = DialogCloseState;
+export type DrawerCloseActionDetails = DialogCloseActionDetails;   // conventions 9.4
 export type DrawerFormProps = DialogFormProps;
 export type DrawerFormState = DialogFormState;
 export type DrawerTitleProps = DialogTitleProps;

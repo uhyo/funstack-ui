@@ -23,7 +23,7 @@ conventions' state model rather than being special-cased.
 | 3 | Who renders what | `Tab` and `Indicator` render **optimistic** selection; `Panel` renders **committed** selection. `data-pending` on `Root` and on the Tab whose value is the optimistic one. |
 | 4 | Activation | `activationMode="automatic"` by default (selection follows focus), `"manual"` on Enter/Space/click. Automatic is safe here because focus moves synchronously and the panel swap is a transition; choose manual when `valueChangeAction` is an awaited round trip. |
 | 5 | Panel mounting | Default: inactive panels are **not rendered**. `keepMounted` keeps a panel in `<Activity mode="hidden">` (state kept, effects stopped, pre-rendered, absent from SSR HTML). `keepMounted="until-found"` keeps it as `hidden="until-found"` (in SSR HTML, effects live, find-in-page selects the tab). |
-| 6 | Keyboard | APG: orientation-aware arrows, Home/End, Tab into the panel. Roving `tabindex` derived from optimistic selection (no focus-tracking state). `experimental_focusgroup` on `List` hands arrows to the browser where supported. |
+| 6 | Keyboard | APG: orientation-aware arrows, Home/End, Tab into the panel. Roving `tabindex` derived from optimistic selection (no focus-tracking state). `experimental_focusGroup` on `List` hands arrows to the browser where supported. |
 | 7 | Disabled tabs | Focusable (`aria-disabled`), reachable with arrows, never dispatch. |
 | 8 | Transition types | `fsui-tabs`, plus `fsui-tabs-next` / `fsui-tabs-prev` by DOM order of the target tab relative to the committed tab, both looked up by id under the root (so platform dispatches from a panel get a direction too). |
 | 9 | Indicator | Positioned by CSS Anchor Positioning (each Tab gets an `anchor-name`; the Indicator sets `position-anchor` to the optimistic tab). Slides via a plain CSS `transition` on the anchored insets, **not** `<ViewTransition>`: optimistic commits are sync and never start a view transition. No measurement code. |
@@ -160,12 +160,12 @@ export interface TabsListState {
 }
 
 export interface TabsListProps
-  extends Omit<ComponentPropsWithRef<"div">, "onKeyDown" | "onFocus" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "onKeyDown" | "onFocus" | "role" | "aria-orientation" | "tabIndex" | "className" | "style" | "children"> {
   /**
    * Render `focusgroup="tablist …"` and, where the browser implements it, let the browser handle
    * arrow keys, Home and End. Chromium 150+ only; elsewhere the JS path stays active. Default false.
    */
-  experimental_focusgroup?: boolean;
+  experimental_focusGroup?: boolean;
   className?: StateValue<string | undefined, TabsListState>;
   style?: StateValue<CSSProperties | undefined, TabsListState>;
   children?: StateValue<ReactNode, TabsListState>;
@@ -191,7 +191,8 @@ export interface TabsTabState {
 export interface TabsTabProps
   extends Omit<
     ComponentPropsWithRef<"button">,
-    "onClick" | "onKeyDown" | "onFocus" | "id" | "value" | "className" | "style" | "children"
+    | "onClick" | "onKeyDown" | "onFocus" | "id" | "value" | "role" | "type" | "tabIndex"
+    | "aria-selected" | "aria-disabled" | "className" | "style" | "children"
   > {
   /** The value this tab selects. Must be unique within the Root. */
   value: string;
@@ -220,11 +221,14 @@ export interface TabsPanelState {
   readonly value: string;
   /** Committed: true only once the action has resolved and the render has committed. */
   readonly selected: boolean;
+  /** The Root's `orientation` (`data-orientation`). */
   readonly orientation: TabsOrientation;
+  /** The Root's `disabled` (`data-disabled`), as on an Accordion or Collapsible Panel. */
+  readonly disabled: boolean;
 }
 
 export interface TabsPanelProps
-  extends Omit<ComponentPropsWithRef<"div">, "id" | "hidden" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "hidden" | "role" | "className" | "style" | "children"> {
   /** The tab value this panel belongs to. */
   value: string;
   /**
@@ -248,13 +252,20 @@ export interface TabsPanelProps
 `hidden` is omitted because the library controls it in `"until-found"` mode and `<Activity>`
 controls visibility in `keepMounted` mode. `tabIndex` passes through; the default is `0` (section 8).
 
+Owned keys are omitted from the props types (conventions 1.5): `role`, `aria-orientation` and
+`tabIndex` on the List; `role`, `type`, `tabIndex`, `aria-selected` and `aria-disabled` on a
+Tab; `role` on the Panel. `aria-controls` and `aria-labelledby` stay: they are token-merged.
+
 ### 3.5 `Tabs.Indicator`
 
 ```ts
 export interface TabsIndicatorState {
   /** Optimistic selected value, or null (the indicator is then `hidden`). */
   readonly value: string | null;
+  /** A tab is selected (`value !== null`): `data-selected`. */
+  readonly selected: boolean;
   readonly pending: boolean;
+  /** The Root's `orientation` (`data-orientation`). */
   readonly orientation: TabsOrientation;
 }
 
@@ -298,7 +309,7 @@ Focus arriving from outside the List never dispatches, and neither does the List
 (its `relatedTarget` is the List itself); a focus change is a selection only when it is the user
 moving between tabs. This also keeps Tabs-as-links (11.5) from navigating on Tab-key entry. Clicks dispatch through the click handler regardless of where
 focus came from. The arrow-key code in `List` only moves focus; it does not know about
-activation. This keeps the JS roving path and the `experimental_focusgroup` path identical: both
+activation. This keeps the JS roving path and the `experimental_focusGroup` path identical: both
 end in a focus event whose `relatedTarget` is another tab in the list.
 
 The post-veto case is why the rule exists: after a controlled parent vetoes a change, focus stays
@@ -410,10 +421,10 @@ Per APG Tabs pattern.
 | Part | Attributes |
 | --- | --- |
 | `Root` | `data-pending`, `data-orientation`, `data-disabled` |
-| `List` | `role="tablist"`, `aria-orientation` (always set), `data-orientation`, `data-disabled`, `tabindex="0"` only while the List is the tab stop: `value` is `null`, or a controlled `value` matches no `Tabs.Tab` (section 8); with `experimental_focusgroup`: `focusgroup="tablist inline wrap nomemory"` (`block` for vertical, `nowrap` when `loop={false}`; `nomemory` so that Tab re-enters on the selected tab, not the last focused one) |
-| `Tab` | `type="button"` (only when the rendered element is a `<button>`; `render={<a />}` gets no `type`, conventions 1.2), `role="tab"`, `id`, `aria-selected` (optimistic), `aria-controls` (always set, see below), `aria-disabled="true"` when disabled, `tabindex` (`0` on the optimistic tab, else `-1`; on the native `focusgroup` path unselected tabs render **no** `tabindex`, because Chromium leaves `tabindex="-1"` elements out of the group), `focusgroupstart` on the selected tab with `experimental_focusgroup` (rendered with the flag in every engine, inert where unsupported), `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, `style="anchor-name: …"` |
-| `Panel` | `role="tabpanel"`, `id`, `aria-labelledby`, `tabindex="0"` (overridable), `data-selected` (committed); `hidden` in `"until-found"` mode |
-| `Indicator` | `aria-hidden="true"`, `hidden` when no optimistic selection, `data-selected` when there is one, `data-pending`, `style="position-anchor: …"` |
+| `List` | `role="tablist"`, `aria-orientation` (always set), `data-orientation`, `data-disabled`, `tabindex="0"` only while the List is the tab stop: `value` is `null`, or a controlled `value` matches no `Tabs.Tab` (section 8); with `experimental_focusGroup`: `focusgroup="tablist inline wrap nomemory"` (`block` for vertical, `nowrap` when `loop={false}`; `nomemory` so that Tab re-enters on the selected tab, not the last focused one) |
+| `Tab` | `type="button"` (only when the rendered element is a `<button>`; `render={<a />}` gets no `type`, conventions 1.2), `role="tab"`, `id`, `aria-selected` (optimistic), `aria-controls` (always set, see below), `aria-disabled="true"` when disabled, `tabindex` (`0` on the optimistic tab, else `-1`; on the native `focusgroup` path unselected tabs render **no** `tabindex`, because Chromium leaves `tabindex="-1"` elements out of the group), `focusgroupstart` on the selected tab with `experimental_focusGroup` (rendered with the flag in every engine, inert where unsupported), `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, `style="anchor-name: …"` |
+| `Panel` | `role="tabpanel"`, `id`, `aria-labelledby`, `tabindex="0"` (overridable), `data-selected` (committed), `data-orientation`, `data-disabled`; `hidden` in `"until-found"` mode |
+| `Indicator` | `aria-hidden="true"`, `hidden` when no optimistic selection, `data-selected` when there is one, `data-pending`, `data-orientation`, `style="position-anchor: …"` |
 
 - **Ids.** `rootId = useId()`; `tabId = \`${rootId}-tab-${slug(value)}\``;
   `panelId = \`${rootId}-panel-${slug(value)}\``. `slug` replaces every character outside
@@ -444,8 +455,8 @@ Per APG Tabs pattern.
 | `data-pending` | `Indicator` | `pending` | Convenience for a pulsing marker. |
 | `data-selected` | `Tab`, `Indicator` | optimistic | Immediate. |
 | `data-selected` | `Panel` | committed | Only present on the committed panel (relevant with `keepMounted`). |
-| `data-disabled` | `Root`, `List`, `Tab` | prop | |
-| `data-orientation` | `Root`, `List`, `Tab` | prop | Value-carrying enum. |
+| `data-disabled` | `Root`, `List`, `Tab`, `Panel` | prop | |
+| `data-orientation` | every part | prop | Value-carrying enum. Every part whose state has `orientation` renders it (conventions 4.1 rule 2). |
 
 Panels never carry `data-pending` (conventions section 4.3). Dimming the current panel while the
 next one loads is `.root[data-pending] .panel { opacity: .6 }`.
@@ -466,8 +477,9 @@ Per APG Tabs. All handling lives in `List`'s `onKeyDown` (navigation) and `Tab`'
 | Key | Horizontal | Vertical | Effect |
 | --- | --- | --- | --- |
 | `ArrowRight` / `ArrowLeft` | next / previous tab (swapped under `direction: rtl`) | ignored | Move focus; wrap if `loop`. Automatic mode dispatches via the focus event. |
-| `ArrowDown` / `ArrowUp` | ignored | next / previous tab | Same. |
-| `Home` / `End` | first / last tab | first / last tab | Same. |
+| `ArrowDown` / `ArrowUp` | ignored | next / previous tab | Same, wrap included. |
+| `Home` / `End` | first / last tab | first / last tab | Same. A disabled tab is in the sequence and can be the first or last (conventions 3.10). |
+| any of these with Alt, Ctrl or Meta, or already `defaultPrevented` | | | Not handled: the key is the browser's (`isPlainKey`, conventions 3.10). |
 | `Enter` / `Space` on a tab | | | `preventDefault()`, dispatch unless already the optimistic selection or disabled. Handled on keydown so a `render`ed non-button element behaves the same. |
 | `Tab` | | | Native. Leaves the list; the next stop is the selected panel (`tabindex="0"`) or its first focusable child. |
 | `Shift+Tab` from the panel | | | Native. Lands on the tab with `tabindex="0"`, which is the optimistic selection. In manual mode this may differ from the last tab the user arrowed to; the APG reference implementation behaves the same way. |
@@ -500,7 +512,7 @@ Roving tabindex details:
 - Key events with `altKey`, `ctrlKey` or `metaKey` set are ignored by the arrow / Home / End
   navigation and by Enter / Space activation, so browser and OS shortcuts keep working.
 
-`experimental_focusgroup`: when on, `List` renders
+`experimental_focusGroup`: when on, `List` renders
 `focusgroup="tablist inline|block wrap|nowrap nomemory"` and the selected Tab renders
 `focusgroupstart`, in every engine. The List detects the native path with
 `"focusGroup" in HTMLElement.prototype` (the IDL attribute is camel-cased; `"focusgroup"` is
@@ -621,7 +633,7 @@ Consequences, stated so nobody is surprised:
 - **The Indicator animates through CSS transitions, not `<ViewTransition>`.** Its move happens in
   the optimistic commit. A view transition would run only on snap-back, which would double-animate
   against the CSS transition, so `Indicator` takes no `transition` prop and renders no boundary.
-- **`Tab` keeps a `<ViewTransition>` and a `transition` prop** for parity with Toggle, but it fires
+- **`Tab` keeps a `<ViewTransition>` and a `transition` prop** as the trigger of a content region, next to the Panel whose swap the same commit animates (conventions 5.1), but it fires
   only on the settle commit (a spinner in `children` disappearing) and on snap-back. Styling that
   must react to the click uses CSS transitions on `[data-selected]` / `[data-pending]`.
 - `useDeferredValue(optimistic)` does not rescue the Indicator: probed, the deferred render also

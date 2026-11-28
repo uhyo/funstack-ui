@@ -39,7 +39,7 @@ Every read is `getComputedStyle(element).direction`, at the event, never at rend
 | --- | --- | --- | --- | --- |
 | Tabs | ArrowLeft / ArrowRight between tabs (horizontal only) | the List | each `keydown` | `tabs/tabs-list.tsx` |
 | ToggleGroup, Toolbar | the same, through roving focus (horizontal only) | the Root | each `keydown` | `internal/use-roving-focus.ts`, `internal/arrow-keys.ts` |
-| Toolbar with `experimental_focusgroup` | the same | (the browser) | native | `internal/use-native-focusgroup.ts` |
+| Toolbar with `experimental_focusGroup` | the same | (the browser) | native | `internal/use-native-focusgroup.ts` |
 | Slider | ArrowLeft / ArrowRight change the value; pointer position to value | the input (keys), the Track (pointer) | each `keydown`; each press | `slider/slider-root.tsx` |
 | Menu | the key that opens and closes a submenu; the open key of a Trigger in a vertical Toolbar | the popup; the parent popup; the Trigger | each `keydown` | `menu/use-menu-keyboard.ts`, `menu/menu-submenu-trigger.tsx`, `menu/menu-trigger.tsx` |
 | Menu at a point (ContextTrigger) | which edge of the menu sits at the pointer | the popup | once per open or move | `menu/menu-root.tsx`, `menu/menu-point.ts` |

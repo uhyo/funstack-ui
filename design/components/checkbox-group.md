@@ -43,7 +43,7 @@ hydration.
 | 9 | Partial hydration | **Supported**, unlike RadioGroup: react-dom's same-`name` restore (and its "Mixing React and non-React radio inputs" throw) is radio-only (`restoreControlledInputState`, 19.3.1). Late-mounting Items and Parents report through `onItemMounted` and are reconciled; no dev warning. |
 | 10 | Keyboard | Entirely native: every box is a tab stop, Space toggles, Enter is implicit form submission. No arrow navigation (APG has none for checkbox groups), no `focusgroup`, no `orientation`. |
 | 11 | Disabled | `Root disabled` → `<fieldset disabled>`; `Item` / `Parent` `disabled` → native, owned. Disabled boxes are barred from constraint validation (platform). A form reset still resets a disabled group and the group follows it (RadioGroup 5.3). |
-| 12 | Transition types | `fsui-checkbox-group`, plus `fsui-checkbox-group-check` when `added` is non-empty and `fsui-checkbox-group-uncheck` when `removed` is non-empty (a reset can carry both). `transition` on `Item` and `Parent` (settle only); none on `Root` / `Label`. |
+| 12 | Transition types | `fsui-checkbox-group`, plus `fsui-checkbox-group-check` when `added` is non-empty and `fsui-checkbox-group-uncheck` when `removed` is non-empty (a reset can carry both). No `transition` prop on any part (value controls, conventions 5.1); the types serve consumers' own boundaries. |
 | 13 | Files | `src/checkbox-group/`: `index.ts` (no directive), `checkbox-group-context.ts`, `-root.tsx`, `-label.tsx`, `-item.tsx`, `-parent.tsx` (all `"use client"`), tests. Exports `CheckboxGroup`, `CheckboxGroupRootProps/State`, `CheckboxGroupLabelProps`, `CheckboxGroupItemProps/State`, `CheckboxGroupParentProps/State`, `CheckboxGroupValueChangeDetails`. |
 
 Everything not listed (not disabled while pending, errors and rollback, `preventDefault()` rules
@@ -118,8 +118,7 @@ Why these four:
 - **No `Indicator`**: conventions resolved question 16; the Checkbox CSS recipes (2.6, 2.7) apply
   to Item and Parent alike.
 
-`Item` and `Parent` render `<ViewTransition>` as their outermost node only when `transition` is
-given (conventions 5.1); `Root` and `Label` never do.
+No part renders a `<ViewTransition>` boundary (section 11).
 
 ## 2. Usage
 
@@ -324,9 +323,9 @@ export interface CheckboxGroupRootProps
     "className" | "style" | "children" | "defaultValue" | "defaultChecked" | "name" | "disabled" | "form"
   > {
   /** Controlled checked values. `[]` checks nothing; `undefined` means uncontrolled. Order is not significant; duplicates are ignored. */
-  value?: string[];
+  value?: readonly string[];
   /** Initial values in uncontrolled mode. Defaults to `[]`. Also the form-reset target (latest value). */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Runs inside the Root's transition whenever the set of checked boxes changes. May be sync or
    * async (also a Server Function); rejections reach the nearest Error Boundary and roll the
@@ -389,7 +388,7 @@ export interface CheckboxGroupItemProps
   extends Omit<
     ComponentPropsWithRef<"input">,
     | "type" | "name" | "value" | "checked" | "defaultChecked" | "defaultValue" | "form" | "required"
-    | "aria-checked" | "onChange" | "className" | "style" | "children"
+    | "aria-checked" | "readOnly" | "onChange" | "className" | "style" | "children"
   > {
   /** The value this box contributes when checked. Must be unique within the Root. */
   value: string;
@@ -399,8 +398,6 @@ export interface CheckboxGroupItemProps
    * disabled Item does not satisfy the group's `required` (section 7).
    */
   disabled?: boolean;
-  /** Forwarded to the Item's `<ViewTransition default>`; settle commit only (section 11). Same static rule as Checkbox. */
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxGroupItemState>;
   style?: StateValue<CSSProperties | undefined, CheckboxGroupItemState>;
   /** Must keep an `<input>`; the library sets `type="checkbox"`. */
@@ -434,7 +431,7 @@ export interface CheckboxGroupParentProps
   extends Omit<
     ComponentPropsWithRef<"input">,
     | "type" | "name" | "value" | "checked" | "defaultChecked" | "defaultValue" | "form" | "required"
-    | "aria-checked" | "onChange" | "className" | "style" | "children"
+    | "aria-checked" | "readOnly" | "onChange" | "className" | "style" | "children"
   > {
   /**
    * The Item values this Parent controls (usually every Item of the group). Its checked and
@@ -447,9 +444,8 @@ export interface CheckboxGroupParentProps
    * the Parent acts on all of them (disable the Parent to make it inert). Before hydration the
    * server-rendered state counts disabled Items too; it settles when the Items register.
    */
-  values: string[];
+  values: readonly string[];
   disabled?: boolean;
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxGroupParentState>;
   style?: StateValue<CSSProperties | undefined, CheckboxGroupParentState>;
   /** Must keep an `<input>`; the library sets `type="checkbox"`. */
@@ -854,7 +850,7 @@ is the APG's own grouping advice.
 | `Enter` | Inside a `<form>`, implicit submission (native). | No |
 | Arrows, `Home`, `End` | Nothing. | – |
 
-- No arrow navigation and no `experimental_focusgroup`: the APG does not define arrow movement
+- No arrow navigation and no `experimental_focusGroup`: the APG does not define arrow movement
   for checkbox groups, and adding it would be the component's first keyboard JS. Can be added
   later without a breaking change.
 - No `orientation` prop (nothing keyboard-related would honour it); layout is CSS.
@@ -985,11 +981,15 @@ dropped when restoring (`memory ∩ values`).
 
 As RadioGroup section 10: the optimistic flip (click, Space, Parent cascade) is a sync-lane
 commit and never animates; the commit that settles, rolls back or follows a platform dispatch
-does. `Item` and `Parent` take `transition` and render the boundary only when it is given
-(conventions 5.1, #35): on a void element it animates `data-pending` leaving and the rollback
-write; most consumers animate the check with CSS on `:checked` / `:indeterminate` instead.
-Dependent content elsewhere keys a type map on `fsui-checkbox-group` (`-check` / `-uncheck` for
-direction). `Root` and `Label` render no boundary.
+does. **No part has a `transition` prop**, `Item` and `Parent` included: they are value
+controls whose attributes are all optimistic (conventions 5.1), and the check is animated with
+CSS on `:checked` / `:indeterminate`. Dependent content elsewhere keys the type map of its own
+`<ViewTransition>` on `fsui-checkbox-group` (`-check` / `-uncheck` for direction).
+
+`readOnly` is not in the props types of `Item` and `Parent` (it does not apply to a checkbox
+input, conventions 3.6). `value` / `defaultValue` on the Root and `values` on a `Parent` accept
+a `readonly string[]` (conventions 3.1). `CheckboxGroupRootState` has `invalid` and `required`
+(conventions 4.1 rule 5): the Root renders `data-invalid` inside a Field that shows an error.
 
 ---
 

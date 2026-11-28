@@ -80,7 +80,7 @@ the library warns in development when the mounted element's `tagName` differs
 | `open` owner | Browser | React committed state |
 | Summary click | Native activation | `preventDefault`; dispatch inside the Root's transition |
 | Initial state | closed | `defaultOpen` / `open` |
-| `data-open`, `data-pending`, `state.open` | never emitted, `undefined` (use `:open`) | emitted |
+| `data-open`, `data-pending`, `state.open` | attributes never emitted; `state.open` is `false` (conventions 4.1 rule 3: the browser owns the state and React holds no value; use `:open`) | emitted |
 | `openChangeAction` | n/a | awaited; may be a Server Function |
 | Works before hydration | yes | yes, natively; reconciled at mount (2.2) |
 | `transition` | accepted, does nothing (dev warning) | yes |
@@ -228,8 +228,8 @@ export interface CollapsibleRootProps
 }
 
 export interface CollapsibleRootState {
-  /** Optimistic open state. `undefined` in JS-free mode (browser-owned, unknown to React). */
-  readonly open: boolean | undefined;
+  /** Optimistic open state. `false` in JS-free mode: the browser owns it and React holds no value (conventions 4.1 rule 3); style with `:open`. */
+  readonly open: boolean;
   readonly pending: boolean;
   readonly disabled: boolean;
 }
@@ -257,7 +257,7 @@ writer of `open`. An exclusive group of disclosures is an `Accordion.Root exclus
 
 ```ts
 export interface CollapsibleTriggerProps
-  extends Omit<ComponentPropsWithRef<"summary">, "onClick" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"summary">, "onClick" | "aria-disabled" | "className" | "style" | "children"> {
   transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CollapsibleTriggerState>;
   style?: StateValue<CSSProperties | undefined, CollapsibleTriggerState>;
@@ -285,8 +285,8 @@ export interface CollapsiblePanelProps
 }
 
 export interface CollapsiblePanelState {
-  /** Committed open state. `undefined` in JS-free mode. */
-  readonly open: boolean | undefined;
+  /** Committed open state. `false` in JS-free mode (conventions 4.1 rule 3). */
+  readonly open: boolean;
   readonly disabled: boolean;
 }
 ```
@@ -443,8 +443,9 @@ Chromium only; elsewhere the height jumps. Same flag, same name and same meaning
 
 Root, Trigger and Panel each render `<ViewTransition default={transition}>` as the outermost
 node **only when `transition` is given** (conventions 5.1, `internal/transition-boundary.tsx`).
-Transition types: `fsui-collapsible`, plus `fsui-collapsible-expand` or
-`fsui-collapsible-collapse` (the change names Accordion uses).
+Transition types: `fsui-collapsible`, plus `fsui-collapsible-open` or
+`fsui-collapsible-close`: the kinds of every `open` state in the library (conventions 5.3),
+the overlays' and Accordion's included.
 
 Accordion 8.3 applies: only the settling commit animates (the `open` attribute flip, the Panel
 content that mounts in it); the optimistic `data-open` flip is a CSS transition. `transition`

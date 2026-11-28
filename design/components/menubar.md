@@ -42,7 +42,7 @@ keeps its own `open` / `openChangeAction` / `onOpenChange`; the platform already
 | 9 | ARIA | Bar: `role="menubar"`, named by the consumer (`aria-label`). Triggers: `menuitem` with `aria-haspopup="menu"`; the expanded state is the browser's, from `popovertarget`. Popups and items: unchanged. |
 | 10 | Server rendering | As Menu: always library mode, no JS-free mode. Server HTML has no `tabindex`, so every Trigger is a Tab stop until hydration, and a pre-hydration click opens the (empty) popup natively. |
 | 11 | Animation | Nothing new. `transition` on each `Menu.Popup` animates the opening menu; the menu a switch closes leaves by CSS (it is a dismissal). |
-| 12 | Not in v1 | `orientation="vertical"`, `experimental_focusgroup`, typeahead between Triggers, items directly in the bar (a menuitem without a menu), press-drag-release, a controlled "which menu is open" on the bar. |
+| 12 | Not in v1 | `orientation="vertical"`, `experimental_focusGroup`, typeahead between Triggers, items directly in the bar (a menuitem without a menu), press-drag-release, a controlled "which menu is open" on the bar. |
 
 ---
 
@@ -269,11 +269,14 @@ the bar's.
 ## 5. Props and types
 
 ```ts
-export interface MenubarState {}
+export interface MenubarState {
+  /** Always `"horizontal"` (`data-orientation`); the bar has one orientation in v1. */
+  readonly orientation: "horizontal";
+}
 
 export interface MenubarProps
   extends Omit<ComponentPropsWithRef<"div">,
-    "role" | "onKeyDown" | "onFocus" | "onBlur" | "onPointerDown" | "className" | "style" | "children"> {
+    "role" | "aria-orientation" | "onKeyDown" | "onFocus" | "onBlur" | "onPointerDown" | "className" | "style" | "children"> {
   /** Arrow keys (on the bar and from inside its menus) wrap from the last menu to the first and back. Default `true`. */
   loop?: boolean;
   className?: StateValue<string | undefined, MenubarState>;
@@ -283,9 +286,11 @@ export interface MenubarProps
 }
 ```
 
-Owned keys: `role` (`"menubar"`), `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` (the
-engine's, as `Toolbar.Root`). No `aria-orientation` is rendered: horizontal is the default of
-the role. The name is the consumer's (`aria-label` or `aria-labelledby`), as for a Toolbar.
+Owned keys: `role` (`"menubar"`), `aria-orientation` and `data-orientation` (both
+`"horizontal"`), `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` (the engine's, as
+`Toolbar.Root`). Horizontal is the default of the role, and the bar renders it all the same:
+every composite whose role has `aria-orientation` renders it with `data-orientation`, so a
+stylesheet has one hook for a Toolbar, a tab list and a menubar (conventions 3.10 rule 6). The name is the consumer's (`aria-label` or `aria-labelledby`), as for a Toolbar.
 
 `Menu.Root`, `Menu.Trigger`, `Menu.Popup`: **no new props.** In a bar:
 
@@ -389,7 +394,7 @@ runs, and a user sweeping across the bar switches several times a second.
 - **`orientation="vertical"`**: the engine and `Menu.Trigger`'s perpendicular open key already
   exist for a vertical Toolbar, so this is small, but it needs its own switch keys and popup
   default side. Deferred until asked for.
-- **`experimental_focusgroup`** (`focusgroup="menubar"`): the Toolbar's flag carries over; the
+- **`experimental_focusGroup`** (`focusgroup="menubar"`): the Toolbar's flag carries over; the
   bar's own key handling for menu mode must then run next to the native moves. Deferred.
 - **Typeahead between Triggers** (optional in the APG).
 - **Items directly in the bar** (a `menuitem` with no menu, or a link). `Menu.Item` needs a

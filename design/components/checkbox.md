@@ -26,7 +26,7 @@ Inputs: as for Switch, plus WAI-ARIA APG "Checkbox" (dual- and tri-state), prior
 | 5 | Click on a mixed box | Dispatches `next = !optimistic`, which is `true` for the conventional "unchecked + mixed" representation (APG: mixed → checked). The DOM and the library agree because the browser applies the same rule. |
 | 6 | ARIA | Native `checkbox` role and state. `aria-checked` (including `"mixed"`) is **owned and removed**: forbidden on native inputs and ignored by Chromium. Before hydration a mixed box looks and is announced as unchecked; `data-indeterminate` is emitted from render so CSS can draw the dash from SSR output. |
 | 7 | CheckboxGroup | **Deferred** to `design/components/checkbox-group.md`. Checkbox leaves room: `value` is a native string prop, `checked`/`indeterminate` can be driven from a future group context without new props, and the "select all" parent is already expressible in consumer code (section 2.4). |
-| 8 | ViewTransition | `fsui-checkbox` plus `fsui-checkbox-check` / `fsui-checkbox-uncheck`; settle only. |
+| 8 | ViewTransition | No `transition` prop and no boundary (a value control whose attributes are all optimistic, conventions 5.1). Types `fsui-checkbox` plus `fsui-checkbox-check` / `fsui-checkbox-uncheck` on every dispatch, for a consumer's own boundary. |
 | 9 | Files | `src/checkbox/{index.ts,checkbox.tsx,checkbox.test.tsx,checkbox.browser.test.tsx}`; `checkbox.tsx` is `"use client"`. Exports `Checkbox`, `CheckboxProps`, `CheckboxState`, `CheckboxCheckedChangeDetails`. |
 
 Everything not listed (next value, not disabled while pending, errors and rollback, overlap,
@@ -38,8 +38,7 @@ Function channels, no `useFormStatus`) is identical to Switch and is not restate
 ## 1. Anatomy
 
 ```
-<ViewTransition default={transition}>                         only when `transition` is set (conventions 5.1)
-  <input type="checkbox" checked … data-indeterminate?>     the only element
+<input type="checkbox" checked … data-indeterminate?>     the only element
 ```
 
 ### Why a single input and no `Indicator` part
@@ -229,7 +228,7 @@ export interface CheckboxCheckedChangeDetails extends ActionDetails {
 export interface CheckboxProps
   extends Omit<
     ComponentPropsWithRef<"input">,
-    "type" | "checked" | "defaultChecked" | "onChange" | "aria-checked" | "className" | "style" | "children"
+    "type" | "checked" | "defaultChecked" | "onChange" | "aria-checked" | "readOnly" | "className" | "style" | "children"
   > {
   /** Controlled checked state. `undefined` means uncontrolled. */
   checked?: boolean;
@@ -248,7 +247,6 @@ export interface CheckboxProps
   disabled?: boolean;
   /** Submitted as the value when checked. Default `"on"`. In a future CheckboxGroup it identifies the item. */
   value?: string;
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CheckboxState>;
   style?: StateValue<CSSProperties | undefined, CheckboxState>;
   /** Must keep an `<input type="checkbox">`. */
@@ -417,9 +415,15 @@ merged rather than owned: a `render` element's own handler runs first, then the 
 
 ## 8. ViewTransition
 
-`fsui-checkbox` plus `fsui-checkbox-check` / `fsui-checkbox-uncheck` on every dispatch. Same
-settle-only semantics, the same conditional boundary (rendered only when `transition` is given,
-conventions 5.1) and the same honest expectation as Switch section 8.
+`fsui-checkbox` plus `fsui-checkbox-check` / `fsui-checkbox-uncheck` on every dispatch. The
+Checkbox has **no `transition` prop** and renders no boundary, as Switch (its section 8) and
+every other value control (conventions 5.1): the flip is CSS on `:checked` / `[data-checked]`,
+and the types serve a consumer's own `<ViewTransition>` around content that changes when the
+action settles.
+
+`readOnly` is not in the props type (conventions 3.6): HTML's `readonly` does not apply to a
+checkbox, so the box would still toggle. `state.invalid` is `true` while the enclosing Field
+shows an error (`data-invalid`), `false` outside a Field (conventions 4.1 rule 5).
 
 ---
 

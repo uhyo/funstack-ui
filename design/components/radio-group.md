@@ -32,7 +32,7 @@ stays native and the Async React model stays the conventions' model.
 | 7 | Residual browser paths (`reason: "platform"`) | Mount reconciliation (pre-hydration clicks, Firefox form-state restoration): one dispatch per group with `event: undefined`. Form reset (`<button type=reset>`, `form.reset()`, React's automatic reset after a successful `<form action>`): one dispatch per group with `event` set to the `reset` event. Both go through the Root's `useNativeGroupReconciliation` on the fieldset (conventions 3.8); Items call `useNativeChecked` with `group: true` and report nothing themselves. |
 | 8 | `preventDefault` | Not a veto. A click cancelled **before** the library's handler runs (a pass-through `onClick`) is treated as "no change" and never dispatches, because the browser reverts the DOM. `details.event.preventDefault()` inside the action desyncs the DOM while pending and triggers a dev warning. A veto is controlled mode. |
 | 9 | Disabled | Native: `disabled` on an Item, `<fieldset disabled>` for the group. Disabled radios are skipped by native arrow navigation and never dispatch. A form reset still resets a disabled group and the group follows it (section 5.3). |
-| 10 | Transition types | `fsui-radio-group` only. Consumers' dependent content elsewhere in the tree can key a `<ViewTransition>` type map on it. |
+| 10 | Transition types | `fsui-radio-group` only (a single selection that is the component's only dispatch has no kind, conventions 5.3). No `transition` prop on any part: consumers' dependent content elsewhere in the tree keys its own `<ViewTransition>` type map on the type. |
 | 11 | Forms and Server Functions | Two independent channels: `valueChangeAction` (per-group transition, may be a Server Function passed directly) and `<form action>` with native `name` (no action on the group needed). Both at once is fine. |
 | 12 | Files | Every part file is `"use client"` (context). An action-less group is JS-free in behaviour (works before hydration). #19 resolved 2026-10-23, user decision, option A of `docs/research/zero-js-variants.md` 5: no directive-free variant; the JS-free radio group from a Server Component is the native `<fieldset>` with same-`name` radios, a recipe on the docs page (conventions 7.3). |
 
@@ -98,8 +98,8 @@ Why these three and nothing else:
   an `<input>` whose `type` the library sets to `radio`. The library warns in development when the
   mounted element's `tagName` is wrong (Accordion precedent).
 
-Every part renders exactly one element, with `<ViewTransition>` as the outermost node of `Item`
-(section 10). `Root` and `Label` render no boundary: their content is not driven by library state.
+Every part renders exactly one element and no `<ViewTransition>` boundary (section 10): nothing
+in a radio group mounts from library state, and every attribute is optimistic.
 
 ## 2. States
 
@@ -119,7 +119,6 @@ Section 9.4 explains what that means for an awaited action.
 ## 3. Props and types
 
 Shared types come from `packages/ui/src/internal/types.ts` (conventions 2.2 and 9.4).
-`ViewTransitionClass` is React's own type for the `default` prop of `<ViewTransition>`.
 
 ### 3.1 `RadioGroup.Root`
 
@@ -226,17 +225,12 @@ export interface RadioGroupItemProps
   extends Omit<
     ComponentPropsWithRef<"input">,
     | "type" | "name" | "value" | "checked" | "defaultChecked" | "defaultValue" | "form" | "required"
-    | "onChange" | "className" | "style" | "children"
+    | "readOnly" | "onChange" | "className" | "style" | "children"
   > {
   /** The value this radio checks. Must be unique within the Root. Submitted as the form value. */
   value: string;
   /** Native `disabled`: unfocusable, skipped by arrow keys, never dispatches. */
   disabled?: boolean;
-  /**
-   * Forwarded to the Item's `<ViewTransition default>`. Default "none". Fires only on the commit
-   * that settles the action (or rolls it back), never on the optimistic check (section 10).
-   */
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, RadioGroupItemState>;
   style?: StateValue<CSSProperties | undefined, RadioGroupItemState>;
   render?: RenderProp<ComponentPropsWithRef<"input">, RadioGroupItemState>;
@@ -550,7 +544,7 @@ Decisions:
   focus in JS and can restrict the axis. Native radios honour all four arrows regardless, so a
   prop would either lie (if it only set `aria-orientation` / `data-orientation`) or re-implement
   the keyboard (if it filtered keys). Layout is the consumer's CSS. Flagged in the questions.
-- **No `experimental_focusgroup`.** `focusgroup` would add what radios already have.
+- **No `experimental_focusGroup`.** `focusgroup` would add what radios already have.
 - **The library never moves focus**, not on rollback either: after a rejected or vetoed change
   focus stays on the radio the user reached, which is now unchecked, and the checked radio is the
   group's tab stop again. The next arrow press works from where focus is.
@@ -604,8 +598,8 @@ Uncontrolled, `defaultValue="free"`, `valueChangeAction={async (next) => { await
    post-await `setInternal` is skipped, so `C="free"`; `O` reverts.
 3. The settle commit re-renders every Item with `checked` from `C`: react-dom writes `checked`
    from the props, so **the DOM rolls back to "Free"**. `data-pending` leaves. Focus is still on
-   "Pro" (now unchecked); nothing is announced. The Item's `transition` (if set) animates this
-   commit.
+   "Pro" (now unchecked); nothing is announced. A consumer's own `<ViewTransition>` animates this
+   commit through its `default` entry (a rollback carries no types).
 
 Controlled with "update on success" is identical. A consumer who catches inside the action gets a
 resolved action: in uncontrolled mode the new value commits (conventions 2.4).
@@ -702,11 +696,11 @@ What animates when, applying conventions 5.1 and the Tabs 10.1 table:
 - **The check itself is CSS.** `.radio:checked::before { scale: 1 }` with a CSS `transition`
   animates on click and back on rejection. Any `<ViewTransition>` keyed on optimistic state is a
   bug (conventions 5.1).
-- **`Item` keeps a `transition` prop** for parity with Toggle and Tabs (product-owner decision),
-  rendering `<ViewTransition default={transition}>` only when the prop is given (conventions 5.1,
-  #35; a group whose Items are inserted by an action would otherwise start a page cross-fade per
-  insertion), documented as animating the settle commit only. On a radio with no children that is the `data-pending` attribute leaving and the rollback
-  write; most consumers will never set it.
+- **No part has a `transition` prop**, `Item` included: a radio is a value control whose
+  attributes are all optimistic (conventions 5.1, the one rule for Toggle, Checkbox, Switch,
+  the group items, Select and Slider). On a void input a boundary could only animate
+  `data-pending` leaving and the rollback write. `readOnly` is not in `Item`'s props type
+  either: HTML's `readonly` does not apply to a radio (conventions 3.6).
 - **Dependent content is the consumer's boundary.** The library adds `fsui-radio-group` to every
   dispatch, so a consumer's own `<ViewTransition default={{ "fsui-radio-group": "fade", default: "none" }}>`
   around `<PlanDetails>` animates exactly the commits the group caused (walkthrough 9.2) and not
@@ -864,7 +858,7 @@ Deltas from the primary design:
   and `render` (must stay a `<label>` to keep click forwarding, or the consumer wires `htmlFor`).
 - `Input` renders the `<input type="radio">` with everything section 13.5 lists; it reads the item
   context for `value` and `disabled`; must be rendered exactly once inside its Item (dev warning
-  otherwise). The `transition` prop moves here.
+  otherwise).
 - `Indicator` renders `<span aria-hidden="true">` with `data-checked`, `data-pending`,
   `data-disabled` and function props of the item state; no `<ViewTransition>` (optimistic part).
 - The input must be hidden with a visually-hidden clip, never `display: none` or `hidden` (that

@@ -589,13 +589,18 @@ export interface PopoverRootProps {
 ```
 
 No `ref`, `className`, `style` (no DOM), no `modal`, no `disabled` (the Trigger is). `state.open`
-is `false` in JS-free mode (the real state is `:popover-open`), as Dialog decided.
+is `false` in JS-free mode on every part (the real state is `:popover-open`): the library-wide
+rule for a browser-owned open React holds no value for (conventions 4.1 rule 3).
 
 ### 3.2 `Popover.Trigger`
 
 ```ts
 export interface PopoverTriggerState {
-  /** Optimistic open state (library mode); `false` in JS-free mode. */
+  /**
+   * Optimistic open state (library mode). `false` in JS-free mode, **while `data-open` is kept
+   * current there by a DOM write** from the popup's `toggle`: the one case where the attribute
+   * and the state field differ (conventions 4.1 rules 1 and 3). Style with `[data-open]`.
+   */
   readonly open: boolean;
   /** The Root's transition is pending (an open or a part-initiated close). */
   readonly pending: boolean;
@@ -603,8 +608,15 @@ export interface PopoverTriggerState {
 }
 
 export interface PopoverTriggerProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "aria-expanded" | "className" | "style" | "children"> {
-  /** Native `disabled`: a disabled button is not a valid invoker and never dispatches. */
+  extends Omit<
+    ComponentPropsWithRef<"button">,
+    "onClick" | "type" | "aria-expanded" | "aria-disabled" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "className" | "style" | "children"
+  > {
+  /**
+   * Native `disabled`: a disabled button is not a valid invoker and never dispatches. Inside a
+   * `Toolbar.Root`: `aria-disabled="true"` instead, focusable and in the arrow sequence, with
+   * no invoker attribute (conventions 3.6).
+   */
   disabled?: boolean;
   className?: StateValue<string | undefined, PopoverTriggerState>;
   style?: StateValue<CSSProperties | undefined, PopoverTriggerState>;
@@ -728,8 +740,14 @@ export interface PopoverCloseState {
   readonly disabled: boolean;
 }
 
+/** A pure trigger's details: `<Component><Part>ActionDetails` (conventions 9.4). Adds nothing to `ActionDetails`. */
+export interface PopoverCloseActionDetails extends ActionDetails {}
+
 export interface PopoverCloseProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "className" | "style" | "children"> {
+  extends Omit<
+    ComponentPropsWithRef<"button">,
+    "onClick" | "type" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "aria-disabled" | "className" | "style" | "children"
+  > {
   /**
    * Runs inside this part's own transition (`data-pending` on the button), then closes the
    * popover: in library mode through the Root (`openChangeAction(false)` awaited, view
@@ -740,7 +758,7 @@ export interface PopoverCloseProps
    * `command`, conventions 7.3): a click before hydration does nothing. Without `action` in
    * JS-free mode the button is a native `command="hide-popover"` invoker.
    */
-  action?: Action<[details: ActionDetails]>;
+  action?: Action<[details: PopoverCloseActionDetails]>;
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the popover
@@ -760,8 +778,8 @@ export interface PopoverCloseProps
 
 Owned keys: `type`, `commandfor`, `command` (`"hide-popover"`; on a `<button>` or a component
 render only, and never with `action`: #182, conventions 7.3, a pre-hydration click on a Close
-with `action` does nothing instead of hiding the popover without running the action), `disabled`, `onClick` (library
-mode, or with `action`), `data-pending`, `data-disabled`. No `value` and no `returnValue`:
+with `action` does nothing instead of hiding the popover without running the action), `disabled`, `aria-disabled`, `onClick` (library
+mode, or with `action`), `data-pending`, `data-disabled`. All are omitted from the props type (conventions 1.5), with the `popoverTarget` pair. No `value` and no `returnValue`:
 popovers have none. The Close keeps `commandfor` + `command="hide-popover"` under #121
 (`popovertargetaction="hide"` would buy nothing: Chromium and Firefox expose no expanded state for
 an invoker inside its own popover with either attribute, and the `command` event is what tells the
@@ -1501,7 +1519,7 @@ and `aria-labelledby` to the trigger, item parts (`Item`, `CheckboxItem`, `Radio
 tabindex with Up / Down / Home / End and wrap, typeahead, ArrowRight / ArrowLeft for submenus
 (RTL-aware), closing the stack on Tab or focus leaving the tree, hover intent for submenus
 (research question 5; not shared with Tooltip's timers in Popover, which has no hover open),
-`aria-disabled` on items, `experimental_focusgroup="menu"` with the corrected `focusGroup`
+`aria-disabled` on items, `experimental_focusGroup="menu"` with the corrected `focusGroup`
 detection, and the ownership vocabulary of its `open` (recommendation: the same as Popover,
 Dialog option C; research question 3).
 

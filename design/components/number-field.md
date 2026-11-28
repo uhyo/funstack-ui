@@ -300,10 +300,20 @@ Shared types from `packages/ui/src/internal/types.ts` (conventions 2.2, 9.4).
 ### 3.1 `NumberField.Root`
 
 ```ts
+/** What produced a value. Exported: every type a public member names is (conventions 9.4). */
+export type NumberFieldSource = "input" | "increment" | "decrement" | "keyboard" | "wheel";
+
+/** The details of `valueChangeAction` (a step). */
 export interface NumberFieldValueChangeDetails extends ActionDetails {
-  readonly reason: ChangeReason;                       // "activate" | "platform" | "dismiss"
-  /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
-  readonly source: "input" | "increment" | "decrement" | "keyboard" | "wheel" | null;
+  readonly reason: ChangeReason;                       // "activate" | "platform" | "dismiss" (a rollback notice)
+  /** Typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
+  readonly source: NumberFieldSource | null;
+}
+
+/** The details of `valueCommitAction`: a type of its own, as Slider's (conventions 9.4). Never `"dismiss"`. */
+export interface NumberFieldValueCommitDetails extends ActionDetails {
+  readonly reason: ChangeReason;                       // "activate" | "platform"
+  readonly source: NumberFieldSource | null;
 }
 
 /** The state every NumberField part's function props receive (one object, Field's precedent). */
@@ -316,6 +326,8 @@ export interface NumberFieldState {
   readonly disabled: boolean;
   readonly readOnly: boolean;
   readonly required: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid` on Root and Input). `false` outside. */
+  readonly invalid: boolean;
 }
 
 export interface NumberFieldRootProps
@@ -326,7 +338,7 @@ export interface NumberFieldRootProps
   /** Every step (2.1). Keep it cheap: adopt the value, start a deferred render. */
   valueChangeAction?: ChangeAction<number | null, NumberFieldValueChangeDetails>;
   /** Once per gesture (2.1): where the save goes. Commits uncontrolled state when it resolves. */
-  valueCommitAction?: ChangeAction<number | null, NumberFieldValueChangeDetails>;
+  valueCommitAction?: ChangeAction<number | null, NumberFieldValueCommitDetails>;
   /** Native `min` / `max` / `step` on the hidden input (constraints) and the bounds and grid of stepping. `step` default `1`, or `0.01` when `format.style` is `"percent"`. */
   min?: number;
   max?: number;
@@ -447,8 +459,11 @@ Owned keys: `id`, `htmlFor` (the input id), `data-pending`, `data-disabled`.
 // src/number-field/index.ts (no directive)
 import "../internal/platform-attributes.js";
 export const NumberField = { Root, Label, Input, Increment, Decrement } as const;
-export type { NumberFieldRootProps, NumberFieldState, NumberFieldValueChangeDetails, NumberFieldInputProps,
-  NumberFieldIncrementProps, NumberFieldDecrementProps, NumberFieldButtonState, NumberFieldLabelProps };
+export type { NumberFieldRootProps, NumberFieldState, NumberFieldValueChangeDetails, NumberFieldValueCommitDetails,
+  NumberFieldSource, NumberFieldInputProps, NumberFieldIncrementProps, NumberFieldDecrementProps,
+  NumberFieldButtonState, NumberFieldLabelProps,
+  // every part has a state type (conventions 9.4): aliases of NumberFieldState
+  NumberFieldRootState, NumberFieldInputState, NumberFieldLabelState };
 ```
 
 Subpath `@funstack/ui/number-field`; the root entry re-exports the namespace.

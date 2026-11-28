@@ -616,7 +616,13 @@ export interface FieldRootProps
 ```
 
 Owned keys: `data-invalid`, `data-disabled`, `data-required`, `data-pending`. `Field.Root` has no
-`id` of its own; the ids live on the parts. Nesting a `Field.Root` inside another is a dev
+`id` of its own; the ids live on the parts.
+
+**`Field.Root disabled` means the control is not submitted**, whatever the control is
+(conventions 3.6): a native control gets `disabled`, and a control that submits through hidden
+inputs (Combobox, MultiSelect) renders those `disabled` too. Every control inside a Field also
+exposes the Field's error as `state.invalid` next to its `data-invalid`, and `state.required`
+where it takes or inherits `required` (conventions 4.1 rule 5). Nesting a `Field.Root` inside another is a dev
 warning (the inner control would register with the inner Field only).
 
 **`validate` and the prop's identity** (review L4, product-owner decision). A new `validate`

@@ -38,7 +38,7 @@ hiding the stack.
 | 2 | Imperative input, declarative output | The queue is fed imperatively (`toast(options)` returns an id; `toast.promise`, `toast.update`, `toast.dismiss`) and rendered declaratively: the consumer's Viewport `children(state)` maps `state.toasts` to parts. Section 2 justifies this against the vision: toasts are produced in action bodies and outlive the component that produced them, and no `on*` handler exists anywhere in the API. |
 | 3 | Urgent queue | Every queue mutation (add, update, dismiss, drop after exit) is a normal (urgent) update, dispatched from a microtask so a `toast()` call inside a `startTransition` scope escapes it (research §7). The third documented urgent state after a controlled text input and virtual focus (conventions 2.6). Order is preserved, dismissals included: a `toast.dismiss()` closes the toasts open at that point of the batch and never one added later in the same tick. |
 | 4 | Promise toasts | `toast.promise(promise, { pending, success, error })` shows `pending` at once with `data-pending`, swaps to `success` / `error` when the promise settles (urgent `update`), announces on settle, and starts the timer only then. It returns a promise that mirrors `promise`, **except** that a rejection is resolved (with `undefined`) when `error` was given: the error toast is the handler the consumer asked for. Returning the promise lets one call feed both the toast and the awaited action prop of the part that started the work (section 3.1). |
-| 5 | Undo | `Toast.Action` is a pure-trigger action prop (`useActionTrigger`, like `Menu.Item`): `data-pending` on the Action and the Root while it runs, the toast's timer paused, the toast closed with `reason: "activate"` when it resolves (`closeOnSettle`, default `true`); a rejection keeps the toast and reaches the nearest Error Boundary above the Viewport. |
+| 5 | Undo | `Toast.Action` is a pure-trigger action prop (`useActionTrigger`, like `Menu.Item`): `data-pending` on the Action and the Root while it runs, the toast's timer paused, the toast closed with `reason: "activate"` when it resolves (`closeOnActivate`, default `true`); a rejection keeps the toast and reaches the nearest Error Boundary above the Viewport. |
 | 6 | `onClose` | A per-toast **handler** called when the toast leaves, with `details.reason`: `"activate"` (the Action part settled), `"dismiss"` (Close part, Escape, `toast.dismiss()`, a promise toast with no message for its outcome), or `"timeout"` (the timer elapsed; a `ChangeReason` value, conventions feedback 1). Called synchronously where the close is applied, outside any transition, not awaited; it may return a promise, whose rejection goes to `reportError` (the handler rule, conventions 2.1): the "commit the deletion when the Undo window elapses" pattern (section 9.3). |
 | 7 | Top layer | One `popover="manual"` region, shown while it has toasts (exiting ones included), hidden when empty. Re-raised (`hidePopover(); showPopover()`) when a toast is added while it is already open, so a later-opened menu or popover does not cover new toasts. While a library `Dialog` is modal, the region is inside the topmost open modal `<dialog>` and back inline when it closes, because a top-layer region outside a modal dialog is inert and absent from the accessibility tree (research finding 1). Mechanism: the region always portals into a library-owned `display: contents` host element that the library itself moves with a DOM `append` (React never sees the move, so the toasts keep their React state: an Undo in flight stays pending) between an inline anchor and the topmost modal (a module-level registry Dialog writes to). |
 | 8 | Announcements | `document.ariaNotify(text, { priority })` after the toast's content has committed un-suspended, coalesced per microtask, `priority: "high"` for `priority: "high"` toasts. No live region anywhere. The text defaults to the Title and Description text (`textContent` of the parts), overridable per toast or per Viewport through `announce(toast)` (built-in strings rule, conventions 11). |
@@ -84,10 +84,10 @@ toast({ title: "Link copied" });
 | --- | --- | --- | --- | --- |
 | `toast` | – | – | – | A function with methods: `toast(options): string`, `toast.promise(promise, options): Promise`, `toast.update(id, options)`, `toast.dismiss(id?)`. Bound to the default manager; `createToastManager()` makes an isolated one for a second root or a test. |
 | `Viewport` | `section` with `popover="manual"` | `region` (named section), `aria-label="Notifications (F8)"` by default | `data-paused`, `data-empty` | Owns the queue state, timers, hotkey, pause, focus return, the portal host (on the client the region sits inside two `display: contents` `div`s: an anchor where the Viewport is rendered and the host the library moves into a modal dialog, section 4.3), re-raise, announcements. `children` is a function of `ToastViewportState` (or a node, for a fixed layout). |
-| `Root` | `div` | `dialog`; `alertdialog` when `priority === "high"`; `tabindex="0"`; `aria-labelledby` → Title id, `aria-describedby` → Description id (both always emitted; a dangling IDREF falls through to `aria-label`) | `data-type` (the toast's `type`), `data-pending`, `data-ending` | One per `ToastItem`; takes `toast`. Renders the Suspense guard around `children`. Keyboard: Escape, ArrowUp / ArrowDown. |
+| `Root` | `div` | `dialog`; `alertdialog` when `priority === "high"`; `tabindex="0"`; `aria-labelledby` → Title id, `aria-describedby` → Description id (both always emitted; a dangling IDREF falls through to `aria-label`) | `data-type` (the toast's `type`), `data-priority` (`"normal"` / `"high"`), `data-pending`, `data-ending` | One per `ToastItem`; takes `toast`. Renders the Suspense guard around `children`. Keyboard: Escape, ArrowUp / ArrowDown. |
 | `Title` | `div` | id for `aria-labelledby` | – | `children` defaults to `toast.title`. Not a heading: a transient notification should not appear in heading navigation. |
 | `Description` | `p` | id for `aria-describedby` | – | `children` defaults to `toast.description`; renders nothing when both are absent. |
-| `Action` | `button type="button"` | – | `data-pending` | `action` defaults to `toast.action.action`, `children` to `toast.action.label`; renders nothing when the toast has no `action` and the part no `action` prop. `closeOnSettle` default `true`. |
+| `Action` | `button type="button"` | – | `data-pending` | `action` defaults to `toast.action.action`, `children` to `toast.action.label`; renders nothing when the toast has no `action` and the part no `action` prop. `closeOnActivate` default `true`. |
 | `Close` | `button type="button"` | – | – | Dismisses the toast (`reason: "dismiss"`). The consumer labels it (`aria-label` or text). No Invoker Command: `hide-popover` would hide the whole region. |
 
 No Provider: with a module-level `toast` function there is nothing to put in context above the
@@ -221,23 +221,27 @@ Rules:
 **`whilePending`** (conventions 2.5.1) says what a second click does while the Action's own run
 is pending. The Action is of **mixed ownership**: the `action` is the consumer's (the part's
 prop or the toast's `action.action`), the close on settle and the paused timer are the
-library's. So the default follows `closeOnSettle`: `"ignore"` while the toast closes on settle
-(the default: one Undo, one Retry, then the toast leaves), `"run"` with `closeOnSettle={false}`
+library's. So the default follows `closeOnActivate`: `"ignore"` while the toast closes on settle
+(the default: one Undo, one Retry, then the toast leaves), `"run"` with `closeOnActivate={false}`
 (the toast stays and the button is a user-owned trigger; add `whilePending="ignore"` for a
 Retry that must not overlap). Under `"ignore"` the second click is `preventDefault()`ed and the
 Action renders `aria-disabled="true"` while it shows `data-pending` (not while natively
 disabled: native `disabled` wins, conventions 1.2). Under `"run"`:
 `data-pending` on the Action and the Root and the paused timer last until every run has
-settled, no `aria-disabled` from pending; with `closeOnSettle` the toast closes once, when the
+settled, no `aria-disabled` from pending; with `closeOnActivate` the toast closes once, when the
 last run in flight settles, and only if the latest run resolved; an older run's rejection goes
 to `reportError` and the latest one's to the boundary above the Viewport, or to `reportError`
 once the toast has left (conventions 2.4). A rejection keeps the toast in both modes. The prop
 is on the part only: `ToastActionOptions` (`toast({ action: { label, action } })`) has no
 `whilePending` field, since the part is where the consumer renders the button and the options
-carry no `closeOnSettle` either.
+carry no `closeOnActivate` either.
 
-When the action resolves, the toast closes with `details.reason: "activate"` (`closeOnSettle`,
-default `true`; `false` keeps it, for an action that only navigates). When it rejects, the toast
+When the action resolves, the toast closes with `details.reason: "activate"` (`closeOnActivate`,
+default `true`; `false` keeps it, for an action that only navigates). The prop has the name it
+has on `Menu.Item`, because it is the same contract (conventions 2.5.1): activating the part
+closes its container, after the part's `action` and only if the latest run resolved.
+`closeOnSettle` is `Dialog.Form`'s prop and means something else (a form submission settled
+without an error). When it rejects, the toast
 stays and the error reaches the nearest Error Boundary above the Viewport; a consumer who wants
 the failure *in the toast* catches inside the action and updates it:
 
@@ -259,7 +263,7 @@ action: {
 The rule is therefore explicit in the Action's docs: to keep the toast open after a handled
 failure, either rethrow after the `update` (the error then reaches the boundary above the
 Viewport, which must render the list with the failure visible, section 15.3), or set
-`closeOnSettle={false}` on the Action part and dismiss from the action yourself on success
+`closeOnActivate={false}` on the Action part and dismiss from the action yourself on success
 (`toast.dismiss(details.id)`).
 
 `details` for the Action's action is `ToastActionDetails`: `{ id }` plus the virtual `event`
@@ -558,7 +562,7 @@ choice, is a menu accelerator on Windows.
 
 | Close | `details.reason` | `details.event` | Who |
 | --- | --- | --- | --- |
-| `Toast.Action` settled (`closeOnSettle`) | `"activate"` | the Action's click / keydown | library, after the action resolves |
+| `Toast.Action` settled (`closeOnActivate`) | `"activate"` | the Action's click / keydown | library, after the action resolves |
 | `Toast.Close` | `"dismiss"` | the click | library |
 | Escape in the toast | `"dismiss"` | the keydown | library |
 | `toast.dismiss(id)` / `toast.dismiss()` | `"dismiss"` | `undefined` | consumer code |
@@ -794,6 +798,8 @@ export interface ToastViewportState {
   readonly queued: number;
   /** A viewport-wide pause condition holds (hover, focus inside, hidden document, blurred window). */
   readonly paused: boolean;
+  /** No toasts in the queue, exiting ones included (`data-empty`; conventions 4.1 rule 1). */
+  readonly empty: boolean;
 }
 export interface ToastViewportProps extends Omit<HTMLAttributes<HTMLElement>, "children" | "className" | "style" | "onPointerEnter" | "onPointerLeave" | "onFocus" | "onBlur" | "onKeyDown"> {
   readonly manager?: ToastManager;          // default: the module-level one
@@ -814,7 +820,7 @@ export interface ToastRootState {
   readonly pending: boolean;   // toast.pending
   readonly ending: boolean;    // toast.ending
   readonly type: string | undefined;
-  readonly priority: ToastPriority;
+  readonly priority: ToastPriority; // also `data-priority` (conventions 4.1 rule 2), next to `data-type`
 }
 export interface ToastRootProps extends Omit<HTMLAttributes<HTMLDivElement>, "children" | "className" | "style" | "onKeyDown"> {
   readonly toast: ToastItem;
@@ -830,8 +836,8 @@ export interface ToastRootProps extends Omit<HTMLAttributes<HTMLDivElement>, "ch
 export interface ToastActionState { readonly pending: boolean; readonly disabled: boolean; readonly toast: ToastItem; }
 export interface ToastActionProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children" | "className" | "style" | "onClick"> {
   readonly action?: Action<[ToastActionDetails]>;  // default toast.action?.action
-  readonly closeOnSettle?: boolean;                 // default true
-  readonly whilePending?: WhilePending;             // section 3.2: default closeOnSettle ? "ignore" : "run"
+  readonly closeOnActivate?: boolean;                 // default true
+  readonly whilePending?: WhilePending;             // section 3.2: default closeOnActivate ? "ignore" : "run"
   readonly disabled?: boolean;                      // default false; the library disabled rule (below)
   readonly children?: StateValue<ReactNode, ToastActionState>; // default toast.action?.label
   // className / style / render / ref as above
@@ -851,7 +857,9 @@ Viewport handlers the library uses (`onPointerEnter`, `onPointerLeave`, `onFocus
 Public types, flat: `ToastOptions`, `ToastItem`, `ToastPriority`, `ToastActionOptions`,
 `ToastActionDetails`, `ToastCloseDetails`, `ToastPromiseOptions`, `ToastManager`,
 `ToastViewportProps`, `ToastViewportState`, `ToastRootProps`, `ToastRootState`,
-`ToastTitleProps`, `ToastDescriptionProps`, `ToastActionProps`, `ToastActionState`,
+`ToastTitleProps`, `ToastTitleState`, `ToastDescriptionProps`, `ToastDescriptionState` (both
+aliases of `ToastRootState`: every part has an exported state type, conventions 9.4),
+`ToastActionProps`, `ToastActionState`,
 `ToastCloseProps`, `ToastCloseState`. Namespace: `Toast = { Viewport, Root, Title, Description,
 Action, Close }`, plus the named exports `toast` and `createToastManager` from
 `@funstack/ui/toast` (and the root entry).
@@ -1084,7 +1092,7 @@ it render the queue with the failure visible:
 </Toast.Viewport>
 ```
 
-Alternatively `closeOnSettle={false}` on the Action part and `toast.dismiss(id)` on success,
+Alternatively `closeOnActivate={false}` on the Action part and `toast.dismiss(id)` on success,
 without throwing. Either way the trap in section 3.2 (catch, resolve, toast closes) is avoided.
 
 ### 15.4 A Server Function result in a form

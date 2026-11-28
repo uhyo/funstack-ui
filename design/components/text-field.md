@@ -177,7 +177,8 @@ dispatch. The gesture here is one edit, from the first keystroke to the blur or 
 ## 3. Props and types
 
 ```ts
-export interface TextFieldValueChangeDetails extends ActionDetails {
+/** The details of `valueCommitAction`: `<Component><State>CommitDetails` (conventions 9.4). There is no `TextFieldValueChangeDetails`: the component has no change action. */
+export interface TextFieldValueCommitDetails extends ActionDetails {
   /** `"activate"`: the user committed an edit (blur, the commit key). `"platform"`: a form reset, or text adopted at mount. */
   readonly reason: ChangeReason;
 }
@@ -191,6 +192,8 @@ export interface TextFieldState {
   readonly disabled: boolean;
   readonly readOnly: boolean;
   readonly required: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
 }
 
 export interface TextFieldProps
@@ -204,7 +207,7 @@ export interface TextFieldProps
   /** Initial saved text in uncontrolled mode, and its form-reset target (latest). Default `""`. */
   defaultValue?: string;
   /** Once per edit (blur or the commit key), and for a platform change. Commits uncontrolled state when it resolves. */
-  valueCommitAction?: ChangeAction<string, TextFieldValueChangeDetails>;
+  valueCommitAction?: ChangeAction<string, TextFieldValueCommitDetails>;
   /** Native `name`; defaults to the Field's `name` inside a `Field.Root`. */
   name?: string;
   /** Native `disabled`; or the Field's. */
@@ -668,7 +671,7 @@ jsdom, the component's test file:
 | Inside a Field | The Field's `id`, `name`, `aria-describedby`, `aria-invalid`, `disabled` / `required`; `Field.Label`'s `for`; `data-invalid` on the element; its `data-pending` is its own and the Field parts' is the form's; an Escape revert and a rollback re-run `validate` (no event); a server error is dismissed by the first keystroke. |
 | Form | `FormData` holds the text shown, draft included; Enter in a `Form.Root` dispatches the commit and then submits with the same text; `autoReset` after a successful submission dispatches a `"platform"` commit. A textarea's Ctrl+Enter in a `Form.Root` commits and does not submit; with the form-level handler of section 7 the commit is dispatched before the submission, once each. |
 | Function props, `render`, post-await rule, directive | As in testing.md 10.1. |
-| Types | `valueCommitAction` is a `ChangeAction<string, TextFieldValueChangeDetails>` and joins the action-naming list; no `valueChangeAction`, no `onValueChange`, no `transition`; `onChange`, `onKeyDown` and `onBlur` are not accepted. |
+| Types | `valueCommitAction` is a `ChangeAction<string, TextFieldValueCommitDetails>` and joins the action-naming list; no `valueChangeAction`, no `onValueChange`, no `transition`; `onChange`, `onKeyDown` and `onBlur` are not accepted. |
 
 Browser, three engines:
 
