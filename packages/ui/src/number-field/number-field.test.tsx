@@ -110,7 +110,9 @@ describe("NumberField", () => {
       );
       const label = screen.getByTestId("label");
       expect(root()).toHaveAttribute("role", "group");
-      expect(root().getAttribute("aria-labelledby")).toBe(`extra ${label.id}`);
+      // The group has no name of its own (#216); the consumer's aria-labelledby passes through.
+      expect(root().getAttribute("aria-labelledby")).toBe("extra");
+      expect(root()).not.toHaveAttribute("aria-label");
       expect(label).toHaveAttribute("for", input().id);
       expect(input().type).toBe("text");
       expect(input()).not.toHaveAttribute("role");
@@ -147,13 +149,17 @@ describe("NumberField", () => {
         expect(button).toHaveAttribute("tabindex", "-1");
         expect(button).toHaveAttribute("aria-controls", input().id);
         expect(button).toHaveAttribute("aria-label", name);
+        expect(button.id).not.toBe("");
+        expect(button.getAttribute("aria-labelledby")).toBe(`${button.id} ${label.id}`);
       }
+      expect(inc().id).not.toBe(dec().id);
       // At min: the next step down would change nothing.
       expect(dec()).toBeDisabled();
       expect(dec()).toHaveAttribute("data-disabled", "");
       expect(inc()).toBeEnabled();
-      expect(screen.getByRole("group", { name: "Quantity" })).toBe(root());
       expect(screen.getByRole("textbox", { name: "Quantity" })).toBe(input());
+      expect(screen.getByRole("button", { name: "Increase Quantity" })).toBe(inc());
+      expect(screen.getByRole("button", { name: "Decrease Quantity" })).toBe(dec());
     });
 
     it("inputmode follows the 8.5 rule and a consumer's inputMode replaces it", () => {
@@ -175,16 +181,172 @@ describe("NumberField", () => {
       expect(screen.getByTestId("c")).toHaveAttribute("inputmode", "text");
     });
 
-    it("a consumer aria-label replaces the default; aria-labelledby drops it", () => {
+    it("a consumer aria-label replaces the word and keeps the label; aria-labelledby replaces the whole", () => {
       render(
         <NumberField.Root locale="de-DE">
+          <NumberField.Label data-testid="label">Menge</NumberField.Label>
           <NumberField.Increment data-testid="inc" aria-label="Erhöhen" />
           <NumberField.Decrement data-testid="dec" aria-labelledby="x" />
           <NumberField.Input />
+          <span id="x">Weniger</span>
         </NumberField.Root>,
       );
+      const label = screen.getByTestId("label");
       expect(inc()).toHaveAttribute("aria-label", "Erhöhen");
+      expect(inc()).toHaveAttribute("aria-labelledby", `${inc().id} ${label.id}`);
+      expect(inc()).toHaveAccessibleName("Erhöhen Menge");
       expect(dec()).not.toHaveAttribute("aria-label");
+      expect(dec()).toHaveAttribute("aria-labelledby", "x");
+      expect(dec()).toHaveAccessibleName("Weniger");
+    });
+
+    it("two Increments in one Root get distinct default ids", () => {
+      render(
+        <NumberField.Root locale="en-US">
+          <NumberField.Label data-testid="label">Quantity</NumberField.Label>
+          <NumberField.Increment data-testid="a" />
+          <NumberField.Increment data-testid="b" />
+          <NumberField.Input data-testid="input" />
+        </NumberField.Root>,
+      );
+      const a = screen.getByTestId("a");
+      const b = screen.getByTestId("b");
+      expect(a.id).not.toBe(b.id);
+      expect(b).toHaveAttribute("aria-labelledby", `${b.id} ${screen.getByTestId("label").id}`);
+      expect(b).toHaveAccessibleName("Increase Quantity");
+    });
+
+    it("a consumer id replaces the default and is used in the self-reference", () => {
+      render(
+        <NumberField.Root locale="en-US">
+          <Parts />
+        </NumberField.Root>,
+      );
+      const defaultId = inc().id;
+      expect(defaultId).not.toBe("");
+      render(
+        <NumberField.Root locale="en-US">
+          <NumberField.Label data-testid="label2">Quantity</NumberField.Label>
+          <NumberField.Increment data-testid="plus" id="plus" />
+          <NumberField.Input data-testid="input2" />
+        </NumberField.Root>,
+      );
+      const plus = screen.getByTestId("plus");
+      expect(plus.id).toBe("plus");
+      expect(plus).toHaveAttribute("aria-labelledby", `plus ${screen.getByTestId("label2").id}`);
+      expect(plus).toHaveAccessibleName("Increase Quantity");
+    });
+
+    it("without a label the buttons have no aria-labelledby and the short name", () => {
+      render(
+        <NumberField.Root locale="en-US">
+          <NumberField.Decrement data-testid="dec" />
+          <NumberField.Input data-testid="input" aria-label="Quantity" />
+          <NumberField.Increment data-testid="inc" />
+        </NumberField.Root>,
+      );
+      for (const button of [inc(), dec()]) {
+        expect(button.id).not.toBe("");
+        expect(button).not.toHaveAttribute("aria-labelledby");
+      }
+      expect(inc()).toHaveAccessibleName("Increase");
+      expect(dec()).toHaveAccessibleName("Decrease");
+    });
+
+    it("a Label mounted later adds its token; unmounting it removes the token", () => {
+      function Toggle({ shown }: { shown: boolean }) {
+        return (
+          <NumberField.Root locale="en-US">
+            {shown && <NumberField.Label data-testid="label">Quantity</NumberField.Label>}
+            <NumberField.Input data-testid="input" aria-label="Quantity" />
+            <NumberField.Increment data-testid="inc" />
+          </NumberField.Root>
+        );
+      }
+      const { rerender } = render(<Toggle shown={false} />);
+      expect(inc()).not.toHaveAttribute("aria-labelledby");
+      rerender(<Toggle shown />);
+      expect(inc()).toHaveAttribute(
+        "aria-labelledby",
+        `${inc().id} ${screen.getByTestId("label").id}`,
+      );
+      expect(inc()).toHaveAccessibleName("Increase Quantity");
+      rerender(<Toggle shown={false} />);
+      expect(inc()).not.toHaveAttribute("aria-labelledby");
+      expect(inc()).toHaveAccessibleName("Increase");
+    });
+
+    it("the Root has no name; a consumer's aria-label passes through", () => {
+      render(
+        <>
+          <NumberField.Root data-testid="root" locale="en-US">
+            <Parts />
+          </NumberField.Root>
+          <NumberField.Root data-testid="named" locale="en-US" aria-label="Order">
+            <NumberField.Input aria-label="Quantity" />
+          </NumberField.Root>
+        </>,
+      );
+      expect(root()).toHaveAttribute("role", "group");
+      expect(root()).not.toHaveAttribute("aria-labelledby");
+      expect(root()).not.toHaveAttribute("aria-label");
+      expect(root()).toHaveAccessibleName("");
+      const named = screen.getByTestId("named");
+      expect(named).toHaveAttribute("aria-label", "Order");
+      expect(named).not.toHaveAttribute("aria-labelledby");
+      expect(screen.getByRole("group", { name: "Order" })).toBe(named);
+    });
+
+    it("inside a Field with only Field.Label, the Field's label names the buttons", async () => {
+      render(
+        <Field.Root>
+          <Field.Label data-testid="field-label">Quantity</Field.Label>
+          <NumberField.Root data-testid="root" locale="en-US">
+            <NumberField.Decrement data-testid="dec" />
+            <NumberField.Input data-testid="input" />
+            <NumberField.Increment data-testid="inc" />
+          </NumberField.Root>
+        </Field.Root>,
+      );
+      await flushMicrotasks();
+      const fieldLabel = screen.getByTestId("field-label");
+      expect(root()).not.toHaveAttribute("aria-labelledby");
+      expect(inc()).toHaveAttribute("aria-labelledby", `${inc().id} ${fieldLabel.id}`);
+      expect(inc()).toHaveAccessibleName("Increase Quantity");
+      expect(dec()).toHaveAccessibleName("Decrease Quantity");
+      expect(screen.getByRole("textbox", { name: "Quantity" })).toBe(input());
+    });
+
+    it("server render: the button ids and the Field label's token are in the HTML; hydrates without a warning", async () => {
+      const consoleError = silenceErrors();
+      const ui = (
+        <Field.Root>
+          <Field.Label>Quantity</Field.Label>
+          <NumberField.Root data-testid="root" locale="en-US" defaultValue={1}>
+            <NumberField.Label data-testid="label">Qty</NumberField.Label>
+            <NumberField.Decrement data-testid="dec" />
+            <NumberField.Input data-testid="input" />
+            <NumberField.Increment data-testid="inc" />
+          </NumberField.Root>
+        </Field.Root>
+      );
+      let serverInc: { id: string; labelledBy: string | null } | undefined;
+      await hydrateFromServer(ui, {
+        mutate: (c) => {
+          const button = c.querySelector('[data-testid="inc"]') as HTMLElement;
+          serverInc = { id: button.id, labelledBy: button.getAttribute("aria-labelledby") };
+        },
+      });
+      // The server has no layout effects, so NumberField.Label's token joins after hydration; the
+      // Field's label id is known at render time.
+      const fieldLabelId = screen.getByText("Quantity").id;
+      expect(serverInc?.id).toBe(inc().id);
+      expect(serverInc?.labelledBy).toBe(`${inc().id} ${fieldLabelId}`);
+      expect(inc()).toHaveAttribute(
+        "aria-labelledby",
+        `${inc().id} ${screen.getByTestId("label").id} ${fieldLabelId}`,
+      );
+      expect(consoleError).not.toHaveBeenCalled();
     });
 
     it("warns for render type number, NaN, min > max, lang disagreement and an empty aria-label", () => {
@@ -1352,9 +1514,14 @@ describe("NumberField", () => {
       expect(input()).toHaveAttribute("aria-describedby", `own ${screen.getByTestId("desc").id}`);
       expect(input()).toHaveAttribute("aria-invalid", "false");
       expect(hidden()).not.toHaveAttribute("aria-invalid");
-      expect(root().getAttribute("aria-labelledby")).toBe(
-        `consumer ${screen.getByTestId("label").id} ${fieldLabel.id}`,
-      );
+      // The group is unnamed (#216): only the consumer's aria-labelledby. The buttons carry the
+      // labels, the part's first, the Field's second.
+      expect(root().getAttribute("aria-labelledby")).toBe("consumer");
+      for (const button of [inc(), dec()]) {
+        expect(button.getAttribute("aria-labelledby")).toBe(
+          `${button.id} ${screen.getByTestId("label").id} ${fieldLabel.id}`,
+        );
+      }
     });
 
     it("flags come from the hidden input; the visible mirrors", async () => {

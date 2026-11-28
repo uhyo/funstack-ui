@@ -5,7 +5,8 @@ import { NumberField } from "@funstack/ui/number-field";
 const locales = ["en-US", "de-DE", "fr-FR", "ar-EG"] as const;
 type Locale = (typeof locales)[number];
 
-// The buttons' built-in names are English; pass your own next to the locale.
+// The buttons' built-in words are English; pass your own next to the locale. The label is still
+// appended to the name ("Erhöhen Price"), so the word is all you translate.
 const labels: Record<Locale, { increase: string; decrease: string }> = {
   "en-US": { increase: "Increase", decrease: "Decrease" },
   "de-DE": { increase: "Erhöhen", decrease: "Verringern" },

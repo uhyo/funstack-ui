@@ -12,6 +12,9 @@ export type { NumberFieldDecrementProps } from "./use-step-button.js";
  *
  * Owned keys: `type`, `tabIndex`, `aria-controls`, `disabled`, `aria-disabled` (link or component
  * `render`), `onPointerDown`, `onClick`, `onContextMenu`, `data-pending`, `data-disabled`.
+ * Defaults the consumer's replace: `id`, `aria-label` (`"Decrease"`) and `aria-labelledby`
+ * (`"<own id> <label id>"`, so the name is "Decrease Quantity"; with a consumer `aria-labelledby` the
+ * default `aria-label` is omitted).
  *
  * @see https://ui.funstack.work/components/number-field
  */

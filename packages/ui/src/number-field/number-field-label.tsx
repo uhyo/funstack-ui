@@ -30,8 +30,9 @@ export interface NumberFieldLabelProps extends Omit<
 }
 
 /**
- * The visible name of the field: `<label for>` naming the visible input; its id also names the
- * Root group (`aria-labelledby`, emitted only while a Label is mounted).
+ * The visible name of the field: `<label for>` naming the visible input; while it is mounted,
+ * the Increment and Decrement buttons append its id to their `aria-labelledby` ("Increase
+ * Quantity"). The Root group is not named by it.
  *
  * Owned keys: `id`, `htmlFor`, `data-pending`, `data-disabled`, `data-invalid` (the Root's state,
  * conventions 4.1 rule 2).
