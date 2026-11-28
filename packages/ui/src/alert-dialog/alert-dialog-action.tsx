@@ -1,14 +1,14 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { useDialogClose } from "../dialog/dialog-close.js";
-import type { DialogCloseDetails, DialogCloseState } from "../dialog/dialog-close.js";
+import type { DialogCloseActionDetails, DialogCloseState } from "../dialog/dialog-close.js";
 import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
 
 /** State of `AlertDialog.Action`, passed to the function forms of `className`, `style`, `children` and `render`. */
 export type AlertDialogActionState = DialogCloseState;
 
 /** Details passed to `AlertDialog.Action`'s `action`. */
-export type AlertDialogActionDetails = DialogCloseDetails;
+export type AlertDialogActionDetails = DialogCloseActionDetails;
 
 /**
  * Props of `AlertDialog.Action`.
@@ -17,7 +17,17 @@ export type AlertDialogActionDetails = DialogCloseDetails;
  */
 export interface AlertDialogActionProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "value" | "className" | "style" | "children"
+  | "onClick"
+  | "value"
+  | "type"
+  | "commandfor"
+  | "command"
+  | "popoverTarget"
+  | "popoverTargetAction"
+  | "aria-disabled"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * The confirmed work. Runs inside this part's own transition (`data-pending` on the button),
@@ -69,8 +79,9 @@ export interface AlertDialogActionProps extends Omit<
  * the dialog closes; a rejection leaves it open. Unlike `Dialog.Close`, an Action with `action`
  * renders no `commandfor` / `command`.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command`, `value`, `onClick` (library mode, or with `action`), `aria-disabled`,
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `commandfor`, `command`, `popoverTarget` and `popoverTargetAction` (never written), `value`,
+ * `onClick` (library mode, or with `action`), `aria-disabled`. Also owned: `disabled`,
  * `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/alert-dialog

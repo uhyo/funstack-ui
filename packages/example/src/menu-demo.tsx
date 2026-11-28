@@ -100,7 +100,7 @@ function ViewOptions() {
       </p>
       <Menu.Root>
         <Menu.Trigger className="menu-btn">View ▾</Menu.Trigger>
-        <Menu.Popup className="menu" experimental_focusgroup>
+        <Menu.Popup className="menu" experimental_focusGroup>
           <Menu.CheckboxItem
             checked={dense}
             checkedChangeAction={async (next) => {

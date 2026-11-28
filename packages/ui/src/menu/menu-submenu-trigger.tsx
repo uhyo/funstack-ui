@@ -71,7 +71,7 @@ export interface MenuSubmenuTriggerProps extends Omit<
  * Owned keys (conventions 1.2): the Trigger's (`type`, `id`, `popoverTarget`, `aria-haspopup`,
  * `aria-expanded`, `data-open`, `data-pending`; `commandfor`, `command` and `popoverTargetAction`,
  * never written) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`,
- * `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`,
+ * `data-disabled`, `data-fsui-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`,
  * `onPointerLeave`).
  *
  * @see https://ui.funstack.work/components/menu
@@ -182,7 +182,7 @@ export function MenuSubmenuTrigger({
       ...libraryProps,
       role: item.libraryProps.role,
       tabIndex: item.libraryProps.tabIndex,
-      "data-typeahead": item.libraryProps["data-typeahead"],
+      "data-fsui-typeahead": item.libraryProps["data-fsui-typeahead"],
       id: menu.triggerId,
       "aria-haspopup": "menu",
     },

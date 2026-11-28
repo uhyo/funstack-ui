@@ -27,7 +27,7 @@ const itemRows = (state: string, closeDefault: string, closeNote: string) => [
     name: "label",
     type: "string",
     description:
-      "Text that typeahead matches when the item's text content is not representative (an icon). Rendered as `data-typeahead`.",
+      "Text that typeahead matches when the item's text content is not representative (an icon). Rendered as `data-fsui-typeahead`, the library's internal marker: do not select on it.",
   },
   ...functionProps(state),
   renderProp("button", state),
@@ -301,7 +301,7 @@ export function MenuPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`. Owned, so a `render` element cannot re-enable it. With a link or component `render`, `aria-disabled="true"` instead (the element stays focusable); a click, Enter and the arrow keys do not open.',
+              'Native `disabled`. Owned, so a `render` element cannot re-enable it. With a link or component `render`, and inside a `Menubar` or a [`Toolbar.Root`](/components/toolbar), `aria-disabled="true"` instead (the element stays focusable and, in a Toolbar, in the arrow-key sequence); a click, Enter and the arrow keys do not open.',
           },
           ...functionProps("MenuTriggerState", "Rendered from optimistic state; must not suspend."),
           renderProp("button", "MenuTriggerState"),
@@ -310,7 +310,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `popoverTarget` and `aria-expanded`."
+          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`, in a Menubar or a Toolbar), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `type`, `aria-disabled`, `popoverTarget`, `aria-haspopup` and `aria-expanded`."
         }
         note={
           "Use it in a top-level Root only. A primary-button press on it while the menu is open keeps focus on the current item; the click then closes the menu."
@@ -344,7 +344,7 @@ export function MenuPage() {
               'false: the items render only while open (items that suspend hold the open, with `data-pending` on the Trigger). true: they stay mounted in `<Activity mode="hidden">`; an item action that rejects while the menu is closed goes to `reportError`, not to an Error Boundary.',
           },
           {
-            name: "experimental_focusgroup",
+            name: "experimental_focusGroup",
             type: "boolean",
             default: "false",
             description:
@@ -354,7 +354,7 @@ export function MenuPage() {
             name: "transition",
             type: "ViewTransitionClass",
             description:
-              "Forwarded to a `<ViewTransition>` around the popup element: animates the open and every library-driven close (an item's activation, the Trigger, ArrowLeft, a hover close, controlled) in every engine. Dismissals animate with CSS only.",
+              "Forwarded to a `<ViewTransition>` around the popup element: animates the open and every library-driven close (an item's activation, the Trigger, ArrowLeft, a hover close, controlled) in every engine. Dismissals animate with CSS only. Keep it static: changing it remounts the popup. Any value, `\"none\"` included, makes a mount or `<Activity>` reveal of the Popup inside a transition run the page cross-fade; a plain open does not. While a view transition runs, the popup's CSS transitions are cut for the library's own show or hide (a `@keyframes` animation is not, and a dismissal keeps its CSS exit).",
           },
           ...functionProps("MenuPopupState"),
           renderProp("div", "MenuPopupState"),
@@ -362,10 +362,10 @@ export function MenuPage() {
       />
       <PartFacts
         state={
-          "`MenuPopupState` is `{ open, side, align, submenu, context }`; `open` is committed; `context` is true and `side` is `null` for an open from a `Menu.ContextTrigger`. While the menu is shown, `side` / `align` are where the browser placed it (a physical side, after any flip: a submenu reads `right` in LTR and `left` in RTL); otherwise your props."
+          "`MenuPopupState` is `{ open, side, align, submenu, context }`; `open` is committed; `submenu` (`data-submenu`) is true on a submenu's popup; `context` is true and `side` is `null` for an open from a `Menu.ContextTrigger`. While the menu is shown, `side` / `align` are where the browser placed it (a physical side, after any flip: a submenu reads `right` in LTR and `left` in RTL); otherwise your props."
         }
         owned={
-          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged), `tabIndex` (`-1`), `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
+          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged), `tabIndex` (`-1`), `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
         }
         note={
           "A menu shown on the physical side you asked for costs no render for the placement; a logical side (every submenu, by default `inline-end`) costs one render on show and one on hide, since `data-side` turns physical while shown. Style it with `:popover-open`; it emits no `data-open`. Render a `<div>`, not a `<dialog>`."
@@ -379,7 +379,7 @@ export function MenuPage() {
         rows={[
           {
             name: "action",
-            type: "Action<[details: MenuItemDetails]>",
+            type: "Action<[details: MenuItemActionDetails]>",
             description:
               'Runs in the item\'s own transition (`data-pending` on the item); the menu closes when it settles. A second activation while it is pending is ignored, and the item is `aria-disabled="true"` meanwhile, unless `whilePending` is `"run"` (the default with `closeOnActivate={false}`). May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item.',
           },
@@ -396,7 +396,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuItemState` is `{ pending, disabled }`."}
         owned={
-          '`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending with `whilePending="ignore"`), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-typeahead`.'
+          '`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending with `whilePending="ignore"`), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-fsui-typeahead`.'
         }
       />
 
@@ -418,9 +418,9 @@ export function MenuPage() {
           },
           {
             name: "checkedChangeAction",
-            type: "ChangeAction<boolean>",
+            type: "ChangeAction<boolean, MenuCheckboxItemCheckedChangeDetails>",
             description:
-              "Awaited in the item's transition; `aria-checked` flips at once and rolls back on rejection. May be a Server Function.",
+              'Awaited in the item\'s transition; `aria-checked` flips at once and rolls back on rejection. `details.reason` is `"activate"`. May be a Server Function.',
           },
           ...itemRows(
             "MenuCheckboxItemState",
@@ -457,9 +457,9 @@ export function MenuPage() {
           },
           {
             name: "valueChangeAction",
-            type: "ChangeAction<string>",
+            type: "ChangeAction<string, MenuRadioGroupValueChangeDetails>",
             description:
-              "Receives the chosen item's value, awaited in the group's transition. May be a Server Function.",
+              "Receives the chosen item's value, awaited in the group's transition. `details.reason` is `\"activate\"`. May be a Server Function.",
           },
           ...functionProps("MenuRadioGroupState", "The RadioItems and a GroupLabel."),
           renderProp("div", "MenuRadioGroupState"),
@@ -540,7 +540,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`; these, `popoverTarget` and `aria-expanded` are not in the props type) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`; these, `popoverTarget` and `aria-expanded` are not in the props type) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-fsui-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
         }
         note={
           "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. A disabled SubmenuTrigger stays focusable (`aria-disabled`), so it is no invoker while disabled and renders `aria-expanded` from the shown submenu. Use it in a submenu Root only."
@@ -584,10 +584,11 @@ export function MenuPage() {
             "Optimistic checked state.",
           ],
           [
-            "`data-typeahead`",
+            "`data-fsui-typeahead`",
             "Item, CheckboxItem, RadioItem, SubmenuTrigger",
-            "The `label` prop: the text typeahead matches.",
+            "The `label` prop: the text typeahead matches. An internal marker (the `data-fsui-` prefix), not a styling hook.",
           ],
+          ["`data-submenu`", "Popup", "The popup belongs to a submenu (`state.submenu`)."],
           [
             "`:popover-open`",
             "Popup",
@@ -814,7 +815,7 @@ export function MenuPage() {
       <h3 id="browser-notes">Browser notes</h3>
       <ul>
         <li>
-          <code>experimental_focusgroup</code> takes the native path in Chromium only; other engines
+          <code>experimental_focusGroup</code> takes the native path in Chromium only; other engines
           keep the JS arrow keys (identical behaviour).
         </li>
         <li>

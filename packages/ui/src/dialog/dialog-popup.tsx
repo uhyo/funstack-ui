@@ -52,7 +52,15 @@ export interface DialogPopupState {
  */
 export interface DialogPopupProps extends Omit<
   ComponentPropsWithRef<"dialog">,
-  "id" | "open" | "closedby" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"
+  | "id"
+  | "open"
+  | "closedby"
+  | "popover"
+  | "onToggle"
+  | "onBeforeToggle"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * Library mode: what happens to the children while the dialog is closed.
@@ -102,14 +110,16 @@ export interface DialogPopupProps extends Omit<
    * part, a Form submit or settled action, a foreign close command, a controlled
    * `open={false}`), in all engines; dismissals (Escape, a click outside: `onOpenChange`) are the
    * browser's and animate with CSS only, never with a view transition. Ignored (dev warning) in
-   * JS-free mode. While a view transition runs, the dialog's CSS transitions are turned off for
-   * the moment of the library's own show or close (an inline `transition: none !important`,
-   * restored right after), so that show or close runs no CSS transition (a `@keyframes`
-   * animation is not cut).
+   * JS-free mode.
    *
    * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
+   * mount or `<Activity>` reveal of the Popup inside a transition start a document view
+   * transition (a ~250 ms page cross-fade that the next transition waits for); a plain open
+   * starts none, as the content mounts under the already-mounted popup element. While a view
+   * transition runs, the popup's CSS transitions are cut for the moment of the library's own
+   * show or hide (an inline `transition: none !important`, restored right after), so only the
+   * view transition animates it; a `@keyframes` animation is not cut, and a dismissal, which
+   * runs no view transition, keeps its CSS exit.
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
@@ -148,8 +158,9 @@ function valueOf(element: unknown): string {
  * committed state `false` urgently and calls `onOpenChange(false, { reason: "dismiss",
  * returnValue })`; no view transition runs for it.
  *
- * Owned keys (conventions 1.2): `id`, `open`, `closedby`, `aria-labelledby` and
- * `aria-describedby` (token-merged), `data-modal`, `suppressHydrationWarning`.
+ * Owned keys (conventions 1.2): `id`, `open`, `closedby`, `popover` (never written: a
+ * `<dialog popover>` would break `showModal()`), `onToggle`, `onBeforeToggle`, `aria-labelledby`
+ * and `aria-describedby` (token-merged), `data-modal`, `suppressHydrationWarning`.
  *
  * @see https://ui.funstack.work/components/dialog
  */

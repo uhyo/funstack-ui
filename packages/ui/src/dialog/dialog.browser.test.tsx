@@ -143,6 +143,25 @@ function Plain({
 }
 
 /** The shared suite's harness: the content, then `inside`, then a Close part (value "cancel"). */
+/** The shared suite's JS-free harness (its "JS-free data-open" rows). */
+function StaticHarness({ withTrigger = true }: { withTrigger?: boolean }) {
+  return (
+    <Dialog.Root>
+      {withTrigger && (
+        <Dialog.Trigger
+          data-testid="trigger"
+          className={({ open }) => (open ? "state-open" : "state-closed")}
+        >
+          Edit
+        </Dialog.Trigger>
+      )}
+      <Dialog.Popup data-testid="popup" aria-label="Edit">
+        <Dialog.Close data-testid="close">Cancel</Dialog.Close>
+      </Dialog.Popup>
+    </Dialog.Root>
+  );
+}
+
 function SuiteHarness({
   action,
   fact,
@@ -268,6 +287,7 @@ describe("Dialog (browser)", () => {
       dismiss: () => userEvent.keyboard("{Escape}"),
       afterOpen: () => expect(popup().matches(":modal")).toBe(true),
     },
+    jsFree: { Harness: StaticHarness },
   });
 
   describe("JS-free mode", () => {

@@ -247,7 +247,9 @@ export function DrawerPage() {
         <code>data-pending</code> in library mode. Props: <code>disabled</code>,{" "}
         <code>className</code>, <code>style</code>, <code>children</code> (functions of{" "}
         <code>DrawerTriggerState</code>, <code>{"{ open, pending, disabled }"}</code>),{" "}
-        <code>render</code>. See <a href="/components/dialog#props">Dialog.Trigger</a>.
+        <code>render</code>. In JS-free mode <code>data-open</code> follows the dialog; inside a
+        <code>Toolbar.Root</code> a disabled Trigger is <code>aria-disabled</code> and stays
+        focusable. See <a href="/components/dialog#props">Dialog.Trigger</a>.
       </p>
 
       <h4>
@@ -324,10 +326,11 @@ export function DrawerPage() {
         the action runs first in the button's own transition (<code>data-pending</code>) and a
         rejection leaves the drawer open. With or without <code>action</code>, the button has{" "}
         <code>data-pending</code> until the close it asked for has committed. Props:{" "}
-        <code>action</code>, <code>whilePending</code>, <code>value</code>, <code>disabled</code>,{" "}
-        <code>className</code>, <code>style</code>, <code>children</code> (functions of{" "}
-        <code>DrawerCloseState</code>, <code>{"{ pending, disabled }"}</code>), <code>render</code>.
-        See <a href="/components/dialog#props">Dialog.Close</a>.
+        <code>action</code> (details: <code>DrawerCloseActionDetails</code>),{" "}
+        <code>whilePending</code>, <code>value</code>, <code>disabled</code>, <code>className</code>
+        , <code>style</code>, <code>children</code> (functions of <code>DrawerCloseState</code>,{" "}
+        <code>{"{ pending, disabled }"}</code>), <code>render</code>. See{" "}
+        <a href="/components/dialog#props">Dialog.Close</a>.
       </p>
 
       <h4>
@@ -367,7 +370,12 @@ export function DrawerPage() {
             "Popup (inline)",
             "Offset / extent, from 0 to 1. `::backdrop` inherits it.",
           ],
-          ["`data-open`, `data-pending`", "Trigger", "Library mode, as on a Dialog."],
+          [
+            "`data-open`",
+            "Trigger",
+            "As on a Dialog: optimistic in library mode; in JS-free mode whether the dialog is open, written from its `toggle` event.",
+          ],
+          ["`data-pending`", "Trigger", "Library mode, as on a Dialog."],
           [
             "`data-pending`",
             "Close",

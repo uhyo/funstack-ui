@@ -40,6 +40,7 @@ import {
   flushTasks,
   silenceErrors,
 } from "../__tests__/helpers.js";
+import { AlertDialog } from "../alert-dialog/index.js";
 import { Drawer } from "../drawer/index.js";
 import { HoverCard } from "../hover-card/index.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
@@ -222,6 +223,56 @@ describe("Dialog", () => {
   });
 
   describe("JS-free mode", () => {
+    // Conventions 7.4, design 3.2 (#201): the DOM owns `data-open` in JS-free mode, written from
+    // the dialog's `toggle`; React's `state.open` stays `false`. One shared Trigger body.
+    describe.each([
+      ["Dialog", Dialog],
+      ["AlertDialog", AlertDialog],
+      ["Drawer", Drawer],
+    ] as const)("%s.Trigger data-open", (_, C) => {
+      function Static({ withTrigger = true }: { withTrigger?: boolean }) {
+        return (
+          <C.Root>
+            {withTrigger && (
+              <C.Trigger
+                data-testid="trigger"
+                className={({ open }) => (open ? "state-open" : "state-closed")}
+              >
+                Open
+              </C.Trigger>
+            )}
+            <C.Popup data-testid="popup" aria-label="Dialog" />
+          </C.Root>
+        );
+      }
+
+      it("follows the dialog's toggle; state.open stays false", async () => {
+        render(<Static />);
+        expect(trigger()).not.toHaveAttribute("data-open");
+        await act(async () => popup().showModal());
+        await flushTasks(2);
+        expect(trigger()).toHaveAttribute("data-open", "");
+        expect(trigger()).toHaveClass("state-closed");
+        await act(async () => popup().close());
+        await flushTasks(2);
+        expect(trigger()).not.toHaveAttribute("data-open");
+      });
+
+      it("a Trigger mounted while the dialog is open picks the state up; an unmounted one stops listening", async () => {
+        const { rerender } = render(<Static withTrigger={false} />);
+        await act(async () => popup().showModal());
+        await flushTasks(2);
+        rerender(<Static />);
+        expect(trigger()).toHaveAttribute("data-open", "");
+        const first = trigger();
+        rerender(<Static withTrigger={false} />);
+        await act(async () => popup().close());
+        await flushTasks(2);
+        // Detached: its listener was removed, so the stale element is not written.
+        expect(first).toHaveAttribute("data-open", "");
+      });
+    });
+
     it("opens through the native command and closes through request-close", async () => {
       const user = setupUser();
       render(<Harness mode="static" />);

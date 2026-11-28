@@ -199,7 +199,7 @@ export interface MenuListContextValue {
   /** The menu this popup belongs to. */
   readonly menu: MenuContextValue;
   /**
-   * `experimental_focusgroup` is on and the engine implements it: items render no `tabindex`
+   * `experimental_focusGroup` is on and the engine implements it: items render no `tabindex`
    * (Chromium leaves `tabindex="-1"` elements out of a focusgroup) and the JS arrow keys step
    * aside.
    */

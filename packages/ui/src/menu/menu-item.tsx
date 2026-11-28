@@ -14,7 +14,7 @@ import { useMenuContext } from "./menu-context.js";
 import { useMenuItem } from "./use-menu-item.js";
 
 /** Details passed to `Menu.Item`'s `action`. */
-export interface MenuItemDetails extends ActionDetails {}
+export interface MenuItemActionDetails extends ActionDetails {}
 
 /**
  * State of `Menu.Item`, passed to the function forms of `className`, `style`, `children` and
@@ -42,7 +42,7 @@ export interface MenuItemProps extends Omit<
    * (`details.event` is virtual). A rejection leaves the menu open and reaches the nearest Error
    * Boundary above the item. Without `action`, activation only closes.
    */
-  action?: Action<[details: MenuItemDetails]>;
+  action?: Action<[details: MenuItemActionDetails]>;
   /**
    * Close the whole menu once `action` settles.
    *
@@ -89,7 +89,7 @@ export interface MenuItemProps extends Omit<
  *
  * Owned keys (conventions 1.2): `type` (on a `<button>`), `role`, `tabIndex`, `disabled`
  * (always absent), `aria-disabled`, `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`,
- * `data-disabled`, `data-typeahead`.
+ * `data-disabled`, `data-fsui-typeahead`.
  *
  * @see https://ui.funstack.work/components/menu
  */
@@ -124,7 +124,7 @@ export function MenuItem({
     disabled,
     label,
     activate: (event) => {
-      const details: MenuItemDetails = createActionDetails(event, {});
+      const details: MenuItemActionDetails = createActionDetails(event, {});
       // When ignoring, a second activation while this item's own run is in flight starts
       // nothing and is cancelled (the hook's guard): a link does not navigate, a composed
       // command does not run. Enter / Space reach here through the element's click, their keydown is cancelled.
