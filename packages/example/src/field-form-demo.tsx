@@ -3,7 +3,7 @@ import { Checkbox } from "@funstack/ui/checkbox";
 import { Combobox } from "@funstack/ui/combobox";
 import { Field } from "@funstack/ui/field";
 import { Form } from "@funstack/ui/form";
-import type { FormErrors } from "@funstack/ui/form";
+import type { FieldErrorValue, FormErrors } from "@funstack/ui/form";
 import { RadioGroup } from "@funstack/ui/radio-group";
 import { Select } from "@funstack/ui/select";
 import { Slider } from "@funstack/ui/slider";
@@ -15,14 +15,20 @@ import "./field-form-demo.css";
 
 interface State {
   readonly errors?: FormErrors;
+  /** A form-level error (`Form.Root error`): not about one field, the same values may retry. */
+  readonly error?: FieldErrorValue;
   readonly done?: string;
 }
 
-/** Fake Server Function: field errors for "taken@example.com" and an "admin" handle. */
+/**
+ * Fake Server Function: field errors for "taken@example.com" and an "admin" handle; a
+ * form-level error for an "offline" handle (a retry with the same values runs again).
+ */
 async function signUp(_prev: State, formData: FormData): Promise<State> {
   console.log("[sign-up] submitting", Object.fromEntries(formData));
   await sleep(1000);
   if (formData.get("handle") === "crash") throw new Error("[sign-up] the server crashed");
+  if (formData.get("handle") === "offline") return { error: "Could not reach the server." };
   const errors: Record<string, string> = {};
   if (formData.get("email") === "taken@example.com") errors["email"] = "Already registered.";
   if (String(formData.get("handle")).includes("admin")) errors["handle"] = "Reserved.";
@@ -34,7 +40,8 @@ async function signUp(_prev: State, formData: FormData): Promise<State> {
 function SignUp() {
   const [state, formAction] = useActionState(signUp, {});
   return (
-    <Form.Root action={formAction} errors={state.errors} className="ff-form">
+    <Form.Root action={formAction} errors={state.errors} error={state.error} className="ff-form">
+      <Form.Error className="ff-form-error" />
       <Field.Root name="email" required className="ff-field">
         <Field.Label>Email</Field.Label>
         <Field.Control type="email" className="ff-input" />
@@ -47,7 +54,8 @@ function SignUp() {
         <Field.Label>Handle</Field.Label>
         <Field.Control pattern="[a-z0-9_]+" className="ff-input" />
         <Field.Description className="ff-description">
-          A handle containing "admin" is reserved; "crash" makes the action throw.
+          A handle containing "admin" is reserved; "crash" makes the action throw; "offline" returns
+          a form-level error (Form.Error).
         </Field.Description>
         <Field.Error className="ff-error" />
       </Field.Root>

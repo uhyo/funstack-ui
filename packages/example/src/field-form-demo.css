@@ -78,6 +78,17 @@
   cursor: progress;
 }
 
+.ff-form-error {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #fca5a5;
+  border-radius: 4px;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.ff-form-error[data-pending] {
+  opacity: 0.6;
+}
+
 .ff-error-box {
   padding: 0.5em 1em;
   border: 1px solid crimson;
