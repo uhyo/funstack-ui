@@ -1,5 +1,5 @@
 "use client";
-import { startTransition, useState } from "react";
+import { useState } from "react";
 import { toast } from "@funstack/ui/toast";
 import { sleep } from "./fake-api.js";
 
@@ -24,7 +24,7 @@ export function ToastUndoWindow() {
       duration: 6000,
       action: {
         label: "Undo",
-        action: () => startTransition(() => setItems((list) => [...list, name])),
+        action: () => setItems((list) => [...list, name]),
       },
       onClose: async ({ reason }) => {
         if (reason === "activate") {

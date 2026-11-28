@@ -14,7 +14,7 @@ export function ToolbarEditor() {
   const [styles, setStyles] = useState<string[]>(["bold"]);
   const [align, setAlign] = useState<string | null>("left");
   const [log, setLog] = useState("Nothing yet.");
-  const note = (line: string) => startTransition(() => setLog(line));
+  const note = (line: string) => setLog(line);
 
   return (
     <DemoErrorBoundary>
@@ -72,7 +72,8 @@ export function ToolbarEditor() {
             className="demo-toolbar-button"
             action={async () => {
               await fakeSave("cut");
-              note("Cut.");
+              // After an await: wrap the update in startTransition (React limitation).
+              startTransition(() => note("Cut."));
             }}
           >
             {({ pending }) => (

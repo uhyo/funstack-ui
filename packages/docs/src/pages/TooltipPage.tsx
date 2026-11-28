@@ -58,6 +58,17 @@ export function TooltipPage() {
           that reading order for popovers, and some screen readers attach an adjacent tooltip to the
           wrong control otherwise.
         </li>
+        <li>
+          <strong>
+            Inside running text, render a <code>&lt;span&gt;</code> Popup:
+          </strong>{" "}
+          <code>render={"{<span />}"}</code>. The default <code>&lt;div&gt;</code> cannot sit inside
+          a <code>&lt;p&gt;</code>: the HTML parser closes the paragraph before it, so
+          server-rendered HTML no longer matches React's tree and hydration fails (React also warns
+          in development). The <code>&lt;span&gt;</code> keeps <code>popover</code> and{" "}
+          <code>role="tooltip"</code>; keep its content phrasing content (text, <code>kbd</code>,{" "}
+          <code>span</code>).
+        </li>
         <li>One Trigger per Root.</li>
         <li>
           <code>Arrow</code> is optional and draws nothing itself: it carries the Popup's{" "}
@@ -294,7 +305,11 @@ export function TooltipPage() {
             "TooltipPopupState",
             "Rendered at mount (hidden), not at open time. Keep it static and non-interactive.",
           ),
-          renderProp("div", "TooltipPopupState"),
+          renderProp(
+            "div",
+            "TooltipPopupState",
+            "A `<span>` for a tooltip inside running text (phrasing content only).",
+          ),
         ]}
       />
       <PartFacts

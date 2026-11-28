@@ -48,11 +48,11 @@ import type { ActionDetails, ChangeAction } from "@funstack/ui/types";`}</CodeBl
       <p>
         <code>@funstack/ui/types</code> holds the types that several components share and none owns:{" "}
         <code>Action</code>, <code>ActionDetails</code>, <code>ChangeAction</code>,{" "}
-        <code>ChangeReason</code>, <code>RenderProp</code>, <code>StateValue</code>,{" "}
-        <code>UrgentChangeHandler</code>, <code>UrgentHandler</code> and <code>WhilePending</code>.
-        It contains types only, so importing it costs nothing at runtime. A type that belongs to one
-        component (<code>TabsValueChangeDetails</code>) comes from that component's subpath; the
-        component subpaths do not re-export the shared types.
+        <code>ChangeReason</code>, <code>Rejectable</code>, <code>RenderProp</code>,{" "}
+        <code>StateValue</code>, <code>UrgentChangeHandler</code>, <code>UrgentHandler</code> and{" "}
+        <code>WhilePending</code>. It contains types only, so importing it costs nothing at runtime.
+        A type that belongs to one component (<code>TabsValueChangeDetails</code>) comes from that
+        component's subpath; the component subpaths do not re-export the shared types.
       </p>
       <p>
         Single-element components are plain components (<code>Toggle</code>). Compound components

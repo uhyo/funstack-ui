@@ -30,7 +30,7 @@ export function MenuSlowOpen() {
     (open: boolean, { reason }: MenuOpenChangeDetails) => {
       setLog(`${menu} onOpenChange(${open}, "${reason}")`);
     };
-  const choose = (next: string) => () => startTransition(() => setView(next));
+  const choose = (next: string) => () => setView(next);
 
   return (
     <div className="demo-stack">

@@ -69,6 +69,20 @@ export function PopoverPage() {
           keeps it open.
         </li>
         <li>
+          <strong>
+            Never inside a <code>&lt;p&gt;</code>.
+          </strong>{" "}
+          A <code>&lt;dialog&gt;</code> or <code>&lt;div&gt;</code> cannot sit in running text: the
+          HTML parser closes the paragraph before it, so server-rendered HTML no longer matches
+          React's tree and hydration fails (React also warns in development). A{" "}
+          <code>&lt;span&gt;</code> Popup is not an option (see <code>render</code> below). For a
+          Trigger inside a sentence, put the text in a <code>&lt;div&gt;</code> styled as your
+          paragraph, or end the <code>&lt;p&gt;</code> and render the Popup right after it. The
+          default <code>&lt;dialog&gt;</code> moves focus into itself on open, so it need not be
+          adjacent; a <code>&lt;div&gt;</code> Popup away from its Trigger has the Safari 27.0 Tab
+          order gap above.
+        </li>
+        <li>
           No <code>Form</code> part: a popover-shown <code>&lt;dialog&gt;</code> ignores{" "}
           <code>&lt;form method="dialog"&gt;</code>. "Submit, then close" is a{" "}
           <code>&lt;form action&gt;</code> plus a controlled <code>open</code> (recipe below), or a{" "}

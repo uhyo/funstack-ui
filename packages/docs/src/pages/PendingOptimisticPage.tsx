@@ -238,6 +238,37 @@ export function PendingOptimisticPage() {
         <code>data-open</code> is the optimistic state (see{" "}
         <a href="/concepts/browser-owned-state#popup-triggers">Triggers of a popup</a>).
       </p>
+
+      <h3 id="testing">Testing pending state</h3>
+      <p>
+        A <a href="#trigger">trigger</a> whose label depends on <code>pending</code> changes its
+        accessible name while the action runs. A query by role and name then stops matching halfway
+        through the test: the button named "Close" is named "Closing…" while it is pending, so an
+        assertion on its <code>data-pending</code> waits for an element the query no longer finds.
+        Playwright locators run their query again on every use, so they hit this every time. A
+        Testing Library query returns the element itself, so an element you queried before the click
+        stays usable.
+      </p>
+      <p>Two ways to keep the name stable:</p>
+      <ul>
+        <li>
+          Keep the pending indicator out of the name: a label that does not change, plus an{" "}
+          <code>aria-hidden</code> spinner while <code>pending</code>.
+        </li>
+        <li>
+          Name the trigger with an <code>aria-label</code> that does not change, and match that name
+          in the test.
+        </li>
+      </ul>
+      <p>For example, the second way on a Popover's Close button, tested with Playwright:</p>
+      <CodeBlock>{`// The name stays "Close" while the label reads "Closing…".
+<Popover.Close aria-label="Close" action={save}>
+  {({ pending }) => (pending ? "Closing…" : "Close")}
+</Popover.Close>
+
+const close = page.getByRole("button", { name: "Close", exact: true });
+await close.click();
+await expect(close).toHaveAttribute("data-pending");`}</CodeBlock>
     </DocPage>
   );
 }
