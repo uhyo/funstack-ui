@@ -45,7 +45,7 @@ with a view transition in every engine.
 | 8 | Hover intent (research Q5) | Timers only: `delay` / `closeDelay` on the submenu's `Menu.Root`, defaults 100 / 150 ms, implemented with the same small internal timer helper Tooltip's interaction uses for its delays, **not** Tooltip's interaction hook (focus, blur, document listeners and `interestfor` do not apply). No "safe triangle" in v0; `closeDelay` covers a diagonal move into the submenu. `interestfor` is not used (research: opens on focus and collapses the stack on Escape). |
 | 9 | `experimental_focusGroup` | On `Menu.Popup`: renders `focusgroup="menu wrap|nowrap"` (`wrap` from `loop`), detected with `"focusGroup" in HTMLElement.prototype` through `useSyncExternalStore` (#43); on the native path items render **no** `tabindex` (Chromium leaves `tabindex="-1"` elements out of the group) and the JS Up / Down / Home / End branch steps aside. Typeahead, Enter / Space, submenu keys and Tab-closes-stack stay JS everywhere. |
 | 10 | Closing the stack on Tab | A `focusout` listener on the **root** menu's Popup: when `relatedTarget` is outside the menu tree (the root Popup's subtree, which contains every submenu as a DOM descendant, since nothing portals), the root Popup hides itself (`hidePopover()`, the platform hides nested popovers) and every Root is notified with `reason: "dismiss"`. A null `relatedTarget` (window blur) closes nothing. A press on the Trigger of an open menu is not a focus-out: `Menu.Trigger` prevents the `mousedown` default while `intended()` is `true`, so focus stays on the current item in every engine and the click's library-owned close is the one source of the close (#110). Nor is a press on a **foreign invoker** of the root popup (a consumer `<button>` whose `popovertarget`, or `commandfor` with a popover `command`, names it): the root Popup prevents its primary `mousedown` while shown, so the click's native toggle closes the menu and #125 names it `"activate"` (#126). The Trigger is itself a `popovertarget` invoker of the root popup (#121), so that guard also covers it whenever the menu is shown, including a pending close where `intended()` is `false`: a second press then keeps focus on the item and the menu shown, and its click re-opens through `requestOpen` with no hide and re-show (#126 review). |
-| 11 | ARIA | Trigger: `aria-haspopup="menu"`, `aria-expanded` (shown: the Root's mirror of the Popup's `toggle`, #118), `id`. Popup: `role="menu"`, `aria-labelledby` → the Trigger (or SubmenuTrigger) id. Items: explicit `role`s, `aria-disabled`, `aria-checked` from optimistic state. `Menu.Group` / `Menu.RadioGroup`: `role="group"` + `aria-labelledby` → `GroupLabel`. `Separator`: `<hr>` (implicit `separator`). |
+| 11 | ARIA | Trigger: `aria-haspopup="menu"`, `aria-expanded` (shown: the Root's mirror of the Popup's `toggle`, #118), `id`. Popup: `role="menu"`, `aria-labelledby` → the Trigger (or SubmenuTrigger) id. Items: explicit `role`s, `aria-disabled`, `aria-checked` from optimistic state. `Menu.Group` / `Menu.RadioGroup`: `role="group"` + `aria-labelledby` → `GroupLabel`. `Separator`: `<hr role="separator">`. |
 | 12 | Pending UI | Trigger: `data-open`, `data-pending` (Root pending: open or close in flight). Item: `data-pending` while its action runs. CheckboxItem / RadioItem: `data-checked` (optimistic), `data-pending`; `RadioGroup`: `data-pending` (owner). Popup: nothing (`:popover-open`). |
 | 13 | Content mounting | Conventions 3.7 unchanged: Popup children unmount when closed by default; `keepMounted` keeps them in `<Activity mode="hidden">`. Items are read from the DOM at keydown time (no registration), so mounting strategy does not affect keyboard code. |
 | 14 | Animation | As Popover: CSS for opens and dismissals; `transition` on Popup wraps the `<div popover>` and animates library-driven opens and closes (item activation, Close, ArrowLeft, hover close, controlled) in every engine. Types `fsui-menu`, `fsui-menu-open`, `fsui-menu-close`; item state types `fsui-menu-check` / `fsui-menu-uncheck` / `fsui-menu-select`. |
@@ -133,7 +133,7 @@ Rendered HTML (closed; ids come from one `useId` per Root):
 | `RadioItem` | `button` | `menuitemradio` | `aria-checked`, `data-checked` (optimistic), `data-pending` (initiating item), `data-disabled` | `value`; `closeOnActivate` default `false`. |
 | `Group` | `div` | `group` | none | `aria-labelledby` → `GroupLabel`. |
 | `GroupLabel` | `div` | | none | `id` wiring. |
-| `Separator` | `hr` | `separator` (implicit) | none | `render={<div role="separator" />}` if an `<hr>` cannot be styled as wanted. |
+| `Separator` | `hr` | `separator` (rendered) | none | `render={<div />}` if an `<hr>` cannot be styled as wanted; the part writes the role. |
 | `SubmenuTrigger` | `button` | `menuitem` | `data-open` (optimistic), `data-pending`, `data-disabled`; no `aria-expanded` (a `popovertarget` invoker, #121) | Both an item of the parent menu and the Trigger of the submenu: `popovertarget`, `aria-haspopup="menu"`, roving `tabindex`, typeahead participation, ArrowRight / Enter / Space / click / hover open. |
 | `ContextTrigger` | `div` | none | `data-open` (optimistic), `data-pending`, `data-disabled`; inline `-webkit-touch-callout: none` | #45: the region whose `contextmenu` (and touch / pen long-press) opens the Popup at the pointer. No ARIA. Top-level Roots only. `design/components/context-menu.md`. |
 
@@ -157,8 +157,10 @@ Why these parts:
 - **`GroupLabel`, not `Label`**: the conventions' `Label` names its owner; a `Label` directly
   under `Popup` would read as the menu's name, which is the Trigger's job (`aria-labelledby`).
   `GroupLabel` is Base UI's name and is unambiguous. Added to the part vocabulary (feedback).
-- **`Separator` is an `<hr>`**: the platform's separator with the implicit role, what Open UI
-  proposes for `<menulist>`, and it needs no `aria-orientation` in a vertical menu.
+- **`Separator` is an `<hr>`**: the platform's separator, what Open UI proposes for
+  `<menulist>`, and it needs no `aria-orientation` in a vertical menu. The part renders
+  `role="separator"` on it all the same, so that a `render` element of another tag is a
+  separator too (3.7).
 - **No `Menu.Close`**: Escape and Tab close a menu; a "Cancel" item is a plain `Item` with no
   `action` (activation closes). No `Menu.Title` / `Description`: the Trigger names the menu.
 
@@ -170,8 +172,7 @@ platform exempts invoker buttons only; dev warning, popover.md 2.7 and #115; a n
 into it, with its own warning text); items may render anything
 focusable (a link, a `div` with `tabIndex`), with the keydown handler providing Enter / Space;
 `Popup` should render a `<div>` (a `<dialog>` would run the dialog focusing steps and fight the
-item focus); `RadioGroup` / `Group` any element; `Separator` any element with `role="separator"`
-if not an `<hr>`. Dev warnings as Popover.
+item focus); `RadioGroup` / `Group` / `Separator` any element. Dev warnings as Popover.
 
 ---
 
@@ -463,9 +464,12 @@ a dev warning (no hover open at the top level in v0).
 
 As `PopoverTriggerProps` / `PopoverTriggerState` (owned keys: `type`, `id`, `popoverTarget`
 (#121; `commandfor` / `command` and `aria-expanded` stay omitted from the type as reserved keys; a
-non-button `render` renders `aria-expanded` from `shown`), `disabled`, `aria-haspopup`, `onClick`, `onKeyDown`, `data-open`,
+non-button `render` renders `aria-expanded` from `shown`), `disabled`, `aria-haspopup`, `onClick`, `onKeyDown`, `onMouseDown`, `onPointerMove`, `data-open`,
 `data-pending`, `data-disabled`). `onKeyDown` is added for ArrowDown / ArrowUp (open with the
-first / last item focused; Enter / Space are the native click). Rendering a `Menu.Trigger` inside
+first / last item focused; Enter / Space are the native click), `onMouseDown` for the press on
+the Trigger of an open menu (2.2), `onPointerMove` for the hover switch inside a Menubar
+(`design/components/menubar.md` 2.3). The four handler keys are omitted from the props type in
+every context, a Trigger outside a Menubar included (conventions 1.5). Rendering a `Menu.Trigger` inside
 a submenu Root is a dev warning ("use `Menu.SubmenuTrigger`").
 
 ### 3.3 `Menu.Popup`
@@ -482,7 +486,7 @@ export interface MenuPopupState {
 }
 
 export interface MenuPopupProps
-  extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "role" | "aria-labelledby" | "onKeyDown" | "onFocus" | "onBlur" | "onMouseDown" | "onContextMenu" | "onPointerEnter" | "onPointerLeave" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "id" | "popover" | "role" | "tabIndex" | "focusgroup" | "onKeyDown" | "onFocus" | "onBlur" | "onMouseDown" | "onContextMenu" | "onPointerEnter" | "onPointerLeave" | "onToggle" | "onBeforeToggle" | "className" | "style" | "children"> {
   /**
    * Default `"bottom"` for a top-level menu, `"inline-end"` for a submenu (the right of the item
    * in LTR, its left in RTL). `"left"` / `"right"` stay physical. `null`: stylesheet-owned placement.
@@ -510,7 +514,9 @@ export interface MenuPopupProps
 
 Owned keys: `id`, `popover` (`"auto"`), `role` (`"menu"`; owned here, unlike Popover, because the
 keyboard model assumes it), `aria-labelledby` (the Trigger's id, token-merged with the
-consumer's), `focusgroup` (with the flag), `tabIndex` (`-1`, so the popup itself can take focus
+consumer's, so it stays in the props type), `focusgroup` (`"menu wrap|nowrap"` with
+`experimental_focusGroup`, `undefined` without it; owned in both cases and omitted from the props
+type, conventions 1.5: a consumer's `focusgroup` would run beside the JS arrow keys), `tabIndex` (`-1`, so the popup itself can take focus
 as a last resort when a menu has no items; when it has focus the arrow keys enter the items,
 section 5), `data-submenu` (a submenu's popup), `data-side` / `data-align` (anchored opens) or `data-context` (a context open,
 #45: then the inline style is the point placement, `--menu-point-x` / `--menu-point-y`, `inset:
@@ -647,8 +653,11 @@ when it is the optimistic target while the group is pending. Transition types `f
 
 `Group`: `div[role=group]` with `aria-labelledby` → its `GroupLabel`'s id (always emitted;
 dangling is harmless). `GroupLabel`: `div` with the owned `id` (reads the nearest `Group` or
-`RadioGroup` context). `Separator`: `hr` by default; no state. All three take `render`,
-`className`, `style`, `children` (not `Separator`'s `children`: an `<hr>` is void).
+`RadioGroup` context). `Separator`: `hr role="separator"` by default; no state. It owns `role`
+(omitted from its props type), the rule of `Separator` and `Toolbar.Separator`
+(`design/components/separator.md` 3): the role does not depend on the element `render` chose.
+All three take `render`, `className`, `style`, `children` (not `Separator`'s `children`: an
+`<hr>` is void).
 
 ### 3.8 `Menu.SubmenuTrigger`
 
@@ -929,7 +938,7 @@ No `returnFocus` prop.
 | RadioGroup | `role="group"`, `aria-labelledby` → GroupLabel |
 | RadioItem | `role="menuitemradio"`, `aria-checked` (optimistic), rest as Item |
 | Group / GroupLabel | `role="group"` + `aria-labelledby`; the label has the `id` |
-| Separator | `<hr>` (implicit `separator`) |
+| Separator | `<hr role="separator">` |
 | SubmenuTrigger | `role="menuitem"`, `aria-haspopup="menu"`, `id`, `popovertarget`, `tabindex="-1"`; no `aria-expanded` (#121: measured `menuitem expanded=true/false` in Chromium and `menuitem [expanded,expandable]` in Firefox from the attribute alone) |
 | ContextTrigger | none (#45): no role, no `aria-haspopup`, no `aria-expanded`; `aria-label` on the Popup names a context-only menu |
 

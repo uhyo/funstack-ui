@@ -22,11 +22,11 @@ so that the product owner can weigh it.
 | --- | --- | --- |
 | 1 | Shape | A single-element component, `Separator`, from `@funstack/ui/separator`. Renders `<hr>`. |
 | 2 | Props | `orientation` (`"horizontal"` default, `"vertical"`), `decorative` (default `false`), plus `className` / `style` / `render` and the `<hr>`'s own props. No `children`. |
-| 3 | Semantics | Semantic by default: the `<hr>`'s implicit `separator` role with `aria-orientation`. `decorative` renders `role="none"` and no `aria-orientation`. |
+| 3 | Semantics | Semantic by default: `role="separator"`, rendered by the part, with `aria-orientation`. `decorative` renders `role="none"` and no `aria-orientation`. The part owns `role` in both cases. |
 | 4 | Styling hook | `data-orientation` always. No other attribute. |
 | 5 | Server Component | The file has **no `"use client"`**: no context, no hook. Function props run on the server. |
-| 6 | `Toolbar.Separator` | Stays, unchanged: it reads the Toolbar's orientation from context, which a directive-free part cannot do. Same vocabulary (`orientation` state, `data-orientation`). |
-| 7 | `Menu.Separator`, `Select.Separator` | Stay, unchanged: always horizontal, always semantic, `<hr>`. Nothing to reuse but the element. |
+| 6 | `Toolbar.Separator` | Stays: it reads the Toolbar's orientation from context, which a directive-free part cannot do. Same vocabulary (`orientation` state, `data-orientation`) and the same role rule. |
+| 7 | `Menu.Separator`, `Select.Separator` | Stay: always horizontal, always semantic, `<hr>`. `Menu.Separator` follows the role rule; `Select.Separator` cannot be anything but an `<hr>` and writes no role (section 5). |
 | 8 | Combobox, MultiSelect | Still no `Separator` part. `<Separator decorative />` is the allowed line inside a listbox. |
 | 9 | Not this part | A focusable separator (window splitter with `aria-valuenow`). |
 
@@ -38,7 +38,7 @@ so that the product owner can weigh it.
 import { Separator } from "@funstack/ui/separator";
 
 <article>…</article>
-<Separator />                                   {/* hr aria-orientation="horizontal" */}
+<Separator />                                   {/* hr role="separator" aria-orientation="horizontal" */}
 <article>…</article>
 
 <nav className="breadcrumbs">
@@ -51,13 +51,13 @@ import { Separator } from "@funstack/ui/separator";
 Rendered HTML:
 
 ```html
-<hr aria-orientation="horizontal" data-orientation="horizontal">
-<hr role="none" data-orientation="vertical">
+<hr role="separator" aria-orientation="horizontal" data-orientation="horizontal">
+<hr role="none" data-orientation="vertical" data-decorative>
 ```
 
 | Part | Element | Role | Library state rendered |
 | --- | --- | --- | --- |
-| `Separator` | `hr` | `separator` (implicit); `none` when `decorative` | `aria-orientation` (not when `decorative`), `data-orientation`, `data-decorative` |
+| `Separator` | `hr` | `separator` (rendered); `none` when `decorative` | `role`, `aria-orientation` (not when `decorative`), `data-orientation`, `data-decorative` |
 
 ## 2. Why a part at all
 
@@ -109,7 +109,7 @@ export interface SeparatorProps
   decorative?: boolean;
   className?: StateValue<string | undefined, SeparatorState>;
   style?: StateValue<CSSProperties | undefined, SeparatorState>;
-  /** Replace the `<hr>`. Another element must carry `role="separator"` itself unless `decorative`. */
+  /** Replace the `<hr>`. The part writes the role, so any element is a separator (or, with `decorative`, none). */
   render?: RenderProp<ComponentPropsWithRef<"hr">, SeparatorState>;
 }
 ```
@@ -117,18 +117,32 @@ export interface SeparatorProps
 Owned keys (conventions 1.2): `aria-orientation`, `data-orientation`, `data-decorative`
 (present while `decorative`: every boolean of a part's state is also an attribute, conventions
 4.1 rule 2, so a stylesheet selects `[data-decorative]` as it selects `[data-orientation]`,
-without knowing which role the part renders), and `role` **only while
-`decorative`** (`"none"`, which then wins over a `render` element's own). While not decorative
-the part renders no `role`, so `render={<div role="separator" />}` keeps the one it carries;
-this is `Menu.Separator`'s rule. `role` is not in the props type: the two meanings the part
-supports are spelled `decorative` and its absence.
+without knowing which role the part renders), and `role` **in both modes**: `"separator"`,
+or `"none"` while `decorative`. Either wins over a `render` element's own. `role` is not in the
+props type: the two meanings the part supports are spelled `decorative` and its absence.
+
+**The role is rendered, not left to the `<hr>`.** This is one rule for every library separator
+whose element `render` may replace freely (`Separator`, `Toolbar.Separator`, `Menu.Separator`):
+
+- `render={<div />}` is a separator without the consumer having to know that a `<div>` has no
+  role. A line that silently stops being a separator is the failure this library exists to
+  prevent; a consumer-supplied role was a rule that had to be remembered at every call site.
+- `aria-orientation` is never rendered on an element whose role does not support it.
+- `role` is owned in one way: a key the part always writes and always omits from its type,
+  with no "owned while decorative" case.
+
+The cost is a redundant attribute on the default element: `<hr role="separator">` repeats the
+implicit role. Assistive technology reads the same thing; a markup validator may note the
+redundancy (ARIA in HTML discourages, and does not forbid, restating an implicit role). Writing
+the role only on a non-`<hr>` was rejected: the part cannot see what a component or a function
+`render` produces (conventions 1.2, the `type` rule), so the attribute would depend on a guess.
 
 `aria-orientation` is rendered for both orientations (not only for `"vertical"`, where it
 differs from the role's default), so that the part and `Toolbar.Separator` follow one rule and
-a `render` element with an explicit role gets the same attributes as the `<hr>`.
+a `render` element gets the same attributes as the `<hr>`.
 
 No `children`: an `<hr>` is void. A line with a word in it ("or") is
-`render={<div role="separator">or</div>}`; the children of a `separator` are presentational, so
+`render={<div>or</div>}`; the children of a `separator` are presentational, so
 the word is not announced, which is the right result for "or" and the wrong one for anything
 that matters.
 
@@ -145,8 +159,8 @@ Not offered:
 
 | Case | Rendered | Announced |
 | --- | --- | --- |
-| default | `hr[aria-orientation=horizontal]` | "separator" (wording varies by screen reader) |
-| `orientation="vertical"` | `hr[aria-orientation=vertical]` | "separator", vertical where the screen reader says so |
+| default | `hr[role=separator][aria-orientation=horizontal]` | "separator" (wording varies by screen reader) |
+| `orientation="vertical"` | `hr[role=separator][aria-orientation=vertical]` | "separator", vertical where the screen reader says so |
 | `decorative` | `hr[role=none][data-decorative]` | nothing |
 
 - Not focusable, no keyboard interaction, in every case.
@@ -164,12 +178,17 @@ Not offered:
 
 ## 5. The existing separators
 
-| Part | Reads | Orientation | Role | Changes with this design |
+| Part | Reads | Orientation | Role | `role` owned |
 | --- | --- | --- | --- | --- |
-| `Toolbar.Separator` | `ToolbarContext` | perpendicular to the Toolbar's | `separator` | none |
-| `Menu.Separator` | nothing | horizontal (implicit) | `separator` | none |
-| `Select.Separator` | the Select's context (its function props get `SelectRootState`) | horizontal (implicit) | `separator` where the engine exposes it | none |
-| `Separator` | nothing | prop | `separator` or `none` | new |
+| `Toolbar.Separator` | `ToolbarContext` | perpendicular to the Toolbar's | `separator`, rendered | yes |
+| `Menu.Separator` | nothing | horizontal (implicit) | `separator`, rendered | yes |
+| `Select.Separator` | the Select's context (its function props get `SelectRootState`) | horizontal (implicit) | the `<hr>`'s own, `separator` where the engine exposes it | no |
+| `Separator` | nothing | prop | `separator` or `none`, rendered | yes |
+
+`Select.Separator` is the one exception to the role rule of section 3, and for the reason the
+rule exists: its element is fixed. Inside a `<select>` the parser keeps an `<hr>` and nothing
+else, so `render` may not replace it with another tag (conventions 1.2), the implicit role can
+never be lost, and the part writes none and owns none.
 
 They share an element and a vocabulary, not code: each is one render call with no logic, so a
 shared helper would be longer than what it replaces. Folding the three into the standalone part

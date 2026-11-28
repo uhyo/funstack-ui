@@ -641,7 +641,7 @@ export interface DialogTriggerState {
 export interface DialogTriggerProps
   extends Omit<
     ComponentPropsWithRef<"button">,
-    "onClick" | "type" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "aria-disabled" | "className" | "style" | "children"
+    "onClick" | "onPointerDown" | "type" | "commandfor" | "command" | "popoverTarget" | "popoverTargetAction" | "aria-disabled" | "className" | "style" | "children"
   > {
   /**
    * Native `disabled`: a disabled button is not a valid invoker and never dispatches. Inside a
@@ -663,9 +663,11 @@ Owned keys: `type` (`"button"`, only when the rendered element is a `<button>`),
 mode, #116), and `onClick` **only when installed**
 (library mode, or non-modal JS-free mode), the Accordion rule: in modal JS-free mode the Trigger
 installs no handler, owns no `onClick`, and a `render` element's own `onClick` passes through.
-`onClick` is still omitted from the props type because the library installs it in the other
-modes (prop form, as Accordion's Trigger; the handler is not feature-detected away, so the
-Tooltip `addEventListener` route buys nothing here). **Every owned key is omitted from the
+`onClick` and `onPointerDown` are still omitted from the props type in every mode because the
+library installs each in some mode (prop form, as Accordion's Trigger; the handlers are not
+feature-detected away, so the Tooltip `addEventListener` route buys nothing here). That
+`onPointerDown` only records whether the dialog was open at the press changes nothing: a key
+the part passes to its element is omitted, whatever its handler does (conventions 1.5). **Every owned key is omitted from the
 props type** (conventions 1.5): `type`, `commandfor`, `command`, the `popoverTarget` pair (a
 dialog Trigger is a command invoker, never a popover one) and `aria-disabled`, as on
 `Popover.Trigger`; passing one is a type error, not a silently overwritten prop. In JS-free

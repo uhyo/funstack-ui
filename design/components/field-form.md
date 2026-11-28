@@ -645,7 +645,7 @@ row match.
 
 ```ts
 export interface FieldLabelProps
-  extends Omit<ComponentPropsWithRef<"label">, "htmlFor" | "id" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"label">, "htmlFor" | "id" | "onClick" | "className" | "style" | "children"> {
   className?: StateValue<string | undefined, FieldState>;
   style?: StateValue<CSSProperties | undefined, FieldState>;
   children?: StateValue<ReactNode, FieldState>;
@@ -672,7 +672,9 @@ export interface FieldErrorProps
 
 Owned keys: `Label`: `id`, `htmlFor` (present while the registered control is labelable, which is
 the default before any control registers; removed when a group control registers), `onClick`
-(composed with the consumer's), the four `data-*`. **A `<button>` control** (MultiSelect's
+(omitted from the props type, conventions 1.5, as on `MultiSelect.Label`; a `render` element's
+own `onClick` runs first and its `preventDefault()` leaves the Label's handler with nothing to
+do), the four `data-*`. **A `<button>` control** (MultiSelect's
 Trigger, `design/components/multi-select.md` B.8): a `<label for>` would forward its click to
 the button and activate it, so the Label's click is cancelled and the button is focused instead
 (unless it is disabled), as a label focuses a `<select>` without opening it. Every other control
@@ -818,7 +820,7 @@ export interface FormSubmitState {
 }
 
 export interface FormSubmitProps
-  extends Omit<ComponentPropsWithRef<"button">, "type" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"button">, "type" | "aria-disabled" | "onClick" | "className" | "style" | "children"> {
   /** Native `disabled`; owned. Never set by the library (conventions 3.6). */
   disabled?: boolean;
   className?: StateValue<string | undefined, FormSubmitState>;
@@ -829,7 +831,9 @@ export interface FormSubmitProps
 ```
 
 Owned keys: `type` (`"submit"`, when the rendered element is a `<button>`), `disabled`,
-`aria-disabled`, `onClick` (while disabled), `data-pending`, `data-disabled`. `disabled` is native
+`aria-disabled`, `onClick` (installed while disabled only, to cancel the click; omitted from the
+props type in every state, conventions 1.5, as `aria-disabled` is: a submit is the Form's
+`action`, not a click to listen to), `data-pending`, `data-disabled`. `disabled` is native
 on a submitter: no `render`, a host `<button>` or `<input>`, or a component (assumed to render a
 `<button>`, `rendersButton`; only native `disabled` stops a submitter before hydration). A host
 element of another tag (`<a>`) gets `aria-disabled="true"` and a cancelled click instead
