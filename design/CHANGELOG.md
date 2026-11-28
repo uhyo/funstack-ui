@@ -17185,3 +17185,12 @@ Tests. The hook rows are the core; each component gets one row that proves it is
 | Server Function | a function that receives the serialised details has no `reject` (the `JSON.stringify` row stands in) |
 | Types | `details.reject` exists on every action prop's parameter and on no `on*` handler's; `Details & Rejectable` annotates a standalone function |
 | Toast boundary placements | a rejecting Undo with the boundary around the Action: Title and Close still rendered; around one Root: the other toasts still rendered |
+
+## 2026-11-28, #208: field-form.md 11.9 holds in library mode only
+
+Found while implementing #208 on `dev/208`. The recipe "put `useActionState` inside the Popup so
+the errors start fresh at the next open" relies on the Popup's content being unmounted while
+closed, which is true in library mode only. In JS-free mode (no `open`, `defaultOpen` or
+`openChangeAction` on the Root) the content stays mounted, as with `keepMounted`, and the stale
+errors survive the close. 11.9 now says so, and its example uses
+`<Dialog.Root defaultOpen={false}>`, as the developer's tests and docs do. No behaviour change.

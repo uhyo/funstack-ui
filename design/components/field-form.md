@@ -1718,7 +1718,7 @@ function NewTaskForm() {
   );
 }
 
-<Dialog.Root>
+<Dialog.Root defaultOpen={false}>   {/* library mode: see below */}
   <Dialog.Trigger>New task</Dialog.Trigger>
   <Dialog.Popup><NewTaskForm /></Dialog.Popup>
 </Dialog.Root>
@@ -1727,9 +1727,13 @@ function NewTaskForm() {
 Both kinds of error keep the dialog open and the values in place. The field error blocks the
 same title until it is edited; the form-level one does not, so "Create" retries.
 
-**`useActionState` lives inside the Popup.** The Popup's content is unmounted while the dialog
-is closed (without `keepMounted`), so the action state, and with it the errors, starts fresh at
-the next open. With the hook in the component that renders `Dialog.Root`, the state outlives
+**`useActionState` lives inside the Popup, and the dialog is in library mode.** In library mode
+(`open`, `defaultOpen` or `openChangeAction` on the Root; here `defaultOpen={false}`) the Popup's
+content is unmounted while the dialog is closed (without `keepMounted`), so the action state,
+and with it the errors, starts fresh at the next open. In JS-free mode (none of those props) the
+content stays mounted in the closed `<dialog>`, as it does with `keepMounted`, and the errors
+survive the close wherever the hook is: such a dialog clears them itself (a `key` on the form
+component that changes at each open, or a reset of its own state). With the hook in the component that renders `Dialog.Root`, the state outlives
 the close, and the next open shows the last submission's errors on an empty form (errors
 present at mount are shown, 3.4). The docs write the recipe this way.
 
