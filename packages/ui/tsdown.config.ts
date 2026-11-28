@@ -47,7 +47,12 @@ export default defineConfig({
   // One output file per source file so that each file's "use client" directive survives
   // (conventions 7.2). Bundling would strip the directive from non-entry files.
   unbundle: true,
-  dts: true,
+  // No source maps (#223): the package ships no `src`, so a `.d.mts.map` points at missing files
+  // and a JS map only repeats the readable, unminified output (about 2.3 MB of the tarball).
+  // Turned off at the source rather than left out through `files`, which would leave dangling
+  // `sourceMappingURL` comments behind.
+  sourcemap: false,
+  dts: { sourcemap: false },
   clean: true,
   // Generates the `exports` map (root entry plus per-component subpaths) from `entry`, and the
   // `bin` field. Without the explicit name, the bin would be named after the package ("ui").
