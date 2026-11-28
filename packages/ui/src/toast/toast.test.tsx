@@ -243,8 +243,9 @@ describe("Toast", () => {
       const id = await call(() => manager({ title: "Hello" }));
       expect(screen.queryByTestId(`description-${id}`)).toBeNull();
       expect(screen.queryByTestId(`action-${id}`)).toBeNull();
-      // Both IDREFs are emitted anyway (a dangling one falls through).
-      expect(root(id)).toHaveAttribute("aria-describedby");
+      // Only the Title is referenced: no Description is rendered (#218).
+      expect(root(id)).not.toHaveAttribute("aria-describedby");
+      expect(root(id)).toHaveAttribute("aria-labelledby", screen.getByTestId(`title-${id}`).id);
     });
   });
 

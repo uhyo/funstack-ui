@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -47,6 +48,9 @@ export function useDialogDescription(
   namespace: DialogNamespace,
 ): ReactNode {
   const ctx = useDialogContext(`${namespace}.Description`);
+  // The Popup's `aria-describedby` names it only while it is mounted (#218).
+  const { registerDescription } = ctx.parts;
+  useLayoutEffect(registerDescription, [registerDescription]);
   const state: DialogDescriptionState = { open: ctx.committed, modal: ctx.modal };
   return useRender<ComponentPropsWithRef<"p">, DialogDescriptionState>({
     defaultElement: "p",

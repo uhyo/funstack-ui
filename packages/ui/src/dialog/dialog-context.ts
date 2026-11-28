@@ -2,6 +2,7 @@
 import { createContext, use } from "react";
 import type { ChangeReason } from "../internal/types.js";
 import type { OverlayRootValue } from "../internal/overlay/use-overlay-root.js";
+import type { TitleDescriptionPresence } from "../internal/use-title-description.js";
 
 /**
  * The Root's machinery (`useOverlayRoot`, as Popover's) with the `<dialog>` as the popup element
@@ -15,6 +16,8 @@ export interface DialogContextValue extends OverlayRootValue<
   [returnValue: string]
 > {
   readonly modal: boolean;
+  /** Which of Title and Description are mounted: the Popup names a part only then (#218). */
+  readonly parts: TitleDescriptionPresence;
   /**
    * A library-owned close (library mode, design 2.3): a Close part, a `method="dialog"` submit,
    * a Form's settle close, a foreign close command. Records `returnValue` for the apply effect's

@@ -458,7 +458,7 @@ export function MultiSelectPage() {
       <PartFacts
         state={"none (Empty: `MultiSelectListState`)."}
         owned={
-          'Group: `role` (`"group"`), `aria-labelledby`; GroupLabel: `id`; Status: `role` (`"none"` inside the List, `"status"` in the Popup).'
+          'Group: `role` (`"group"`), `aria-labelledby` (while a GroupLabel is mounted); GroupLabel: `id`; Status: `role` (`"none"` inside the List, `"status"` in the Popup).'
         }
         note={
           "`Group` is named by the `GroupLabel` inside it. `Status` inside the List (as a Suspense fallback) marks the List as loading; in the Popup it is a plain hint."

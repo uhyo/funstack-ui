@@ -14,6 +14,7 @@ import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { usePopoverPopup } from "../internal/overlay/use-popover-popup.js";
 import { useAnchoredPlacement } from "../internal/overlay/use-resolved-placement.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { titleDescriptionRefs } from "../internal/use-title-description.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { PopoverPopupContext, usePopoverContext } from "./popover-context.js";
 
@@ -198,8 +199,8 @@ export function PopoverPopup({
     open: undefined,
     // Chromium exposes a <dialog popover> as modal without it (design, Decisions 4).
     "aria-modal": "false",
-    "aria-labelledby": ids.title,
-    "aria-describedby": ids.description,
+    // Only the parts that are mounted (#218); a key without one is omitted.
+    ...titleDescriptionRefs(ctx.parts),
     // Not owned with `side={null}`: the stylesheet (or a render element) may set them.
     ...placement.dataAttributes,
   };

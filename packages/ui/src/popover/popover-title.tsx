@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -36,6 +37,9 @@ export interface PopoverTitleProps extends Omit<
  */
 export function PopoverTitle({ className, style, children, render, ...rest }: PopoverTitleProps) {
   const ctx = usePopoverContext("Popover.Title");
+  // The Popup's `aria-labelledby` names it only while it is mounted (#218).
+  const { registerTitle } = ctx.parts;
+  useLayoutEffect(registerTitle, [registerTitle]);
   const state = usePopoverPopupState(ctx);
   return useRender<ComponentPropsWithRef<"h2">, PopoverTitleState>({
     defaultElement: "h2",

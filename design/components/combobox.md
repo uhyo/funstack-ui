@@ -113,7 +113,7 @@ Rendered HTML (closed, `value` is `"jp"`, text "Japan"; ids come from one `useId
 | `Popup` | `div` | none (a container) | committed open | `popover="auto"`, `id`, inline placement, `data-stale`, `data-open` never (`:popover-open`). The content region; children render from committed open. Must be a DOM sibling of the Input where possible (section 7). |
 | `List` | `div` | `listbox` | `query` (deferred) | `id`, `aria-labelledby` → Label while one is mounted (token-merged), `data-stale` while stale, `aria-busy="true"` while stale or loading, `data-empty`. Function `children` receive `{ query }`. Its accessibility children are `Option`s and `Group`s only (ARIA content model): `Empty` lives in the Popup, outside it, and a `Status` rendered inside it (the Suspense fallback) is role-less and marks the List as loading (6.3). |
 | `Option` | `div` | `option` | optimistic `value`, urgent active | `value` required; `label` optional (the text written into the input; default the element's `textContent` at the time of the pick); `disabled` → `aria-disabled`. `id` derived from `value`. `aria-selected`, `data-selected`, `data-active`, `data-pending`, `data-disabled`. `pointerdown` is `preventDefault()`ed so the input keeps focus. |
-| `Group` / `GroupLabel` | `div[role=group]` / `div` | group | | `aria-labelledby` → the `GroupLabel` id, as Menu. |
+| `Group` / `GroupLabel` | `div[role=group]` / `div` | group | | `aria-labelledby` → the `GroupLabel` id while one is mounted (conventions 1.1.1), as Menu. |
 | `Empty` | `div` | none | mounted-option count, stale, loading | Renders its children only when the List has **no mounted options and the results are neither stale nor loading** (section 6.3); nothing otherwise. |
 | `Status` | `div` | `status` in the Popup; none inside the List | | In the Popup: a hint with `role="status"`. Inside the List: the Suspense fallback; it renders with `role="none"` (a listbox may own only options and groups) and its presence tells the Root the results are **loading** (6.3). Announcements are `ariaNotify` (6.4), never a live region. |
 
@@ -1078,14 +1078,14 @@ Typeahead does not exist (the input *is* the typeahead).
 
 | Part | Attributes |
 | --- | --- |
-| Input | `role="combobox"`, `aria-autocomplete="list"`, `aria-expanded` (shown: the listbox is in the top layer), `aria-controls` → List id, `aria-activedescendant` → the active Option id or absent, `autocomplete="off"`, `id` (the Label's `for`), `required` / `aria-describedby` pass through |
+| Input | `role="combobox"`, `aria-autocomplete="list"`, `aria-expanded` (shown: the listbox is in the top layer), `aria-controls` → List id (also while closed, when the List is not rendered: the conventions 1.1.1 exception), `aria-activedescendant` → the active Option id or absent, `autocomplete="off"`, `id` (the Label's `for`), `required` / `aria-describedby` pass through |
 | Label | `for` → Input id, `id` |
 | Trigger | `tabindex="-1"`, `popovertarget` after hydration and **no `aria-expanded`** on a `<button>` (a non-button `render` renders it from `shown`), `aria-controls` → List id, `aria-label` from the consumer (dev warning without a name) |
 | Clear | `tabindex="-1"`, `aria-label` from the consumer |
 | Popup | `popover="auto"`, `id`; no role |
 | List | `role="listbox"`, `id`, `aria-labelledby` → Label id while a `Label` is mounted (the Label registers with the Root; token-merged with the consumer's; never a dangling IDREF), otherwise the consumer's `aria-label` on the List names it (pass-through; dev warning when it has neither), `aria-busy="true"` while stale or loading; `aria-multiselectable="true"` with `multiple` (15.7), absent otherwise |
 | Option | `role="option"`, `id`, `aria-selected` (optimistic; `"true"` on the selected option only, not on the active one: the APG distinguishes selected from focused, and `aria-activedescendant` conveys focus), `aria-disabled` |
-| Group / GroupLabel | `role="group"` + `aria-labelledby`; the label has the `id` |
+| Group / GroupLabel | `role="group"` + `aria-labelledby` while a GroupLabel is mounted (conventions 1.1.1); the label has the `id` |
 | Status | `role="status"` in the Popup; `role="none"` inside the List, where the busy listbox carries the meaning (6.3) |
 
 `Element.ariaActiveDescendantElement` is not used: the attribute form serialises, works with

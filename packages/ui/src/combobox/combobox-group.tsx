@@ -1,8 +1,9 @@
 "use client";
-import { use, useId, useLayoutEffect } from "react";
+import { use, useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useGroupLabel, useGroupLabelId } from "../internal/use-group-label.js";
 import { useRender } from "../internal/use-render.js";
 import {
   ComboboxGroupContext,
@@ -45,13 +46,14 @@ export interface ComboboxGroupProps extends Omit<
 
 /**
  * A labelled set of options: `<div role="group" aria-labelledby>` named by the
- * `Combobox.GroupLabel` inside it. Owned keys: `role`, `aria-labelledby` (token-merged).
+ * `Combobox.GroupLabel` inside it, while one is mounted (#218). Owned keys: `role`,
+ * `aria-labelledby` (token-merged).
  *
  * @see https://ui.funstack.work/components/combobox
  */
 export function ComboboxGroup({ className, style, children, render, ...rest }: ComboboxGroupProps) {
   useComboboxContext("Combobox.Group");
-  const labelId = `${useId()}-label`;
+  const { context, labelledBy } = useGroupLabel();
   const element = useRender<ComponentPropsWithRef<"div">, ComboboxGroupState>({
     defaultElement: "div",
     render,
@@ -60,9 +62,9 @@ export function ComboboxGroup({ className, style, children, render, ...rest }: C
     style,
     children,
     props: rest,
-    libraryProps: { role: "group", "aria-labelledby": labelId },
+    libraryProps: { role: "group", ...labelledBy },
   });
-  return <ComboboxGroupContext value={labelId}>{element}</ComboboxGroupContext>;
+  return <ComboboxGroupContext value={context}>{element}</ComboboxGroupContext>;
 }
 
 ComboboxGroup.displayName = "ComboboxGroup";
@@ -98,7 +100,7 @@ export function ComboboxGroupLabel({
   render,
   ...rest
 }: ComboboxGroupLabelProps) {
-  const labelId = use(ComboboxGroupContext);
+  const labelId = useGroupLabelId(use(ComboboxGroupContext)) ?? null;
   useDevWarning(
     labelId === null,
     isDev && "Combobox.GroupLabel: rendered outside a Combobox.Group; it names nothing.",

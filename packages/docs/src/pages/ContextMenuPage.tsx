@@ -483,8 +483,8 @@ export function ContextMenuPage() {
           </li>
           <li>
             <strong>Name the menu</strong> with <code>aria-label</code> on the Popup when the Root
-            has no <code>Menu.Trigger</code> (the Popup's <code>aria-labelledby</code> points at the
-            Trigger's id).
+            has no <code>Menu.Trigger</code> (without one the Popup has no{" "}
+            <code>aria-labelledby</code>; with one it points at the Trigger).
           </li>
         </ol>
       </Callout>

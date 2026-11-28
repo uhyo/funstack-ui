@@ -1,8 +1,9 @@
 "use client";
-import { use, useId, useMemo } from "react";
+import { use } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useGroupLabel, useGroupLabelId } from "../internal/use-group-label.js";
 import { useRender } from "../internal/use-render.js";
 import { MenuGroupContext } from "./menu-context.js";
 
@@ -38,12 +39,12 @@ export interface MenuGroupProps extends Omit<
 
 /**
  * A labelled set of items: `<div role="group" aria-labelledby>` named by the `Menu.GroupLabel`
- * inside it. Owned keys: `role`, `aria-labelledby` (token-merged).
+ * inside it, while one is mounted (#218). Owned keys: `role`, `aria-labelledby` (token-merged).
  *
  * @see https://ui.funstack.work/components/menu
  */
 export function MenuGroup({ className, style, children, render, ...rest }: MenuGroupProps) {
-  const labelId = `${useId()}-label`;
+  const { context, labelledBy } = useGroupLabel();
   const element = useRender<ComponentPropsWithRef<"div">, MenuGroupState>({
     defaultElement: "div",
     render,
@@ -52,9 +53,8 @@ export function MenuGroup({ className, style, children, render, ...rest }: MenuG
     style,
     children,
     props: rest,
-    libraryProps: { role: "group", "aria-labelledby": labelId },
+    libraryProps: { role: "group", ...labelledBy },
   });
-  const context = useMemo(() => ({ labelId }), [labelId]);
   return <MenuGroupContext value={context}>{element}</MenuGroupContext>;
 }
 
@@ -93,6 +93,8 @@ export function MenuGroupLabel({
   ...rest
 }: MenuGroupLabelProps) {
   const group = use(MenuGroupContext);
+  // The group references this id only while a GroupLabel is mounted (#218).
+  useGroupLabelId(group);
   useDevWarning(
     group === null,
     isDev && "Menu.GroupLabel: rendered outside a Menu.Group or Menu.RadioGroup; it names nothing.",

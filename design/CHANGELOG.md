@@ -17483,3 +17483,74 @@ no parts mounted (`Field.Control aria-describedby`, `RadioGroup.Root aria-labell
 remount of the parts and of the whole Field; `<Activity>` hide and show; parts revealed by a
 Suspense boundary; Combobox `multiple` with Chips (the Chips and the List follow the Field
 label).
+
+## 2026-11-29, #218: every owner references an optional part only while it is mounted
+
+Product-owner decision under the user's alignment principle (one consistent rule): the #217
+mechanism (`usePartPresence`) applies to the remaining always-present IDREFs found by the #217
+audit. Developer implementation on `dev/218`.
+
+### What changed in the rules
+
+- conventions.md: new 1.1.1 "Referenced only while mounted" (the rule, the mechanism, the SSR
+  approach, hidden content, the cost, and the three kept exceptions with their reasons); the
+  part table rows `Title`, `Description` and `GroupLabel` point at it.
+- dialog.md 1 (the `Title` and `Description` decision) and the ARIA table: the Popup names
+  them only while mounted, none while the content is not rendered. AlertDialog and Drawer run
+  the Dialog parts' code and follow.
+- popover.md 1 and the ARIA table: the same; a Title outside the Popup counts (it registers
+  with the Root).
+- toast.md 1 (the Root row) and the Suspense-fallback bullet: the same; a Description with no
+  content renders nothing and is not referenced.
+- menu.md 3.6, 3.7: `Menu.RadioGroup` and `Menu.Group` name their `GroupLabel` only while one
+  is mounted; the Popup's `aria-labelledby` → Trigger follows the rule (`Menu.Trigger` and
+  `Menu.SubmenuTrigger` register).
+- context-menu.md row 10 and the ARIA table: a context-only menu has no `aria-labelledby`.
+- combobox.md (part table, ARIA table: Group; the Input's `aria-controls` marked as the
+  exception), multi-select.md (ARIA table: Group).
+- tabs.md: the `aria-controls` paragraph names itself the conventions 1.1.1 exception.
+- progress.md row 8 and 8: the precedent is now the exception it is.
+- field-form.md "Why these parts": the stale "`Field.Description` is always wired" bullet from
+  before #217 now states the #217 rule.
+- internal-hooks.md, the file index: `use-title-description.ts`, `use-group-label.ts`.
+
+### Kept, and why
+
+- **Progress / Meter**: Server Components; registering needs client state.
+- **Combobox and MultiSelect `aria-controls` → the List**: ARIA 1.2 requires `aria-controls` on
+  `combobox`; the popup it controls exists whether or not it is rendered now.
+- **Tabs `aria-controls` → the Panel**: the APG pattern references the panel; a mounted-panel
+  registry would cost a render per panel for a reference AT ignores until the panel exists.
+
+### Found while implementing
+
+- **The shown-name warning ran too early.** `useShownNameWarning` (Dialog, AlertDialog, Drawer,
+  Popover) checked in a passive effect of the showing commit. A Title mounted by that commit
+  registers from a layout effect, and React flushes the passive effects before the sync
+  re-render that adds the token, so the warning fired for a dialog that had a Title. The check
+  now runs a microtask later, after that re-render. A dialog without a Title or `aria-label`
+  still warns, as before (the check resolves ids, so a dangling token never counted as a name).
+- **Hidden `keepMounted` content.** An owner that first mounts inside a hidden `<Activity>` (a
+  group in a closed `keepMounted` popup) runs no effects there and keeps the assumed token
+  until first shown; stated in conventions 1.1.1 as accepted (the content is hidden).
+- **Cost.** A Dialog, Popover or Toast Root without a Title or Description, a group without a
+  GroupLabel and a context-only Menu render once more at mount (the presence settling); the
+  Popover render-count test (#118) now expects that render.
+
+### Test plan
+
+`__tests__/part-references.test.tsx` (jsdom):
+
+| Owner | Rows |
+| --- | --- |
+| Dialog, AlertDialog, Drawer, Popover Popup (JS-free mode) | no parts: no token; Title, then Description mounted later, then unmounted; the consumer's own tokens kept exactly with no parts; StrictMode; keyed remount of the parts; `<Activity>` hide and show; Suspense reveal; SSR with both parts (server and hydrated reference them, no warning); SSR without parts (the server references them, hydration drops them, no warning) |
+| Dialog, library mode | closed: none; opened: both, no missing-name warning; closed again: none |
+| Toast Root | Title and Description referenced; a Description part removed, and one with no content, not referenced (no SSR row: toasts are created on the client) |
+| Menu.Group, Menu.RadioGroup, Combobox.Group, MultiSelect.Group | no GroupLabel: no token; mounted later and unmounted; consumer token kept; StrictMode, `<Activity>`, Suspense reveal; hydration without a warning (their popup content is client-rendered, so the server HTML has no group) |
+| A group in a closed `keepMounted` popup | keeps the assumed token while never shown; settles when shown |
+| Menu Popup | labelled by the Trigger only while one is mounted; StrictMode; a submenu Popup by its SubmenuTrigger; SSR with and without a Trigger |
+
+Updated rows: `menu-context-trigger.test.tsx` (no `aria-labelledby` without a Trigger),
+`toast.test.tsx` (no `aria-describedby` without a Description), `popover.test.tsx` (#118 render
+count), `dialog.test.tsx` and `alert-dialog.test.tsx` (the missing-name warning is a microtask
+after the show).

@@ -2,6 +2,7 @@
 import { createContext, use } from "react";
 import type { RefObject } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
+import type { GroupLabelContextValue } from "../internal/use-group-label.js";
 import type { ListboxOptionEntry } from "../internal/use-option-registry.js";
 
 /** One MultiSelect: what its Root provides to every part (design/components/multi-select.md B.1). */
@@ -87,5 +88,5 @@ export const MultiSelectPopupContext = createContext<boolean>(false);
 /** Provided by `MultiSelect.List` (an Option outside a List warns). */
 export const MultiSelectListContext = createContext<boolean>(false);
 
-/** `MultiSelect.Group`: the id its `MultiSelect.GroupLabel` renders. */
-export const MultiSelectGroupContext = createContext<string | null>(null);
+/** `MultiSelect.Group`: the id its `MultiSelect.GroupLabel` renders and its registration (#218). */
+export const MultiSelectGroupContext = createContext<GroupLabelContextValue | null>(null);

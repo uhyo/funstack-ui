@@ -1,5 +1,5 @@
 "use client";
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -150,6 +150,9 @@ export function MenuTrigger({
   ...rest
 }: MenuTriggerProps) {
   const menu = useMenuContext("Menu.Trigger");
+  // The Popup is labelled by this id only while a Trigger is mounted (#218).
+  const { registerTrigger } = menu;
+  useLayoutEffect(registerTrigger, [registerTrigger]);
   useDevWarning(
     menu.submenu,
     isDev &&

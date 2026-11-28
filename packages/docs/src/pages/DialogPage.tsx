@@ -317,7 +317,7 @@ export function DialogPage() {
           "`DialogPopupState` is `{ open, modal }`; `open` is committed (`false` in JS-free mode; `:open` is the DOM truth)."
         }
         owned={
-          "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` are merged with yours. `onToggle` and `onBeforeToggle` are not accepted: use a `ref` for the platform events. `popover` is not accepted either: a `<dialog popover>` cannot be opened with `showModal()`."
+          "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` name the Title and the Description only while each is mounted (none while the content is not rendered), merged with yours. `onToggle` and `onBeforeToggle` are not accepted: use a `ref` for the platform events. `popover` is not accepted either: a `<dialog popover>` cannot be opened with `showModal()`."
         }
         note={
           'Other props, such as `role` or `onCancel`, pass through. For a confirmation, use [AlertDialog](/components/alert-dialog): `role="alertdialog"`, no light dismiss and focus on Cancel are its defaults.'
@@ -584,8 +584,9 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
           <code>role="alertdialog"</code> passes through; for a confirmation that needs an answer,{" "}
           <a href="/components/alert-dialog">AlertDialog</a> renders it for you, with no light
           dismiss and focus on Cancel. <code>aria-labelledby</code> and{" "}
-          <code>aria-describedby</code> point at Title and Description. A Popup with neither a Title
-          nor an <code>aria-label</code> is a development warning.
+          <code>aria-describedby</code> point at Title and Description while they are mounted (never
+          at a missing element). A Popup with neither a Title nor an <code>aria-label</code> is a
+          development warning.
         </li>
         <li>
           There is no focus trap: <code>showModal()</code> makes the rest of the page inert. Focus

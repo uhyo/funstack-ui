@@ -575,7 +575,7 @@ optional multi-select keys.
 | Popup | `popover="auto"`, `id`; no role |
 | List | `role="listbox"`, `aria-multiselectable="true"`, `aria-labelledby` → the Label id while one is mounted (token-merged), `aria-busy="true"` while loading |
 | Option | `role="option"`, `id` (derived from the value), `aria-selected` `"true"` / `"false"` on **every** option (optimistic), `aria-disabled` |
-| Group / GroupLabel | `role="group"` + `aria-labelledby` |
+| Group / GroupLabel | `role="group"` + `aria-labelledby` while a GroupLabel is mounted (conventions 1.1.1) |
 | Status | `role="status"` in the Popup; `role="none"` inside the List |
 
 **`aria-expanded` on an invoker.** Every other overlay Trigger renders no `aria-expanded`,

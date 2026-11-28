@@ -1453,13 +1453,15 @@ describe("Dialog", () => {
       expect(error).toHaveBeenCalledWith(expect.stringContaining("`keepMounted={false}`"));
     });
 
-    it("warns when the dialog has no accessible name", () => {
+    it("warns when the dialog has no accessible name", async () => {
       const error = silenceErrors();
       render(
         <Dialog.Root>
           <Dialog.Popup />
         </Dialog.Root>,
       );
+      // A microtask after the showing effect (a Title registers first, #218).
+      await act(async () => {});
       expect(error).toHaveBeenCalledWith(expect.stringContaining("no accessible name"));
     });
 

@@ -369,7 +369,8 @@ export function MenuPopup({
     id: popover.ids.popup,
     popover: "auto",
     role: "menu",
-    "aria-labelledby": menu.triggerId,
+    // Only while a Trigger is mounted (#218); the key is omitted otherwise.
+    ...(menu.labelledById !== undefined && { "aria-labelledby": menu.labelledById }),
     // The popup itself takes focus as the last resort when a menu has no items.
     tabIndex: -1,
     // Owned in both modes (conventions 1.5): without the flag a `render` element's own

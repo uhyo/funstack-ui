@@ -289,7 +289,9 @@ packages/ui/src/internal/
   use-value-set.ts        # a set-valued `value` / `defaultValue` prop as a set
   use-hydrated-mount.ts   # whether this mount is the hydration render (useSyncExternalStore)
   use-register-count.ts   # how many parts of a kind are registered
-  use-part-presence.ts    # usePartPresence(): an optional referenced part is mounted, assumed so until the owner's first commit (the server HTML); the Field's Label, Description, Error (field-form.md 4.2, #217)
+  use-part-presence.ts    # usePartPresence(): an optional referenced part is mounted, assumed so until the owner's first commit (the server HTML); the Field's Label, Description, Error (field-form.md 4.2, #217); the rule is conventions 1.1.1
+  use-title-description.ts # useTitleDescriptionPresence(ids), titleDescriptionRefs(presence): a Popup's or Toast Root's Title / Description references (conventions 1.1.1, #218)
+  use-group-label.ts      # useGroupLabel(), useGroupLabelId(group): a group's GroupLabel reference (Menu, Combobox, MultiSelect; conventions 1.1.1, #218)
   use-mount-fixed.ts      # useMountFixed(value, isDev && message): a prop read once at mount (the JS-free / library mode, `exclusive`), with its dev warning
   use-delayed-pair.ts     # an open timer and a close timer that exclude each other
   decimal.ts              # decimal helpers of Slider and NumberField; directive-free

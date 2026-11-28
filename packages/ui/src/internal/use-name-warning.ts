@@ -112,11 +112,21 @@ function useShownNameWarningDev(
   const warned = useRef(false);
   useEffect(() => {
     if (message === false || !shown || warned.current) return;
-    const target = element !== null && "current" in element ? element.current : element;
-    if (target === null || hasName(target, { resolveIds: true })) return;
-    if (applies !== undefined && !applies(target)) return;
-    warned.current = true;
-    console.error(message);
+    let cancelled = false;
+    // A microtask later: a Title that mounted in the showing commit registers from a layout
+    // effect, and React runs this effect before the re-render that adds its `aria-labelledby`
+    // token (#218). That re-render is synchronous, so it has committed by the microtask.
+    queueMicrotask(() => {
+      if (cancelled || warned.current) return;
+      const target = element !== null && "current" in element ? element.current : element;
+      if (target === null || hasName(target, { resolveIds: true })) return;
+      if (applies !== undefined && !applies(target)) return;
+      warned.current = true;
+      console.error(message);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [element, shown, message, applies]);
 }
 

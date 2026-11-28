@@ -40,7 +40,7 @@ runs with `data-pending` on the item and the menu closes in the commit that ends
 | 7 | Editable targets | `input` (text-taking types), `textarea` and `contenteditable` targets keep the browser's menu by default (copy and paste); `editableTargets="menu"` overrides. Product-owner decision. |
 | 8 | Nesting | Inner region wins through `defaultPrevented`: a region opens only if the event is not already prevented, and opening prevents it. A `disabled` region does nothing and lets the event bubble to an outer region. A consumer handler deeper in the tree that calls `preventDefault()` keeps the native menu away and the region quiet; one that calls `stopPropagation()` gets the native menu (research 7). |
 | 9 | Focus | As Menu 6: first item on open (quiet / ring by modality); focus return is the platform's (the previously focused element; `<body>` when the right-button `mousedown` blurred a non-focusable region, which is native too); with a `Menu.Trigger` in the same Root, Popover 6.2's rule focuses it when a close would leave focus on `<body>`. No `returnFocus` prop. |
-| 10 | ARIA | None on the region (`aria-haspopup` is not allowed on `generic`; there is no ARIA for "has a context menu", w3c/aria#1971). `data-open` / `data-pending` / `data-disabled` for styling. The Popup keeps `aria-labelledby` → the Trigger id (dangling without a Trigger; `aria-label` pass-through names a context-only menu). |
+| 10 | ARIA | None on the region (`aria-haspopup` is not allowed on `generic`; there is no ARIA for "has a context menu", w3c/aria#1971). `data-open` / `data-pending` / `data-disabled` for styling. The Popup has `aria-labelledby` → the Trigger id only while a `Menu.Trigger` is mounted (conventions 1.1.1); a context-only menu has none and is named by `aria-label` pass-through. |
 | 11 | Pending UI | Region: `data-open` (optimistic), `data-pending` (the Root's transition). Popup: `data-context` while the current open came from a ContextTrigger (and no `data-side` / `data-align`). Items as Menu. |
 | 12 | Animation | As Menu 9: `transition` on the Popup animates the open commit and library-driven closes (item activation, controlled close). The outside-right-click close, Tab and dismissals are CSS exits; a move is instant (no React open or close). Types unchanged (`fsui-menu-open` / `-close`). |
 | 13 | Touch | Long-press on every platform (iOS has no `contextmenu`; Android's own `contextmenu` and the timer race harmlessly). Inline `-webkit-touch-callout: none` on the region. The one `click` that may follow a long-press open is swallowed. `user-select: none` for regions with text is the consumer's CSS (documented trade-off). |
@@ -818,7 +818,7 @@ No `aria-*` anywhere on the region; the Popup is `role="menu"` as Menu, named by
 | Part | Attributes |
 | --- | --- |
 | ContextTrigger | none; `data-open`, `data-pending`, `data-disabled`; inline `-webkit-touch-callout: none` |
-| Popup | as Menu; `data-context` on a context open; `aria-labelledby` → the Trigger id (dangling without one); `aria-label` pass-through |
+| Popup | as Menu; `data-context` on a context open; `aria-labelledby` → the Trigger id while a `Menu.Trigger` is mounted (conventions 1.1.1; none without one); `aria-label` pass-through |
 
 Discoverability is the consumer's (research 4, w3c/aria#1971): nothing in the platform or ARIA
 announces a context menu, iOS VoiceOver cannot open one, and TalkBack is unverified. The docs

@@ -1121,7 +1121,7 @@ describe("AlertDialog", () => {
       expect(error).not.toHaveBeenCalled();
     });
 
-    it("the missing-name warning names AlertDialog.Title", () => {
+    it("the missing-name warning names AlertDialog.Title", async () => {
       const error = silenceErrors();
       render(
         <AlertDialog.Root>
@@ -1130,6 +1130,8 @@ describe("AlertDialog", () => {
           </AlertDialog.Popup>
         </AlertDialog.Root>,
       );
+      // A microtask after the showing effect (a Title registers first, #218).
+      await act(async () => {});
       expect(error).toHaveBeenCalledWith(
         expect.stringContaining("AlertDialog.Popup: the dialog has no accessible name"),
       );

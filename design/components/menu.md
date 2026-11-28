@@ -642,8 +642,8 @@ export interface MenuRadioItemProps extends Omit<MenuCheckboxItemProps, "checked
 ```
 
 `RadioGroup` is the owner (`useControllableAction<string | null>`; `data-pending` on the group,
-`role="group"`, `aria-labelledby` → its `GroupLabel`'s id, always emitted as on `Group`: without
-a label the IDREF dangles, which accname ignores, so a consumer's `aria-label` still names the
+`role="group"`, `aria-labelledby` → its `GroupLabel`'s id while one is mounted, as on `Group`
+(conventions 1.1.1): without a label there is none, so a consumer's `aria-label` names the
 group; deviation 5); `RadioItem` renders
 `role="menuitemradio"`, `aria-checked={optimistic === value}`, `data-checked`, and `data-pending`
 when it is the optimistic target while the group is pending. Transition types `fsui-menu`,
@@ -651,9 +651,10 @@ when it is the optimistic target while the group is pending. Transition types `f
 
 ### 3.7 `Menu.Group`, `Menu.GroupLabel`, `Menu.Separator`
 
-`Group`: `div[role=group]` with `aria-labelledby` → its `GroupLabel`'s id (always emitted;
-dangling is harmless). `GroupLabel`: `div` with the owned `id` (reads the nearest `Group` or
-`RadioGroup` context). `Separator`: `hr role="separator"` by default; no state. It owns `role`
+`Group`: `div[role=group]` with `aria-labelledby` → its `GroupLabel`'s id while one is mounted
+(the GroupLabel registers from a layout effect, conventions 1.1.1). `GroupLabel`: `div` with the
+owned `id` (reads the nearest `Group` or `RadioGroup` context). The Popup's `aria-labelledby` →
+the Trigger id (`Menu.Trigger` or `Menu.SubmenuTrigger`) follows the same rule. `Separator`: `hr role="separator"` by default; no state. It owns `role`
 (omitted from its props type), the rule of `Separator` and `Toolbar.Separator`
 (`design/components/separator.md` 3): the role does not depend on the element `render` chose.
 All three take `render`, `className`, `style`, `children` (not `Separator`'s `children`: an

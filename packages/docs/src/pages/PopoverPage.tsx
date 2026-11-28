@@ -353,7 +353,7 @@ export function PopoverPage() {
           "`PopoverPopupState` is `{ open, side, align }`; `open` is committed (`false` in JS-free mode; `:popover-open` is the DOM truth); `side` / `align` are where the browser placed the popup while it is shown (a physical side, after any fallback flip, in both modes), your props otherwise."
         }
         owned={
-          '`id`, `popover` (`"auto"`), `open` (never rendered), `aria-modal` (`"false"`: Chromium exposes a `<dialog popover>` as modal otherwise), `data-side` / `data-align` (unless `side` is `null`); `aria-labelledby` and `aria-describedby` are merged with yours.'
+          '`id`, `popover` (`"auto"`), `open` (never rendered), `aria-modal` (`"false"`: Chromium exposes a `<dialog popover>` as modal otherwise), `data-side` / `data-align` (unless `side` is `null`); `aria-labelledby` and `aria-describedby` name the Title and the Description only while each is mounted (none while the content is not rendered), merged with yours.'
         }
         note={
           '`role="dialog"` is a default you can override (`"region"` or `"group"` for a non-interactive card). `onToggle` and `onBeforeToggle` are not accepted; use a `ref` for the platform events. Your `style` wins over the inline placement.'

@@ -117,8 +117,9 @@ Why these parts, where they differ from Dialog:
   user works elsewhere (`manual`) is a different component (a pinned panel, a toast) and is not
   designed in v0.
 - **`Title` and `Description`** are the same parts as Dialog's: `aria-labelledby` /
-  `aria-describedby` are always emitted and token-merged with the consumer's; dangling references
-  are skipped by the accessible-name computation. A popup with neither a Title nor an
+  `aria-describedby` name them only while they are mounted (they register with the Root,
+  conventions 1.1.1; a Title outside the Popup counts) and are token-merged with the consumer's.
+  A popup with neither a Title nor an
   `aria-label` / consumer `aria-labelledby` warns in development once it has been shown, because
   `role="dialog"` requires a name. A popup whose content is not a dialog (an info card with no
   interactive content) may pass `role="group"` or `role="region"` through; `role` is a default,
@@ -1141,7 +1142,7 @@ and every prior-art library opens it below the trigger.
 
 | Part | ARIA |
 | --- | --- |
-| Popup | `role="dialog"` (explicit default; WebKit has no minimum role for `[popover]`), `aria-modal="false"` (always; Chromium's `<dialog popover>` exposure), `aria-labelledby` → Title id, `aria-describedby` → Description id, both always emitted and token-merged |
+| Popup | `role="dialog"` (explicit default; WebKit has no minimum role for `[popover]`), `aria-modal="false"` (always; Chromium's `<dialog popover>` exposure), `aria-labelledby` → Title id, `aria-describedby` → Description id, each only while the part is mounted (conventions 1.1.1; the key is omitted otherwise), token-merged |
 | Trigger | `popoverTarget` (the Popup's id) and **no `aria-expanded`** on a `<button>`: HTML-AAM maps a `popovertarget` invoker to an implicit expanded state that Chromium, Firefox and WebKit all expose from the popover itself (`docs/research/invoker-aria-expanded.md`; `memo/architect/probes/121-popovertarget/`), and ARIA in HTML #514 forbids the explicit attribute on such a button (Firefox would OR it in). So the exposed state equals `:popover-open` at the show or hide itself, with no mirror to lag, in both modes and before hydration; `data-open` and `state.open` stay optimistic. A non-button `render` is no invoker and renders `aria-expanded` from the Root's `shown` mirror (an urgent mirror of the popup's `toggle` read from `:popover-open`) in library mode, `"false"` in JS-free mode. A native-disabled Trigger is no invoker either and exposes no state while its popup is shown: transient, accepted. JS-free mode: the Popup's native `toggle` listener writes `data-open` on the Trigger element after hydration (reads `:popover-open`, not `newState`) and the Trigger's ref syncs it once for a pre-hydration open; a styling hook, not ARIA. No `aria-haspopup` (passes through), no `aria-controls` (the implicit expanded state plus the next-in-focus-order popup is the APG disclosure shape; `aria-controls` passes through for consumers who want it) |
 | Close | plain button; an icon-only one gets an `aria-label` from the consumer |
 | Title | `h2` by default |

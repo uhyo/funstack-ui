@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -47,6 +48,9 @@ export function useDialogTitle(
   namespace: DialogNamespace,
 ): ReactNode {
   const ctx = useDialogContext(`${namespace}.Title`);
+  // The Popup's `aria-labelledby` names it only while it is mounted (#218).
+  const { registerTitle } = ctx.parts;
+  useLayoutEffect(registerTitle, [registerTitle]);
   const state: DialogTitleState = { open: ctx.committed, modal: ctx.modal };
   return useRender<ComponentPropsWithRef<"h2">, DialogTitleState>({
     defaultElement: "h2",

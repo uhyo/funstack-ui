@@ -11,6 +11,7 @@ import type {
 } from "../internal/types.js";
 import { intendedValue } from "../internal/action/use-controllable-action.js";
 import { useOverlayRoot } from "../internal/overlay/use-overlay-root.js";
+import { useTitleDescriptionPresence } from "../internal/use-title-description.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import { DialogContext } from "./dialog-context.js";
 import type { DialogContextValue, DialogNamespace } from "./dialog-context.js";
@@ -188,9 +189,11 @@ export function useDialogRoot(
 
   // Memoised: `root` changes only with the open state and pending, so the value changes only
   // with those and `modal`, and the parts do not re-render for an unrelated render of the Root.
+  // The Popup names a Title and a Description only while they are mounted (#218).
+  const parts = useTitleDescriptionPresence(root.ids);
   const context = useMemo<DialogContextValue>(
-    () => ({ ...root, modal, requestClose, takeCloseReturnValue }),
-    [root, modal, requestClose, takeCloseReturnValue],
+    () => ({ ...root, modal, parts, requestClose, takeCloseReturnValue }),
+    [root, modal, parts, requestClose, takeCloseReturnValue],
   );
 
   const state: DialogRootState = { open: optimistic, pending: root.pending, modal };

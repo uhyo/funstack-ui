@@ -29,6 +29,7 @@ import { useLatest } from "../internal/use-latest.js";
 import { useModalRegistration } from "../internal/overlay/use-modal-registration.js";
 import { useShownNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
+import { titleDescriptionRefs } from "../internal/use-title-description.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { useDialogContext } from "./dialog-context.js";
 import type { DialogNamespace } from "./dialog-context.js";
@@ -542,8 +543,8 @@ export function useDialogPopup(
     // `:modal` true (research). Owned so a `render` element cannot add it.
     open: undefined,
     closedby: experimental_closedBy ? (lightDismiss ? "any" : "closerequest") : undefined,
-    "aria-labelledby": ids.title,
-    "aria-describedby": ids.description,
+    // Only the parts that are mounted (#218); a key without one is omitted.
+    ...titleDescriptionRefs(ctx.parts),
     "data-modal": dataAttr(modal),
     // Owned when fixed (AlertDialog's `alertdialog`): a consumer's `role` is dropped.
     ...(role !== undefined && { role }),

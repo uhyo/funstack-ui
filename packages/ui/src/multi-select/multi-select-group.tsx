@@ -1,8 +1,9 @@
 "use client";
-import { use, useId, useLayoutEffect } from "react";
+import { use, useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useGroupLabel, useGroupLabelId } from "../internal/use-group-label.js";
 import { useRender } from "../internal/use-render.js";
 import {
   MultiSelectGroupContext,
@@ -45,7 +46,8 @@ export interface MultiSelectGroupProps extends Omit<
 
 /**
  * A labelled set of options: `<div role="group" aria-labelledby>` named by the
- * `MultiSelect.GroupLabel` inside it. Owned keys: `role`, `aria-labelledby` (token-merged).
+ * `MultiSelect.GroupLabel` inside it, while one is mounted (#218). Owned keys: `role`,
+ * `aria-labelledby` (token-merged).
  *
  * @see https://ui.funstack.work/components/multi-select
  */
@@ -57,7 +59,7 @@ export function MultiSelectGroup({
   ...rest
 }: MultiSelectGroupProps) {
   useMultiSelectContext("MultiSelect.Group");
-  const labelId = `${useId()}-label`;
+  const { context, labelledBy } = useGroupLabel();
   const element = useRender<ComponentPropsWithRef<"div">, MultiSelectGroupState>({
     defaultElement: "div",
     render,
@@ -66,9 +68,9 @@ export function MultiSelectGroup({
     style,
     children,
     props: rest,
-    libraryProps: { role: "group", "aria-labelledby": labelId },
+    libraryProps: { role: "group", ...labelledBy },
   });
-  return <MultiSelectGroupContext value={labelId}>{element}</MultiSelectGroupContext>;
+  return <MultiSelectGroupContext value={context}>{element}</MultiSelectGroupContext>;
 }
 
 MultiSelectGroup.displayName = "MultiSelectGroup";
@@ -105,7 +107,7 @@ export function MultiSelectGroupLabel({
   render,
   ...rest
 }: MultiSelectGroupLabelProps) {
-  const labelId = use(MultiSelectGroupContext);
+  const labelId = useGroupLabelId(use(MultiSelectGroupContext)) ?? null;
   useDevWarning(
     labelId === null,
     isDev && "MultiSelect.GroupLabel: rendered outside a MultiSelect.Group; it names nothing.",

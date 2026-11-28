@@ -9,6 +9,10 @@ import { exitAnimations } from "../internal/overlay/use-exit-animation.js";
 import { useLatest } from "../internal/use-latest.js";
 import { ownsArrows } from "../internal/use-roving-focus.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
+import {
+  titleDescriptionRefs,
+  useTitleDescriptionPresence,
+} from "../internal/use-title-description.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { ToastItem, ToastPriority } from "./toast.js";
 import { ToastRootContext, useToastRootContext, useToastViewportContext } from "./toast-context.js";
@@ -103,6 +107,8 @@ export function ToastRoot({
     () => ({ title: `${baseId}title`, description: `${baseId}description` }),
     [baseId],
   );
+  // The Root names a Title and a Description only while they are mounted (#218).
+  const parts = useTitleDescriptionPresence(ids);
   const elementRef = useRef<HTMLElement | null>(null);
   const titleRef = useRef<HTMLElement | null>(null);
   const descriptionRef = useRef<HTMLElement | null>(null);
@@ -195,6 +201,7 @@ export function ToastRoot({
     () => ({
       toast: item,
       ids,
+      parts,
       state,
       registerTitle,
       registerDescription,
@@ -206,6 +213,7 @@ export function ToastRoot({
     [
       item,
       ids,
+      parts,
       state,
       registerTitle,
       registerDescription,
@@ -289,8 +297,8 @@ export function ToastRoot({
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
     role: priority === "high" ? "alertdialog" : "dialog",
     tabIndex: 0,
-    "aria-labelledby": ids.title,
-    "aria-describedby": ids.description,
+    // Only the parts that are mounted (#218); a key without one is omitted.
+    ...titleDescriptionRefs(parts),
     inert: item.ending || undefined,
     "data-type": item.type,
     "data-priority": priority,

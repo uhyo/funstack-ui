@@ -1,6 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { DelayedPair } from "../internal/use-delayed-pair.js";
+import type { GroupLabelContextValue } from "../internal/use-group-label.js";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
 
 /**
@@ -76,8 +77,15 @@ export interface MenuContextValue {
   readonly loop: boolean;
   readonly delay: number;
   readonly closeDelay: number;
-  /** The Trigger's id (`aria-labelledby` of the Popup). */
+  /** The Trigger's id (Menu.Trigger or Menu.SubmenuTrigger renders it). */
   readonly triggerId: string;
+  /**
+   * The Popup's `aria-labelledby`: `triggerId` while a Trigger or SubmenuTrigger is mounted,
+   * else `undefined` (a context-only menu, #218). Assumed mounted until the Root's first commit.
+   */
+  readonly labelledById: string | undefined;
+  /** Stable. A Trigger or SubmenuTrigger calls it from a layout effect; returns the unregistration. */
+  readonly registerTrigger: () => () => void;
   /** Record the focus target of the next open (and whether a pointer asked for it). */
   readonly setOpenCause: (cause: MenuOpenCause, pointer?: boolean) => void;
   /** Read and clear the focus target of the open being shown (default `"first"`, keyboard). */
@@ -210,10 +218,11 @@ export interface MenuListContextValue {
 
 export const MenuListContext = createContext<MenuListContextValue | null>(null);
 
-/** `Menu.Group` / `Menu.RadioGroup`: the id their `Menu.GroupLabel` renders. */
-export interface MenuGroupContextValue {
-  readonly labelId: string;
-}
+/**
+ * `Menu.Group` / `Menu.RadioGroup`: the id their `Menu.GroupLabel` renders, and its
+ * registration (the group references it only while it is mounted, #218).
+ */
+export type MenuGroupContextValue = GroupLabelContextValue;
 
 export const MenuGroupContext = createContext<MenuGroupContextValue | null>(null);
 

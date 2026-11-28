@@ -92,7 +92,7 @@ anatomy section says what the part renders there; this table fixes what the name
 | `ContextTrigger` | A region whose `contextmenu` (right-click, the keyboard's context-menu keys, a library long-press for touch) opens the owner's `Popup` at the pointer (Menu). A plain element with **no role and no ARIA**; may share a Root with a `Trigger`. | `div` |
 | `Panel` | Content region whose visibility is driven by library state (Tabs, Accordion, Collapsible). | `div` |
 | `Popup` | Content that lives in the top layer. An overlay's content region: its children render from committed state in library mode. | `div[popover]` (Tooltip, HoverCard, Menu, NavigationMenu, Combobox, MultiSelect), `dialog[popover]` (Popover) or `dialog` (Dialog, AlertDialog, Drawer) |
-| `Title` | Names a popup through `aria-labelledby`: an `h2[id]` whose level `render` changes (Dialog, AlertDialog, Drawer, Popover). Toast's is a `div[id]`, not a heading: a transient notification stays out of heading navigation. | `h2` / `div` |
+| `Title` | Names a popup through `aria-labelledby` while it is mounted (1.1.1): an `h2[id]` whose level `render` changes (Dialog, AlertDialog, Drawer, Popover). Toast's is a `div[id]`, not a heading: a transient notification stays out of heading navigation. | `h2` / `div` |
 | `Close` | A button that asks its owner to close. In an overlay (Dialog, Drawer, Popover) it is a pure trigger: an optional `action` runs first, and the close is `"activate"` (2.5.1). Toast's has no `action`, and its close is `"dismiss"` (2.2). | `button` |
 | `Viewport` | The owner of a queue that a command fills (Toast): the region the queued entries render into. It plays the Root's role for the component, whose `Root` is one entry. | `section[popover=manual]` |
 | `Link` | A navigation link the component knows about (NavigationMenu): inside a `Popup`, following it closes the panel (`closeOnActivate`, 2.5.1); anywhere else it is a plain link. | `a` |
@@ -116,10 +116,10 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Cancel` | The safe answer of an AlertDialog: a close button that is the default initial focus target (`Dialog.Close` under another name). | `button` |
 | `Action` | The confirm button of an AlertDialog: a close button whose `action` runs first in its own transition and that, with `action`, is no native close invoker. Not Toast's `Action`, which is a toast's own button. | `button` |
 | `Control` | The native form control a Field labels and describes (`input`, or `textarea` / `select` through `render`), inside a Field or alone (outside a `Field.Root` it is the plain control, nothing added). Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (3.8). | `input` |
-| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the `<dialog>` (Dialog, AlertDialog) always references, mounted or not; the control (Field) references it only while it is mounted (field-form.md 4.2). | `p` |
+| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the owner (Dialog, AlertDialog, Drawer, Popover, Toast; a Field's control) references only while it is mounted (1.1.1; field-form.md 4.2). | `p` |
 | `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown and referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
-| `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |
+| `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`, while it is mounted (1.1.1). Not `Label`, which names the component's owner. | `div` |
 | `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending`. The general one is the single-element `Button` (`@funstack/ui/button`; `whilePending`, 2.5.1), which is also a Toolbar's command button: the Toolbar has no button part, and every library button-like part reads `ToolbarContext` so that a disabled one stays focusable there (3.6). | `button` |
 | `Image` | A picture the owner shows while it is available, mirrored as a load `status` (Avatar): an `<img alt="">` rendered from the server render on, unmounted once its source failed; the owner carries the name. Never an `onLoad` prop of the library's (react-dom's commit wait, `design/components/avatar.md` 5). | `img` |
 | `Fallback` | What the owner shows in an `Image`'s place: rendered until the image has loaded, **under** it (the consumer's CSS stacks them), so nothing is swapped while it loads (Avatar). | `span` |
@@ -151,6 +151,48 @@ value as hidden inputs, one for a single selection and **one per value** with `m
 (`design/components/combobox.md` 15.8); they are form plumbing, take no `ref`, `className` or
 `render`, and sit before the children, outside every `<ViewTransition>`. MultiSelect's Root
 does the same, one per value (`design/components/multi-select.md` B.10).
+
+#### 1.1.1 Referenced only while mounted
+
+An owner references an optional part's id (`aria-labelledby`, `aria-describedby`) **only
+while that part is mounted**, so no IDREF names a missing element (#217, #218). The rule covers:
+the Popup of Dialog, AlertDialog, Drawer and Popover and the Toast Root → `Title` and
+`Description` (a Toast Description that renders nothing is not mounted); `Menu.Group`,
+`Menu.RadioGroup`, `Combobox.Group`, `MultiSelect.Group` → `GroupLabel`; a `Menu.Popup` → its
+`Menu.Trigger` or `Menu.SubmenuTrigger` (a menu opened only from a `Menu.ContextTrigger` has
+none); a Field's control → `Field.Label`, `Field.Description`, `Field.Error`
+(`design/components/field-form.md` 4.2).
+
+- **Mechanism.** The part registers with its owner from a layout effect (`usePartPresence`,
+  `internal/use-part-presence.ts`); the owner emits the token while one is registered. A key
+  with nothing to reference is **omitted** from the owned layer, never set to `undefined`
+  (which would remove the consumer's own tokens, 1.2).
+- **Server HTML and hydration.** Until the owner's first commit every part counts as mounted:
+  the server cannot know whether a part rendered after the reader exists, and the hydration
+  render must match the server HTML. The server HTML therefore references every part (a
+  Title rendered with a JS-free Dialog keeps its token for no-JS pages); the owner's layout
+  effect settles the real presence before the first paint, and the drop is a post-hydration
+  render (no mismatch, no warning). A page without the part references a missing id until
+  hydration.
+- **Hidden content.** A part hidden by `<Activity mode="hidden">` or by a Suspense boundary
+  that suspends again loses its token while hidden (its layout effects disconnect) and gets it
+  back when shown. An owner that itself first mounts inside a hidden `<Activity>` (a group in a
+  closed `keepMounted` popup) runs no effects there, so it keeps the server-HTML assumption until
+  it is first shown; the content is hidden, so nothing is exposed meanwhile.
+- **Cost.** An owner mounted on the client without one of its parts renders once more in the
+  mount commit (the presence settling), synchronously and before paint.
+- **Kept as they are**, each with its reason:
+  - Progress and Meter Root → `${id}-label` (`design/components/progress.md` 8): Server
+    Components, which cannot register without becoming client modules; the dangling token is
+    skipped by accname and falls through to `aria-label`.
+  - `aria-controls` of a combobox (Combobox Input and Trigger, MultiSelect Trigger) → the List,
+    which is not rendered while the popup is closed: ARIA 1.2 requires `aria-controls` on
+    `combobox`, and the reference names the popup the element controls whether or not it is
+    rendered.
+  - Tabs: a Tab's `aria-controls` → its Panel (`design/components/tabs.md`): the APG tab pattern
+    references the panel, and a lazily rendered panel is ignored by assistive technology until
+    it exists.
+  - `aria-controls` of the NumberField step buttons names the Input, which is always rendered.
 
 ### 1.2 Element polymorphism: `render`
 

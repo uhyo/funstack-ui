@@ -370,7 +370,7 @@ export function MenuPage() {
           "`MenuPopupState` is `{ open, side, align, submenu, context }`; `open` is committed; `submenu` (`data-submenu`) is true on a submenu's popup; `context` is true and `side` is `null` for an open from a `Menu.ContextTrigger`. While the menu is shown, `side` / `align` are where the browser placed it (a physical side, after any flip: a submenu reads `right` in LTR and `left` in RTL); otherwise your props."
         }
         owned={
-          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged with yours), `tabIndex` (`-1`), `focusgroup` (the token list with the flag, removed otherwise), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
+          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (the Trigger or SubmenuTrigger while one is mounted, token-merged with yours), `tabIndex` (`-1`), `focusgroup` (the token list with the flag, removed otherwise), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
         }
         note={
           "A menu shown on the physical side you asked for costs no render for the placement; a logical side (every submenu, by default `inline-end`) costs one render on show and one on hide, since `data-side` turns physical while shown. Style it with `:popover-open`; it emits no `data-open`. Render a `<div>`, not a `<dialog>`."
@@ -473,7 +473,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuRadioGroupState` is `{ value, pending }`."}
         owned={
-          '`role` (`"group"`), `aria-labelledby` (token-merged: a `GroupLabel` inside it), `data-pending`.'
+          '`role` (`"group"`), `aria-labelledby` (token-merged: the `GroupLabel` inside it, while one is mounted), `data-pending`.'
         }
         note={"Transition types `fsui-menu`, `fsui-menu-select`."}
       />

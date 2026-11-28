@@ -1,4 +1,5 @@
 "use client";
+import { useMemo } from "react";
 import type { ReactNode } from "react";
 import type {
   ActionDetails,
@@ -9,7 +10,9 @@ import type {
 } from "../internal/types.js";
 import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";
 import { resolveStateValue } from "../internal/use-render.js";
+import { useTitleDescriptionPresence } from "../internal/use-title-description.js";
 import { PopoverContext } from "./popover-context.js";
+import type { PopoverContextValue } from "./popover-context.js";
 
 /** Details passed as the second argument of `openChangeAction` and `onOpenChange`. */
 export interface PopoverOpenChangeDetails extends ActionDetails {
@@ -98,7 +101,7 @@ export function PopoverRoot({
   onOpenChange,
   children,
 }: PopoverRootProps) {
-  const context = usePopoverRoot<PopoverOpenChangeDetails>({
+  const root = usePopoverRoot<PopoverOpenChangeDetails>({
     component: "popover",
     part: "Popover.Root",
     open,
@@ -107,6 +110,9 @@ export function PopoverRoot({
     onOpenChange,
     details: popoverDetails,
   });
+  // The Popup names a Title and a Description only while they are mounted (conventions 1.1.1, #218).
+  const parts = useTitleDescriptionPresence(root.ids);
+  const context = useMemo<PopoverContextValue>(() => ({ ...root, parts }), [root, parts]);
 
   const state: PopoverRootState = { open: context.optimistic, pending: context.pending };
 

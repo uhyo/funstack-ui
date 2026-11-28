@@ -11,6 +11,7 @@ import type {
 import { useDelayedPair } from "../internal/use-delayed-pair.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";
+import { usePartPresence } from "../internal/use-part-presence.js";
 import { resolveStateValue } from "../internal/use-render.js";
 import {
   ANCHOR_PLACEMENT,
@@ -243,6 +244,10 @@ export function MenuRoot({
     return cause;
   }, []);
 
+  // The Popup is labelled by the Trigger only while one is mounted: a menu opened only from a
+  // `Menu.ContextTrigger` has none (context-menu.md 10, #218).
+  const triggerId = `${popover.ids.popup}-trigger`;
+  const { present: triggerPresent, register: registerTrigger } = usePartPresence();
   const resolvedDelay = delay ?? 100;
   const resolvedCloseDelay = closeDelay ?? 150;
   // `popover` is memoised by `usePopoverRoot` and the other members are stable, so this
@@ -259,7 +264,9 @@ export function MenuRoot({
       loop,
       delay: resolvedDelay,
       closeDelay: resolvedCloseDelay,
-      triggerId: `${popover.ids.popup}-trigger`,
+      triggerId,
+      labelledById: triggerPresent ? triggerId : undefined,
+      registerTrigger,
       setOpenCause,
       takeOpenCause,
       timers,
@@ -275,6 +282,9 @@ export function MenuRoot({
     loop,
     resolvedDelay,
     resolvedCloseDelay,
+    triggerId,
+    triggerPresent,
+    registerTrigger,
     setOpenCause,
     takeOpenCause,
     timers,

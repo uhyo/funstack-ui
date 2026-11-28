@@ -84,7 +84,7 @@ toast({ title: "Link copied" });
 | --- | --- | --- | --- | --- |
 | `toast` | – | – | – | A function with methods: `toast(options): string`, `toast.promise(promise, options): Promise`, `toast.update(id, options)`, `toast.dismiss(id?)`. Bound to the default manager; `createToastManager()` makes an isolated one for a second root or a test. |
 | `Viewport` | `section` with `popover="manual"` | `region` (named section), `aria-label="Notifications (F8)"` by default | `data-paused`, `data-empty` | Owns the queue state, timers, hotkey, pause, focus return, the portal host (on the client the region sits inside two `display: contents` `div`s: an anchor where the Viewport is rendered and the host the library moves into a modal dialog, section 4.3), re-raise, announcements. `children` is a function of `ToastViewportState` (or a node, for a fixed layout). |
-| `Root` | `div` | `dialog`; `alertdialog` when `priority === "high"`; `tabindex="0"`; `aria-labelledby` → Title id, `aria-describedby` → Description id (both always emitted; a dangling IDREF falls through to `aria-label`) | `data-type` (the toast's `type`), `data-priority` (`"normal"` / `"high"`), `data-pending`, `data-ending` | One per `ToastItem`; takes `toast`. Renders the Suspense guard around `children`. Keyboard: Escape, ArrowUp / ArrowDown. |
+| `Root` | `div` | `dialog`; `alertdialog` when `priority === "high"`; `tabindex="0"`; `aria-labelledby` → Title id, `aria-describedby` → Description id, each only while the part is mounted (conventions 1.1.1; a Description with no content renders nothing and is not referenced) | `data-type` (the toast's `type`), `data-priority` (`"normal"` / `"high"`), `data-pending`, `data-ending` | One per `ToastItem`; takes `toast`. Renders the Suspense guard around `children`. Keyboard: Escape, ArrowUp / ArrowDown. |
 | `Title` | `div` | id for `aria-labelledby` | – | `children` defaults to `toast.title`. Not a heading: a transient notification should not appear in heading navigation. |
 | `Description` | `p` | id for `aria-describedby` | – | `children` defaults to `toast.description`; renders nothing when both are absent. |
 | `Action` | `button type="button"` | – | `data-pending` | `action` defaults to `toast.action.action`, `children` to `toast.action.label`; renders nothing when the toast has no `action` and the part no `action` prop. `closeOnActivate` default `true`. |
@@ -1250,8 +1250,8 @@ fires after the suspended flag is set and the announcement returns early.
   unchanged in substance, visible now).
 - **Parts inside the fallback** are allowed (a visually hidden `<Toast.Title>Loading…
   </Toast.Title>` gives the Root an accessible name while the skeleton shows **on mount**;
-  without one the `aria-labelledby` IDREF dangles and a user who presses F8 into the toast
-  hears a nameless dialog, as today) but gate nothing: a `contentCommitted` report while the
+  without one the Root has no `aria-labelledby` while the skeleton shows (conventions 1.1.1)
+  and a user who presses F8 into the toast hears a nameless dialog) but gate nothing: a `contentCommitted` report while the
   guard is mounted is ignored, and nothing is announced for the fallback. On an **update** that
   re-suspends, the fallback Title does not rename the toast: React hides the committed content
   with `display: none` but keeps it in the DOM, so the previous Title keeps the same `id` and

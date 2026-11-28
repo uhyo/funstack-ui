@@ -134,8 +134,9 @@ Why these parts:
   text. One `Field.Error` per Field (a second is a dev warning): messages are a list, so a single
   element with function `children` covers the per-constraint wording that Radix and Base UI spell
   with several `match` elements.
-- **`Field.Description` is always wired**, mounted or not, like `Dialog.Description`: a
-  deterministic id and no registration keep the server HTML exact.
+- **`Field.Description` is referenced only while mounted**, like `Dialog.Description`: it
+  registers from a layout effect, and until the Field's first commit it counts as mounted, so the
+  server HTML keeps the reference (4.2; conventions 1.1.1).
 - **`Form.Root` is a part** because the three things React's form channel does not do (keep the
   user's input after a failed validation, route field errors to fields, focus the first error)
   need the `submit` event, the `FormData` and the settle edge of one form, and because

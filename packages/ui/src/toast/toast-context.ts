@@ -1,6 +1,7 @@
 "use client";
 import { createContext, use } from "react";
 import type { ChangeReason } from "../internal/types.js";
+import type { TitleDescriptionPresence } from "../internal/use-title-description.js";
 import type { ToastRootState } from "./toast-root.js";
 import type { ToastItem, ToastPriority } from "./toast.js";
 
@@ -43,6 +44,8 @@ export function useToastViewportContext(part: string): ToastViewportContextValue
 export interface ToastRootContextValue {
   readonly toast: ToastItem;
   readonly ids: { readonly title: string; readonly description: string };
+  /** Which of Title and Description are mounted: the Root names a part only then (#218). */
+  readonly parts: TitleDescriptionPresence;
   /** Root state, so Title and Description can resolve their function props against it. */
   readonly state: ToastRootState;
   readonly registerTitle: (element: HTMLElement | null) => void;

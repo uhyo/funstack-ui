@@ -234,7 +234,7 @@ describe("Menu.ContextTrigger", () => {
       expect(html).toMatch(/<div style="-webkit-touch-callout:none"/);
     });
 
-    it("render={<tr />} keeps the row; the Popup keeps role=menu, a dangling aria-labelledby and aria-label", async () => {
+    it("render={<tr />} keeps the row; the Popup keeps role=menu and aria-label, no aria-labelledby without a Trigger (#218)", async () => {
       render(
         <table>
           <tbody>
@@ -252,9 +252,8 @@ describe("Menu.ContextTrigger", () => {
       const p = popup();
       expect(p).toHaveAttribute("role", "menu");
       expect(p).toHaveAttribute("aria-label", "File actions");
-      const labelledBy = p.getAttribute("aria-labelledby")!;
-      expect(labelledBy).toBe(`${p.id}-trigger`);
-      expect(document.getElementById(labelledBy)).toBeNull();
+      // No Menu.Trigger: nothing to be labelled by, so no dangling IDREF (#218).
+      expect(p).not.toHaveAttribute("aria-labelledby");
     });
 
     it("data-context on a context open, absent on a Trigger open; state.context and state.side", async () => {

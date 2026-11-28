@@ -435,6 +435,8 @@ Per APG Tabs pattern.
   A dangling `aria-controls` is ignored by assistive technology; the alternative (a mounted-panel
   registry) costs a second render and a context write per panel. APG's own examples keep all
   panels in the DOM, so there is no APG guidance on the unmounted case; Radix made the same choice.
+  This is the exception conventions 1.1.1 lists ("Referenced only while mounted" does not apply):
+  the tab controls its panel whether or not the panel is rendered yet.
 - **`aria-orientation` is always emitted** on the list, even for the default horizontal, so the
   attribute agrees with `data-orientation`.
 - **Panel `tabindex="0"`.** APG wants the panel in the tab sequence when it contains no focusable

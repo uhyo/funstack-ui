@@ -1,5 +1,5 @@
 "use client";
-import { useId, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import { callAction } from "../internal/action/call-action.js";
@@ -13,6 +13,7 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useControllableAction } from "../internal/action/use-controllable-action.js";
+import { useGroupLabel } from "../internal/use-group-label.js";
 import { useRender } from "../internal/use-render.js";
 import { MenuGroupContext, MenuRadioGroupContext } from "./menu-context.js";
 import type { MenuRadioGroupContextValue } from "./menu-context.js";
@@ -72,7 +73,8 @@ export interface MenuRadioGroupProps extends Omit<
 
 /**
  * The state owner of a set of `Menu.RadioItem`s: `<div role="group" aria-labelledby>` (named by
- * a `Menu.GroupLabel` inside it). Emits `data-pending` while `valueChangeAction` runs.
+ * a `Menu.GroupLabel` inside it, while one is mounted: #218). Emits `data-pending` while
+ * `valueChangeAction` runs.
  *
  * Owned keys (conventions 1.2): `role`, `aria-labelledby` (token-merged), `data-pending`.
  *
@@ -88,7 +90,7 @@ export function MenuRadioGroup({
   render,
   ...rest
 }: MenuRadioGroupProps) {
-  const labelId = `${useId()}-label`;
+  const { context: groupContext, labelledBy } = useGroupLabel();
   // The work to run after a dispatch's action resolved (an item's `closeOnActivate`), keyed by
   // the dispatch's details object.
   const after = useRef(new WeakMap<object, () => void>());
@@ -126,7 +128,6 @@ export function MenuRadioGroup({
     }),
     [optimistic, pending, dispatch],
   );
-  const groupContext = useMemo(() => ({ labelId }), [labelId]);
 
   const state: MenuRadioGroupState = { value: optimistic, pending };
 
@@ -140,7 +141,7 @@ export function MenuRadioGroup({
     props: rest,
     libraryProps: {
       role: "group",
-      "aria-labelledby": labelId,
+      ...labelledBy,
       "data-pending": dataAttr(pending),
     },
   });

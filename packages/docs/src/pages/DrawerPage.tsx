@@ -312,7 +312,7 @@ export function DrawerPage() {
           "`DrawerPopupState` is `{ open, modal, side }`; `open` is committed (`false` in JS-free mode; `:open` is the DOM truth). A drag is not in the state: it is `data-swiping` and the custom properties."
         }
         owned={
-          "Dialog.Popup's (`id`, `open`, `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` merged with yours), `data-side`, `data-swiping`. The inline `touch-action` is merged under your `style`. The `--drawer-swipe-*` properties are written through the DOM and are not part of the rendered `style`: do not set them yourself."
+          "Dialog.Popup's (`id`, `open`, `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` while the Title and the Description are mounted, merged with yours), `data-side`, `data-swiping`. The inline `touch-action` is merged under your `style`. The `--drawer-swipe-*` properties are written through the DOM and are not part of the rendered `style`: do not set them yourself."
         }
         note={"`role`, `onCancel` and the other `<dialog>` props pass through."}
       />

@@ -239,7 +239,7 @@ export function AlertDialogPage() {
           "`AlertDialogPopupState` is `{ open, modal }`; `open` is committed (`false` in JS-free mode; `:open` is the DOM truth)."
         }
         owned={
-          "`role` (`alertdialog`), `id`, `open`, `closedby` (never rendered), `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` are merged with yours."
+          "`role` (`alertdialog`), `id`, `open`, `closedby` (never rendered), `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` name the Title and the Description only while each is mounted (none while the content is not rendered), merged with yours."
         }
         note={"`onCancel` and the other `<dialog>` props pass through."}
       />

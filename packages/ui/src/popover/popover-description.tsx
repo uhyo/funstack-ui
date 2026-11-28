@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
@@ -42,6 +43,9 @@ export function PopoverDescription({
   ...rest
 }: PopoverDescriptionProps) {
   const ctx = usePopoverContext("Popover.Description");
+  // The Popup's `aria-describedby` names it only while it is mounted (#218).
+  const { registerDescription } = ctx.parts;
+  useLayoutEffect(registerDescription, [registerDescription]);
   const state = usePopoverPopupState(ctx);
   return useRender<ComponentPropsWithRef<"p">, PopoverDescriptionState>({
     defaultElement: "p",

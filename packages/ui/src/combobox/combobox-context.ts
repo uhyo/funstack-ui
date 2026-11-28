@@ -2,6 +2,7 @@
 import { createContext, use } from "react";
 import type { RefObject } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
+import type { GroupLabelContextValue } from "../internal/use-group-label.js";
 import type { ListboxOptionEntry } from "../internal/use-option-registry.js";
 
 export { optionId } from "../internal/use-option-registry.js";
@@ -139,8 +140,8 @@ export const ComboboxPopupContext = createContext<boolean>(false);
 /** Provided by `Combobox.List` (an Option outside a List warns). */
 export const ComboboxListContext = createContext<boolean>(false);
 
-/** `Combobox.Group`: the id its `Combobox.GroupLabel` renders. */
-export const ComboboxGroupContext = createContext<string | null>(null);
+/** `Combobox.Group`: the id its `Combobox.GroupLabel` renders and its registration (#218). */
+export const ComboboxGroupContext = createContext<GroupLabelContextValue | null>(null);
 
 /** `Combobox.Chip`: its value, for the `Combobox.ChipRemove` inside it. */
 export const ComboboxChipContext = createContext<string | null>(null);

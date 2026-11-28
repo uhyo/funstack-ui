@@ -109,10 +109,13 @@ Why these parts:
 - **`Close` has an `action`** because "run this, then close" without a form (a Delete
   confirmation) is the single most common dialog interaction, and the library's idiom for it is
   an action prop with `data-pending`.
-- **`Title` and `Description`** are plain elements with ids; the Popup wires `aria-labelledby`
-  and `aria-describedby` to them whether or not they are mounted (dangling references are
-  skipped by the accessible-name computation, so a Popup with `aria-label` and no Title is still
-  named correctly; a Popup with neither warns in development, section 9).
+- **`Title` and `Description`** are plain elements with ids that register with the Root from a
+  layout effect; the Popup wires `aria-labelledby` and `aria-describedby` to them **only while
+  they are mounted** (conventions 1.1.1), so no reference dangles: none while closed (the content
+  is not rendered), none for a Popup named by `aria-label` alone. Until the Root's first commit
+  both count as mounted, so the server HTML (a JS-free dialog with a Title) keeps them. A Popup
+  with neither a Title nor a name warns in development (section 9), a microtask after it is
+  shown, once a Title mounted with the showing has registered.
 
 Element constraints for `render`: `Popup` must render a `<dialog>`; `Trigger` and `Close` must
 render a `<button>` for the command path (a non-button `render` works in library mode through
@@ -1450,7 +1453,7 @@ library surfaces it as `details.returnValue` (on the request and on the fact) an
 
 | Part | ARIA |
 | --- | --- |
-| Popup | implicit `role="dialog"`; `aria-modal="true"` exposed by the browser after `showModal()` (never set by hand: HTML-AAM maps it from the modal flag); `aria-labelledby` → Title id, `aria-describedby` → Description id, both always emitted, token-merged with the consumer's; `role="alertdialog"` passes through |
+| Popup | implicit `role="dialog"`; `aria-modal="true"` exposed by the browser after `showModal()` (never set by hand: HTML-AAM maps it from the modal flag); `aria-labelledby` → Title id, `aria-describedby` → Description id, each only while the part is mounted (conventions 1.1.1; the key is omitted otherwise), token-merged with the consumer's; `role="alertdialog"` passes through |
 | Trigger | plain button; no `aria-expanded` (not an invoker state for dialogs), no `aria-haspopup` (inconsistently announced; research) |
 | Close | plain button; a consumer gives an icon-only ✕ an `aria-label` |
 | Title | `h2` by default; `render={<h3 />}` for a different level |

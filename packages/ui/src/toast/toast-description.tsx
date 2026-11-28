@@ -57,6 +57,14 @@ export function ToastDescription({
   // Mounted, or revealed by a Suspense boundary inside the Root: announce the text now present.
   const { contentCommitted } = root;
   useLayoutEffect(() => contentCommitted(), [contentCommitted]);
+  // The Root's `aria-describedby` names it only while it renders an element (#218): without
+  // content the part renders nothing.
+  const rendered = !(content == null || content === false);
+  const { registerDescription } = root.parts;
+  useLayoutEffect(
+    () => (rendered ? registerDescription() : undefined),
+    [rendered, registerDescription],
+  );
   const element = useRender<ComponentPropsWithRef<"p">, ToastDescriptionState>({
     defaultElement: "p",
     render,
@@ -68,7 +76,7 @@ export function ToastDescription({
     libraryProps: { id: root.ids.description },
     ref: root.registerDescription,
   });
-  return content == null || content === false ? null : element;
+  return rendered ? element : null;
 }
 
 ToastDescription.displayName = "ToastDescription";

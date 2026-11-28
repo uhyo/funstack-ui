@@ -444,8 +444,12 @@ describe("Popover", () => {
         </Popover.Root>,
       );
       await flushTasks(2);
-      // The attach wrote `false` over `false`: no render for an unchanged value.
-      expect(seen).toEqual([[false, false, false]]);
+      // The attach wrote `false` over `false`: no render for an unchanged value. The second
+      // render is the Root settling that no Title or Description is mounted (#218).
+      expect(seen).toEqual([
+        [false, false, false],
+        [false, false, false],
+      ]);
       await user.click(trigger());
       await flushTasks(2);
       expect(isOpen()).toBe(true);

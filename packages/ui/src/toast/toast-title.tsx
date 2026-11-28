@@ -49,6 +49,9 @@ export function ToastTitle({ children, className, style, render, ...rest }: Toas
   // Mounted, or revealed by a Suspense boundary inside the Root: announce the text now present.
   const { contentCommitted } = root;
   useLayoutEffect(() => contentCommitted(), [contentCommitted]);
+  // The Root's `aria-labelledby` names it only while it is mounted (#218).
+  const { registerTitle } = root.parts;
+  useLayoutEffect(registerTitle, [registerTitle]);
   return useRender<ComponentPropsWithRef<"div">, ToastTitleState>({
     defaultElement: "div",
     render,

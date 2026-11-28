@@ -1,11 +1,18 @@
 "use client";
 import { createContext, use } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
+import type { TitleDescriptionPresence } from "../internal/use-title-description.js";
 import type { PopoverPopupState } from "./popover-popup.js";
 
-export const PopoverContext = createContext<PopoverRootValue | null>(null);
+/** The Root's popover machinery and which of Title and Description are mounted (#218). */
+export interface PopoverContextValue extends PopoverRootValue {
+  /** The Popup's `aria-labelledby` / `aria-describedby` name a part only while it is mounted. */
+  readonly parts: TitleDescriptionPresence;
+}
 
-export function usePopoverContext(part: string): PopoverRootValue {
+export const PopoverContext = createContext<PopoverContextValue | null>(null);
+
+export function usePopoverContext(part: string): PopoverContextValue {
   const context = use(PopoverContext);
   if (context === null) {
     throw new Error(`${part} must be rendered inside a Popover.Root.`);
