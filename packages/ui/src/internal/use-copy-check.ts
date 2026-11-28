@@ -51,14 +51,16 @@ export function registerMountedCopy(copy: object): () => void {
   if (isDev && copies.mounted.size > 1 && !copies.warned) {
     copies.warned = true;
     console.error(
-      "@funstack/ui: parts from two copies of the library are mounted on this page. A part " +
-        "cannot see the Root or Popup of another copy (a NavigationMenu.Link inside a Popup " +
-        "rendered by the other copy does not close it). Under the Vite dev server with React " +
-        "Server Components (@vitejs/plugin-rsc, FUNSTACK Static), the parts a Server " +
+      "@funstack/ui: parts from two copies of the library are mounted on this page. If parts " +
+        "of the two copies are nested or share a page, they cannot see each other: a part " +
+        "does not find the Root or Popup of the other copy (a NavigationMenu.Link inside a " +
+        "Popup rendered by the other copy does not close it). Under the Vite dev server with " +
+        "React Server Components (@vitejs/plugin-rsc, FUNSTACK Static), the parts a Server " +
         "Component renders load from node_modules while client components get Vite's " +
         'pre-bundled copy: add `optimizeDeps: { exclude: ["@funstack/ui"] }` to the Vite ' +
-        "config. Otherwise, check that only one version of @funstack/ui is installed. " +
-        "See https://ui.funstack.work/concepts/server-components#vite-dev",
+        "config. Otherwise, check that only one version of @funstack/ui is installed. Two " +
+        "separately bundled apps on one page (an embedded widget) also log this, and can " +
+        "ignore it. See https://ui.funstack.work/concepts/server-components#vite-dev",
     );
   }
   return () => {

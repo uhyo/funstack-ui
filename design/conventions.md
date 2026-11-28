@@ -604,12 +604,16 @@ readonly valid: boolean;
 - **What it does not cover**: a server error (`Form.Root errors`). That is a statement about a
   value already submitted, and the change that is being dispatched is the edit that dismisses
   it.
-- **It is information, not a gate.** The library dispatches an invalid value like any other
+- **It is information, not a gate.** The action is always called, also for an invalid value
   (the control holds what the user entered; validity is a separate fact that a Field shows and
   a form submission enforces). An action that saves checks it:
-  `if (!details.valid) return;`. In uncontrolled mode that early return keeps the invalid value
-  in the control, with the Field's error next to it, and saves nothing; a controlled parent
-  that does not adopt rolls back instead.
+  `if (!details.valid) return;`. The control then keeps showing what the user entered, with
+  the Field's error next to it, and nothing is saved.
+- **One exception, for typed text: an invalid draft is not written to uncontrolled state**
+  (3.3.1). In TextField and NumberField, text the user typed that is invalid at the commit
+  stays a draft: the action runs, but the saved value does not change and remains what a later
+  rollback returns to. Every other control, and controlled mode everywhere, writes or adopts
+  an invalid value as it does a valid one.
 - **Every reason**: `"activate"`, `"platform"` (a form reset, a value adopted at mount) and
   NumberField's `"dismiss"` notice all carry it, computed the same way.
 - **Serialisable** (a boolean own property), so a Server Function passed directly receives it.
@@ -961,9 +965,10 @@ The contract:
     A copy of `details` (`{ ...details }`) has no `reject`, as it has no `event`. The function
     does not depend on `this`: `({ reject }) => …` works.
 11. **With `details.valid`** (2.2). The two compose into the two things an inline-save action
-    can do with an invalid value: `if (!details.valid) return;` keeps the value in the control
-    and saves nothing (the Field shows why); `if (!details.valid) return details.reject();`
-    puts the saved value back.
+    can do with an invalid value: `if (!details.valid) return;` keeps what the user entered in
+    the control and saves nothing (the Field shows why); `if (!details.valid) return
+    details.reject();` puts the saved value back. For typed text the first keeps it as a draft
+    and the second drops the draft (3.3.1).
 12. **No state for it.** There is no `data-rejected`, no `state.error` and no error object held
     by the library: the action that calls `reject()` is the one that shows the message.
 
@@ -1500,6 +1505,71 @@ mode (Slider 2.4).
 
 Matches implication #4 of `docs/research/react-async-apis.md` (probes in
 `memo/architect/conventions-notes.md`).
+
+#### 3.3.1 An invalid draft is not committed (TextField, NumberField)
+
+The commit controls have a stage the others lack: the **draft**, the text the user is typing,
+which is not yet the value. A draft that is invalid when the user commits it (`details.valid`
+is `false`, 2.2) does not leave that stage in uncontrolled mode:
+
+```tsx
+<TextField
+  defaultValue={doc.title}            // saved: "Untitled draft"
+  required
+  minLength={3}
+  valueCommitAction={async (next, details) => {
+    if (!details.valid) return;       // "ab": stays in the input as a draft, with its error
+    try { await rename(doc.id, next); }
+    catch { toast({ title: "Could not rename" }); details.reject(); }  // back to "Untitled draft"
+  }}
+/>
+```
+
+1. **The action still runs**, in the owner's transition, with `data-pending`, with the parsed
+   `next` and `valid: false`. `valid` stays information for the consumer.
+2. **Nothing is written.** No optimistic value, no uncontrolled value: the control's value
+   (`state.value`, the saved one) is unchanged, and it is what a later rollback returns to.
+3. **The draft is kept**, exactly as typed, also after a blur. The library does not write the
+   text back, so the browser still counts it as the user's edit: `tooShort` and `tooLong`,
+   which the platform flags only for text the user typed, keep flagging it, and the Field's
+   error stays. It is what a form submission posts (and what the form's validation blocks).
+4. **What ends a kept draft**: the user edits it (it is an ordinary draft again); Escape
+   (reverts to the saved value, as for any draft); a later commit of valid text (the normal
+   commit); a step (NumberField: the draft is its base, as always); a form reset; `disabled`
+   or `readOnly` turning on; and a rejection of the invalid dispatch itself (rule 6).
+5. **Not dispatched twice.** A commit (blur, the commit key) of a kept draft whose text has not
+   changed and which is still invalid dispatches nothing: Enter followed by a blur is one
+   request. If it has become valid meanwhile (another field changed, a prop changed) it is a
+   normal commit.
+6. **Rejection** (a throw, or `details.reject()`, 2.4.1) of the invalid dispatch: the draft is
+   dropped, if it is still the text that was dispatched, and the control shows the saved value.
+   That keeps item 11 of 2.4.1: a bare `return` keeps the user's text, `return
+   details.reject()` discards it. A throw also takes its route of 2.4.
+7. **Overlap.** An invalid dispatch is not a state request, so for the *value* it supersedes
+   nothing: a valid commit still in flight when it is made commits when it resolves (it is the
+   latest request for the value), and its rejection rolls back to the saved value. For
+   *errors* it is a dispatch like any other: the latest dispatch's rejection goes to the
+   boundary, an older one's to `reportError` (2.4).
+8. **Only a typed draft, only `"activate"`.** A `"platform"` dispatch (a form reset, text
+   adopted at mount) is a fact the browser performed and is committed as before, valid or not:
+   a reset to an empty `required` field makes the empty text the value. NumberField's steps
+   (keys, buttons, wheel) have no draft and are committed as before; they are clamped, so only
+   a Field's `validate` can make one invalid.
+9. **Controlled mode is unchanged.** The draft is cleared at the commit, the optimistic value
+   shows during the action, and then the parent's `value` shows: adopted, or the previous one.
+10. **No action prop**: the same. An invalid draft stays a draft; nothing observable depends on
+    whether an action was passed.
+
+**Why not the other controls.** Checkbox, Switch, RadioGroup, Select, Combobox, MultiSelect,
+CheckboxGroup and Slider have no draft: what the user entered is already the control's native
+or shown state. An invalid value that resolves is written as before and **stays** (a
+`required` checkbox can be unchecked, a `required` select can return to its placeholder, as on
+the platform; the error shows; a form does not submit). The rollback of the *next* request then
+returns to that state, which is the right one: after "uncheck" (invalid, kept) a failed
+"check" must show unchecked, not the saved "checked", and in a set-valued control a rejected
+change has always been undone alone (2.5). The problem this rule fixes does not arise there:
+their constraints (`required`, a range) do not depend on who wrote the value. OTPField's
+`completeAction` writes no state at all.
 
 ### 3.4 The shared hook
 
@@ -2870,7 +2940,11 @@ re-exports them.
   a `warned` flag; its shape is shared across versions, so it only grows compatibly). Nothing
   but the warning reads it. Mounted parts are counted, not loaded copies, so a server render,
   modules loaded again by a test and an HMR update that swaps the parts in one commit do not
-  warn; directive-free parts do not register.
+  warn; directive-free parts do not register. Its message is the one exception to "a warning
+  names the part": no single part warns, so the prefix is the package, `@funstack/ui: `. It
+  says "if parts of the two copies are nested or share a page": two separately bundled apps on
+  one page (an embedded widget, micro-frontends) warn too, and there is no opt-out (development
+  only, once per page).
 
 ---
 

@@ -52,6 +52,8 @@ a docs client component importing from `"@funstack/ui"` would get a second copy;
 
 ## What to report (a human files these)
 
+Filed by a human as #224.
+
 ### uhyo/funstack-static (primary)
 
 Title: "Dev: a client package whose `"use client"` is on internal files loads twice (Server
@@ -96,7 +98,7 @@ same package are optimized (duplicate module instances in dev)"
 - `internal/use-copy-check.ts`: development-only `console.error` once per page when parts of two
   copies are mounted together (registry on `globalThis` under
   `Symbol.for("@funstack/ui/mounted-copies")`, detection only).
-- Server Components page: "With the Vite dev server" (`#vite-dev`), skill rule 19.
+- Server Components page: "With the Vite dev server" (`#vite-dev`), skill rule 20.
 
 ## In-package fixes considered and rejected
 
@@ -107,6 +109,13 @@ same package are optimized (duplicate module instances in dev)"
   subpath entry), but ~185 part files become exports, each is found only at request time
   (re-optimization pass on cold start, the thing FUNSTACK Static #128 avoids), and it changes
   resolution in every other bundler.
+- A `react-server` export condition per subpath (review of dev/219): the server entry builds the
+  namespace from a `"use client"` bare-specifier entry (`@funstack/ui/navigation-menu/client`),
+  so plugin-rsc proxies by specifier. ~40 `/client` entries rather than 185, and they could go in
+  `optimizeDeps.include`. Costs: a changed exports map for every bundler; each part must be a
+  named export of the client entry; the directive-free parts (Progress/Meter Roots,
+  NavigationMenu Root/List, Separator) must stay out of it; FUNSTACK Static still has to include
+  the entries. Not done.
 - Contexts on `globalThis`: fixes contexts only, not module state (escape-key layering, modal
   registry), and couples context shapes across versions.
 - No package.json field: Vite has no package-level opt-out of pre-bundling, and plugin-rsc reads

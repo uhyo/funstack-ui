@@ -17555,6 +17555,113 @@ Updated rows: `menu-context-trigger.test.tsx` (no `aria-labelledby` without a Tr
 count), `dialog.test.tsx` and `alert-dialog.test.tsx` (the missing-name warning is a microtask
 after the show).
 
+## 2026-11-29, #220: an invalid draft is not written to uncontrolled state (TextField, NumberField)
+
+From dogfood run 2 (F9). With `if (!details.valid) return;`, an uncontrolled TextField wrote
+the invalid text ("ab") as its value. A later failed save with `details.reject()` then rolled
+back to "ab" instead of the saved text, and because a rollback writes the text from script, the
+platform stopped flagging `tooShort`: an unsaved, invalid text with no error. The user approved:
+an uncontrolled control does not commit a dispatch whose `details.valid` is false; the invalid
+text stays as the user's draft, the saved value stays the rollback target, the action still
+runs, controlled mode is unchanged. Design only; not implemented.
+
+### What changed in the rules
+
+- Conventions 3.3.1 (new): the rule and its ten points. 2.2 ("information, not a gate" now
+  names the exception) and 2.4.1 item 11 point to it.
+- text-field.md: the commit list of 4.2 has two new steps (4: a kept draft is not dispatched
+  twice; 5: an invalid uncontrolled commit calls the action and writes nothing), the paragraph
+  after it, the state table, section 5, section 13.
+- number-field.md: the state table, 2.3, 4.1 (the typed-value bullet: the draft is kept and the
+  hidden input keeps its number).
+- field-form.md 7.5: the per-control table of what an invalid dispatch does.
+
+### Decisions taken in the design, for the product owner to confirm
+
+- **The rule is limited to typed drafts.** The approved wording says "an uncontrolled control";
+  the design applies it to TextField and to NumberField's typed text, and leaves every other
+  control as it is. Reason: they have no draft, so "not written" could only mean "snaps back",
+  and then a `required` checkbox could not be unchecked and a `required` select could not
+  return to its placeholder, which the platform allows and a submit form relies on. Keeping
+  the entry on screen in a second slot and rolling later failures back to the saved value was
+  considered too: after "uncheck" (invalid, kept), a failed "check" would show the saved
+  "checked", as if the failed request had succeeded. And the F9 defect cannot occur there:
+  `required` and range constraints do not depend on who wrote the value.
+- **A rejection of the invalid dispatch drops the draft** (rule 6), so `return` and `return
+  details.reject()` remain two different things.
+- **An invalid dispatch does not supersede a valid commit in flight** (rule 7). Otherwise a
+  save that succeeded on the server would not become the saved value.
+- **A kept, unchanged, still invalid draft is not dispatched again** (rule 5): Enter followed
+  by a blur is one request.
+- **`"platform"` dispatches are written whatever their validity** (rule 8): a form reset to an
+  empty `required` field must become the value. Text adopted at mount is written too; if it is
+  invalid, the F9 defect remains possible in that one corner (rare: text typed before
+  hydration that is invalid and later rolled back to).
+- **The same without an action prop** (rule 10): no behaviour depends on whether one was
+  passed.
+- **Trade-off**: an action that saves invalid text anyway (it ignores `valid`) is now out of
+  step with an uncontrolled field, whose value does not follow. Such a field is controlled.
+
+### Checklist
+
+- `internal/action/use-controllable-action.ts`: a dispatch option for "run the action, write
+  no state": no optimistic value, no commit, counts for `pending` and for error routing, does
+  not advance the latest-commit guard.
+- `text-field/text-field.tsx`: steps 4 and 5; the kept draft (the dispatched text is
+  remembered); drop on rejection when the draft is still that text; nothing else clears it
+  that does not clear a draft today.
+- NumberField (`number-field-root.tsx`, `number-field-input.tsx`): the same for
+  `commitDraft`; `syncHidden` follows the kept draft's number while one is kept, and the
+  Input's layout effect must not re-sync it to `state.value` meanwhile; both actions still
+  called.
+- The uncontrolled / controlled test is the hook's own (`value === undefined`).
+- Docs: TextField and NumberField pages (the inline-save section: the draft stays, the saved
+  value is the rollback target, Escape); the Action props page (`valid` section); the Field
+  page; the skill rule on `details.valid` (drop "keeps the invalid value in the control" for
+  "keeps the text as a draft"; controlled fields roll back).
+- Update the dogfood test that pins the old behaviour only in the dogfood app, not here.
+
+### Test plan
+
+TextField (jsdom unless marked):
+
+| Row | Assert |
+| --- | --- |
+| The issue | `required minLength={3}`, saved "Untitled draft": type "ab", Enter: action called once with `("ab", { valid: false })`; input shows "ab"; `state.value` "Untitled draft", `state.text` "ab"; `Field.Error` shown. Then type "Escalation notes", Enter, the action calls `reject()`: input shows "Untitled draft" |
+| Dirty flag (browser, three engines) | after the invalid commit settles, `input.validity.tooShort` is still `true` and `:user-invalid` matches; the `value` setter of the input was not called between the keystrokes and the settle |
+| Pending | `data-pending` during the invalid dispatch; gone after |
+| Blur keeps it | invalid commit by blur: the draft stays while unfocused |
+| Not twice | Enter then blur on the unchanged invalid draft: one call; after an edit that is still invalid: a second call; after the constraint is lifted (prop change): a normal commit |
+| Escape | on a kept draft: saved text shown, Escape consumed |
+| Fix and commit | edit to valid text, Enter: normal commit; value and saved text are the new text |
+| Reject the invalid dispatch | `return details.reject()`: saved text shown; a throw: the boundary, saved text; the user typed more before it settled: the newer draft stays |
+| Overlap | valid commit A in flight, then invalid B, A resolves: `state.value` is A, the input shows B's draft; A rejects (throw): `reportError`, saved unchanged |
+| Reset | kept draft, `form.reset()`: draft dropped, the reset text is the value even when invalid (`"platform"`) |
+| `readOnly` / `disabled` on | kept draft dropped |
+| Form | a submit with a kept draft: blocked by validation; `FormData` holds the draft |
+| Controlled | unchanged: draft cleared, non-adopting parent shows the saved text |
+| No action prop | the invalid draft is kept; a valid one commits |
+| Textarea | the same with Ctrl+Enter |
+| `validate` only | native-valid text that `validate` rejects is kept as well |
+
+NumberField:
+
+| Row | Assert |
+| --- | --- |
+| Typed out of range | saved 5, `min={1}`: type "0", Enter: both actions called with `valid: false`; the input shows "0" (not re-formatted); `state.value` 5; hidden input value "0"; the visible input's custom validity is the browser's range message; `Field.Error` shown |
+| Later failure | then type "7", Enter, the commit rejects: the input shows "5", hidden "5" |
+| Empty with `required` | the empty draft is kept, hidden "" and `valueMissing` |
+| Not twice, Escape, reset, read-only | as TextField; after Escape the hidden input is "5" again |
+| Step from a kept draft | ArrowUp on the kept "0" with `min={1}`: steps from the parsed draft, a normal gesture, the draft is gone |
+| Steps | a step made invalid by `validate` is written as before |
+| Controlled | unchanged |
+| Browser | the bubble / `:user-invalid` on the visible input while the draft is kept, three engines |
+
+Unchanged controls (one pinning row each, so the limit of the rule is tested): Checkbox
+`required` unchecked with an early return stays unchecked and a later rejected "check" shows
+unchecked; Select `required` returns to the placeholder and stays; CheckboxGroup `required`
+with the last Item unchecked stays empty.
+
 ## 2026-11-29, #219: a development warning for two copies of the library
 
 Dogfood run 2, F5. Under `vite dev` with `@vitejs/plugin-rsc` (FUNSTACK Static) the library
@@ -17584,6 +17691,17 @@ Production builds are not affected. The workaround is `optimizeDeps: { exclude:
   subpath entry: some 185 part files (240 with the `"use client"` internals) behind new package
   exports, and every one would be discovered at request time, forcing the re-optimization pass
   that FUNSTACK Static avoids on purpose.
+- **A `react-server` export condition per subpath** (the reviewer's idea): the server entry of
+  `@funstack/ui/navigation-menu` builds the namespace from a `"use client"` bare-specifier entry
+  (`@funstack/ui/navigation-menu/client`), so plugin-rsc proxies the parts by specifier, and the
+  browser imports them through the optimizer. About 40 new `/client` entries rather than 185, and
+  a framework could list them in `optimizeDeps.include` to avoid the request-time discovery.
+  Costs: every bundler sees a changed exports map with a second entry per subpath; the
+  namespace stays a plain object only on the server side, so a Server Component dotting into
+  it still needs each part to be its own named client export; the directive-free parts
+  (Progress and Meter Roots, `NavigationMenu.Root` and `List`, Separator) must stay out of the
+  client entry or lose their server-only rendering; and FUNSTACK Static would still need
+  changing to include those entries. Not done; the upstream fix stays primary.
 - **Contexts kept on `globalThis` (`Symbol.for` keys)**: fixes context identity only (not
   module state: the Escape layering of `escape-key.ts`, the modal registry, the `<details>` open
   map), hides the duplicate bundle, and

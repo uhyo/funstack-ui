@@ -82,8 +82,13 @@ export default defineConfig({
         <code>import</code> of the same subpath gets Vite's pre-bundled copy instead. Each copy has
         its own contexts, so a part from one copy does not see the other's Root or Popup: a{" "}
         <code>NavigationMenu.Link</code> in a client component, inside a Popup that a Server
-        Component rendered, does not close it. In development the library logs an error when parts
-        of two copies are mounted on one page.
+        Component rendered, does not close it.
+      </p>
+      <p>
+        In development the library logs an error when parts of two copies are mounted on one page.
+        It matters if parts of the two copies are nested or share a page; two separately bundled
+        apps on one page (an embedded widget, micro-frontends) log it too, and there they can ignore
+        it.
       </p>
       <p>
         Import from the subpaths (<code>@funstack/ui/tabs</code>) in client components. FUNSTACK

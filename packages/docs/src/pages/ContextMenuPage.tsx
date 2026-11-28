@@ -571,6 +571,14 @@ export function ContextMenuPage() {
           <code>border-radius</code> (WebKit bug 317496): keep a square focus target, or offer the
           Menu button.
         </li>
+        <li>
+          <strong>In Playwright tests</strong>, Shift+F10 and the ContextMenu key fire a{" "}
+          <code>contextmenu</code> event in Chromium only. In Firefox and WebKit no event fires and
+          the menu stays closed: a gap in the test driver, not in the library. To test the keyboard
+          open there, press the key and then dispatch the <code>contextmenu</code> the engine would
+          fire on the focused element yourself (a <code>PointerEvent</code> with{" "}
+          <code>bubbles</code>, <code>cancelable</code> and <code>button: 0</code>).
+        </li>
       </ul>
 
       <h4 id="content-security-policy">Content Security Policy</h4>
@@ -581,7 +589,13 @@ export function ContextMenuPage() {
         <code>STYLE_SHA256["@funstack/ui/menu-point"]</code> from <code>@funstack/ui/csp</code>, or
         wrap the app in <code>{"<CSPProvider nonce>"}</code>, which puts your nonce on the element.
         Details and the hash values:{" "}
-        <a href="/concepts/content-security-policy">Content Security Policy</a>.
+        <a href="/concepts/content-security-policy">Content Security Policy</a>. The region's{" "}
+        <code>-webkit-touch-callout: none</code> is in the server-rendered HTML when the region is,
+        so it needs <code>style-src-attr 'unsafe-inline'</code> (
+        <a href="/concepts/content-security-policy#server-rendered-inline-styles">
+          Inline styles in server-rendered HTML
+        </a>
+        ).
       </p>
     </DocPage>
   );

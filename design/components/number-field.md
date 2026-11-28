@@ -158,7 +158,7 @@ is emitted for a `<button>` only); `Root` any element. Library-controlled attrib
 | State | Owner | Kind | Lane | Library-owned or browser-owned |
 | --- | --- | --- | --- | --- |
 | `value` (committed, optimistic) | Root, `useControllableAction<number \| null>` with `valueCommitAction` as its action | the number the field holds | **transition** (optimistic through `useOptimistic`) | Library-owned; residual browser paths: text typed before hydration and Firefox restoration (mount reconciliation), form reset. Uncontrolled state is written when a gesture's commit resolves (2.3). |
-| `draft` | Root, `useState<string \| null>` | the text the user is editing, `null` when the input shows the formatted value | **urgent** (written in the `input` event) | Library-owned, internal: the text of a controlled text input, which React requires to be urgent (conventions 2.6). Not controllable, no action: it is not a number until it is parsed. Cleared by every commit, every step, a reset and a rollback. |
+| `draft` | Root, `useState<string \| null>` | the text the user is editing, `null` when the input shows the formatted value | **urgent** (written in the `input` event) | Library-owned, internal: the text of a controlled text input, which React requires to be urgent (conventions 2.6). Not controllable, no action: it is not a number until it is parsed. Cleared by every commit of a valid typed value, every step, a reset and a rollback; an uncontrolled commit of an invalid typed value keeps it (4.1). |
 | `live` | Root, `useState<{ value: number \| null } \| null>` (boxed: `null` is a value) plus a ref | the value the current gesture has reached | **urgent** | Library-owned, internal (Slider 2.2): the value under a held button or the value a key press produced, before anything has committed. Shown while `held`. |
 | step transition | Root, `useActionTrigger` | `valueChangeAction` in flight | transition | One `run` per step; the latest run's rejection goes to React, older ones are surfaced (conventions 3.4). |
 | `hold` | Root, `useState<"increment" \| "decrement" \| null>` | a button is held (pointer captured, timers running) | urgent | Internal; not exposed (`:active` on the button is the platform's). |
@@ -248,6 +248,8 @@ the gesture's commit resolves (Slider 2.3). Consequences, documented on the comp
   replaces it; the visible rollback (the text re-formatting) happens with an update-on-success
   parent whose commit action catches its own failure, or a non-adopting parent.
 - `valueChangeAction` resolving changes no library state; it is the preview channel.
+- A typed value that is invalid at its commit is not written: the text stays a draft and the
+  value before the gesture stays the saved one (4.1; conventions 3.3.1).
 - Overlapping gestures (a key press while a save is pending, typing and committing again)
   follow latest intent.
 
@@ -507,6 +509,24 @@ Subpath `@funstack/ui/number-field`; the root entry re-exports the namespace.
   field holding `1` shows `1` again after blur).
 - Typed values are **not** clamped to `min` / `max` and **not** snapped to `step` (5.6): the
   hidden input's constraints report them and the browser's localised message says so.
+- **An invalid typed value stays a draft** (uncontrolled; conventions 3.3.1). When the parsed
+  value is invalid (`details.valid` is `false`: out of range, off the grid, empty with
+  `required`, or a Field's `validate`), both actions are called as usual, with `valid: false`,
+  and `data-pending` shows, but:
+  - the draft is **not** cleared and the text is not re-formatted;
+  - no value is written, optimistic or committed: `state.value` is the saved number;
+  - the hidden input **keeps the draft's number** for as long as the draft is kept (it was
+    written there to compute `valid`, field-form.md 7.5), so the validity mirror, the
+    browser's message, `:user-invalid`, a Field's error and a form submission all follow the
+    text on screen. When the kept draft ends, the hidden input returns to the shown value.
+  - a second blur or Enter on the unchanged, still invalid draft dispatches nothing;
+  - Escape reverts it (4.2); a step uses it as the base and replaces it (5.5); a valid typed
+    value commits normally; a reset, `disabled` or `readOnly` drops it; a rejection of the
+    invalid dispatch (a throw or `details.reject()`) drops it and shows the saved number.
+  A later commit that fails therefore rolls back to the saved number, not to the invalid one.
+  Steps (keys, buttons, wheel) have no draft and are written as before. Controlled mode is
+  unchanged: the draft is cleared and the parent decides. `"platform"` values (reset, mount)
+  are written whatever their validity.
 - The rounding of 5.4 applies before the comparison with the shown value and before the
   dispatch.
 

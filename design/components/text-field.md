@@ -134,7 +134,7 @@ the engine's Escape, and no save of its own, is a native `<input type="search">`
 | State | Owner | Kind | Lane | Library-owned or browser-owned |
 | --- | --- | --- | --- | --- |
 | `value` (committed, optimistic) | `useControllableAction<string>` with `valueCommitAction` as its action | the saved text | **transition** (optimistic through `useOptimistic`) | Library-owned; residual browser paths: text typed before hydration, form-state restoration (mount reconciliation), form reset. Uncontrolled state is written when a commit resolves. |
-| `draft` | `useState<string \| null>` | the text the user is editing; `null` when the input shows the value | **urgent** (written in the `input` event) | Library-owned, internal: the text of a controlled text input, which React requires to be urgent (conventions 2.6). Not controllable, no action, no handler. Cleared by a commit, a revert and a reset. |
+| `draft` | `useState<string \| null>` | the text the user is editing; `null` when the input shows the value | **urgent** (written in the `input` event) | Library-owned, internal: the text of a controlled text input, which React requires to be urgent (conventions 2.6). Not controllable, no action, no handler. Cleared by a commit of valid text, a revert and a reset; an uncontrolled commit of invalid text keeps it (4.2). |
 | `pending` | the component | a commit is in flight | | Including the Suspense wait of the render the commit caused. |
 | focus, selection, composition, validity | DOM | | | Browser-owned. The component never moves focus and never touches the selection. Validity is read by a Field (section 7). |
 
@@ -297,16 +297,20 @@ What a commit does:
 3. The draft equals the shown value (the optimistic one, conventions 2.3 item 8: typing and
    deleting again, or re-typing the text of a save that is still pending): the draft is
    cleared, nothing is dispatched.
-4. Otherwise the draft is cleared and the value is dispatched: `setOptimistic(next)`,
+4. The draft is a **kept draft** (below) whose text has not changed and which is still
+   invalid: nothing is dispatched and the draft stays.
+5. Uncontrolled, and the text is invalid (`details.valid` would be `false`): the action is
+   dispatched, `valueCommitAction(next, { reason: "activate", valid: false })` awaited,
+   `data-pending` meanwhile, but **the draft is not cleared and no value is written**, neither
+   optimistic nor committed. The draft is now a kept draft.
+6. Otherwise the draft is cleared and the value is dispatched: `setOptimistic(next)`,
    `valueCommitAction(next, { reason: "activate" })` awaited, `data-pending` meanwhile. The
    input shows the same characters before and after (the draft, then the optimistic value), so
    the caret does not move.
 
-The commit does not look at validity: text that fails `required` or `pattern` is committed like
-any other, as NumberField commits a number outside `min` / `max` (number-field.md 5.6). The
-constraint is reported by the platform and by a Field, and **the action is told**:
-`details.valid` is `false` (conventions 2.2: the native constraints of the text being committed
-and, inside a Field, `validate`). An action that must not save such text returns early:
+**The action is always told, and always called**: `details.valid` is `false` for text that
+fails `required`, `pattern`, `minLength` or a Field's `validate` (conventions 2.2). An action
+that must not save such text returns early:
 
 ```tsx
 valueCommitAction={async (next, details) => {
@@ -315,10 +319,29 @@ valueCommitAction={async (next, details) => {
 }}
 ```
 
-Uncontrolled, the early return commits the text to the field: it stays on screen with the
-Field's error, `state.value` is that text, and the next valid commit saves. Controlled, a parent
-that does not adopt it shows the saved text again. Section 13 lists the alternative (a commit
-that waits for validity).
+**An invalid draft stays a draft** (step 5; conventions 3.3.1). Uncontrolled, the text the user
+typed stays in the input with the Field's error, also after the blur; `state.text` is that
+text and `state.value` is still the saved one. Then:
+
+- the user fixes it and commits: a normal commit (step 6);
+- Escape shows the saved text again (4.3);
+- a later save that fails returns to the saved text, never to the invalid one (section 5);
+- the action rejects the invalid dispatch itself (a throw, or `return details.reject()`): the
+  draft is dropped, if it is still that text, and the saved text shows;
+- a form reset, or `disabled` / `readOnly` turning on, drops it as it drops any draft.
+
+Why the draft and not the value: writing the invalid text as the value made it the rollback
+target, and a rollback writes the text from script. The platform flags `tooShort` and
+`tooLong` only for text the user edited, so the field then showed text that was never saved
+and was invalid, with no error (#220). A kept draft is never rewritten by the library, so
+those two flags keep working.
+
+A commit of invalid text while a valid save is still in flight does not cancel that save's
+commit: the invalid dispatch is not a request for the value (conventions 3.3.1 rule 7).
+
+Controlled, nothing changes: the draft is cleared at the commit (step 6 for every text), and
+a parent that does not adopt the text shows the saved one again. A `"platform"` commit (a form
+reset, text adopted at mount, 4.4) is written whatever its validity.
 
 Nothing commits at unmount: a draft that is open when the field is removed (a popover that
 closes, a navigation) is dropped. A commit needs a mounted owner for its transition.
@@ -373,7 +396,8 @@ Both go through the hooks NumberField and Slider use (`useResetTarget`, `useForm
 The contract is the conventions', with nothing added (2.4, 3.3):
 
 - The uncontrolled value is written when `valueCommitAction` resolves, and only for the latest
-  commit. A rejection writes nothing: the optimistic value reverts and the input shows the
+  commit of **valid** text (an invalid draft is never written, 4.2), so the saved text is always
+  the last one a valid commit resolved for. A rejection writes nothing: the optimistic value reverts and the input shows the
   saved text again.
 - A rejection reaches the Error Boundary above the field (the latest commit, while the field is
   mounted and visible); a superseded one goes to `reportError`.
@@ -644,8 +668,10 @@ Each of these is a question for a later issue, not a decision made against it.
   adopted a normalised text, so it would need an explicit signal the action gives.
   `details.reject()` (conventions 2.4.1) is such a signal, but it means "roll back", as a
   rejection does; a draft that stays open after a refusal is a further state and is not in v1.
-- **A commit that waits for validity** (do not dispatch while the element is invalid). It
-  would leave an edited, unfocused draft on screen, and NumberField would have to follow.
+- **A commit that waits for validity** (do not call the action while the element is invalid).
+  The action is always called (`details.valid`, 4.2); what an invalid commit does not do is
+  write the value. The edited, unfocused draft this leaves on screen is accepted (#220), and
+  NumberField follows.
 - **A commit key that also submits the form**, or a prop that changes or removes the key
   (section 7 has the form-level handler).
 - **`commitOnBlur={false}`** (Atlassian's `keepEditViewOpenOnBlur`, for long text), **saving

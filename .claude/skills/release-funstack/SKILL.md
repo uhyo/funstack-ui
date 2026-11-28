@@ -13,7 +13,7 @@ metadata:
 
 Creating a GitHub release is the whole release: the `release: created` event triggers the npm publish workflow.
 
-- `.github/workflows/publish.yml` builds `@funstack/ui` and publishes it to npm (trusted publishing). A prerelease version such as `0.1.0-alpha.0` is published under the matching dist-tag (`alpha`); other versions go to `latest`.
+- `.github/workflows/publish.yml` builds `@funstack/ui` and publishes it to npm (trusted publishing). A stable version goes to `latest`. A prerelease version such as `0.1.0-alpha.30` is published under the matching dist-tag (`alpha`); until 1.0 (`0.x` and `1.0.0-*` prereleases) a second step then moves `latest` to it, so `npm i @funstack/ui` installs it. From 1.0 on a prerelease gets only its prerelease tag.
 - `.github/workflows/deploy-docs.yml` deploys the docs site (https://ui.funstack.work, worker `funstack-ui`) to Cloudflare Workers on the same event. The dev worker `funstack-ui-dev` is deployed on push by Cloudflare's Git integration.
 
 Do not run `npm publish` or `wrangler deploy` locally.

@@ -23,12 +23,10 @@ const initialFiles: readonly File[] = [
 export function ContextMenuFiles() {
   const [files, setFiles] = useState(initialFiles);
   const [log, setLog] = useState("Right-click a row, or use its ⋯ button.");
-  const remove = (id: string) =>
-    startTransition(() => setFiles((f) => f.filter((x) => x.id !== id)));
+  // Plain updates: an action's synchronous part already runs in the item's transition.
+  const remove = (id: string) => setFiles((f) => f.filter((x) => x.id !== id));
   const rename = (id: string) =>
-    startTransition(() =>
-      setFiles((f) => f.map((x) => (x.id === id ? { ...x, name: `Renamed ${x.name}` } : x))),
-    );
+    setFiles((f) => f.map((x) => (x.id === id ? { ...x, name: `Renamed ${x.name}` } : x)));
 
   return (
     <div className="demo-stack">
@@ -69,8 +67,11 @@ export function ContextMenuFiles() {
                     <Menu.Item
                       action={async () => {
                         await fakeSave("the archive", { ms: 1200 });
-                        remove(file.id);
-                        startTransition(() => setLog(`Archived ${file.name}.`));
+                        // After an await: wrap the updates in startTransition (React limitation).
+                        startTransition(() => {
+                          remove(file.id);
+                          setLog(`Archived ${file.name}.`);
+                        });
                       }}
                     >
                       {({ pending }) => (pending ? "Archiving…" : "Archive")}
