@@ -200,6 +200,22 @@ describe("NumberField", () => {
       expect(dec()).toHaveAccessibleName("Weniger");
     });
 
+    it("two Increments in one Root get distinct default ids", () => {
+      render(
+        <NumberField.Root locale="en-US">
+          <NumberField.Label data-testid="label">Quantity</NumberField.Label>
+          <NumberField.Increment data-testid="a" />
+          <NumberField.Increment data-testid="b" />
+          <NumberField.Input data-testid="input" />
+        </NumberField.Root>,
+      );
+      const a = screen.getByTestId("a");
+      const b = screen.getByTestId("b");
+      expect(a.id).not.toBe(b.id);
+      expect(b).toHaveAttribute("aria-labelledby", `${b.id} ${screen.getByTestId("label").id}`);
+      expect(b).toHaveAccessibleName("Increase Quantity");
+    });
+
     it("a consumer id replaces the default and is used in the self-reference", () => {
       render(
         <NumberField.Root locale="en-US">

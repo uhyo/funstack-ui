@@ -17330,3 +17330,24 @@ finds the input and both buttons (before: the input and the group). The docs' te
 | `aria-label=""` | the dev warning, unchanged |
 | Server render | ids and `aria-labelledby` in the HTML; hydrates without a warning |
 | Existing rows | the ones that assert the Root's `aria-labelledby` are replaced, not deleted |
+
+## 2026-11-28, #216: implementation notes and test-plan amendment
+
+From the review of `dev/216`. Amends the test plan of the #216 entry above.
+
+- **Server render row.** The server HTML has the buttons' ids and, inside a Field, the Field
+  label's token in `aria-labelledby`. `NumberField.Label` registers from a layout effect, so its
+  token is added right after hydration, with no hydration warning; before hydration a
+  standalone field's buttons have the short name. Referencing the Label's id unconditionally
+  would leave a dangling idref when no Label is rendered, so the registry stays. Rule stated in
+  number-field.md 8.4 ("Server HTML").
+- **Computed-name browser row.** Runs in Chromium only (CDP accessibility tree); Firefox and
+  WebKit expose no engine accessibility tree to the tests. jsdom covers the names
+  (`toHaveAccessibleName`, dom-accessibility-api) in the other rows.
+- **Button ids.** Each button's default id comes from its own `useId` rather than the Root's, so
+  two Increments in one Root do not share an id (number-field.md 1, 3.3).
+- **Field without `Field.Label`.** The Field's label id is always present in the context, so
+  the buttons reference an element that may not exist; the name still resolves to the short
+  word. Shared with the Root before #216 and with Combobox / MultiSelect; tracked as #217.
+- With both `NumberField.Label` and `Field.Label` the name holds both texts ("Increase Qty
+  Quantity"), as designed; documented in 8.4.

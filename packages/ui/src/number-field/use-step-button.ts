@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -246,7 +246,9 @@ export function useStepButtonElement(
   // Quantity"). A consumer `aria-labelledby` replaces the library's whole and drops the default
   // `aria-label`; a consumer `id` is used in the self-reference.
   const { id: idProp, "aria-label": ariaLabelProp, "aria-labelledby": labelledByProp } = rest;
-  const id = idProp ?? `${ctx.buttonIdPrefix}-${direction}`;
+  // Each button's own `useId`, so two Increments in one Root never share an id.
+  const defaultId = useId();
+  const id = idProp ?? `${defaultId}-${direction}`;
   const naming =
     labelledByProp !== undefined
       ? { id }

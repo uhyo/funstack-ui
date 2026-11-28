@@ -351,12 +351,12 @@ export function NumberFieldPage() {
             type: "string",
             default: '"<own id> <label id>"',
             description:
-              "The button itself, then `NumberField.Label` (while one is mounted) and the Field's label, so the name is \"Increase Quantity\". Not rendered when there is no label. Yours replaces the whole and drops the default `aria-label`: for another word order, pass the full text as `aria-label` and `aria-labelledby` set to the button's own `id`.",
+              'The button itself, then `NumberField.Label` (while one is mounted) and the Field\'s label, so the name is "Increase Quantity" (with both labels, both texts: "Increase Qty Quantity"). Not rendered outside a Field when no `NumberField.Label` is mounted. Before hydration only the Field\'s label is referenced; `NumberField.Label` joins at hydration. Yours replaces the whole and drops the default `aria-label`: for another word order, pass the full text as `aria-label` and `aria-labelledby` set to the button\'s own `id`.',
           },
           {
             name: "id",
             type: "string",
-            default: "derived from the Root",
+            default: "generated per button",
             description:
               "Yours replaces it and is used in the self-reference of `aria-labelledby`.",
           },

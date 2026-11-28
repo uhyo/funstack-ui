@@ -89,8 +89,8 @@ import { NumberField } from "@funstack/ui/number-field";
 </NumberField.Root>
 ```
 
-Rendered HTML for the first example (ids from one `useId` in Root; the hidden input's inline style
-abbreviated):
+Rendered HTML for the first example (ids from the Root's `useId`, the buttons' from their own,
+shown here with readable suffixes; the hidden input's inline style abbreviated):
 
 ```html
 <div role="group">
@@ -437,8 +437,8 @@ export type NumberFieldDecrementProps = NumberFieldIncrementProps;
 ```
 
 Owned keys: `type="button"` (on a `<button>`), `tabIndex={-1}`, `aria-controls`, `disabled`,
-the three handlers, `data-pending`, `data-disabled`. `id` is a default (derived from the Root's
-`useId`) that the consumer's `id` replaces. `aria-label` is a default (`"Increase"` /
+the three handlers, `data-pending`, `data-disabled`. `id` is a default (from the button's own
+`useId`, so two Increments in one Root never share an id) that the consumer's `id` replaces. `aria-label` is a default (`"Increase"` /
 `"Decrease"`, section 8.4) that the consumer's `aria-label` replaces. `aria-labelledby` is the
 library's (`"<the button's id> <the label's id>"`, 8.4) unless the consumer passes one; with a
 consumer `aria-labelledby` the library's is not rendered and the default `aria-label` is
@@ -1065,7 +1065,12 @@ words, and the name follows a label that changes.
   neither (the Input named by the consumer's `aria-label`) no `aria-labelledby` is rendered
   and the name is the short one: the library has no label to refer to, and it does not compose
   a sentence from an attribute. Such a field passes full names to the buttons
-  (`aria-label="Increase quantity"`).
+  (`aria-label="Increase quantity"`). With both labels the name holds both texts
+  ("Increase Qty Quantity").
+- **Server HTML.** `NumberField.Label` registers from a layout effect, which does not run on
+  the server, so the server HTML carries the buttons' ids and, inside a Field, the Field
+  label's token; the `NumberField.Label` token is added right after hydration (no mismatch, no
+  warning). Before hydration a standalone field's buttons are named "Increase" / "Decrease".
 - **Word order is "verb, label"**, which is all a list of id references can express. A consumer's
   `aria-labelledby` replaces the library's whole, so a language that needs another order
   passes an `aria-label` with the full text and `aria-labelledby` pointing at the button's own
