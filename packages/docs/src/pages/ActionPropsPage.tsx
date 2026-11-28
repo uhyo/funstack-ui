@@ -344,12 +344,82 @@ type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: De
 >`}</CodeBlock>
       </ConceptExample>
 
-      <h3 id="await-only">Await only what the UI must wait for</h3>
+      <h3 id="pending-actions-hold-transitions">Pending actions hold other transitions</h3>
       <p>
-        While an async action is pending, React holds <em>every</em> transition in the app that
-        started meanwhile and commits them together. A two-second awaited save in one Toggle also
-        delays a router navigation. Background work that the UI need not wait for should not be
-        returned:
+        While any async action is pending, React holds <em>every</em> transition update in the app,
+        from any component, until the last pending action has settled. Then it commits them
+        together. This is React's behaviour, not the library's: React cannot tell which action an
+        update belongs to, so it puts all of them in one batch. That includes a router navigation,
+        when the router renders it in a transition.
+      </p>
+      <p>
+        The library commits its state changes in transitions (that is what lets content that{" "}
+        <a href="/concepts/suspense">suspends</a> keep the old UI on screen). So a popup that opens,
+        a tab panel that switches or an item that expands waits for any pending action, even one in
+        an unrelated component, and even when it has no action of its own. Its{" "}
+        <a href="/concepts/pending-and-optimistic#trigger">trigger</a> still shows the{" "}
+        <a href="/concepts/pending-and-optimistic#optimistic">optimistic value</a> at once, with{" "}
+        <code>data-pending</code>; the{" "}
+        <a href="/concepts/pending-and-optimistic#content-region">content region</a> waits. Not
+        held, because the browser performs them and the library holds no state for them: the changes
+        of a component in <a href="/concepts/browser-owned-state#js-free-mode">JS-free mode</a>, and
+        a <a href="/concepts/browser-owned-state#dismissal">dismissal</a>.
+      </p>
+      <p>
+        How long the wait can be, measured in a test app built with the library: a checkbox whose
+        awaited save took 300 to 1200 ms, and while it saved, a menu took 1.3 to 1.8 s to open and a
+        tab switch 1.4 to 1.9 s. Typing in a text input took 20 ms. The time beyond the save was the
+        app's refetch, which the save's action started (see{" "}
+        <a href="#refetch-after">Start refetches after the action</a>).
+      </p>
+
+      <h4 id="what-waits">What waits and what does not</h4>
+      <p>Held until every pending action has settled:</p>
+      <ul>
+        <li>
+          Every transition update: a <code>setState</code> inside <code>startTransition</code> or
+          any <code>useTransition</code>, a state update in the synchronous part of an action, and
+          the library's own commits.
+        </li>
+        <li>
+          A transition that a pending action starts after its <code>await</code> joins the same
+          batch. If its render suspends (a refetch), the held updates wait for that data too, even
+          though the action has settled.
+        </li>
+      </ul>
+      <p>Not held:</p>
+      <ul>
+        <li>
+          <a href="#urgent-update">Urgent updates</a>, such as typing into a controlled input.
+        </li>
+        <li>
+          Values set with{" "}
+          <a href="https://react.dev/reference/react/useOptimistic">
+            <code>useOptimistic</code>
+          </a>
+          , which is why a trigger flips at once.
+        </li>
+        <li>
+          The background render of{" "}
+          <a href="https://react.dev/reference/react/useDeferredValue">
+            <code>useDeferredValue</code>
+          </a>
+          : content that follows a deferred value updates while an action is pending, and if it
+          suspends, the old content stays without a fallback.
+        </li>
+      </ul>
+
+      <h4 id="await-only">Return the promise only when the UI must wait for it</h4>
+      <p>
+        Return (or <code>await</code>) the save when the UI should wait for it: the component then
+        shows pending state and rolls back if the save fails. For background work, start the promise
+        and return nothing. The action then settles at once, so nothing waits for the save.
+      </p>
+      <p>
+        What you give up: no <code>data-pending</code> while the save runs, and no{" "}
+        <a href="/concepts/pending-and-optimistic#rollback">rollback</a>. The library never sees the
+        promise, so a rejection does not reach an Error Boundary either: handle it yourself (with{" "}
+        <code>.catch</code>), or it becomes an unhandled rejection.
       </p>
       <ConceptExample component="Tabs" href="/components/tabs">
         <CodeBlock>{`// The panel switches immediately; the save runs in the background.
@@ -358,6 +428,70 @@ valueChangeAction={(next) => { void saveSelection(next); }}
 // The panel switches when the save succeeds; the tab shows pending meanwhile.
 valueChangeAction={async (next) => { await saveSelection(next); }}`}</CodeBlock>
       </ConceptExample>
+
+      <h4 id="refetch-after">Start refetches after the action</h4>
+      <p>
+        A refetch started inside the action, after its <code>await</code>, joins the action's batch:
+        every transition held during the save then also waits for the refetched data. Start it once
+        the action has settled instead. A callback queued with <code>setTimeout</code> runs after
+        the component's transition has settled, so the refetch is a transition of its own. Better
+        still, skip the refetch when the component already shows the new value.
+      </p>
+      <ConceptExample component="Checkbox" href="/components/checkbox">
+        <CodeBlock>{`// refresh() re-reads the task list; its render suspends until the data arrives.
+
+// The refetch holds every open that waited for the save, until its data loads.
+checkedChangeAction={async (checked) => {
+  await saveTask(id, checked);
+  startTransition(() => refresh());
+}}
+
+// Opens held by the save commit when the save settles; the refetch runs after.
+checkedChangeAction={async (checked) => {
+  await saveTask(id, checked);
+  setTimeout(() => startTransition(() => refresh()));
+}}`}</CodeBlock>
+      </ConceptExample>
+
+      <h4 id="urgent-open">Open your own controlled overlay urgently</h4>
+      <p>
+        When your own code opens a controlled overlay (a keyboard shortcut, a command palette), set
+        its <code>open</code> state with an <a href="#urgent-update">urgent update</a>, not inside{" "}
+        <code>startTransition</code>. An urgent update is not held, so the overlay opens even while
+        a save is pending. The cost: the open is not a transition, so content that suspends shows
+        the nearest Suspense fallback instead of keeping the old UI. Put a{" "}
+        <code>&lt;Suspense&gt;</code> boundary inside the popup, or keep its content from
+        suspending.
+      </p>
+      <ConceptExample component="Dialog" href="/components/dialog">
+        <p>
+          In the test app above, this dialog opened in 72 ms while a save was pending; opened inside{" "}
+          <code>startTransition</code>, it took up to 2.3 s.
+        </p>
+        <CodeBlock>{`const [open, setOpen] = useState(false);
+
+useEffect(() => {
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === "n" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      setOpen(true); // urgent: not held by a pending action
+    }
+  };
+  document.addEventListener("keydown", onKeyDown);
+  return () => document.removeEventListener("keydown", onKeyDown);
+}, []);
+
+<Dialog.Root open={open} openChangeAction={setOpen} onOpenChange={setOpen}>`}</CodeBlock>
+      </ConceptExample>
+
+      <h4 id="short-actions">Keep actions short</h4>
+      <p>
+        An action holds the whole app for as long as it is pending, so put in it only the work the
+        UI must wait for. Leave out background saves, logging, analytics and prefetching: start them
+        without returning their promise, or after the action has settled. A control that dispatches
+        many times per gesture (a slider drag, a held stepper button, arrow keys that select as they
+        move) needs a cheap action. Where a component also has an action that runs once per gesture,
+        put the save there.
+      </p>
 
       <h3>Errors go to Error Boundaries</h3>
       <p>

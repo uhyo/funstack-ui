@@ -464,9 +464,11 @@ Library mode, uncontrolled, unless stated. `C` committed open, `O` optimistic op
    the Action pending until that content has committed: one transition.
 2. **Confirm rejects.** As 1 until the rejection: nothing was dispatched, `C` and `O` stay
    `true`, the dialog is open and focus is on the Action. The error reaches the nearest Error
-   Boundary above the Action. A boundary inside the Popup shows the failure in the dialog; one
-   above the Root replaces the whole subtree, which removes the dialog (section 9 shows both
-   and the catch-in-the-action alternative).
+   Boundary above the Action. A boundary inside the Popup, around the Action only, shows the
+   failure in the dialog; one that also contains the Cancel removes the way out, and one above
+   the Root replaces the whole subtree, which removes the dialog. An action that catches its
+   error and calls `details.reject()` gets the same "nothing dispatched, dialog open, focus on
+   the Action" with no boundary (conventions 2.4.1; section 9.1 shows both).
 3. **Escape while the confirm is pending.** The platform closes the dialog: a fact,
    `onOpenChange(false, "dismiss")`, `C=false` at once. **The action keeps running**; an action
    cannot be recalled. When it resolves, its close is a no-op (`false` is already intended).
@@ -552,6 +554,7 @@ selector cannot tell an alert dialog's open from a dialog's. A consumer who need
 import { AlertDialog } from "@funstack/ui/alert-dialog";
 
 export function DeleteProject({ project }: { project: Project }) {
+  const [failure, setFailure] = useState<string | null>(null);
   return (
     <AlertDialog.Root defaultOpen={false}>
       <AlertDialog.Trigger className="btn danger">Delete</AlertDialog.Trigger>
@@ -560,22 +563,44 @@ export function DeleteProject({ project }: { project: Project }) {
         <AlertDialog.Description>
           The project and its documents are removed for everyone. This cannot be undone.
         </AlertDialog.Description>
-        <ErrorBoundary fallback={<DeleteFailed />}>   {/* a rejection lands here; the dialog stays */}
-          <AlertDialog.Cancel className="btn">Cancel</AlertDialog.Cancel>
-          <AlertDialog.Action className="btn danger" action={() => deleteProject(project.id)}>
-            {({ pending }) => (pending ? "Deleting…" : "Delete")}
-          </AlertDialog.Action>
-        </ErrorBoundary>
+        {failure !== null && <p className="dialog-error">{failure}</p>}
+        <AlertDialog.Cancel className="btn">Cancel</AlertDialog.Cancel>
+        <AlertDialog.Action
+          className="btn danger"
+          action={async (details) => {
+            try {
+              await deleteProject(project.id);
+            } catch (e) {
+              setFailure(String(e));
+              details.reject();        // the dialog stays open, Cancel and Delete stay usable
+            }
+          }}
+        >
+          {({ pending }) => (pending ? "Deleting…" : "Delete")}
+        </AlertDialog.Action>
       </AlertDialog.Popup>
     </AlertDialog.Root>
   );
 }
 ```
 
-`DeleteFailed` renders its own `AlertDialog.Cancel` so the user can leave (and a retry that
-resets the boundary, if wanted). The boundary is the way to keep the dialog open on failure:
-an action that catches its error **resolves**, and a resolved action closes the dialog
-(conventions 2.4). A confirm that needs field-level or inline errors next to live buttons is
+`details.reject()` (conventions 2.4.1) is the way to keep the dialog open on a handled failure:
+an action that catches its error and does not call it **resolves**, and a resolved action closes
+the dialog (conventions 2.4). The message is the consumer's own markup; inside an alert dialog
+give it `role="alert"` or move focus to it if it must be announced.
+
+With an Error Boundary instead (the action lets the error through), put the boundary around the
+**Action only**:
+
+```tsx
+<AlertDialog.Cancel className="btn">Cancel</AlertDialog.Cancel>
+<ErrorBoundary fallback={<span className="dialog-error">Could not delete.</span>}>
+  <AlertDialog.Action className="btn danger" action={() => deleteProject(project.id)}>Delete</AlertDialog.Action>
+</ErrorBoundary>
+```
+
+A boundary that also wraps the Cancel replaces it with the fallback on failure, and Escape is
+then the only way out. A confirm that needs field-level or inline errors next to live buttons is
 shape (a) of section 6 with the `Form.Root` composition (`dialog.md` 8.1), whose settle close
 waits for a result without errors.
 

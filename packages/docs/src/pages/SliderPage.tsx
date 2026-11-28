@@ -115,7 +115,7 @@ export function SliderPage() {
       <Callout title="The save goes in valueCommitAction">
         <p>
           A drag is dozens of steps, and an awaited action holds every transition in the app (
-          <a href="/concepts/action-props#await-only">Action props</a>). Keep{" "}
+          <a href="/concepts/action-props#pending-actions-hold-transitions">Action props</a>). Keep{" "}
           <code>valueChangeAction</code> cheap and put the network call in{" "}
           <code>valueCommitAction</code>, which runs once per gesture.
         </p>

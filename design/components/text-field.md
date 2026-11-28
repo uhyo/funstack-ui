@@ -641,8 +641,9 @@ Each of these is a question for a later issue, not a decision made against it.
   an edit-mode state with its own action, focus management and three built-in strings.
 - **Keeping a refused text as an open draft** (the field shows what the user typed, marked
   `data-dirty`, and Enter tries again). The library cannot tell a refusal from a parent that
-  adopted a normalised text, so it would need an explicit signal the action gives; the
-  conventions have none (an action's return value is never interpreted, 2.7).
+  adopted a normalised text, so it would need an explicit signal the action gives.
+  `details.reject()` (conventions 2.4.1) is such a signal, but it means "roll back", as a
+  rejection does; a draft that stays open after a refusal is a further state and is not in v1.
 - **A commit that waits for validity** (do not dispatch while the element is invalid). It
   would leave an edited, unfocused draft on screen, and NumberField would have to follow.
 - **A commit key that also submits the form**, or a prop that changes or removes the key

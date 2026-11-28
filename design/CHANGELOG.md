@@ -17069,6 +17069,132 @@ Tests, per control (jsdom unless marked):
 
 Not done here: the screen-reader pass for the `Form.Error` announcement (NVDA, JAWS,
 VoiceOver), which is a human task.
+
+## 2026-11-28, dogfood run 1: `details.reject()` (#207), and where an Error Boundary goes in a Toast and an AlertDialog
+
+The fourth amendment from the first dogfood run (F6, F8, F11; analysis in
+`memo/architect/dogfood-1-api.md`). The analysis recommended an `onActionError` prop; the user
+chose a signal the action gives instead: the action catches its error, shows its own message
+and calls a method on `details`. Working name `details.fail()`; the design names it
+`details.reject()` (reason below). Design only: nothing here is implemented. Separate from the
+#208 to #210 entry above, which is being implemented on its own branch; this one also touches
+the details typing, so land it after that branch.
+
+### What changed in the rules
+
+- Conventions 2.4.1 (new): the rule ("as if it had rejected, except that nothing is thrown and
+  nothing is reported") and the twelve-point contract. Decisions row 2, 2.2 (the `Rejectable`
+  type, `ChangeAction`'s `details` parameter, `reject` as the second virtual property, the
+  Server Function note) and the end of 2.4 point to it. "v0 has no `cancel()` on `details`" is
+  gone.
+- toast.md: decision row 5, 3.2 (the recipe uses `details.reject()`; a table of boundary
+  placements), walkthroughs 4 and 6, 15.3.
+- alert-dialog.md: walkthrough 2 and example 9.1 (the action calls `details.reject()`; the
+  boundary alternative wraps the Action only).
+- text-field.md 13: the "refused text as an open draft" item no longer says the conventions
+  have no signal.
+- Unchanged and still true: the sentences in button.md, toggle.md, tabs.md, radio-group.md,
+  checkbox-group.md and number-field.md that say an action which catches its error resolves and
+  counts as success. That is the behaviour without `reject()`.
+
+### The name
+
+`reject`, not `fail` or `cancel`. The effect is defined by reference to "a rejection", the word
+the conventions and every component document already use for this outcome, so the rule is one
+sentence and no per-component text has to be written. `fail` would be a second word for the
+same thing. `cancel` suggests stopping work, and the work has already run. The cost: it can be
+read as "rejects the promise"; it does not throw, and the doc comment says so. If the user
+prefers `fail`, it is a rename with no change of meaning.
+
+### The Toast "above the Viewport" text was wrong, the behaviour right
+
+`Toast.Action` owns its transition, so by conventions 2.4 its rejection reaches the nearest
+boundary above the Action part. The design said "above the Viewport" in four places while its
+own example put the boundary inside the Viewport, around the list; both placements replace
+every toast, and the "rethrow after `toast.update`" recipe hid the toast it had just updated.
+The dogfood agent's per-toast boundary was the working one. The same text is in the
+`toast-action.tsx` doc comment and on the Toast docs page; AlertDialog's page says "inside the
+Popup" without saying "around the Action only" (F11).
+
+### Decisions taken in the design, for the product owner to confirm
+
+- **`reject()` is read when the action settles**, not when it is called: pending does not end
+  early. One moment for every outcome keeps the overlap rules of 2.5 as they are.
+- **A late call is a development warning and nothing else.**
+- **A throw after `reject()` wins.**
+- **Nothing is reported** for a `reject()` on a superseded dispatch or a gone owner, where a
+  thrown rejection goes to `reportError`: the action handled its failure.
+- **Typed as `Details & Rejectable` on action props**, because actions and handlers share the
+  named details types and a fact cannot be rejected. Alternative not taken: `reject` on
+  `ActionDetails` itself, present but inert in handlers.
+- **Form actions have no `reject()`** (they have no `details`); `Form.Root error` / `errors` is
+  their counterpart.
+- **No `data-rejected` and no library-held error.**
+
+### Checklist, #207
+
+Implementation (one mechanism, three places):
+
+- `internal/types.ts`: `Rejectable`; `ChangeAction` intersects it; the same for the pure-trigger
+  and event-action prop types. Export from `@funstack/ui/types` and the root entry.
+- `internal/action/action-details.ts`: a variant of `createActionDetails` for actions that
+  serves the virtual `reject` (and `"reject" in details`), backed by a per-dispatch record
+  `{ rejected, settled }`; writes to `reject` refused as writes to `event` are. Handlers keep
+  the existing builder. An internal `callAction(action, …args)` (or equivalent) awaits the
+  action, marks the record settled, and turns `rejected` into an internal sentinel throw.
+- `internal/action/use-controllable-action.ts`, `internal/action/use-action-trigger.ts`: in the
+  existing `catch`, the sentinel takes the rejection path without the rethrow and without
+  `reportDropped`. Nothing else in the hooks changes, which is the point of defining it as a
+  rejection. `use-step-commit.ts` follows from its two channels.
+- Every site that calls a consumer action outside those two hooks (search for
+  `createActionDetails`: 26 files) goes through the same helper. `Form.Root` and `Dialog.Form`
+  form actions: no change.
+- The development warning for a late call (conventions 9.5 wording).
+- Doc comments: `toast-action.tsx` ("above the Viewport"), the `action` props of the closing
+  parts, `Rejectable`.
+- Docs: the Action props page (a section "Handling a failed save without an Error Boundary":
+  the Checkbox example, the Server Function wrapper, the late-call mistake, `valid` with
+  `reject()`); the Toast page ("Undo and onClose" and its Callout: the `reject()` recipe and
+  the boundary table; remove "above the Viewport" and "rethrow after the update"); the
+  AlertDialog page ("Where the confirmed work goes" and the example); the Menu page
+  (`closeOnActivate`); the Server Components page (no `reject` on the server); the skill (the
+  recipe, and "Things agents get wrong": a caught error counts as success unless the action
+  calls `details.reject()`; never `void promise.catch(() => details.reject())`).
+- The dogfood app's controlled rows are the before picture: an uncontrolled `Checkbox` with
+  `details.reject()` in the playground.
+
+Tests. The hook rows are the core; each component gets one row that proves it is wired.
+
+| Where | Rows |
+| --- | --- |
+| `action-details` | `details.reject` is a function, `"reject" in details`, not in `Object.keys`, not in `{ ...details }`, not in `JSON.stringify`; destructured `reject` works; assignment refused; a handler's details has none |
+| `useControllableAction`, uncontrolled | async action calls `reject()` then resolves: optimistic reverts, committed value unchanged, no boundary, `reportError` not called, `pending` ends at the settle (not at the call); sync action calls it before returning: same |
+| same, controlled | `reject()` without adopting: value shown is the prop; parent adopts and calls `reject()`: the adopted value |
+| same, contract | twice equals once; after the settle: no effect and one dev warning; `reject()` then throw: the boundary gets the error |
+| same, overlaps (single-valued) | latest calls `reject()`, older resolves: nothing committed; older calls `reject()`, latest resolves: latest committed, nothing reported |
+| same, set-valued | A calls `reject()`, B resolves: the set ends with B only; `added` / `removed` replay unchanged |
+| same, owner gone | unmounted before the settle, then `reject()`: nothing thrown, nothing reported |
+| `useActionTrigger` | `reject()`: `then` not run; `"ignore"`: the part is usable again after the settle; `"run"`: latest `reject()` and older resolves: `then` not run; older `reject()` and latest resolves: `then` runs once; `openGeneration` unaffected |
+| Step and commit channels (Slider, NumberField) | `reject()` in `valueChangeAction` and in `valueCommitAction` each behave as that channel's rejection does today; the other channel is unaffected |
+| Per state owner (Toggle, ToggleGroup, Checkbox, Switch, RadioGroup, CheckboxGroup, Select, MultiSelect, Combobox, TextField, NumberField, Slider, Tabs, Accordion, Collapsible, Menu checkable items) | one row: `reject()` shows the previous value and reaches no boundary; for the native inputs the DOM `checked` / `value` is back (browser row where jsdom cannot tell) |
+| Overlay `openChangeAction` (Dialog, AlertDialog, Drawer, Popover, Menu, Tooltip, HoverCard, Select, Combobox, MultiSelect, NavigationMenu) | `reject()` on open: stays closed; on close: stays open |
+| Closing triggers | `Menu.Item`: the menu stays open; `Toast.Action`: the toast stays, timer resumes, a second press runs; `AlertDialog.Action` and `Dialog.Close` / `Popover.Close` / `Drawer.Close` with `action`: the overlay stays open, focus stays on the part |
+| `Button` | `reject()`: `data-pending` ends, nothing else |
+| `OTPField` | `reject()` in `completeAction`: the code stays, no boundary |
+| With `details.valid` | TextField, `required`, cleared: `return` keeps the empty text; `return details.reject()` shows the saved text again |
+| Server Function | a function that receives the serialised details has no `reject` (the `JSON.stringify` row stands in) |
+| Types | `details.reject` exists on every action prop's parameter and on no `on*` handler's; `Details & Rejectable` annotates a standalone function |
+| Toast boundary placements | a rejecting Undo with the boundary around the Action: Title and Close still rendered; around one Root: the other toasts still rendered |
+
+## 2026-11-28, #208: field-form.md 11.9 holds in library mode only
+
+Found while implementing #208 on `dev/208`. The recipe "put `useActionState` inside the Popup so
+the errors start fresh at the next open" relies on the Popup's content being unmounted while
+closed, which is true in library mode only. In JS-free mode (no `open`, `defaultOpen` or
+`openChangeAction` on the Root) the content stays mounted, as with `keepMounted`, and the stale
+errors survive the close. 11.9 now says so, and its example uses
+`<Dialog.Root defaultOpen={false}>`, as the developer's tests and docs do. No behaviour change.
+
 ## 2026-11-28, dogfood run 1: #208, #209, #210 implemented
 
 Developer. The three checklists of the entry "2026-11-28, dogfood run 1: `Form.Root error` and
@@ -17099,8 +17225,8 @@ examples lost their empty branch.
   `defaultOpen`, `openChangeAction`, `onOpenChange`, which is the example's `<Dialog.Root>`) the
   Popup's content is always mounted, so `useActionState` inside it still outlives the close and
   the stale errors come back at the next open; the jsdom row failed exactly that way. The test
-  row, the docs recipe and the live example use `defaultOpen={false}`. The rule text of 11.9
-  (and its example) should say so: left to the architect.
+  row, the docs recipe and the live example use `defaultOpen={false}`. Settled by the entry
+  "2026-11-28, #208: field-form.md 11.9 holds in library mode only", which amends 11.9.
 
 ### #210
 
@@ -17130,3 +17256,14 @@ examples lost their empty branch.
   `field/details-valid.browser.test.tsx` (the click-time read of Checkbox and Switch,
   controlled too; TextField with real keys; NumberField's hidden-input flags). The shared
   suites' expected details gained `valid: true`.
+
+### Review fixes
+
+From the review of `dev/208` (`memo/reviewer/review-208.md`): the settle moves focus to the
+first errored field before announcing the form-level error (a focus change flushes the speech
+queue); `Form.Error` renders its element, and calls its function props, only while there is a
+message (an inner component), so `messages` is never empty in them; CheckboxGroup, MultiSelect
+and Combobox count a disabled control as not missing a value, as the read controls do; browser
+rows for a controlled unchecked click and RadioGroup's click-time read; the `ariaNotify` rows
+assert in every engine (a stand-in where the method lags) and check the message in Chromium's
+accessibility tree.
