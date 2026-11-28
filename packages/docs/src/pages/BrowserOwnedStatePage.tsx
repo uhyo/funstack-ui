@@ -254,8 +254,8 @@ export function BrowserOwnedStatePage() {
           else closes.
         </li>
         <li>
-          Then a tooltip or a hover card that is showing, wherever focus is; with two, the one that
-          opened first.
+          Then a tooltip or a hover card that is showing, wherever focus is; with two unrelated
+          ones, the one that opened first.
         </li>
         <li>
           Then the innermost layer around the focus. The next Escape reaches the layer outside it.

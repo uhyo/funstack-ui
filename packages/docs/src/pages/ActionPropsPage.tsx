@@ -661,6 +661,13 @@ useEffect(() => {
         the whole <code>next</code>.
       </p>
       <p>
+        In controlled mode the committed value is your state, and the library cannot order your
+        updates. A <code>setState</code> after an <code>await</code> runs when that action's promise
+        resolves, so the updates land in completion order: an older response that arrives last
+        overwrites the newer value. Guard the update yourself (keep the latest request's id in a ref
+        and skip a stale one), or queue the calls with <code>useActionState</code> as below.
+      </p>
+      <p>
         If your actions must run in order, one after another, or each must build on the result of
         the one before (reducer-style accumulation), use React's{" "}
         <a href="https://react.dev/reference/react/useActionState">
