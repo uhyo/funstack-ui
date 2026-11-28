@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useLayoutEffect, useMemo, useRef } from "react";
-import type { ChangeEvent, ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
+import type { ChangeEvent, ComponentPropsWithRef, CSSProperties } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useHydratedMount } from "../internal/use-hydrated-mount.js";
@@ -49,6 +48,7 @@ export interface CheckboxGroupParentProps extends Omit<
   | "required"
   | "autoComplete"
   | "aria-checked"
+  | "readOnly"
   | "onChange"
   | "className"
   | "style"
@@ -65,23 +65,13 @@ export interface CheckboxGroupParentProps extends Omit<
    * (disable the Parent to make it inert). Before hydration the server-rendered state counts
    * disabled Items too; it settles when the Items hydrate.
    */
-  values: string[];
+  values: readonly string[];
   /**
    * Native `disabled`: unfocusable, never dispatches.
    *
    * @defaultValue `false`
    */
   disabled?: boolean;
-  /**
-   * Forwarded to the Parent's `<ViewTransition default>`. Default: no boundary. Fires only on the
-   * commit that settles the action (or rolls it back), never on the optimistic flip; animate the
-   * flip itself with CSS on `:checked` / `:indeterminate`.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CheckboxGroupParentState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -117,7 +107,6 @@ function derive(values: readonly string[], set: ReadonlySet<string>) {
 export function CheckboxGroupParent({
   values,
   disabled: disabledProp = false,
-  transition,
   className,
   style,
   render,
@@ -211,7 +200,7 @@ export function CheckboxGroupParent({
 
   const state: CheckboxGroupParentState = { values, checked, indeterminate, pending, disabled };
 
-  const element = useRender<ComponentPropsWithRef<"input">, CheckboxGroupParentState>({
+  return useRender<ComponentPropsWithRef<"input">, CheckboxGroupParentState>({
     defaultElement: "input",
     render,
     state,
@@ -252,8 +241,6 @@ export function CheckboxGroupParent({
       },
     },
   });
-
-  return useTransitionBoundary("CheckboxGroup.Parent", transition, element);
 }
 
 CheckboxGroupParent.displayName = "CheckboxGroupParent";

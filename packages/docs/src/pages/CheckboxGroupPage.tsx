@@ -8,12 +8,6 @@ import { CheckboxGroupForm } from "../examples/CheckboxGroupForm.js";
 import { CheckboxGroupToppings } from "../examples/CheckboxGroupToppings.js";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
-const transitionRow = (part: string) => ({
-  name: "transition",
-  type: "ViewTransitionClass",
-  description: `Forwarded to the ${part}'s \`<ViewTransition default>\`; without it no boundary is rendered. Fires only on the commit that settles an action or rolls it back, never on the click itself. Keep it static.`,
-});
-
 export function CheckboxGroupPage() {
   return (
     <DocPage
@@ -85,13 +79,13 @@ export function CheckboxGroupPage() {
       <h3 id="how-it-works">How it works</h3>
       <h4>The value is a set</h4>
       <p>
-        <code>value</code> and <code>defaultValue</code> are <code>string[]</code>, so a{" "}
-        <code>useState&lt;string[]&gt;</code> setter plugs in. Order does not matter and duplicates
-        are ignored. <code>next</code> is a fresh array in the document order of the Items (what{" "}
-        <code>formData.getAll(name)</code> returns); compare it as a set. <code>details.added</code>{" "}
-        and <code>details.removed</code> say what changed: one value for an Item click, a whole
-        subset for a Parent click, the diff for a form reset. A value with no Item is kept through
-        clicks and never submitted.
+        <code>value</code> and <code>defaultValue</code> are <code>readonly string[]</code>, so a{" "}
+        <code>useState&lt;string[]&gt;</code> setter plugs in, and so does an <code>as const</code>{" "}
+        list. Order does not matter and duplicates are ignored. <code>next</code> is a fresh array
+        in the document order of the Items (what <code>formData.getAll(name)</code> returns);
+        compare it as a set. <code>details.added</code> and <code>details.removed</code> say what
+        changed: one value for an Item click, a whole subset for a Parent click, the diff for a form
+        reset. A value with no Item is kept through clicks and never submitted.
       </p>
       <Callout title="Controlled and updating after the save? Use the diff">
         <p>
@@ -138,13 +132,13 @@ export function CheckboxGroupPage() {
         rows={[
           {
             name: "value",
-            type: "string[]",
+            type: "readonly string[]",
             description:
               "Controlled checked values; `[]` checks nothing. undefined means uncontrolled. Order is not significant; duplicates are ignored.",
           },
           {
             name: "defaultValue",
-            type: "string[]",
+            type: "readonly string[]",
             default: "[]",
             description:
               "Initial values in uncontrolled mode. Also what a form reset returns to: the latest value is mirrored into the boxes' `defaultChecked`.",
@@ -198,13 +192,13 @@ export function CheckboxGroupPage() {
       />
       <PartFacts
         state={
-          "`CheckboxGroupRootState` is `{ value, pending, disabled }`; `value` is the optimistic set as an array in the Items' document order as of the Root's last render (Items reordered by a component that re-renders without the Root are picked up at its next render; `next` always reads the current order)."
+          "`CheckboxGroupRootState` is `{ value, pending, disabled, invalid, required }`; `value` is the optimistic set as an array in the Items' document order as of the Root's last render (Items reordered by a component that re-renders without the Root are picked up at its next render; `next` always reads the current order); `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the prop or the Field's."
         }
         owned={
           "`disabled`, `form`, `data-pending`, `data-disabled`; no `role` is written. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`."
         }
         note={
-          "Other fieldset props pass through (`aria-label` for a group without a Label, for example)."
+          "Other fieldset props pass through (`aria-label` for a group without a Label, for example). In development a group with no accessible name (no `Label`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning. A disabled group (its own prop or the Field's) is not submitted."
         }
       />
 
@@ -237,7 +231,7 @@ export function CheckboxGroupPage() {
             description:
               "Native `disabled`: unfocusable, never dispatches, not validated. A Parent leaves it alone, and checked it does not satisfy `required`.",
           },
-          transitionRow("Item"),
+
           ...stylingProps("CheckboxGroupItemState"),
           {
             name: "render",
@@ -255,7 +249,7 @@ export function CheckboxGroupPage() {
           "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required` (computed by the Root), `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged. Inside a `Field.Root` also `aria-invalid`."
         }
         note={
-          '`id`, `role` and other input props pass through. There is no per-Item `required`: use a plain `Checkbox` for "this box must be checked".'
+          '`id`, `role` and other input props pass through. There is no per-Item `required`: use a plain `Checkbox` for "this box must be checked". `readOnly` is not accepted (a type error) and there is no `transition` prop: animate the check with CSS on `:checked`.'
         }
       />
 
@@ -266,7 +260,7 @@ export function CheckboxGroupPage() {
         rows={[
           {
             name: "values",
-            type: "string[]",
+            type: "readonly string[]",
             description:
               "Required. The values this Parent controls, usually every Item's value. Values whose Items are disabled are left alone (see Click cycle); values with no Item are still added and removed.",
           },
@@ -276,7 +270,7 @@ export function CheckboxGroupPage() {
             default: "false",
             description: "Native `disabled`: unfocusable, never dispatches.",
           },
-          transitionRow("Parent"),
+
           ...stylingProps("CheckboxGroupParentState"),
           {
             name: "render",
@@ -294,7 +288,7 @@ export function CheckboxGroupPage() {
           '`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `autoComplete` (`"off"`: it is not a value, so a browser restoring form state on reload must not restore it), `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `name`, `value`, `form`, `required` and `aria-checked` are removed; `onChange` is merged.'
         }
         note={
-          "Other props pass through, such as `aria-controls` with the ids of the boxes it controls (as in the example above)."
+          "Other props pass through, such as `aria-controls` with the ids of the boxes it controls (as in the example above). `readOnly` is not accepted (a type error) and there is no `transition` prop."
         }
       />
 
@@ -412,7 +406,7 @@ export function CheckboxGroupPage() {
       <BehaviourSection
         id="transition-types"
         summary={
-          "`fsui-checkbox-group`, plus `fsui-checkbox-group-check` when a dispatch checks something and `fsui-checkbox-group-uncheck` when it unchecks something (a reset can carry both)."
+          "`fsui-checkbox-group`, plus `fsui-checkbox-group-check` when a dispatch checks something and `fsui-checkbox-group-uncheck` when it unchecks something (a reset can carry both). No part has a `transition` prop: a consumer's own `<ViewTransition>` keys a type map on them."
         }
       />
 

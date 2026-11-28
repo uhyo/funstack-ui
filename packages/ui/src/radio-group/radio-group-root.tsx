@@ -46,6 +46,10 @@ export interface RadioGroupRootState {
   readonly pending: boolean;
   /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
+  /** The `required` prop, or the enclosing Field's. */
+  readonly required: boolean;
 }
 
 /**
@@ -177,7 +181,7 @@ export function RadioGroupRoot({
   render,
   ...rest
 }: RadioGroupRootProps) {
-  const { field, name, required, disabled, fieldsetRef, rootRef } = useFieldsetGroup({
+  const { field, name, required, disabled, invalid, fieldsetRef, rootRef } = useFieldsetGroup({
     component: "RadioGroup.Root",
     name: nameProp,
     disabled: disabledProp,
@@ -255,8 +259,8 @@ export function RadioGroupRoot({
   // the state and the props below.
   const contextDefault = value === undefined ? (defaultValue ?? null) : undefined;
   const state = useMemo<RadioGroupRootState>(
-    () => ({ value: optimistic, pending, disabled }),
-    [optimistic, pending, disabled],
+    () => ({ value: optimistic, pending, disabled, invalid, required }),
+    [optimistic, pending, disabled, invalid, required],
   );
   const context = useMemo<RadioGroupContextValue>(
     () => ({

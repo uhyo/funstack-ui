@@ -76,19 +76,14 @@ export function SwitchPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`; never dispatches.",
+            description:
+              "Native `disabled`, or the enclosing `Field.Root`'s; never dispatches. A disabled switch is not submitted.",
           },
           {
             name: "value",
             type: "string",
             default: '"on"',
             description: "Submitted with the form when checked (platform default).",
-          },
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Forwarded to the Switch's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the flip; animate the flip with CSS on `:checked`.",
           },
           ...stylingProps("SwitchState"),
           {
@@ -100,12 +95,14 @@ export function SwitchPage() {
         ]}
       />
       <PartFacts
-        state={"`SwitchState` is `{ checked, pending, disabled }`; `checked` is optimistic."}
+        state={
+          "`SwitchState` is `{ checked, pending, disabled, invalid }`; `checked` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field."
+        }
         owned={
-          "`type`, `role`, `checked`, `defaultChecked`, `disabled`, `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+          "`type`, `role`, `checked`, `defaultChecked`, `disabled`, `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`, and `disabled` / `name` / `required` default from the Field."
         }
         note={
-          "Every other `<input>` prop passes through (`name`, `required`, `form`, `id`, `autoFocus`, ...). A `render` element's own `onChange` or `onClick` runs first."
+          "Every other `<input>` prop passes through (`name`, `required`, `form`, `id`, `autoFocus`, ...). A `render` element's own `onChange` or `onClick` runs first. `readOnly` is not accepted (a type error): HTML's `readonly` does not apply to a checkbox input. There is no `transition` prop: animate the flip with CSS on `:checked`. In development a switch with no accessible name (no `<label>`, `aria-label` or `aria-labelledby`) logs a warning."
         }
       />
 
@@ -122,9 +119,14 @@ export function SwitchPage() {
           [
             "`data-disabled`",
             "`:disabled`",
-            "The `disabled` prop. Only `:disabled` also sees `<fieldset disabled>`.",
+            "The `disabled` prop (or the Field's). Only `:disabled` also sees `<fieldset disabled>`.",
           ],
-          ["–", "`:required`, `:user-invalid`, `:focus-visible`", "Platform only; no attribute."],
+          [
+            "`data-invalid`",
+            "`:user-invalid`",
+            "Inside a `Field.Root`: the Field shows an error for the switch.",
+          ],
+          ["–", "`:required`, `:focus-visible`", "Platform only; no attribute."],
         ]}
       />
       <p>
@@ -162,13 +164,15 @@ export function SwitchPage() {
 
       <BehaviourSection
         id="transition-types"
-        summary={"`fsui-switch` plus `fsui-switch-on` or `fsui-switch-off`."}
+        summary={
+          "`fsui-switch` plus `fsui-switch-check` or `fsui-switch-uncheck`, the kinds of every `checked` state (Checkbox, CheckboxGroup, `Menu.CheckboxItem`). There is no `transition` prop: a consumer's own `<ViewTransition>` keys a type map on them."
+        }
       />
 
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Switch while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the flip."
+          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Switch while `checkedChangeAction` is in flight. Animate the flip with CSS on `:checked`; your own `<ViewTransition>` around content next to the Switch can animate the commit that ends the action."
         }
       >
         <h4>Walkthrough</h4>

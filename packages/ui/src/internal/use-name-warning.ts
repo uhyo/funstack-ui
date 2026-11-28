@@ -13,6 +13,10 @@ export interface NameRules {
   readonly text?: boolean;
   /** `title` counts. */
   readonly title?: boolean;
+  /** A labelable element's `<label for>` or wrapping `<label>` counts (`element.labels`). */
+  readonly labels?: boolean;
+  /** A `<fieldset>`'s first-child `<legend>` counts. */
+  readonly legend?: boolean;
 }
 
 /** A button is also named by its text or `title`. */
@@ -20,6 +24,15 @@ export const BUTTON_NAME: NameRules = { text: true, title: true };
 
 /** Text content names it too (`title` does not). */
 export const TEXT_NAME: NameRules = { text: true };
+
+/**
+ * A form control (`<input>`, `<select>`, `<textarea>`) is also named by a `<label for>`, a
+ * wrapping `<label>` or `title` (conventions 9.5).
+ */
+export const CONTROL_NAME: NameRules = { labels: true, title: true };
+
+/** A `<fieldset>` group is also named by its `<legend>` (conventions 9.5). */
+export const GROUP_NAME: NameRules = { legend: true };
 
 /** Whether `element` has an accessible name by `rules` (development checks only). */
 function hasName(element: Element, rules: NameRules): boolean {
@@ -33,6 +46,8 @@ function hasName(element: Element, rules: NameRules): boolean {
     }
   }
   if (rules.text && (element.textContent ?? "").trim() !== "") return true;
+  if (rules.labels && ((element as HTMLInputElement).labels?.length ?? 0) > 0) return true;
+  if (rules.legend && element.querySelector(":scope > legend") !== null) return true;
   return rules.title === true && element.hasAttribute("title");
 }
 
@@ -59,19 +74,19 @@ function useNameWarningDev(
   rules: NameRules = {},
 ): ElementCheck<HTMLElement> | undefined {
   const warned = useRef(false);
-  const { resolveIds, text, title } = rules;
+  const { resolveIds, text, title, labels, legend } = rules;
   const check = useCallback(
     (element: HTMLElement) => {
       if (warned.current) return () => {};
       queueMicrotask(() => {
         if (warned.current || !element.isConnected) return;
-        if (hasName(element, { resolveIds, text, title })) return;
+        if (hasName(element, { resolveIds, text, title, labels, legend })) return;
         warned.current = true;
         console.error(message);
       });
       return () => {};
     },
-    [message, resolveIds, text, title],
+    [message, resolveIds, text, title, labels, legend],
   );
   return message === false ? undefined : check;
 }

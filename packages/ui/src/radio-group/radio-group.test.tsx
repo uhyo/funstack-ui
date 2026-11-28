@@ -37,6 +37,7 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { RadioGroup } from "./index.js";
 import type {
+  RadioGroupItemProps,
   RadioGroupItemState,
   RadioGroupRootProps,
   RadioGroupRootState,
@@ -1088,7 +1089,13 @@ describe("RadioGroup", () => {
           )}
         </RadioGroup.Root>,
       );
-      expect(rootClass).toHaveBeenLastCalledWith({ value: "a", pending: false, disabled: false });
+      expect(rootClass).toHaveBeenLastCalledWith({
+        value: "a",
+        pending: false,
+        disabled: false,
+        invalid: false,
+        required: false,
+      });
       expect(group()).toHaveClass("g");
       expect(screen.getByText("Fruit a")).toHaveClass("l-a");
       expect(screen.getByText("Fruit a")).toHaveStyle({ color: "rgb(255, 0, 0)" });
@@ -1103,7 +1110,13 @@ describe("RadioGroup", () => {
 
       const user = setupUser();
       await user.click(radio("b"));
-      expect(rootClass).toHaveBeenLastCalledWith({ value: "b", pending: true, disabled: false });
+      expect(rootClass).toHaveBeenLastCalledWith({
+        value: "b",
+        pending: true,
+        disabled: false,
+        invalid: false,
+        required: false,
+      });
       expect(group()).toHaveClass("g", "busy");
       expect(group()).toHaveStyle({ opacity: "0.5" });
       expect(screen.getByTestId("root-children")).toHaveTextContent("b");
@@ -1372,5 +1385,134 @@ describe("RadioGroup inside a Field.Root", () => {
     await act(async () => {});
     expect(screen.getByTestId("group")).toBeDisabled();
     expect(screen.getByTestId("group")).toHaveAttribute("data-disabled", "");
+  });
+});
+
+// #200, the consistency alignment: conventions 3.6, 4.1 rule 5, 5.1, 9.5; testing.md 10.1.
+describe("RadioGroup alignment rows", () => {
+  it("types: `transition` and `readOnly` are not Item props", () => {
+    // @ts-expect-error A value control whose attributes are all optimistic takes no `transition`.
+    const withTransition: RadioGroupItemProps = { value: "a", transition: "fade" };
+    // @ts-expect-error HTML's `readonly` does not apply to a radio.
+    const withReadOnly: RadioGroupItemProps = { value: "a", readOnly: true };
+    expect([withTransition, withReadOnly]).toHaveLength(2);
+  });
+
+  it("state.invalid and state.required follow the Field (data-invalid on the fieldset)", async () => {
+    const rootClass = vi.fn(
+      (s: RadioGroupRootState) => `${s.invalid ? "bad" : "ok"}${s.required ? " req" : ""}`,
+    );
+    render(
+      <form>
+        <Field.Root name="plan" required>
+          <Field.Label>Plan</Field.Label>
+          <RadioGroup.Root className={rootClass} data-testid="group">
+            <RadioGroup.Item value="a" aria-label="A" />
+          </RadioGroup.Root>
+          <Field.Error />
+        </Field.Root>
+        <button type="submit">Save</button>
+      </form>,
+    );
+    await act(async () => {});
+    const group = screen.getByTestId("group");
+    expect(group).toHaveClass("ok", "req");
+    await setupUser().click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(group).toHaveAttribute("data-invalid", "");
+    expect(group).toHaveClass("bad", "req");
+  });
+
+  it("state.required is the own prop outside a Field; state.invalid is false", () => {
+    const rootClass = vi.fn((s: RadioGroupRootState) => (s.required ? "req" : ""));
+    render(
+      <RadioGroup.Root aria-label="Plan" required className={rootClass}>
+        <RadioGroup.Item value="a" aria-label="A" />
+      </RadioGroup.Root>,
+    );
+    expect(rootClass).toHaveBeenLastCalledWith(
+      expect.objectContaining({ required: true, invalid: false }),
+    );
+  });
+
+  it.each(["own", "field"] as const)(
+    "disabled submission (%s): nothing is posted, a reset still reaches it",
+    async (source) => {
+      const action = vi.fn<ActionFn>();
+      const group = (defaultValue: string) => (
+        <RadioGroup.Root
+          aria-label="Plan"
+          name="plan"
+          defaultValue={defaultValue}
+          disabled={source === "own"}
+          valueChangeAction={action}
+        >
+          <RadioGroup.Item value="a" aria-label="A" />
+          <RadioGroup.Item value="b" aria-label="B" />
+        </RadioGroup.Root>
+      );
+      const ui = (defaultValue: string) => (
+        <form data-testid="form">
+          {source === "field" ? (
+            <Field.Root name="plan" disabled>
+              {group(defaultValue)}
+            </Field.Root>
+          ) : (
+            group(defaultValue)
+          )}
+        </form>
+      );
+      const { rerender } = render(ui("a"));
+      await act(async () => {});
+      const form = screen.getByTestId("form") as HTMLFormElement;
+      expect([...new FormData(form)]).toEqual([]);
+      rerender(ui("b"));
+      await act(async () => form.reset());
+      expect((screen.getByRole("radio", { name: "B" }) as HTMLInputElement).checked).toBe(true);
+      expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([["b", "platform"]]);
+    },
+  );
+
+  it("warns once when the group has no accessible name", async () => {
+    const error = silenceErrors();
+    render(
+      <RadioGroup.Root>
+        <RadioGroup.Item value="a" aria-label="A" />
+      </RadioGroup.Root>,
+    );
+    await act(async () => {});
+    const calls = error.mock.calls.filter(([m]) => String(m).includes("no accessible name"));
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toMatch(/^RadioGroup\.Root: /);
+  });
+
+  it.each([
+    [
+      "a Label",
+      <RadioGroup.Root key="l">
+        <RadioGroup.Label>Plan</RadioGroup.Label>
+        <RadioGroup.Item value="a" aria-label="A" />
+      </RadioGroup.Root>,
+    ],
+    [
+      "aria-label",
+      <RadioGroup.Root key="a" aria-label="Plan">
+        <RadioGroup.Item value="a" aria-label="A" />
+      </RadioGroup.Root>,
+    ],
+    [
+      "Field.Label",
+      <Field.Root key="f">
+        <Field.Label>Plan</Field.Label>
+        <RadioGroup.Root>
+          <RadioGroup.Item value="a" aria-label="A" />
+        </RadioGroup.Root>
+      </Field.Root>,
+    ],
+  ])("does not warn when named by %s", async (_, ui) => {
+    const error = silenceErrors();
+    render(ui);
+    await act(async () => {});
+    expect(error.mock.calls.some(([m]) => String(m).includes("no accessible name"))).toBe(false);
   });
 });

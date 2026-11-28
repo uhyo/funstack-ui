@@ -1,7 +1,7 @@
 // CheckboxGroup rows that need a real engine (design/components/checkbox-group.md section 13):
 // the Parent's `:indeterminate` (14), group `required` as the user sees it (`:user-invalid`,
 // `validationMessage`, blocked submission, before hydration too; 17), no view transition from a
-// mounted Item without `transition` (30), the accessibility tree (34, Chromium through CDP; the
+// mounted Item (30: no part has a boundary), the accessibility tree (34, Chromium through CDP; the
 // other engines assert the DOM-level equivalent), and Tab / Space / a real label click as the
 // engine does them (35). Runs in Chromium, Firefox and WebKit.
 /// <reference types="@vitest/browser-playwright" />
@@ -20,7 +20,7 @@ import {
 } from "../__tests__/helpers.js";
 import { CheckboxGroup } from "./index.js";
 import type { CheckboxGroupValueChangeDetails } from "./index.js";
-import { itStartsNoViewTransitionOnMount } from "../__tests__/view-transition-mount.js";
+import { countLateMountViewTransitions } from "../__tests__/view-transition-mount.js";
 
 type ActionFn = (next: string[], details: CheckboxGroupValueChangeDetails) => unknown;
 
@@ -296,15 +296,18 @@ describe("CheckboxGroup (browser)", () => {
   });
 
   describe("view transitions", () => {
-    itStartsNoViewTransitionOnMount({
-      late: (props) => <CheckboxGroup.Item value="b" aria-label="b" {...props} />,
-      wrap: (late) => (
-        <CheckboxGroup.Root aria-label="T">
-          <CheckboxGroup.Item value="a" aria-label="a" />
-          {late}
-        </CheckboxGroup.Root>
-      ),
-      mounted: () => screen.queryByRole("checkbox", { name: "b" }),
+    it("an Item mounting in a transition starts no view transition (no boundary, conventions 5.1)", async () => {
+      const count = await countLateMountViewTransitions(undefined, {
+        late: () => <CheckboxGroup.Item value="b" aria-label="b" />,
+        wrap: (late) => (
+          <CheckboxGroup.Root aria-label="T">
+            <CheckboxGroup.Item value="a" aria-label="a" />
+            {late}
+          </CheckboxGroup.Root>
+        ),
+        mounted: () => screen.queryByRole("checkbox", { name: "b" }),
+      });
+      expect(count).toBe(0);
     });
   });
 

@@ -1,8 +1,7 @@
 "use client";
 import { useLayoutEffect } from "react";
-import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, CSSProperties } from "react";
 import { groupMemberProps } from "../internal/form/group-member.js";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useNativeChecked } from "../internal/form/use-native-checked.js";
 import { useRender } from "../internal/use-render.js";
@@ -39,6 +38,7 @@ export interface CheckboxGroupItemProps extends Omit<
   | "form"
   | "required"
   | "aria-checked"
+  | "readOnly"
   | "onChange"
   | "className"
   | "style"
@@ -54,16 +54,6 @@ export interface CheckboxGroupItemProps extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
-  /**
-   * Forwarded to the Item's `<ViewTransition default>`. Default: no boundary. Fires only on the
-   * commit that settles the action (or rolls it back), never on the optimistic check; animate the
-   * check itself with CSS on `:checked`.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CheckboxGroupItemState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -90,7 +80,6 @@ export interface CheckboxGroupItemProps extends Omit<
 export function CheckboxGroupItem({
   value,
   disabled: disabledProp = false,
-  transition,
   className,
   style,
   render,
@@ -131,7 +120,7 @@ export function CheckboxGroupItem({
 
   const state: CheckboxGroupItemState = { value, checked, pending, disabled };
 
-  const element = useRender<ComponentPropsWithRef<"input">, CheckboxGroupItemState>({
+  return useRender<ComponentPropsWithRef<"input">, CheckboxGroupItemState>({
     defaultElement: "input",
     render,
     state,
@@ -157,8 +146,6 @@ export function CheckboxGroupItem({
       activate: (event) => ctx.toggle(value, !checked, event),
     }),
   });
-
-  return useTransitionBoundary("CheckboxGroup.Item", transition, element);
 }
 
 CheckboxGroupItem.displayName = "CheckboxGroupItem";

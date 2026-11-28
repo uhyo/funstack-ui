@@ -11,7 +11,6 @@ describeCheckableInput({
   name: "Switch",
   Control: Switch,
   role: "switch",
-  changeTypes: ["fsui-switch-on", "fsui-switch-off"],
 });
 
 describe("Switch specifics", () => {

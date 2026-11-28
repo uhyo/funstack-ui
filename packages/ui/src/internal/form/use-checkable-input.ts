@@ -37,6 +37,8 @@ export interface CheckableInput {
   readonly pending: boolean;
   /** Own `disabled` or the Field's. */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: the Field shows an error (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
   /** `indeterminate && !pending`. */
   readonly shownIndeterminate: boolean;
   readonly ref: Ref<HTMLInputElement> | undefined;
@@ -47,8 +49,7 @@ export interface CheckableInput {
 /**
  * The single-checkbox machinery `Checkbox` and `Switch` share: the Field wiring, the
  * controllable action, the native `checked` re-apply and reconciliation (`useNativeChecked`),
- * and the input's owned layer. The components keep their props, state, `useRender` call and
- * transition boundary.
+ * and the input's owned layer. The components keep their props, state and `useRender` call.
  */
 export function useCheckableInput(options: UseCheckableInputOptions): CheckableInput {
   const {
@@ -141,5 +142,6 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     },
   };
 
-  return { optimistic, pending, disabled, shownIndeterminate, ref, libraryProps };
+  const invalid = field.state?.invalid ?? false;
+  return { optimistic, pending, disabled, invalid, shownIndeterminate, ref, libraryProps };
 }

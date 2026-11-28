@@ -9,12 +9,13 @@ type KeyLike = Pick<KeyboardEvent, "key" | "isComposing" | "keyCode">;
 const consumed = new WeakSet<object>();
 
 /**
- * Whether a `keydown` belongs to an IME composition: `isComposing`, or `keyCode === 229`, which
- * engines report for a key the IME took (WebKit fires `compositionend` before the key that ends
- * the composition, so that keydown has `isComposing === false`).
+ * Whether a `keydown` belongs to an IME composition: `isComposing`, or `keyCode === 229` /
+ * `key === "Process"`, which engines report for a key the IME took (WebKit fires
+ * `compositionend` before the key that ends the composition, so that keydown has
+ * `isComposing === false`). The one IME guard of every key handler (conventions 15).
  */
 export function isComposingKey(event: KeyLike): boolean {
-  return event.isComposing || event.keyCode === 229;
+  return event.isComposing || event.keyCode === 229 || event.key === "Process";
 }
 
 /**

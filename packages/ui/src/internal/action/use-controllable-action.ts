@@ -13,7 +13,7 @@ import type { ActionDetails, ChangeAction } from "../types.js";
 import { useLatest } from "../use-latest.js";
 import { reportDropped } from "./report-dropped.js";
 import { useConnected } from "./use-connected.js";
-import { useDevWarning } from "../use-dev-warning.js";
+import { useModeWarnings } from "../use-dev-warning.js";
 
 export interface UseControllableActionOptions<T, Details extends ActionDetails> {
   /** The controlled prop (`x`). `undefined` means uncontrolled. */
@@ -104,8 +104,6 @@ export interface DispatchOptions {
   readonly whole?: boolean | undefined;
 }
 
-const isDev = process.env.NODE_ENV !== "production";
-
 /** One uncontrolled reducer-mode dispatch of a burst; `resolved` once its action resolved. */
 interface BurstEntry<T, Details> {
   readonly next: T;
@@ -128,10 +126,6 @@ export function intendedValue<T>(
 ): T {
   const inFlight = latestInFlight === undefined ? null : latestInFlight();
   return inFlight === null ? optimistic : inFlight.next;
-}
-
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**
@@ -177,7 +171,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const burst = useRef<BurstEntry<T, Details>[]>([]);
   const connected = useConnected();
 
-  useDevWarnings(isControlled, defaultValue !== undefined, warn);
+  useModeWarnings(isControlled, defaultValue !== undefined, warn);
 
   // The functions below keep one identity for the hook's lifetime, so the returned object changes
   // only with `committed`, `optimistic` and `pending`, and the components' memoised context values
@@ -274,29 +268,5 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   return useMemo(
     () => ({ committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFact, epoch }),
     [committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFact, epoch],
-  );
-}
-
-function useDevWarnings(
-  isControlled: boolean,
-  hasDefault: boolean,
-  warn: { readonly component: string; readonly prop: string },
-): void {
-  const [initialMode] = useState(isControlled);
-  const { component, prop } = warn;
-  const defaultProp = isDev && `default${capitalize(prop)}`;
-
-  useDevWarning(
-    isControlled && hasDefault,
-    isDev &&
-      `${component}: both \`${prop}\` and \`${defaultProp}\` are set. ` +
-        `Use \`${prop}\` for controlled mode or \`${defaultProp}\` for uncontrolled mode, not both.`,
-  );
-  useDevWarning(
-    initialMode !== isControlled,
-    isDev &&
-      `${component}: \`${prop}\` changed from ${initialMode ? "controlled" : "uncontrolled"} to ` +
-        `${isControlled ? "controlled" : "uncontrolled"}. Switching modes after mount ` +
-        `is not supported; keep \`${prop}\` either always defined or always undefined.`,
   );
 }

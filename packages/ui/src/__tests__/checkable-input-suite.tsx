@@ -42,15 +42,13 @@ export interface CheckableInputConfig {
   readonly role: "switch" | "checkbox";
   /** State fields beyond `{ checked, pending, disabled }` (Checkbox: `indeterminate: false`). */
   readonly extraState?: Readonly<Record<string, unknown>>;
-  /** The component's two `fsui-<component>-<change>` types (on, off). */
-  readonly changeTypes: readonly [string, string];
 }
 
 export function describeCheckableInput(config: CheckableInputConfig): void {
-  const { name, Control, role, changeTypes } = config;
+  const { name, Control, role } = config;
   const extraState = config.extraState ?? {};
-  /** The full state object the component passes to its function props. */
-  const fullState = (s: ControlState) => ({ ...s, ...extraState });
+  /** The full state object the component passes to its function props (`invalid`: no Field). */
+  const fullState = (s: Omit<ControlState, "invalid">) => ({ ...s, invalid: false, ...extraState });
   /** The role attribute the component renders: Switch owns `role="switch"`, Checkbox none. */
   const expectRoleAttribute = (el: Element) => {
     if (role === "switch") expect(el).toHaveAttribute("role", "switch");
@@ -831,20 +829,19 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
     });
 
-    describe("transition prop (row 18)", () => {
-      it("renders the same markup with and without `transition`", () => {
-        const plain = render(<Control aria-label="x" defaultChecked />).container.innerHTML;
-        const str = render(<Control aria-label="x" defaultChecked transition="fsui-fade" />)
-          .container.innerHTML;
-        const map = render(
-          <Control
-            aria-label="x"
-            defaultChecked
-            transition={{ [changeTypes[0]]: "on", [changeTypes[1]]: "off", default: "none" }}
-          />,
-        ).container.innerHTML;
-        expect(str).toBe(plain);
-        expect(map).toBe(plain);
+    describe("no transition prop, no readOnly (row 18; conventions 5.1, 3.6)", () => {
+      it("`transition` and `readOnly` are type errors", () => {
+        // @ts-expect-error A value control whose attributes are all optimistic has no boundary.
+        const withTransition: ControlProps = { transition: "fsui-fade" };
+        // @ts-expect-error HTML's `readonly` does not apply to a checkbox input.
+        const withReadOnly: ControlProps = { readOnly: true };
+        expect([withTransition, withReadOnly]).toHaveLength(2);
+      });
+
+      it("renders the input alone: no element or boundary around it", () => {
+        const { container } = render(<Control aria-label="x" defaultChecked />);
+        expect(container.childNodes).toHaveLength(1);
+        expect(container.firstElementChild?.tagName).toBe("INPUT");
       });
     });
 
@@ -1324,7 +1321,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       it("attaches the component transition types (wiring smoke test)", async () => {
         // jsdom has no view transitions; this only proves a dispatch with types does not throw.
         const action = vi.fn<ActionFn>();
-        render(<Control aria-label="x" transition="fsui-fade" checkedChangeAction={action} />);
+        render(<Control aria-label="x" checkedChangeAction={action} />);
         const user = setupUser();
         await user.click(input());
         await user.click(input());
@@ -1424,6 +1421,29 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       await act(async () => submission.resolve());
     });
 
+    it("state.invalid equals data-invalid (conventions 4.1 rule 5)", async () => {
+      const className = vi.fn((s: ControlState) => (s.invalid ? "bad" : "ok"));
+      render(
+        <form data-testid="form">
+          <Field.Root name="terms" required>
+            <Field.Label>Accept</Field.Label>
+            <Control className={className} data-testid="control" />
+            <Field.Error />
+          </Field.Root>
+          <button type="submit">Save</button>
+        </form>,
+      );
+      await act(async () => {});
+      const el = screen.getByTestId("control");
+      expect(el).toHaveClass("ok");
+      expect(el).not.toHaveAttribute("data-invalid");
+      await setupUser().click(screen.getByRole("button", { name: "Save" }));
+      await act(async () => {});
+      expect(el).toHaveAttribute("data-invalid", "");
+      expect(el).toHaveClass("bad");
+      expect(className).toHaveBeenLastCalledWith(expect.objectContaining({ invalid: true }));
+    });
+
     it("Field disabled disables it; its own id is ignored with a warning", async () => {
       const error = silenceErrors();
       render(
@@ -1438,6 +1458,102 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       expect(el).toHaveAttribute("data-disabled", "");
       expect(el.id).not.toBe("mine");
       expect(error).toHaveBeenCalledWith(expect.stringContaining(`${name}: the \`id\` prop`));
+    });
+  });
+
+  // testing.md 10.1 "Disabled submission".
+  describe(`${name}: disabled submission`, () => {
+    it.each(["own", "field"] as const)(
+      "a %s-disabled checked control posts nothing; a form reset still reaches it",
+      async (source) => {
+        const action = vi.fn<ActionFn>();
+        const ui = (defaultChecked: boolean) => {
+          const control = (
+            <Control
+              name="opt"
+              aria-label="Opt"
+              defaultChecked={defaultChecked}
+              disabled={source === "own"}
+              checkedChangeAction={action}
+              data-testid="control"
+            />
+          );
+          return (
+            <form data-testid="form">
+              {source === "field" ? (
+                <Field.Root name="opt" disabled>
+                  {control}
+                </Field.Root>
+              ) : (
+                control
+              )}
+            </form>
+          );
+        };
+        const { rerender } = render(ui(true));
+        await act(async () => {});
+        const form = screen.getByTestId("form") as HTMLFormElement;
+        const el = screen.getByTestId("control") as HTMLInputElement;
+        expect(el).toBeDisabled();
+        expect(el.checked).toBe(true);
+        expect([...new FormData(form)]).toEqual([]);
+        // The reset target moves; a reset of the disabled box still dispatches "platform".
+        rerender(ui(false));
+        await act(async () => form.reset());
+        expect(el.checked).toBe(false);
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(action.mock.calls[0]?.[0]).toBe(false);
+        expect(action.mock.calls[0]?.[1].reason).toBe("platform");
+      },
+    );
+  });
+
+  // conventions 9.5: a form control the consumer must name warns when it has no name.
+  describe(`${name}: accessible-name warning`, () => {
+    it("warns once when the input has no accessible name", async () => {
+      const error = silenceErrors();
+      const { rerender } = render(<Control data-testid="control" />);
+      await act(async () => {});
+      rerender(<Control data-testid="control" defaultChecked />);
+      await act(async () => {});
+      const calls = error.mock.calls.filter(([m]) => String(m).includes("no accessible name"));
+      expect(calls).toHaveLength(1);
+      expect(String(calls[0]?.[0])).toMatch(new RegExp(`^${name}: `));
+    });
+
+    it.each([
+      ["aria-label", () => <Control aria-label="Opt" />],
+      [
+        "a wrapping <label>",
+        () => (
+          <label>
+            Opt <Control />
+          </label>
+        ),
+      ],
+      [
+        "a <label for>",
+        () => (
+          <>
+            <label htmlFor="c">Opt</label>
+            <Control id="c" />
+          </>
+        ),
+      ],
+      [
+        "Field.Label",
+        () => (
+          <Field.Root>
+            <Field.Label>Opt</Field.Label>
+            <Control />
+          </Field.Root>
+        ),
+      ],
+    ])("does not warn when named by %s", async (_, ui) => {
+      const error = silenceErrors();
+      render(ui());
+      await act(async () => {});
+      expect(error.mock.calls.some(([m]) => String(m).includes("no accessible name"))).toBe(false);
     });
   });
 }

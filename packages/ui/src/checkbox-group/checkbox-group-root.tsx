@@ -62,6 +62,10 @@ export interface CheckboxGroupRootState {
   readonly pending: boolean;
   /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
+  /** The `required` prop, or the enclosing Field's. */
+  readonly required: boolean;
 }
 
 /**
@@ -88,14 +92,14 @@ export interface CheckboxGroupRootProps extends Omit<
    * `defaultChecked` once, from the initial `checked`). The reset is offered to
    * `valueChangeAction` as a `"platform"` change; for a stable target use `defaultValue`.
    */
-  value?: string[];
+  value?: readonly string[];
   /**
    * Initial values in uncontrolled mode. Also the values a form reset returns
    * to: the latest prop value is mirrored into the boxes' `defaultChecked`.
    *
    * @defaultValue `[]`
    */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Runs inside the Root's transition whenever the set of checked values changes. May be sync
    * or async (also a Server Function); rejections reach the nearest Error Boundary and roll the
@@ -213,7 +217,7 @@ export function CheckboxGroupRoot({
   ...rest
 }: CheckboxGroupRootProps) {
   // `required` is "at least one" (design section 7).
-  const { field, name, required, disabled, fieldsetRef, rootRef } = useFieldsetGroup({
+  const { field, name, required, disabled, invalid, fieldsetRef, rootRef } = useFieldsetGroup({
     component: "CheckboxGroup.Root",
     name: nameProp,
     disabled: disabledProp,
@@ -421,8 +425,8 @@ export function CheckboxGroupRoot({
   // `renderedValue` is a fresh array on every render: keyed on its contents.
   const renderedKey = JSON.stringify(renderedValue);
   const state = useMemo<CheckboxGroupRootState>(
-    () => ({ value: JSON.parse(renderedKey) as string[], pending, disabled }),
-    [renderedKey, pending, disabled],
+    () => ({ value: JSON.parse(renderedKey) as string[], pending, disabled, invalid, required }),
+    [renderedKey, pending, disabled, invalid, required],
   );
 
   // The context's callbacks are stable (handlers and member effects only: they read the last

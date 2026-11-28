@@ -21,10 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { setupUser, silenceErrors } from "../__tests__/helpers.js";
 import { Accordion } from "../accordion/index.js";
-import { Checkbox } from "../checkbox/index.js";
 import { Dialog } from "../dialog/index.js";
-import { RadioGroup } from "../radio-group/index.js";
-import { Switch } from "../switch/index.js";
 import { Tabs } from "../tabs/index.js";
 import { Toggle } from "../toggle/index.js";
 import { transitionBoundary } from "./transition-boundary.js";
@@ -126,8 +123,6 @@ function mountInTransition(node: ReactNode) {
 describe("parts mounting at the top of an inserted subtree", () => {
   const parts: [string, (t: ViewTransitionClass | undefined) => ReactNode][] = [
     ["Toggle", (t) => <Toggle transition={t}>B</Toggle>],
-    ["Switch", (t) => <Switch aria-label="s" transition={t} />],
-    ["Checkbox", (t) => <Checkbox aria-label="c" transition={t} />],
   ];
 
   describe.each(parts)("%s", (_name, part) => {
@@ -145,15 +140,6 @@ describe("parts mounting at the top of an inserted subtree", () => {
   });
 
   const grouped: [string, (t: ViewTransitionClass | undefined, show: boolean) => ReactNode][] = [
-    [
-      "RadioGroup.Item",
-      (t, show) => (
-        <RadioGroup.Root name="g" aria-label="g">
-          <RadioGroup.Item value="a" aria-label="a" />
-          {show && <RadioGroup.Item value="b" aria-label="b" transition={t} data-testid="added" />}
-        </RadioGroup.Root>
-      ),
-    ],
     [
       "Tabs.Tab",
       (t, show) => (

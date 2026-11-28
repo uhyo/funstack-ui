@@ -125,19 +125,14 @@ export function CheckboxPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`; never dispatches.",
+            description:
+              "Native `disabled`, or the enclosing `Field.Root`'s; never dispatches. A disabled checkbox is not submitted.",
           },
           {
             name: "value",
             type: "string",
             default: '"on"',
             description: "Submitted with the form when checked (platform default).",
-          },
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Forwarded to the Checkbox's `<ViewTransition default>`; without it no boundary is rendered. Animates the commit that ends an action, not the check itself.",
           },
           ...stylingProps("CheckboxState"),
           {
@@ -150,12 +145,14 @@ export function CheckboxPage() {
       />
       <PartFacts
         state={
-          "`CheckboxState` is `{ checked, indeterminate, pending, disabled }`; `checked` is optimistic and `indeterminate` is already `indeterminate && !pending`."
+          "`CheckboxState` is `{ checked, indeterminate, pending, disabled, invalid }`; `checked` is optimistic, `indeterminate` is already `indeterminate && !pending`, and `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field."
         }
         owned={
-          "`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+          "`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`, and `disabled` / `name` / `required` default from the Field."
         }
-        note={"Other `<input>` props pass through, including `role`."}
+        note={
+          "Other `<input>` props pass through, including `role`. `readOnly` is not accepted (a type error): HTML's `readonly` does not apply to a checkbox input. There is no `transition` prop: animate the check with CSS on `:checked`. In development a checkbox with no accessible name (no `<label>`, `aria-label` or `aria-labelledby`) logs a warning."
+        }
       />
 
       <h3 id="data-attributes">Data attributes</h3>
@@ -176,9 +173,14 @@ export function CheckboxPage() {
           [
             "`data-disabled`",
             "`:disabled`",
-            "The `disabled` prop. Only `:disabled` also sees `<fieldset disabled>`.",
+            "The `disabled` prop (or the Field's). Only `:disabled` also sees `<fieldset disabled>`.",
           ],
-          ["–", "`:required`, `:user-invalid`, `:focus-visible`", "Platform only; no attribute."],
+          [
+            "`data-invalid`",
+            "`:user-invalid`",
+            "Inside a `Field.Root`: the Field shows an error for the checkbox.",
+          ],
+          ["–", "`:required`, `:focus-visible`", "Platform only; no attribute."],
         ]}
       />
       <Callout kind="warning" title="Chromium and :checked while indeterminate">
@@ -219,13 +221,15 @@ export function CheckboxPage() {
 
       <BehaviourSection
         id="transition-types"
-        summary={"`fsui-checkbox` plus `fsui-checkbox-check` or `fsui-checkbox-uncheck`."}
+        summary={
+          "`fsui-checkbox` plus `fsui-checkbox-check` or `fsui-checkbox-uncheck`. There is no `transition` prop: a consumer's own `<ViewTransition>` keys a type map on them."
+        }
       />
 
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Checkbox while `checkedChangeAction` is in flight. `transition` animates the commit that ends the action, not the check."
+          "The native input renders the optimistic state, so `:checked` and `data-checked` change at the click and assistive technology hears it at once. `data-pending` is on the Checkbox while `checkedChangeAction` is in flight. Animate the check with CSS on `:checked`; your own `<ViewTransition>` around content next to the Checkbox can animate the commit that ends the action."
         }
       >
         <p>

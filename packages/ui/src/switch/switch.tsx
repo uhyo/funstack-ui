@@ -1,6 +1,5 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
+import type { ComponentPropsWithRef, CSSProperties } from "react";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
   ActionDetails,
@@ -10,7 +9,12 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useCheckableInput } from "../internal/form/use-checkable-input.js";
+import type { ElementCheck } from "../internal/use-element-check.js";
+import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { CONTROL_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { useRender } from "../internal/use-render.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 /** State of `Switch`, passed to the function forms of `className`, `style` and `render`. */
 export interface SwitchState {
@@ -20,6 +24,8 @@ export interface SwitchState {
   readonly pending: boolean;
   /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
 }
 
 /** Details passed as the second argument of `checkedChangeAction`. */
@@ -46,6 +52,7 @@ export interface SwitchProps extends Omit<
   | "defaultChecked"
   | "onChange"
   | "aria-checked"
+  | "readOnly"
   | "className"
   | "style"
   | "children"
@@ -81,15 +88,7 @@ export interface SwitchProps extends Omit<
    * @defaultValue `"on"` (platform)
    */
   value?: string;
-  /**
-   * Forwarded as `default` to the Switch's `<ViewTransition>`. Default: no boundary. Animates the
-   * commit that ends an action, not the optimistic flip; animate the flip with CSS on `:checked`.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
+
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SwitchState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -105,6 +104,10 @@ export interface SwitchProps extends Omit<
  * An on/off switch (WAI-ARIA "Switch" pattern, HTML checkbox input variant). Renders
  * `<input type="checkbox" role="switch">` whose DOM `checked` is the optimistic state; the input
  * carries `data-pending` while `checkedChangeAction` is in flight and takes part in forms natively.
+ * Animate the flip with CSS on `:checked`; there is no `transition` prop (a value control whose
+ * attributes are all optimistic, conventions 5.1). Every dispatch carries the View Transition
+ * types `fsui-switch` and `fsui-switch-check` / `fsui-switch-uncheck` for your own
+ * `<ViewTransition>`. `readOnly` is not accepted: it does not apply to a checkbox input.
  *
  * Owned keys (a `render` element's value is overridden): `type`, `role`, `checked`,
  * `defaultChecked`, `aria-checked` (always removed), `disabled`, `data-checked`, `data-pending`,
@@ -121,7 +124,6 @@ export function Switch({
   defaultChecked,
   checkedChangeAction,
   disabled,
-  transition,
   className,
   style,
   render,
@@ -134,7 +136,7 @@ export function Switch({
     checkedChangeAction,
     disabled,
     own: rest,
-    transitionTypes: (next) => transitionTypes("switch", next ? "on" : "off"),
+    transitionTypes: (next) => transitionTypes("switch", next ? "check" : "uncheck"),
     role: "switch",
   });
 
@@ -142,22 +144,31 @@ export function Switch({
     checked: input.optimistic,
     pending: input.pending,
     disabled: input.disabled,
+    invalid: input.invalid,
   };
 
-  const element = useRender<ComponentPropsWithRef<"input">, SwitchState>({
+  // Development check (conventions 9.5): a switch needs a name, from a `<label for>`, a wrapping
+  // `<label>` (a `Field.Label` included), `aria-label` or `aria-labelledby`.
+  const checkName: ElementCheck<HTMLInputElement> | undefined = useNameWarning(
+    isDev &&
+      "Switch: the switch has no accessible name. Wrap it in a <label>, associate a <label for>, " +
+        "use Field.Label, or give it aria-label / aria-labelledby.",
+    CONTROL_NAME,
+  );
+  const ref = useMergedRefs<HTMLInputElement>(input.ref, checkName);
+
+  return useRender<ComponentPropsWithRef<"input">, SwitchState>({
     defaultElement: "input",
     render,
     state,
     className,
     style,
     children: undefined,
-    ref: input.ref,
+    ref,
     // Pass-through layer: a `render` element's own props win over these.
     props: rest,
     libraryProps: input.libraryProps,
   });
-
-  return useTransitionBoundary("Switch", transition, element);
 }
 
 Switch.displayName = "Switch";

@@ -130,12 +130,14 @@ export function RadioGroupPage() {
         ]}
       />
       <PartFacts
-        state={"`RadioGroupRootState` is `{ value, pending, disabled }`; `value` is optimistic."}
+        state={
+          "`RadioGroupRootState` is `{ value, pending, disabled, invalid, required }`; `value` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the prop or the Field's."
+        }
         owned={
           '`role` (`"radiogroup"`), `aria-required`, `disabled`, `form`, `data-pending`, `data-disabled`. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`.'
         }
         note={
-          "Other fieldset props pass through (`aria-label` for a group without a Label, for example)."
+          "Other fieldset props pass through (`aria-label` for a group without a Label, for example). In development a group with no accessible name (no `Label`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning. A disabled group (its own prop or the Field's) is not submitted."
         }
       />
 
@@ -167,12 +169,6 @@ export function RadioGroupPage() {
             default: "false",
             description: "Native `disabled`: unfocusable, skipped by the arrow keys.",
           },
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Forwarded to the Item's `<ViewTransition default>`; without it no boundary is rendered. Fires only on the commit that settles an action or rolls it back, never on the check itself.",
-          },
           ...stylingProps("RadioGroupItemState"),
           {
             name: "render",
@@ -189,7 +185,9 @@ export function RadioGroupPage() {
         owned={
           "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`, `data-checked`, `data-pending`, `data-disabled`; `onChange` is merged (a `render` element's own handler runs first)."
         }
-        note={"`id` and other input props pass through."}
+        note={
+          "`id` and other input props pass through. `readOnly` is not accepted (a type error): HTML's `readonly` does not apply to a radio. There is no `transition` prop: animate the check with CSS on `:checked`."
+        }
       />
 
       <h3 id="data-attributes">Data attributes</h3>
@@ -290,13 +288,15 @@ export function RadioGroupPage() {
 
       <BehaviourSection
         id="transition-types"
-        summary={"`fsui-radio-group` (no kind: every change checks one radio)."}
+        summary={
+          "`fsui-radio-group` (no kind: every change checks one radio). No part has a `transition` prop: a consumer's own `<ViewTransition>` around dependent content keys a type map on it."
+        }
       />
 
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The checked radio is the optimistic value, rendered into the native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on the Item being checked. An Item's `transition` animates the commit that settles an action or rolls it back, not the check."
+          "The checked radio is the optimistic value, rendered into the native inputs. `data-pending` is on the Root while `valueChangeAction` is in flight, and on the Item being checked. Animate the check with CSS on `:checked`; your own `<ViewTransition>` around dependent content animates the commit that settles an action or rolls it back."
         }
       >
         <h4>Walkthrough</h4>

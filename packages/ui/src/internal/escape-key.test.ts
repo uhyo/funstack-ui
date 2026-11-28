@@ -38,10 +38,11 @@ describe("isEscapeRequest", () => {
 });
 
 describe("isComposingKey", () => {
-  it("reads isComposing and keyCode 229", () => {
+  it("reads isComposing, keyCode 229 and key Process", () => {
     expect(isComposingKey(keydown({ key: "a" }))).toBe(false);
     expect(isComposingKey(keydown({ key: "a", isComposing: true }))).toBe(true);
     expect(isComposingKey(keydown({ key: "Enter", keyCode: 229 }))).toBe(true);
+    expect(isComposingKey(keydown({ key: "Process" }))).toBe(true);
   });
 });
 

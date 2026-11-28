@@ -38,7 +38,9 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { CheckboxGroup } from "./index.js";
 import type {
+  CheckboxGroupItemProps,
   CheckboxGroupItemState,
+  CheckboxGroupParentProps,
   CheckboxGroupParentState,
   CheckboxGroupRootProps,
   CheckboxGroupRootState,
@@ -2068,7 +2070,13 @@ describe("CheckboxGroup", () => {
           )}
         </CheckboxGroup.Root>,
       );
-      expect(rootClass).toHaveBeenLastCalledWith({ value: ["a"], pending: false, disabled: false });
+      expect(rootClass).toHaveBeenLastCalledWith({
+        value: ["a"],
+        pending: false,
+        disabled: false,
+        invalid: false,
+        required: false,
+      });
       expect(screen.getByText("Fruit a")).toHaveClass("l-a");
       expect(screen.getByText("Fruit a")).toHaveStyle({ color: "rgb(255, 0, 0)" });
       expect(box("a")).toHaveClass("r", "on");
@@ -2088,6 +2096,8 @@ describe("CheckboxGroup", () => {
         value: ["a", "b"],
         pending: true,
         disabled: false,
+        invalid: false,
+        required: false,
       });
       expect(group()).toHaveClass("g", "busy");
       expect(group()).toHaveStyle({ opacity: "0.5" });
@@ -2436,5 +2446,107 @@ describe("CheckboxGroup inside a Field.Root", () => {
     for (const box of screen.getAllByRole("checkbox")) {
       expect(box).toHaveAttribute("aria-invalid", "false");
     }
+  });
+});
+
+// #200, the consistency alignment: conventions 3.1, 3.6, 4.1 rule 5, 5.1, 9.5; testing.md 10.1.
+describe("CheckboxGroup alignment rows", () => {
+  it("types: no `transition` or `readOnly` on Item / Parent; readonly arrays", () => {
+    // @ts-expect-error A value control whose attributes are all optimistic takes no `transition`.
+    const item: CheckboxGroupItemProps = { value: "a", transition: "fade" };
+    // @ts-expect-error HTML's `readonly` does not apply to a checkbox.
+    const itemReadOnly: CheckboxGroupItemProps = { value: "a", readOnly: true };
+    // @ts-expect-error As on Item.
+    const parent: CheckboxGroupParentProps = { values: ["a"], transition: "fade" };
+    // @ts-expect-error As on Item.
+    const parentReadOnly: CheckboxGroupParentProps = { values: ["a"], readOnly: true };
+    const list = ["a", "b"] as const;
+    const root: CheckboxGroupRootProps = { value: list, defaultValue: list };
+    const parentValues: CheckboxGroupParentProps = { values: list };
+    expect([item, itemReadOnly, parent, parentReadOnly, root, parentValues]).toHaveLength(6);
+  });
+
+  it("state.invalid and state.required follow the Field (data-invalid on the fieldset)", async () => {
+    const rootClass = vi.fn(
+      (s: CheckboxGroupRootState) => `${s.invalid ? "bad" : "ok"}${s.required ? " req" : ""}`,
+    );
+    render(
+      <form>
+        <Field.Root name="t" required>
+          <Field.Label>Toppings</Field.Label>
+          <CheckboxGroup.Root className={rootClass} data-testid="group">
+            <CheckboxGroup.Item value="a" aria-label="A" />
+          </CheckboxGroup.Root>
+          <Field.Error />
+        </Field.Root>
+        <button type="submit">Save</button>
+      </form>,
+    );
+    await act(async () => {});
+    const group = screen.getByTestId("group");
+    expect(group).toHaveClass("ok", "req");
+    await setupUser().click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(group).toHaveAttribute("data-invalid", "");
+    expect(group).toHaveClass("bad", "req");
+  });
+
+  it.each(["own", "field"] as const)(
+    "disabled submission (%s): nothing is posted, a reset still reaches it",
+    async (source) => {
+      const action = vi.fn<ActionFn>();
+      const group = (defaultValue: readonly string[]) => (
+        <CheckboxGroup.Root
+          aria-label="T"
+          name="t"
+          defaultValue={defaultValue}
+          disabled={source === "own"}
+          valueChangeAction={action}
+        >
+          <CheckboxGroup.Item value="a" aria-label="A" />
+          <CheckboxGroup.Item value="b" aria-label="B" />
+        </CheckboxGroup.Root>
+      );
+      const ui = (defaultValue: readonly string[]) => (
+        <form data-testid="form">
+          {source === "field" ? (
+            <Field.Root name="t" disabled>
+              {group(defaultValue)}
+            </Field.Root>
+          ) : (
+            group(defaultValue)
+          )}
+        </form>
+      );
+      const { rerender } = render(ui(["a"]));
+      await act(async () => {});
+      const form = screen.getByTestId("form") as HTMLFormElement;
+      expect([...new FormData(form)]).toEqual([]);
+      rerender(ui(["b"]));
+      await act(async () => form.reset());
+      expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([[["b"], "platform"]]);
+    },
+  );
+
+  it("warns once when the group has no accessible name; a Label or aria-label names it", async () => {
+    const error = silenceErrors();
+    render(
+      <>
+        <CheckboxGroup.Root>
+          <CheckboxGroup.Item value="a" aria-label="A" />
+        </CheckboxGroup.Root>
+        <CheckboxGroup.Root>
+          <CheckboxGroup.Label>Named</CheckboxGroup.Label>
+          <CheckboxGroup.Item value="b" aria-label="B" />
+        </CheckboxGroup.Root>
+        <CheckboxGroup.Root aria-label="Named too">
+          <CheckboxGroup.Item value="c" aria-label="C" />
+        </CheckboxGroup.Root>
+      </>,
+    );
+    await act(async () => {});
+    const calls = error.mock.calls.filter(([m]) => String(m).includes("no accessible name"));
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toMatch(/^CheckboxGroup\.Root: /);
   });
 });

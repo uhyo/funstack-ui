@@ -26,7 +26,6 @@ describeCheckableInput({
   Control: Checkbox,
   role: "checkbox",
   extraState: { indeterminate: false },
-  changeTypes: ["fsui-checkbox-check", "fsui-checkbox-uncheck"],
 });
 
 type ActionFn = (next: boolean, details: CheckboxCheckedChangeDetails) => unknown;
@@ -287,6 +286,7 @@ describe("Checkbox indeterminate", () => {
       indeterminate: true,
       pending: false,
       disabled: false,
+      invalid: false,
     };
     expect(className).toHaveBeenLastCalledWith(idle);
     expect(style).toHaveBeenLastCalledWith(idle);
@@ -299,6 +299,7 @@ describe("Checkbox indeterminate", () => {
       indeterminate: false,
       pending: true,
       disabled: false,
+      invalid: false,
     };
     expect(className).toHaveBeenLastCalledWith(pending);
     expect(style).toHaveBeenLastCalledWith(pending);

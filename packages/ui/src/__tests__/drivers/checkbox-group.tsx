@@ -5,7 +5,7 @@
 // values[0] by an added and a removed value, so the platform rows that go there (several
 // pre-hydration clicks, a reset) carry both. The "update on success" parent patches its value with
 // `details.added` / `removed` (design 2.6). Item and Parent state (DOM `checked`, `data-checked`,
-// the Parent's mixed state) is optimistic.
+// the Parent's mixed state) is optimistic. No part takes `transition` (conventions 5.1).
 import { screen } from "@testing-library/react";
 import { expect } from "vitest";
 import { CheckboxGroup } from "../../checkbox-group/index.js";
@@ -52,19 +52,16 @@ export const checkboxGroupDriver: NativeGroupPlatformDriver<
   CheckboxGroupValueChangeDetails
 > = {
   name: "CheckboxGroup.Root",
-  render: ({ value, defaultValue, changeAction, transition, extra }) => (
+  transitionProp: false,
+  render: ({ value, defaultValue, changeAction, extra }) => (
     <CheckboxGroup.Root
       {...definedProps({ value, defaultValue, valueChangeAction: changeAction })}
       {...extra}
     >
       <CheckboxGroup.Label>Fruit</CheckboxGroup.Label>
-      <CheckboxGroup.Parent
-        values={[...ITEMS]}
-        aria-label="all"
-        {...definedProps({ transition })}
-      />
+      <CheckboxGroup.Parent values={ITEMS} aria-label="all" />
       {ITEMS.map((v) => (
-        <CheckboxGroup.Item key={v} value={v} aria-label={v} {...definedProps({ transition })} />
+        <CheckboxGroup.Item key={v} value={v} aria-label={v} />
       ))}
     </CheckboxGroup.Root>
   ),

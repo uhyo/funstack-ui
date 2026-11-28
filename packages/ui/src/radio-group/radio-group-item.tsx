@@ -1,7 +1,6 @@
 "use client";
-import type { ComponentPropsWithRef, CSSProperties, ViewTransitionClass } from "react";
+import type { ComponentPropsWithRef, CSSProperties } from "react";
 import { groupMemberProps } from "../internal/form/group-member.js";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { syncPresences } from "../internal/form/sync-presence.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useNativeChecked } from "../internal/form/use-native-checked.js";
@@ -37,6 +36,7 @@ export interface RadioGroupItemProps extends Omit<
   | "defaultValue"
   | "form"
   | "required"
+  | "readOnly"
   | "onChange"
   | "className"
   | "style"
@@ -50,16 +50,6 @@ export interface RadioGroupItemProps extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
-  /**
-   * Forwarded to the Item's `<ViewTransition default>`. Default: no boundary. Fires only on the commit
-   * that settles the action (or rolls it back), never on the optimistic check; animate the check
-   * itself with CSS on `:checked`.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, RadioGroupItemState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -88,7 +78,6 @@ export interface RadioGroupItemProps extends Omit<
 export function RadioGroupItem({
   value,
   disabled: disabledProp = false,
-  transition,
   className,
   style,
   render,
@@ -126,7 +115,7 @@ export function RadioGroupItem({
 
   const state: RadioGroupItemState = { value, checked, pending, disabled };
 
-  const element = useRender<ComponentPropsWithRef<"input">, RadioGroupItemState>({
+  return useRender<ComponentPropsWithRef<"input">, RadioGroupItemState>({
     defaultElement: "input",
     render,
     state,
@@ -150,8 +139,6 @@ export function RadioGroupItem({
       activate: (event) => ctx.select(value, event),
     }),
   });
-
-  return useTransitionBoundary("RadioGroup.Item", transition, element);
 }
 
 RadioGroupItem.displayName = "RadioGroupItem";

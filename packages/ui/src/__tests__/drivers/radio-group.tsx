@@ -1,7 +1,8 @@
 // RadioGroup as seen by the value-action suite (value-action-suite.tsx) and the native platform
 // suite (native-group-platform-suite.tsx): radios a, b, c starting on "a"; the gestures click b,
 // c, a. The checked radio (DOM `checked` and `data-checked`) is
-// optimistic; only the optimistic Item is pending, with the Root.
+// optimistic; only the optimistic Item is pending, with the Root. No part takes `transition`
+// (conventions 5.1).
 import { screen } from "@testing-library/react";
 import { expect } from "vitest";
 import { RadioGroup } from "../../radio-group/index.js";
@@ -26,14 +27,15 @@ export const radioGroupDriver: NativeGroupPlatformDriver<
   RadioGroupValueChangeDetails
 > = {
   name: "RadioGroup.Root",
-  render: ({ value, defaultValue, changeAction, transition, extra }) => (
+  transitionProp: false,
+  render: ({ value, defaultValue, changeAction, extra }) => (
     <RadioGroup.Root
       aria-label="Fruit"
       {...definedProps({ value, defaultValue, valueChangeAction: changeAction })}
       {...extra}
     >
       {ITEMS.map((v) => (
-        <RadioGroup.Item key={v} value={v} aria-label={v} {...definedProps({ transition })} />
+        <RadioGroup.Item key={v} value={v} aria-label={v} />
       ))}
     </RadioGroup.Root>
   ),
