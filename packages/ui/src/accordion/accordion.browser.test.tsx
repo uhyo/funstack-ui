@@ -120,8 +120,8 @@ describe("Accordion (browser)", () => {
     expect(action).toHaveBeenCalledTimes(1);
     const details = action.mock.calls[0]![1];
     expect(details.reason).toBe("platform");
-    expect(details.item).toBe("a");
-    expect(details.open).toBe(true);
+    expect(details.added).toEqual(["a"]);
+    expect(details.removed).toEqual([]);
     expect(details.event).toBeInstanceOf(ToggleEvent);
     expect(item("a").open).toBe(true); // stays visible while the action runs
     expect(trigger("a")).toHaveAttribute("data-pending", "");

@@ -1,22 +1,12 @@
 "use client";
 import { use, useCallback } from "react";
-import type {
-  ComponentPropsWithRef,
-  CSSProperties,
-  MouseEvent,
-  ReactNode,
-  ViewTransitionClass,
-} from "react";
+import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import { interceptSummaryClick, useSummaryCheck } from "../internal/details-summary.js";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useRender } from "../internal/use-render.js";
 import { CollapsibleContext } from "./collapsible-context.js";
 import type { CollapsibleRootState } from "./collapsible-root.js";
-
-const isDev = process.env.NODE_ENV !== "production";
 
 /** The trigger is the Root's control; it renders the Root's state object. */
 export type CollapsibleTriggerState = CollapsibleRootState;
@@ -28,18 +18,8 @@ export type CollapsibleTriggerState = CollapsibleRootState;
  */
 export interface CollapsibleTriggerProps extends Omit<
   ComponentPropsWithRef<"summary">,
-  "onClick" | "className" | "style" | "children"
+  "onClick" | "aria-disabled" | "className" | "style" | "children"
 > {
-  /**
-   * Library mode only. Forwarded as `default` to the `<ViewTransition>` around the `<summary>`.
-   * Animates only the commit that ends an action (for example a spinner rendered from `pending`
-   * disappearing); the optimistic `data-open` flip is a CSS job.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CollapsibleTriggerState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -56,10 +36,15 @@ export interface CollapsibleTriggerProps extends Omit<
  * optimistic `data-open` and `data-pending`. The platform forbids `aria-expanded` on a summary,
  * so assistive technology hears the committed state (from `<details open>`).
  *
+ * No `transition` prop: everything it renders is optimistic (conventions 5.1). The Root's
+ * boundary covers it; animate the `data-open` flip with CSS.
+ *
+ * Owned keys (conventions 1.5): `aria-disabled`, `data-open`, `data-pending`, `data-disabled`,
+ * `onClick` (library mode, or while disabled).
+ *
  * @see https://ui.funstack.work/components/collapsible
  */
 export function CollapsibleTrigger({
-  transition,
   className,
   style,
   children,
@@ -71,13 +56,6 @@ export function CollapsibleTrigger({
     throw new Error("Collapsible.Trigger must be rendered inside a Collapsible.Root.");
   }
   const isLibrary = root.library;
-
-  useDevWarning(
-    !isLibrary && transition !== undefined,
-    isDev &&
-      "Collapsible.Trigger: `transition` has no effect in JS-free mode; the browser toggles the " +
-        "<details> outside any React transition.",
-  );
 
   const checkElement = useSummaryCheck("Collapsible.Trigger");
   const libraryRef = useCallback(
@@ -121,7 +99,7 @@ export function CollapsibleTrigger({
     // Library-controlled layer: wins over a `render` element's props (conventions 1.2).
     libraryProps: {
       "aria-disabled": root.disabled ? true : undefined,
-      "data-open": dataAttr(root.optimisticOpen === true),
+      "data-open": dataAttr(root.optimisticOpen),
       "data-pending": dataAttr(root.pending),
       "data-disabled": dataAttr(root.disabled),
       // Only owned when installed, so a render element keeps its own `onClick` in JS-free mode.
@@ -129,7 +107,7 @@ export function CollapsibleTrigger({
     },
   });
 
-  return useTransitionBoundary("Collapsible.Trigger", isLibrary ? transition : undefined, element);
+  return element;
 }
 
 CollapsibleTrigger.displayName = "CollapsibleTrigger";

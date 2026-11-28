@@ -33,10 +33,10 @@ export const AccordionRootContext = createContext<AccordionRootContextValue | nu
 export interface AccordionItemContextValue {
   readonly value: string;
   readonly disabled: boolean;
-  /** `undefined` in static mode (browser-owned, unknown to React). */
-  readonly committedOpen: boolean | undefined;
-  /** `undefined` in static mode. */
-  readonly optimisticOpen: boolean | undefined;
+  /** `false` in static mode (browser-owned, unknown to React; conventions 4.1 rule 3). */
+  readonly committedOpen: boolean;
+  /** `false` in static mode. */
+  readonly optimisticOpen: boolean;
   readonly pending: boolean;
   /**
    * The Root's mode is `"library"`. The Root members the Trigger and Panel need are copied here

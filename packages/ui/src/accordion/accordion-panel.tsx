@@ -17,8 +17,8 @@ const isDev = process.env.NODE_ENV !== "production";
 export interface AccordionPanelState {
   /** The enclosing Item's `value`. */
   readonly value: string;
-  /** Committed open state. `undefined` in JS-free mode. */
-  readonly open: boolean | undefined;
+  /** Committed open state. `false` in JS-free mode (conventions 4.1 rule 3). */
+  readonly open: boolean;
   /** The enclosing Item is disabled (by its own prop or by the Root). */
   readonly disabled: boolean;
 }
@@ -58,6 +58,8 @@ export interface AccordionPanelProps extends Omit<
 /**
  * The item's content region: a `div` inside the `<details>`, after the Trigger. Its visibility
  * is the parent's `open` attribute (`details:open > .panel`); it renders committed state.
+ *
+ * Owned keys (conventions 1.5): `data-disabled`.
  *
  * @see https://ui.funstack.work/components/accordion
  */

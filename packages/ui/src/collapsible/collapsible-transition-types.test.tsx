@@ -1,5 +1,5 @@
 // View Transition types added per Collapsible dispatch (design/components/collapsible.md 8.3,
-// conventions 5.3): fsui-collapsible plus -expand / -collapse by `next`. Rows from the
+// conventions 5.3): fsui-collapsible plus -open / -close by `next`. Rows from the
 // value-action suite (driver __tests__/drivers/collapsible.tsx); see
 // __tests__/transition-type-spy.ts.
 import { vi } from "vitest";
