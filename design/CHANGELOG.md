@@ -17718,3 +17718,47 @@ either order, and none for a third; none when one copy unmounts before the other
 one commit swaps them (an HMR update); counted per part; nothing registered by a server render;
 the registry under its global key. Checked by hand on the dogfood app: without the workaround
 the warning fires and the panel stays open; with it, no warning and the Link closes the panel.
+
+## 2026-11-29, #221: a development warning for a Popup inside a `<p>`
+
+Dogfood run 2, F7, the remaining part of #221 (the docs bullets and skill rule 19 landed
+before). A Tooltip Popup (`div[popover]`) or a Popover Popup (`<dialog>`) inside a byline `<p>`
+made the production build fail hydration (React #418): the HTML parser closes the `<p>` at the
+`<div>` or `<dialog>` start tag, so the server HTML parses into a different tree from React's.
+
+### What changed in the rules
+
+- conventions.md 9.5: the Popup-inside-`<p>` warning.
+- internal-hooks.md, the file index: `paragraph-break.ts`.
+
+### The check, and why this one
+
+Warn when the Popup's element has a start tag that closes a paragraph (the parser's list: `div`,
+`dialog`, `section`, `ul`, ...) and a `<p>` is an ancestor in button scope (a `button`, `td`,
+`th`, `caption`, `table`, `object`, `marquee`, `applet`, `template` or `html` element, or any SVG
+or MathML element, ends the search). This is the parser's own rule, so it reports exactly the
+trees that break, and only those:
+
+- an ancestor, not only the parent: `<p><a><div popover>` breaks the same way;
+- not "a parent that allows phrasing content only": a `<div>` in a `<span>`, `<h2>`, `<label>` or
+  `<button>` is invalid HTML but parses as written and hydrates, so warning there would add
+  noise without a failure behind it (HTML validators report it);
+- a Tooltip or HoverCard Popup rendered as a `<span>` is not a paragraph-closing tag: no warning.
+
+The message names the fix the part allows: `render={<span />}` for Tooltip and HoverCard
+(HoverCard's allowed elements include `SPAN`), otherwise the text in a `<div>` or the Popup
+after the `<p>`. It runs in the existing element checks (`useElementCheck`, once per instance,
+in the ref callback, so the tree is in place): `usePopoverPopup` (Popover, HoverCard, Menu,
+Combobox, MultiSelect, NavigationMenu), `useDialogPopup` (Dialog, AlertDialog, Drawer) and a
+new check in `Tooltip.Popup`. A wrong element warns first; the paragraph check runs for the
+expected element only. Quirks mode (where `<table>` does not close a `<p>`) is not considered:
+Popups never render a table.
+
+### Test plan
+
+`internal/paragraph-break.test.tsx` (jsdom; the trees are built with DOM calls, as the parser
+would move the `<div>` out): the pure check (`<p>` parent and ancestor through phrasing
+elements; `<span>` inside `<p>`; `<span>` / `<h2>` / `<button>` parents; `<button>` and `<td>`
+boundaries; an SVG `foreignObject`; no `<p>`), the two message forms; then for each of the ten
+Popups: one warning inside a `<p>` across a re-render, none outside; Tooltip and HoverCard as a
+`<span>` inside a `<p>`, none.

@@ -2945,6 +2945,16 @@ re-exports them.
   says "if parts of the two copies are nested or share a page": two separately bundled apps on
   one page (an embedded widget, micro-frontends) warn too, and there is no opt-out (development
   only, once per page).
+- **A Popup inside a `<p>` warns** (`paragraph-break.ts`, from the element checks of
+  `usePopoverPopup`, `useDialogPopup` and `Tooltip.Popup`: every Popup), once per instance, in
+  development (#221). The check is the HTML parser's rule, not the content model: the Popup's
+  element is one whose start tag closes a paragraph (`<div>`, `<dialog>`, ...) and a `<p>` is an
+  ancestor in button scope (a `<button>`, `<td>`, `<object>`, ... or an SVG / MathML element
+  ends the search). That is exactly the server HTML that parses into another tree and fails
+  hydration (React #418). A `<div>` in a `<span>`, an `<h2>` or a `<button>` is invalid HTML
+  too, but parses as written and hydrates, so it does not warn; a Tooltip or HoverCard Popup
+  rendered as a `<span>` never warns. The message names the fix: `render={<span />}` where the
+  part allows it, otherwise a `<div>` for the text or the Popup after the `<p>`.
 
 ---
 

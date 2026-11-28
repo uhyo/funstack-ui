@@ -24,6 +24,7 @@ import { eventSource } from "../internal/overlay/invokers.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { paragraphBreakMessage } from "../internal/paragraph-break.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useModalRegistration } from "../internal/overlay/use-modal-registration.js";
@@ -257,7 +258,8 @@ export function useDialogPopup(
         element.tagName !== "DIALOG"
           ? `${part}: expected to render a <dialog> element but got <${element.tagName.toLowerCase()}>. ` +
             "Top layer, backdrop, focus and Escape all come from a real <dialog>."
-          : null),
+          : // A <dialog> inside a <p> breaks the server HTML (conventions 9.5).
+            paragraphBreakMessage(part, element, false)),
   );
   // --- Opening -----------------------------------------------------------------------------
 
