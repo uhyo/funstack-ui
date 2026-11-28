@@ -77,7 +77,7 @@ export const selectDriver: NativeGroupPlatformDriver<string, SelectValueChangeDe
   values: ["a", "b", "c", "a"],
   gesture: (user, i) => user.selectOptions(sel(), selectDriver.values[i + 1]!),
   eventType: () => "change",
-  detailsFields: () => ({ reason: "activate" }),
+  detailsFields: () => ({ reason: "activate", valid: true }),
   expectShown: (v) => {
     expect(sel().value).toBe(v);
     expect(opt(v).selected).toBe(true);
@@ -95,7 +95,7 @@ export const selectDriver: NativeGroupPlatformDriver<string, SelectValueChangeDe
   setDomValue: (container, v) => {
     container.querySelector("select")!.value = v;
   },
-  platformDetails: () => ({ reason: "platform" }),
+  platformDetails: () => ({ reason: "platform", valid: true }),
   expectResetTarget: (v) => {
     expect([...sel().options].filter((o) => o.defaultSelected).map((o) => o.value)).toEqual([v]);
   },

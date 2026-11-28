@@ -39,6 +39,12 @@ export interface SwitchCheckedChangeDetails extends ActionDetails {
    * mount (`event` is `undefined`).
    */
   readonly reason: ChangeReason;
+  /**
+   * The control would be valid holding this value: its native constraints (`required`) and,
+   * inside a Field, `validate`. Not a server error. Information only: the change is dispatched
+   * either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /**

@@ -1,5 +1,5 @@
 "use client";
-import { isValidElement, useCallback } from "react";
+import { isValidElement, useCallback, useLayoutEffect } from "react";
 import type {
   ChangeEvent,
   ComponentPropsWithRef,
@@ -161,6 +161,10 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
   // `multiple` (design 15.8): `required` means "at least one value", a computed native attribute
   // (conventions 3.6) that follows the optimistic selection; `aria-required` says it throughout.
   const required = field.inField ? field.required : rest.required === true;
+  const { requiredRef } = ctx;
+  useLayoutEffect(() => {
+    requiredRef.current = required;
+  });
   const requiredProps = ctx.multiple
     ? { required: required && ctx.values.length === 0, "aria-required": required || undefined }
     : field.inField && { required: field.required };

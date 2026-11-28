@@ -18,6 +18,8 @@ export type MultipleSelectionDetails<Extra extends object> = ActionDetails & {
   readonly added: readonly string[];
   /** Values this dispatch removed, in value order. */
   readonly removed: readonly string[];
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
 } & Readonly<Extra>;
 
 export interface MultipleSelectionOptions<Extra extends object> {
@@ -32,6 +34,11 @@ export interface MultipleSelectionOptions<Extra extends object> {
   readonly valueChangeAction: ChangeAction<string[], MultipleSelectionDetails<Extra>> | undefined;
   /** The component's own fields of a form reset's details (Combobox: `{ custom: false }`). */
   readonly resetFields: Extra;
+  /**
+   * `details.valid` for a requested selection (field-form.md 7.5), computed by the Root from its
+   * own `required` and the Field's `validate`. Called in the handler that dispatches.
+   */
+  readonly validOf: (next: ValueSet) => boolean;
 }
 
 export interface MultipleSelection<Extra extends object> {
@@ -75,6 +82,7 @@ export function useMultipleSelection<Extra extends object>({
   defaultValue,
   valueChangeAction,
   resetFields,
+  validOf,
 }: MultipleSelectionOptions<Extra>): MultipleSelection<Extra> {
   type Details = MultipleSelectionDetails<Extra>;
   const controlledSet = useValueSet(enabled ? value : undefined);
@@ -115,14 +123,16 @@ export function useMultipleSelection<Extra extends object>({
     // `removed` in value order (combobox.md 15.2).
     const ordered = [...optimistic].filter((v) => removed.includes(v));
     const { reason, ...extra } = fields;
+    const next = applyPatch(optimistic, { added, removed: ordered });
     const details = createActionDetails(event, {
       reason,
       added,
       removed: ordered,
       ...(extra as Extra),
+      valid: validOf(next),
     }) as Details;
     latestIsReset.current = false;
-    dispatch(applyPatch(optimistic, details), details);
+    dispatch(next, details);
     return true;
   };
 
@@ -144,6 +154,7 @@ export function useMultipleSelection<Extra extends object>({
       added: [...target].filter((v) => !from.has(v)),
       removed: [...from].filter((v) => !target.has(v)),
       ...resetFields,
+      valid: validOf(target),
     }) as Details;
     latestIsReset.current = true;
     dispatch(new Set(target), details, { whole: true });

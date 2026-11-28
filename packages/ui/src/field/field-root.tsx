@@ -534,6 +534,25 @@ export function FieldRoot({
     [refresh, latest, dismiss],
   );
 
+  // `details.valid`'s custom half (design 7.5): `validate` for the requested value, from a handler.
+  const validateNext = useCallback(
+    (patch: ((formData: FormData) => void) | null): boolean => {
+      const { name, validate, readOnly } = latest.current;
+      // Not run while read-only (4.1), as the slot is not written then.
+      if (validate === undefined || readOnly) return true;
+      const registration = controlRef.current;
+      if (registration === null) return true;
+      const el = registration.validityElement?.() ?? validityElementOf(registration.element);
+      const owner = el?.form ?? null;
+      const formData = owner === null ? new FormData() : new FormData(owner);
+      patch?.(formData);
+      const entry = name === undefined ? null : formData.get(name);
+      const value = typeof entry === "string" ? entry : "";
+      return normaliseErrorValue(validate(value, formData)).length === 0;
+    },
+    [latest],
+  );
+
   // Development: a Field around something that is not a form control (Toggle, Menu, ...).
   useEffect(() => {
     if (!isDev || controlRef.current !== null) return;
@@ -578,6 +597,7 @@ export function FieldRoot({
       registerControl,
       registerError,
       notifyChange,
+      validateNext,
     }),
     [
       ids,
@@ -591,6 +611,7 @@ export function FieldRoot({
       registerControl,
       registerError,
       notifyChange,
+      validateNext,
     ],
   );
 

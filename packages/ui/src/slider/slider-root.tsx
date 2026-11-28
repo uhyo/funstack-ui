@@ -18,6 +18,8 @@ import { useLatest } from "../internal/use-latest.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
 import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { sortByDocumentOrder } from "../internal/dom-order.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -60,6 +62,12 @@ export interface SliderValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
   /** Index of the thumb that moved; `null` on a platform path or a revert, where several may change. */
   readonly thumb: number | null;
+  /**
+   * The slider would be valid holding this value: inside a Field, `validate` for it (a range is
+   * never invalid natively, so `true` without one). Not a server error. Information only: the
+   * value is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /** Details passed as the second argument of `Slider.Root`'s `valueCommitAction` (each gesture). */
@@ -73,6 +81,12 @@ export interface SliderValueCommitDetails extends ActionDetails {
   readonly reason: ChangeReason;
   /** Index of the thumb the gesture moved; `null` on a platform path. */
   readonly thumb: number | null;
+  /**
+   * The slider would be valid holding this value: inside a Field, `validate` for it (a range is
+   * never invalid natively, so `true` without one). Not a server error. Information only: the
+   * value is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /**
@@ -244,8 +258,30 @@ const RANGE_KEYS: ReadonlySet<string> = new Set([
 const COMMIT_TYPES = transitionTypes("slider", "commit");
 
 /** The `details` fields of both actions. */
-function sliderDetails(reason: ChangeReason, thumb: number | null) {
-  return { reason, thumb };
+interface SliderDetailsFields {
+  readonly reason: ChangeReason;
+  readonly thumb: number | null;
+  readonly valid: boolean;
+}
+
+/**
+ * The `details.valid` patch of a slider (field-form.md 7.5): each enabled, named thumb input
+ * submits its next value, in document order per name (the order of `formData.getAll(name)`).
+ */
+function thumbPatch(
+  registry: ReadonlyMap<number, HTMLInputElement>,
+  next: readonly number[],
+): (formData: FormData) => void {
+  return (formData) => {
+    const inputs = sortByDocumentOrder([...registry], ([, input]) => input).filter(
+      ([, input]) => input.name !== "" && !input.disabled,
+    );
+    for (const name of new Set(inputs.map(([, input]) => input.name))) formData.delete(name);
+    for (const [index, input] of inputs) {
+      const v = next[index];
+      if (v !== undefined) formData.append(input.name, String(v));
+    }
+  };
 }
 
 function replaceAt(values: readonly number[], index: number, value: number): readonly number[] {
@@ -329,6 +365,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   // --- State (design 2) ----------------------------------------------------------------------
 
   const [gestureThumb, setGestureThumb] = useState<number | null>(null);
+  const nextValidity = useNextValidity();
   const activeGesture = useRef<ActiveGesture | null>(null);
   const trackRef = useRef<HTMLElement | null>(null);
 
@@ -345,7 +382,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     captureGesture,
     markGestureStart,
     takeEdit,
-  } = useStepCommit<T, readonly number[], number, ReturnType<typeof sliderDetails>>({
+  } = useStepCommit<T, readonly number[], number, SliderDetailsFields>({
     controlled: value,
     defaultValue,
     initialValue: platformDefault(min, max, step) as T,
@@ -357,7 +394,13 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     toShown: toArray,
     fromShown: fromArray,
     equals: equalValues,
-    details: sliderDetails,
+    // `details.valid`: a range is never invalid (design 9), so only `validate` can make it
+    // `false`; it sees each thumb's next value (`registry` is declared below, read in events).
+    details: (reason, thumb, next) => ({
+      reason,
+      thumb,
+      valid: nextValidity(true, thumbPatch(registry, next)),
+    }),
     captured: gestureThumb !== null,
   });
 

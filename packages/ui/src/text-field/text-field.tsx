@@ -18,6 +18,8 @@ import { consumeEscape, isComposingKey, isEscapeRequest } from "../internal/esca
 import { useFieldControl, useFieldValueChange } from "../internal/form/use-field-control.js";
 import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { nativeValid } from "../internal/form/validity.js";
 import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -49,6 +51,13 @@ export interface TextFieldValueCommitDetails extends ActionDetails {
    * before hydration, restored by the browser).
    */
   readonly reason: ChangeReason;
+  /**
+   * The field would be valid holding this text: its native constraints (`required`,
+   * `pattern`, `minLength`, `type`, ...) and, inside a Field, `validate`. Not a server error.
+   * Information only: the commit is dispatched either way; an action that must not save invalid
+   * text returns early (`if (!details.valid) return;`, conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /** The state the function props (`className`, `style`, `render`) receive. */
@@ -232,6 +241,18 @@ export function TextField(props: TextFieldProps) {
     setDraft(null);
   }, []);
 
+  // `details.valid` (field-form.md 7.5): every dispatch runs when the element already holds the
+  // text (the draft being committed, the reset text, the text adopted at mount).
+  const nextValidity = useNextValidity();
+  const details = useCallback(
+    (event: Event | undefined, reason: ChangeReason): TextFieldValueCommitDetails => {
+      const element = elementRef.current;
+      const valid = nextValidity(element === null || nativeValid(element), null);
+      return createActionDetails(event, { reason, valid });
+    },
+    [nextValidity],
+  );
+
   // --- The commit (design 4.2) ------------------------------------------------------------------
 
   const commit = useCallback(
@@ -242,9 +263,9 @@ export function TextField(props: TextFieldProps) {
       clearDraft();
       // Disabled or read-only, or nothing changed (conventions 2.3 item 8): no dispatch.
       if (off || ro || open === shown) return;
-      dispatch(open, createActionDetails(event, { reason: "activate" }));
+      dispatch(open, details(event, "activate"));
     },
-    [clearDraft, dispatch, latest],
+    [clearDraft, dispatch, latest, details],
   );
 
   const keyDown = useCallback(
@@ -301,7 +322,7 @@ export function TextField(props: TextFieldProps) {
     },
     base: () => intendedValue(latestInFlight, latest.current.optimistic),
     onPlatformChange: (next, event) => {
-      dispatch(next, createActionDetails(event, { reason: "platform" }));
+      dispatch(next, details(event, "platform"));
     },
     // Read-only (internal-hooks 3.8 rule 10): text restored by the browser is put back.
     readOnly,

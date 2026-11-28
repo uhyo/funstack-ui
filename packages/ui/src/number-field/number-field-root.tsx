@@ -19,6 +19,8 @@ import type { FormAssociatedElement } from "../internal/form/use-form-owner-even
 import { useLatest } from "../internal/use-latest.js";
 import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { nativeValid } from "../internal/form/validity.js";
 import { useRegisterCount } from "../internal/use-register-count.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
@@ -49,6 +51,12 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
   /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
   readonly source: NumberFieldSource | null;
+  /**
+   * The field would be valid holding this value: its native constraints (`required`, `min`,
+   * `max`, `step`) and, inside a Field, `validate`. Not a server error. Information only: the
+   * value is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /**
@@ -64,6 +72,12 @@ export interface NumberFieldValueCommitDetails extends ActionDetails {
   readonly reason: ChangeReason;
   /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform". */
   readonly source: NumberFieldSource | null;
+  /**
+   * The field would be valid holding this value: its native constraints (`required`, `min`,
+   * `max`, `step`) and, inside a Field, `validate`. Not a server error. Information only: the
+   * value is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /** The state every NumberField part's function props receive (one object, Field's precedent). */
@@ -213,8 +227,10 @@ function sanitize(value: number | null | undefined): number | null | undefined {
 }
 
 /** The `details` fields of both actions. */
-function numberFieldDetails(reason: ChangeReason, source: NumberFieldSource | null) {
-  return { reason, source };
+interface NumberFieldDetailsFields {
+  readonly reason: ChangeReason;
+  readonly source: NumberFieldSource | null;
+  readonly valid: boolean;
 }
 
 function identity(value: number | null): number | null {
@@ -346,6 +362,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   const visibleRef = useRef<HTMLInputElement | null>(null);
   const hiddenRef = useRef<HTMLInputElement | null>(null);
 
+  const nextValidity = useNextValidity();
+
   const clearDraft = useCallback(() => {
     if (draftRef.current === null) return;
     draftRef.current = null;
@@ -384,7 +402,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     number | null,
     number | null,
     NumberFieldSource | null,
-    ReturnType<typeof numberFieldDetails>
+    NumberFieldDetailsFields
   >({
     controlled: value,
     defaultValue,
@@ -397,7 +415,14 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     toShown: identity,
     fromShown: identity,
     equals: Object.is,
-    details: numberFieldDetails,
+    // `details.valid` (field-form.md 7.5): every step, the typed-text commit included, writes the
+    // hidden input in `onStep` before its dispatch, and the hidden input still holds the value
+    // when the gesture's commit follows; the native half is read there (a script-set value is
+    // checked against `min`, `max`, `step` and `required`).
+    details: (reason, source) => {
+      const hidden = hiddenRef.current;
+      return { reason, source, valid: nextValidity(hidden === null || nativeValid(hidden), null) };
+    },
     captured: hold !== null,
     // What the text can show is what the form posts (5.4): a step finer than the format's
     // digits is rounded like a typed value.

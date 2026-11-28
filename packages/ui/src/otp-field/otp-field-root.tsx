@@ -23,6 +23,8 @@ import { FieldContext } from "../internal/form/field-context.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/form/use-field-control.js";
 import { syncValueTracker } from "../internal/form/sync-value-tracker.js";
 import { useFormReset, useResetTarget } from "../internal/form/use-form-reset.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { setEntries } from "../internal/form/validity.js";
 import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 import { resolveStateValue } from "../internal/render-element.js";
 import { transitionTypes } from "../internal/transition-types.js";
@@ -62,6 +64,12 @@ export interface OTPFieldCompleteDetails extends ActionDetails {
    * is the `input` event). `"platform"`: a WebOTP fill (`details.event` is `undefined`).
    */
   readonly reason: ChangeReason;
+  /**
+   * The field would be valid holding this code. A complete code always satisfies the native
+   * constraints, so only the enclosing Field's `validate` can make it `false`. Not a server
+   * error. Information only: the action runs either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /** The state the Root's and the Input's function props receive. */
@@ -339,6 +347,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
   const submitAfterComposition = useRef(false);
 
   const { pending, run } = useActionTrigger();
+  const nextValidity = useNextValidity();
 
   // The latest committed props and `run`, for the stable callbacks below. Named `*Ref` so that
   // React Compiler's lint treats `.current` as a ref read, not a missing memo dependency.
@@ -355,6 +364,8 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     submitOnComplete,
     run,
     notifyField: fieldContext?.notifyChange,
+    name,
+    nextValidity,
   });
 
   // --- Writes ---------------------------------------------------------------------------------
@@ -397,6 +408,8 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
         completeAction: action,
         submitOnComplete: submitting,
         run: runAction,
+        name: fieldName,
+        nextValidity: validityOf,
       } = propsRef.current;
       if (off || ro) return;
       // A code completed by hand makes a waiting WebOTP request moot (design 8), and no new one
@@ -405,7 +418,11 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
       webOTPAbort.current?.abort();
       webOTPAbort.current = null;
       if (action !== undefined) {
-        const details = createActionDetails(event, { reason }) as OTPFieldCompleteDetails;
+        // `details.valid` (field-form.md 7.5): native constraints hold by construction; the
+        // patch gives `validate` the filtered code (the Field's `input` listener saw the
+        // browser's text before the filter's write-back).
+        const valid = validityOf(true, setEntries(fieldName, [code], off));
+        const details = createActionDetails(event, { reason, valid });
         runAction(() => {
           for (const type of COMPLETE_TYPES) addTransitionType(type);
           return action(code, details);

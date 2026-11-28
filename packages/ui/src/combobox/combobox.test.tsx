@@ -1020,7 +1020,7 @@ describe("Combobox", () => {
       expect(details.reason).toBe("activate");
       expect(details.custom).toBe(false);
       expect(details.event?.type).toBe("keydown");
-      expect(JSON.stringify(details)).toBe('{"reason":"activate","custom":false}');
+      expect(JSON.stringify(details)).toBe('{"reason":"activate","custom":false,"valid":true}');
       expect(option("jm")).toHaveAttribute("aria-selected", "true");
       expect(option("jm")).toHaveAttribute("data-selected", "");
       expectPending(option("jm"));

@@ -33,8 +33,12 @@ export interface StepCommitOptions<T, V, S, F extends object> {
   readonly fromShown: (shown: V) => T;
   /** The no-op test of a step and of a commit (conventions 2.3 item 8). */
   readonly equals: (a: V, b: V) => boolean;
-  /** The component's `details` fields for a step or a commit from `source`. */
-  readonly details: (reason: ChangeReason, source: S | null) => F;
+  /**
+   * The component's `details` fields for a step or a commit of `next` from `source`. Called
+   * in the event that dispatches, after `onStep` (so a control that writes its form value there
+   * can read it back: `details.valid`, field-form.md 7.5).
+   */
+  readonly details: (reason: ChangeReason, source: S | null, next: V) => F;
   /** A pointer is captured (a drag, a held button): holds `live` on screen by itself. */
   readonly captured: boolean;
   /** Applied to every step's value before the no-op test (NumberField's rounding). */
@@ -202,9 +206,11 @@ export function useStepCommit<T, V, S, F extends object>(
       // Without a step action there is nothing to run and no consumer update to keep
       // interruptible: no transition, so `data-pending` does not blink on every pointer move.
       if (action === undefined) return true;
+      // Built in the event, not in the transition callback: `details.valid` reads the DOM.
+      const fields = details(reason, source, next);
       run(() => {
         for (const type of stepTypes) addTransitionType(type);
-        return action(fromShown(next), createActionDetails(event, details(reason, source)));
+        return action(fromShown(next), createActionDetails(event, fields));
       });
       return true;
     },
@@ -224,7 +230,7 @@ export function useStepCommit<T, V, S, F extends object>(
       const next = reached.value;
       lastReason.current = reason;
       setPendingSource(source);
-      dispatch(fromShown(next), createActionDetails(event, details(reason, source)));
+      dispatch(fromShown(next), createActionDetails(event, details(reason, source, next)));
       onCommit?.(next, source, reason);
       return true;
     },

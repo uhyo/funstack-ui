@@ -34,7 +34,7 @@ export const textFieldDriver: NativeGroupPlatformDriver<string, TextFieldValueCo
     await user.tab();
   },
   eventType: () => "focusout",
-  detailsFields: () => ({ reason: "activate" }),
+  detailsFields: () => ({ reason: "activate", valid: true }),
   expectShown: (v) => {
     expect(field().value).toBe(v);
   },
@@ -53,6 +53,6 @@ export const textFieldDriver: NativeGroupPlatformDriver<string, TextFieldValueCo
   setDomValue: (container, v) => {
     container.querySelector("input")!.value = v;
   },
-  platformDetails: () => ({ reason: "platform" }),
+  platformDetails: () => ({ reason: "platform", valid: true }),
   expectResetTarget: () => {},
 };

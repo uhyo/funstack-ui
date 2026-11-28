@@ -260,7 +260,7 @@ describe("TextField", () => {
       expect(next).toBe("Report");
       expect(details.reason).toBe("activate");
       expect(details.event?.type).toBe("focusout");
-      expect(JSON.stringify(details)).toBe('{"reason":"activate"}');
+      expect(JSON.stringify(details)).toBe('{"reason":"activate","valid":true}');
       expect(field().value).toBe("Report");
       expect(committed()).toBe("Report");
     });

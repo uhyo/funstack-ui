@@ -65,9 +65,9 @@ export const multiSelectDriver: ValueActionDriver<string[], MultiSelectValueChan
   eventType: () => "click",
   detailsFields: (i) =>
     [
-      { reason: "activate", added: ["olive"], removed: [] },
-      { reason: "activate", added: [], removed: ["ham"] },
-      { reason: "activate", added: ["corn"], removed: [] },
+      { reason: "activate", added: ["olive"], removed: [], valid: true },
+      { reason: "activate", added: [], removed: ["ham"], valid: true },
+      { reason: "activate", added: ["corn"], removed: [], valid: true },
     ][i]!,
   expectShown: (v) => {
     expect(shownValue()).toBe(v.join(","));

@@ -1197,7 +1197,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
           expect(next).toBe(true);
           expect(details.reason).toBe("platform");
           expect(details.event).toBeUndefined();
-          expect(JSON.stringify(details)).toBe('{"reason":"platform"}');
+          expect(JSON.stringify(details)).toBe('{"reason":"platform","valid":true}');
           expect(input().checked).toBe(true);
           expect(input()).toHaveAttribute("data-checked", "");
           expect(committed()).toHaveTextContent("true");
@@ -1310,8 +1310,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         const details = action.mock.calls[0]![1];
         expect(details.event).toBeInstanceOf(window.Event);
         expect("event" in details).toBe(true);
-        expect(Object.keys(details)).toEqual(["reason"]);
-        expect(JSON.stringify(details)).toBe('{"reason":"activate"}');
+        expect(Object.keys(details)).toEqual(["reason", "valid"]);
+        expect(JSON.stringify(details)).toBe('{"reason":"activate","valid":true}');
       });
 
       it("can be passed straight to a Server-Function-shaped action", async () => {
@@ -1320,7 +1320,10 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         const user = setupUser();
         await user.click(input());
         const [next, details] = serverFn.mock.calls[0]!;
-        expect(JSON.parse(JSON.stringify([next, details]))).toEqual([true, { reason: "activate" }]);
+        expect(JSON.parse(JSON.stringify([next, details]))).toEqual([
+          true,
+          { reason: "activate", valid: true },
+        ]);
         expect(input().checked).toBe(true);
       });
 

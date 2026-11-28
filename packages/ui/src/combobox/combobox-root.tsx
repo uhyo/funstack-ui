@@ -34,6 +34,8 @@ import { resolveStateValue } from "../internal/use-render.js";
 import { sortByDocumentOrder } from "../internal/dom-order.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { HiddenValues } from "../internal/form/hidden-values.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { setEntries } from "../internal/form/validity.js";
 import { useMountFixed } from "../internal/use-mount-fixed.js";
 import { toSet } from "../internal/value-set.js";
 import type { SetPatch } from "../internal/value-set.js";
@@ -66,6 +68,13 @@ export interface ComboboxValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
   /** `true` when `next` is free text committed under `allowCustomValue`, not an option's value. */
   readonly custom: boolean;
+  /**
+   * The control would be valid holding this value: the Input's `required` (a selection) and,
+   * inside a Field, `validate` for the next value. Other constraints on the Input (`pattern`,
+   * `minLength`) describe the typed text and are not included. Not a server error. Information
+   * only: the change is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /** Details passed as the second argument of `Combobox.Root`'s `onInputValueChange`. */
@@ -129,6 +138,12 @@ export interface ComboboxMultipleValueChangeDetails extends ActionDetails {
   readonly removed: readonly string[];
   /** `true` when `added` is free text committed under `allowCustomValue`. */
   readonly custom: boolean;
+  /**
+   * The control would be valid holding this value: the Input's `required` ("at least one")
+   * and, inside a Field, `validate` for the next selection. Not a server error. Information
+   * only: the change is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /** State of `Combobox.Root multiple`: as `ComboboxRootState`, with the selection as a list. */
@@ -471,6 +486,19 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   const listRef = useRef<HTMLElement | null>(null);
   const hiddenRef = useRef<HTMLInputElement | null>(null);
   const chipsRef = useRef<HTMLElement | null>(null);
+  /** The Input's `required` (combobox-input.tsx writes it). */
+  const requiredRef = useRef(false);
+
+  // `details.valid` (field-form.md 7.5): computed, since the hidden inputs change only in the
+  // next commit. `required` is on the Input and means "empty text"; a committed value always
+  // has text (an Option's label, or the free text itself) and a cleared one has none, so the
+  // selection decides. Read-only bars the Input from validation.
+  const nextValidity = useNextValidity();
+  const validOf = (next: readonly string[]): boolean =>
+    nextValidity(
+      !(requiredRef.current && !readOnly && next.length === 0),
+      setEntries(name, multiple ? next : [next[0] ?? ""], disabled),
+    );
 
   // --- Text: the urgent lane (design 4) ------------------------------------------------------
 
@@ -573,7 +601,10 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     fields: { reason: ChangeReason; custom: boolean },
     options: { close: boolean; text: string | undefined },
   ): void => {
-    const details = createActionDetails(event, fields);
+    const details = createActionDetails(event, {
+      ...fields,
+      valid: validOf(next === null ? [] : [next]),
+    });
     const dispatchId = ++dispatchSeq.current;
     dispatchMeta.set(details, {
       id: dispatchId,
@@ -603,6 +634,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
           | ChangeAction<string[], ComboboxMultipleValueChangeDetails>
           | undefined)
       : undefined,
+    validOf: (next) => validOf([...next]),
   });
   /** One user change of the multiple selection (design 15.3). */
   const changeValues = (
@@ -1251,6 +1283,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     disabled,
     readOnly,
     inputRef,
+    requiredRef,
     listRef,
     registerOption,
     registerStatus,

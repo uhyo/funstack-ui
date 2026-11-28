@@ -70,9 +70,9 @@ export const checkboxGroupDriver: NativeGroupPlatformDriver<
   eventType: () => "click",
   detailsFields: (i) =>
     [
-      { reason: "activate", added: ["a"], removed: [] },
-      { reason: "activate", added: [], removed: ["c"] },
-      { reason: "activate", added: ["b", "c"], removed: [] },
+      { reason: "activate", added: ["a"], removed: [], valid: true },
+      { reason: "activate", added: [], removed: ["c"], valid: true },
+      { reason: "activate", added: ["b", "c"], removed: [], valid: true },
     ][i]!,
   expectShown: (v) => {
     expect(checkedValues()).toEqual(v);
@@ -119,7 +119,7 @@ export const checkboxGroupDriver: NativeGroupPlatformDriver<
         v.includes(x);
     }
   },
-  platformDetails: (from, to) => ({ reason: "platform", ...diff(from, to) }),
+  platformDetails: (from, to) => ({ reason: "platform", ...diff(from, to), valid: true }),
   // The Parent is not part of the reset target: it keeps the defaultChecked React gave it at
   // mount, from its derivation over values[0] (mixed: unchecked).
   expectResetTarget: (v) => {

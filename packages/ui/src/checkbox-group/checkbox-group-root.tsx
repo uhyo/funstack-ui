@@ -17,6 +17,8 @@ import {
 } from "../internal/action/use-controllable-action.js";
 import { useFieldValueChange } from "../internal/form/use-field-control.js";
 import { useFieldsetGroup } from "../internal/form/use-fieldset-group.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { setEntries } from "../internal/form/validity.js";
 import { useItemOrder } from "../internal/use-item-order.js";
 import type { ItemLayout } from "../internal/use-item-order.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
@@ -43,6 +45,12 @@ export interface CheckboxGroupValueChangeDetails extends ActionDetails {
   readonly added: readonly string[];
   /** Values this dispatch unchecked, same order. */
   readonly removed: readonly string[];
+  /**
+   * The group would be valid holding this value: `required` ("at least one") and, inside a
+   * Field, `validate` for the next set. Not a server error. Information only: the change is
+   * dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /**
@@ -300,6 +308,19 @@ export function CheckboxGroupRoot({
 
   const base = (): ValueSet => intendedValue(latestInFlight, optimistic);
 
+  // `details.valid` (field-form.md 7.5): computed, never read, since a Parent click changes the
+  // Items only in the next commit. The native half is the derived `required` below
+  // (`itemsRequired`) for the next set; the patch is what the form submits for it: the values
+  // whose Item is enabled, in document order.
+  const nextValidity = useNextValidity();
+  const validOf = (next: ValueSet): boolean => {
+    const registry = summarize(itemRegistry.current);
+    const submitted = sortByDocument(next).filter((v) => registry.get(v) === true);
+    const missing =
+      required && !readOnly && (registry.size === 0 ? next.size === 0 : submitted.length === 0);
+    return nextValidity(!missing, setEntries(name, submitted, disabled));
+  };
+
   /** The latest dispatch was a form reset (the absolute one, see `reducer`); for #151 below. */
   const latestIsReset = useRef(false);
   /**
@@ -313,13 +334,17 @@ export function CheckboxGroupRoot({
     event: Event | undefined,
     reset = false,
   ): void => {
+    const added = sortByDocument(patch.added);
+    const removed = sortByDocument(patch.removed);
+    const next = applyPatch(from, { added, removed });
     const details = createActionDetails(event, {
       reason,
-      added: sortByDocument(patch.added),
-      removed: sortByDocument(patch.removed),
+      added,
+      removed,
+      valid: validOf(next),
     });
     latestIsReset.current = reset;
-    dispatch(applyPatch(from, details), details, { whole: reset });
+    dispatch(next, details, { whole: reset });
   };
 
   /**

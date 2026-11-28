@@ -624,7 +624,7 @@ renderBoth("completeAction", (mode) => {
     const details = completeAction.mock.calls[0]![1];
     expect(details.reason).toBe("activate");
     expect(details.event?.type).toBe("input");
-    expect(JSON.stringify(details)).toBe('{"reason":"activate"}');
+    expect(JSON.stringify(details)).toBe('{"reason":"activate","valid":true}');
     expect(order.slice(-2)).toEqual(["value 1234", "complete 1234"]);
   });
 

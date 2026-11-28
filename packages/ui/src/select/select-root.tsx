@@ -18,6 +18,8 @@ import {
   useFieldValueChange,
 } from "../internal/form/use-field-control.js";
 import { useResetTarget } from "../internal/form/use-form-reset.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { nativeValid } from "../internal/form/validity.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import type { ElementCheck } from "../internal/use-element-check.js";
@@ -40,6 +42,12 @@ export interface SelectValueChangeDetails extends ActionDetails {
    * restoration reconciled at mount (`details.event` is `undefined`).
    */
   readonly reason: ChangeReason;
+  /**
+   * The control would be valid holding this value: its native constraints (`required` with the
+   * empty option) and, inside a Field, `validate`. Not a server error. Information only: the
+   * change is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /**
@@ -228,9 +236,14 @@ export function SelectRoot({
 
   // Any dispatch, a pick or a platform change, ends the adoption of the browser's default.
   const established = useRef(false);
-  const dispatchChange = (next: string, details: SelectValueChangeDetails) => {
+  // `details.valid` (field-form.md 7.5): every dispatch runs when the `<select>` already holds
+  // the requested value (a `change`, a reset, a pick before hydration).
+  const nextValidity = useNextValidity();
+  const dispatchChange = (next: string, event: Event | undefined, reason: ChangeReason) => {
     established.current = true;
-    dispatch(next, details);
+    const el = selectRef.current;
+    const valid = nextValidity(el === null || nativeValid(el), null);
+    dispatch(next, createActionDetails(event, { reason, valid }));
   };
 
   const { optionMounted } = useNativeSelectValue({
@@ -242,8 +255,7 @@ export function SelectRoot({
       value === undefined && defaultValue === undefined
         ? { adopt, established: () => established.current }
         : undefined,
-    onPlatformChange: (next, event) =>
-      dispatchChange(next, createActionDetails(event, { reason: "platform" })),
+    onPlatformChange: (next, event) => dispatchChange(next, event, "platform"),
     readOnly,
   });
 
@@ -288,7 +300,7 @@ export function SelectRoot({
         const next = event.currentTarget.value;
         // No-op rule against the optimistic value (conventions 2.3, design 4.2).
         if (next === optimistic) return;
-        dispatchChange(next, createActionDetails(event.nativeEvent, { reason: "activate" }));
+        dispatchChange(next, event.nativeEvent, "activate");
       },
     },
     ref: rootRef,

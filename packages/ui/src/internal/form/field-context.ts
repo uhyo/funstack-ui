@@ -80,6 +80,13 @@ export interface FieldContextValue {
    * shown server error is dismissed as by an `input` event. Call from a layout effect.
    */
   readonly notifyChange: (edit: boolean) => void;
+  /**
+   * The custom half of `details.valid` (design 7.5): `validate` returns no message for the
+   * form's data with `patch` applied (`null`: the DOM already holds the requested value).
+   * `true` without `validate`, while read-only, and before a control registered. Writes no state
+   * and no slot. Handlers only.
+   */
+  readonly validateNext: (patch: ((formData: FormData) => void) | null) => boolean;
 }
 
 export const FieldContext = createContext<FieldContextValue | null>(null);
@@ -104,6 +111,10 @@ export interface FormFieldRegistration {
 
 export interface FormContextValue {
   readonly errors: FormErrors | undefined;
+  /** `Form.Root error`, normalised: the form-level messages, `[]` for none (design 3.7). */
+  readonly error: readonly string[];
+  /** A `Form.Error` is mounted: the Form announces the form-level messages at a settle (3.7). */
+  readonly registerFormError: () => () => void;
   readonly registerField: (registration: FormFieldRegistration) => () => void;
   /**
    * The `FormData` of the submission in flight when the Form ran it itself (the intercepted path),

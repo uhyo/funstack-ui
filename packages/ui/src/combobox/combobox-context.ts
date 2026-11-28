@@ -57,6 +57,11 @@ export interface ComboboxContextValue {
   /** The Root's `readOnly` (or the Field's): the popup never opens, nothing dispatches. */
   readonly readOnly: boolean;
   readonly inputRef: RefObject<HTMLInputElement | null>;
+  /**
+   * The Input's `required` (own or the Field's), written by the Input after each commit: the
+   * native half of `details.valid` (field-form.md 7.5), computed by the Root.
+   */
+  readonly requiredRef: RefObject<boolean>;
   readonly listRef: RefObject<HTMLElement | null>;
   /** Registers a mounted Option; returns the unregistration. */
   readonly registerOption: (value: string, entry: ComboboxOptionEntry) => () => void;

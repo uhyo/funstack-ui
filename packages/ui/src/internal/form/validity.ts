@@ -70,6 +70,43 @@ export function snapshotValidity(validity: ValidityState): FieldValidity {
   return result;
 }
 
+/**
+ * The native half of `details.valid` (design/components/field-form.md 7.5): every
+ * `ValidityState` flag except `customError` is false. Not `validity.valid`: the custom slot may
+ * still hold the previous value's `validate` message or a server error.
+ */
+export function nativeValid(element: ValidatableElement): boolean {
+  const v = element.validity;
+  return !(
+    v.valueMissing ||
+    v.typeMismatch ||
+    v.patternMismatch ||
+    v.tooLong ||
+    v.tooShort ||
+    v.rangeUnderflow ||
+    v.rangeOverflow ||
+    v.stepMismatch ||
+    v.badInput
+  );
+}
+
+/**
+ * A `details.valid` patch that sets `name` to `values` (field-form.md 7.5): `delete` and one
+ * `append` per value. `null` (patches nothing) without a name or for a disabled control, which
+ * is not in the form's data.
+ */
+export function setEntries(
+  name: string | undefined,
+  values: readonly string[],
+  disabled = false,
+): ((formData: FormData) => void) | null {
+  if (name === undefined || name === "" || disabled) return null;
+  return (formData) => {
+    formData.delete(name);
+    for (const value of values) formData.append(name, value);
+  };
+}
+
 export function validityEquals(a: FieldValidity, b: FieldValidity): boolean {
   return VALIDITY_KEYS.every((key) => a[key] === b[key]);
 }
@@ -88,6 +125,15 @@ export function normaliseErrorValue(value: FieldErrorValue): readonly string[] {
 export function hasAnyError(errors: FormErrors | undefined): boolean {
   if (errors === undefined) return false;
   return Object.values(errors).some((v) => normaliseErrorValue(v).length > 0);
+}
+
+/**
+ * "The form has an error" (design/components/field-form.md 3.7 rule 2): `errors` has a non-empty
+ * entry (hidden stale ones included) or the form-level `error` is not empty. The one predicate of
+ * `autoReset` and of `Dialog.Form`'s settle close.
+ */
+export function hasFormError(errors: FormErrors | undefined, error: FieldErrorValue): boolean {
+  return hasAnyError(errors) || normaliseErrorValue(error).length > 0;
 }
 
 let userInvalidSupport: boolean | undefined;

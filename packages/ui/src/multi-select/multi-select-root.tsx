@@ -16,6 +16,8 @@ import { HiddenValues } from "../internal/form/hidden-values.js";
 import type { FormAssociatedElement } from "../internal/form/use-form-owner-event.js";
 import { useFormReset, useResetTarget } from "../internal/form/use-form-reset.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/form/use-field-control.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { setEntries } from "../internal/form/validity.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { toggleFromTrigger } from "../internal/overlay/use-popover-trigger.js";
 import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";
@@ -52,6 +54,12 @@ export interface MultiSelectValueChangeDetails extends ActionDetails {
   readonly added: readonly string[];
   /** Values this dispatch removed, in value order. */
   readonly removed: readonly string[];
+  /**
+   * The control would be valid holding this value: `required` ("not empty") and, inside a
+   * Field, `validate` for the next selection. Not a server error. Information only: the change
+   * is dispatched either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /** Details passed as the second argument of `MultiSelect.Root`'s `openChangeAction` and `onOpenChange`. */
@@ -230,6 +238,16 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
 
   // --- Selection: a set, pick order (B.6) ---------------------------------------------------
 
+  // `details.valid` (field-form.md 7.5): computed, since the hidden inputs and the validity
+  // `<select>` change only in the next commit. The same predicate as the validity element's
+  // `required` (multi-select-trigger.tsx); the patch is what the hidden inputs will submit.
+  const nextValidity = useNextValidity();
+  const validOf = (next: ReadonlySet<string>): boolean =>
+    nextValidity(
+      !(required && !readOnly && next.size === 0),
+      setEntries(name, [...next], disabled),
+    );
+
   const multi = useMultipleSelection<Record<never, never>>({
     component: "multi-select",
     part: "MultiSelect.Root",
@@ -238,6 +256,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     defaultValue,
     valueChangeAction,
     resetFields: {},
+    validOf,
   });
   const selectedRef = useLatest(multi.optimistic);
 

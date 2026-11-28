@@ -1,4 +1,5 @@
 "use client";
+import { useCallback, useRef } from "react";
 import type { ChangeEvent, ComponentPropsWithRef, Ref } from "react";
 import { createActionDetails } from "../action/action-details.js";
 import { dataAttr } from "../data-attr.js";
@@ -8,10 +9,14 @@ import { useControllableAction } from "../action/use-controllable-action.js";
 import { fieldInputProps, useFieldControl, useFieldValueChange } from "./use-field-control.js";
 import { useMergedRefs } from "../use-merged-refs.js";
 import { guardCheckableChange, useNativeChecked } from "./use-native-checked.js";
+import { useNextValidity } from "./use-next-validity.js";
+import { nativeValid } from "./validity.js";
 
 /** The details shape `Checkbox` and `Switch` share (each declares its own public name). */
 export interface CheckableChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
+  /** `details.valid` (conventions 2.2, design/components/field-form.md 7.5). */
+  readonly valid: boolean;
 }
 
 export interface UseCheckableInputOptions {
@@ -97,6 +102,23 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
   // controlled change) re-reads validity and `validate` after the commit.
   useFieldValueChange(optimistic);
 
+  // `details.valid` (field-form.md 7.5): every dispatch runs when the input already holds the
+  // requested value (the click toggled it; a reset or a pre-hydration click wrote it), so the
+  // native half is read from the input and `validate` sees the form as it is.
+  const node = useRef<HTMLInputElement | null>(null);
+  const nodeRef = useCallback((el: HTMLInputElement) => {
+    node.current = el;
+    return () => {
+      node.current = null;
+    };
+  }, []);
+  const nextValidity = useNextValidity();
+  const details = (event: Event | undefined, reason: ChangeReason) => {
+    const el = node.current;
+    const valid = nextValidity(el === null || nativeValid(el), null);
+    return createActionDetails(event, { reason, valid });
+  };
+
   // Suspended while pending (conventions 4.1): the browser clears the property on the click, and
   // the parent may not have recomputed yet. Restored on settle if the parent still says mixed.
   const mixed = indeterminate !== undefined;
@@ -110,12 +132,11 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     defaultChecked: checked === undefined ? (defaultChecked ?? false) : undefined,
     indeterminate: mixed ? shownIndeterminate : undefined,
     latestInFlight,
-    onPlatformChange: (next, event) =>
-      dispatch(next, createActionDetails(event, { reason: "platform" })),
+    onPlatformChange: (next, event) => dispatch(next, details(event, "platform")),
     readOnly,
   });
 
-  const ref = useMergedRefs<HTMLInputElement>(inputRef, field.ref);
+  const ref = useMergedRefs<HTMLInputElement>(inputRef, field.ref, nodeRef);
 
   const libraryProps = {
     // Read-only withholds native `required` (conventions 3.6.1 rule 5).
@@ -149,7 +170,7 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
       // `indeterminate` plays no part: the platform's rule is "flip checked, clear mixed".
       guardCheckableChange(
         nativeEvent,
-        () => dispatch(!optimistic, createActionDetails(nativeEvent, { reason: "activate" })),
+        () => dispatch(!optimistic, details(nativeEvent, "activate")),
         component,
         readOnly,
       );

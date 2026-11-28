@@ -77,9 +77,9 @@ export const comboboxMultipleDriver: ValueActionDriver<
   eventType: () => "click",
   detailsFields: (i) =>
     [
-      { reason: "activate", added: ["fr"], removed: [], custom: false },
-      { reason: "activate", added: [], removed: ["jp"], custom: false },
-      { reason: "activate", added: ["jm"], removed: [], custom: false },
+      { reason: "activate", added: ["fr"], removed: [], custom: false, valid: true },
+      { reason: "activate", added: [], removed: ["jp"], custom: false, valid: true },
+      { reason: "activate", added: ["jm"], removed: [], custom: false, valid: true },
     ][i]!,
   expectShown: (v) => {
     expect(chipValues()).toEqual(v);

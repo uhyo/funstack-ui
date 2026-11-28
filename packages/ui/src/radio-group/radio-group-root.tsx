@@ -16,6 +16,8 @@ import {
   useControllableAction,
 } from "../internal/action/use-controllable-action.js";
 import { useFieldValueChange } from "../internal/form/use-field-control.js";
+import { useNextValidity } from "../internal/form/use-next-validity.js";
+import { nativeValid } from "../internal/form/validity.js";
 import { useFieldsetGroup } from "../internal/form/use-fieldset-group.js";
 import { useNativeGroupReconciliation } from "../internal/form/use-native-group-reconciliation.js";
 import { useRender } from "../internal/use-render.js";
@@ -33,6 +35,12 @@ export interface RadioGroupValueChangeDetails extends ActionDetails {
    * Firefox form-state restoration found at mount (`details.event` is `undefined`).
    */
   readonly reason: ChangeReason;
+  /**
+   * The control would be valid holding this value: its native constraints (`required`) and,
+   * inside a Field, `validate`. Not a server error. Information only: the change is dispatched
+   * either way (conventions 2.2).
+   */
+  readonly valid: boolean;
 }
 
 /**
@@ -223,6 +231,21 @@ export function RadioGroupRoot({
 
   const base = (): string | null => intendedValue(latestInFlight, optimistic);
 
+  // `details.valid` (field-form.md 7.5): every dispatch runs when the radios already hold the
+  // requested value (the click checked one; a reset or a pre-hydration click wrote them). A
+  // checked radio clears `valueMissing` on every radio of the group, so the first enabled one
+  // is read.
+  const nextValidity = useNextValidity();
+  const details = useCallback(
+    (event: Event | undefined, reason: ChangeReason): RadioGroupValueChangeDetails => {
+      const radios = fieldsetRef.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+      const first = [...(radios ?? [])].find((r) => r.name === name && r.willValidate) ?? null;
+      const valid = nextValidity(first === null || nativeValid(first), null);
+      return createActionDetails(event, { reason, valid });
+    },
+    [fieldsetRef, name, nextValidity],
+  );
+
   // The residual browser paths (design section 5): one dispatch per group, from here. Items that
   // mount after the Root report through `onItemMounted` so the group is reconciled again.
   const { onItemMounted } = useNativeGroupReconciliation<string | null>({
@@ -230,8 +253,7 @@ export function RadioGroupRoot({
     readCurrent: () => readGroup(fieldsetRef.current, name, "checked"),
     readDefault: () => readGroup(fieldsetRef.current, name, "defaultChecked"),
     base,
-    onPlatformChange: (next, event) =>
-      dispatch(next, createActionDetails(event, { reason: "platform" })),
+    onPlatformChange: (next, event) => dispatch(next, details(event, "platform")),
     // Read-only: a radio checked before hydration is unchecked again, nothing dispatched.
     readOnly,
     restore: () => {
@@ -299,10 +321,20 @@ export function RadioGroupRoot({
       select: (next, event) => {
         // No-op rule against the optimistic value (conventions 2.3 item 7, design 4.2).
         if (next === optimistic) return;
-        dispatch(next, createActionDetails(event, { reason: "activate" }));
+        dispatch(next, details(event, "activate"));
       },
     }),
-    [name, form, required, state, optimistic, contextDefault, onItemMountedWithCheck, dispatch],
+    [
+      name,
+      form,
+      required,
+      state,
+      optimistic,
+      contextDefault,
+      onItemMountedWithCheck,
+      dispatch,
+      details,
+    ],
   );
 
   const element = useRender<ComponentPropsWithRef<"fieldset">, RadioGroupRootState>({

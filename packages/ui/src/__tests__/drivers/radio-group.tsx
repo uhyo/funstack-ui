@@ -42,7 +42,7 @@ export const radioGroupDriver: NativeGroupPlatformDriver<
   values: ["a", "b", "c", "a"],
   gesture: (user, i) => user.click(radio(radioGroupDriver.values[i + 1]!)),
   eventType: () => "click",
-  detailsFields: () => ({ reason: "activate" }),
+  detailsFields: () => ({ reason: "activate", valid: true }),
   expectShown: (v) => {
     expect(checkedValues()).toEqual(v === null ? [] : [v]);
     expect(dataChecked()).toEqual(v === null ? [] : [v]);
@@ -60,7 +60,7 @@ export const radioGroupDriver: NativeGroupPlatformDriver<
       r.checked = r.value === v;
     }
   },
-  platformDetails: () => ({ reason: "platform" }),
+  platformDetails: () => ({ reason: "platform", valid: true }),
   expectResetTarget: (v) => {
     for (const x of ITEMS) expect(radio(x).defaultChecked).toBe(x === v);
   },
