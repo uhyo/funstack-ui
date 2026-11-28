@@ -16,6 +16,7 @@ import type {
   RefObject,
 } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
+import { callAction } from "../internal/action/call-action.js";
 import { callUrgentHandler } from "../internal/action/call-urgent-handler.js";
 import { useActionTrigger } from "../internal/action/use-action-trigger.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -30,6 +31,7 @@ import { resolveStateValue } from "../internal/render-element.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
   Action,
+  Rejectable,
   ActionDetails,
   ChangeReason,
   RenderProp,
@@ -135,7 +137,7 @@ export interface OTPFieldRootProps extends Omit<
    * for a controlled change, or while disabled or read-only. A rejection reaches the nearest Error
    * Boundary. May be a Server Function.
    */
-  completeAction?: Action<[value: string, details: OTPFieldCompleteDetails]>;
+  completeAction?: Action<[value: string, details: OTPFieldCompleteDetails & Rejectable]>;
   /**
    * Submit the Input's form (`requestSubmit()`) when an edit leaves the code complete, right
    * after dispatching `completeAction`. A change of context on input (WCAG 3.2.2): say so before
@@ -425,7 +427,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
         const details = createActionDetails(event, { reason, valid });
         runAction(() => {
           for (const type of COMPLETE_TYPES) addTransitionType(type);
-          return action(code, details);
+          return callAction("OTPField.Root", details, (d) => action(code, d));
         });
       }
       if (!submitting) return;

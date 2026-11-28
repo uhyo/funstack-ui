@@ -12,6 +12,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
+import { callAction } from "../internal/action/call-action.js";
 import { announce, canAnnounce } from "../internal/announce.js";
 import { FieldContext } from "../internal/form/field-context.js";
 import { isComposingKey } from "../internal/escape-key.js";
@@ -551,7 +552,11 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   ): Promise<void> => {
     const meta = dispatchMeta.get(details);
     try {
-      await valueChangeAction?.(next, details);
+      // Through `callAction`: a `details.reject()` must roll the text back and skip the close
+      // too (conventions 2.4.1).
+      await (valueChangeAction === undefined
+        ? undefined
+        : callAction("Combobox.Root", details, (d) => valueChangeAction(next, d)));
     } catch (error) {
       // Walkthrough 4: the text rolls back with the optimistic value. A synchronous throw lands
       // here inside the Root's `startTransition` callback; yield once so the write (and the

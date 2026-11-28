@@ -18,7 +18,7 @@ import { renderToString } from "react-dom/server";
 import { StrictMode, Suspense, startTransition, use, useState } from "react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
-import type { ChangeReason } from "../internal/types.js";
+import type { ChangeReason, Rejectable } from "../internal/types.js";
 import { dispatchCommand } from "../__tests__/invoker-shim.js";
 import { stubComputedPlacement } from "../__tests__/placement-stub.js";
 import { popoverSource } from "../__tests__/popover-shim.js";
@@ -1631,7 +1631,7 @@ describe("Menu.CheckboxItem", () => {
     const action = vi.fn<(next: boolean, details: MenuCheckboxItemCheckedChangeDetails) => void>();
     expectTypeOf<
       Parameters<NonNullable<MenuCheckboxItemProps["checkedChangeAction"]>>[1]
-    >().toEqualTypeOf<MenuCheckboxItemCheckedChangeDetails>();
+    >().toEqualTypeOf<MenuCheckboxItemCheckedChangeDetails & Rejectable>();
     expectTypeOf<MenuCheckboxItemCheckedChangeDetails["reason"]>().toEqualTypeOf<ChangeReason>();
     render(
       <Harness content={<Menu.CheckboxItem data-testid="box" checkedChangeAction={action} />} />,
@@ -1850,7 +1850,7 @@ describe("Menu.RadioGroup", () => {
     const action = vi.fn<(next: string, details: MenuRadioGroupValueChangeDetails) => void>();
     expectTypeOf<
       Parameters<NonNullable<MenuRadioGroupProps["valueChangeAction"]>>[1]
-    >().toEqualTypeOf<MenuRadioGroupValueChangeDetails>();
+    >().toEqualTypeOf<MenuRadioGroupValueChangeDetails & Rejectable>();
     expectTypeOf<MenuRadioGroupValueChangeDetails["reason"]>().toEqualTypeOf<ChangeReason>();
     render(
       <Harness
@@ -2993,5 +2993,111 @@ describe("Menu: a remount during a hide (#159)", () => {
       expect.objectContaining({ reason: "dismiss" }),
     );
     expect(isOpen()).toBe(false);
+  });
+});
+
+// #207 (conventions 2.4.1): an item's action that called `details.reject()` keeps the menu open
+// (the close is the continuation of a run that resolved), with nothing thrown or reported.
+describe("details.reject() in menu items", () => {
+  function stubReport() {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    return reportError;
+  }
+
+  it("Menu.Item: the menu stays open, no boundary; the next activation closes it", async () => {
+    const user = setupUser();
+    const reportError = stubReport();
+    const caught = vi.fn();
+    let call = 0;
+    const action = vi.fn((details: MenuItemActionDetails & Rejectable) => {
+      if (call++ === 0) details.reject();
+    });
+    render(
+      <Harness
+        boundary={caught}
+        content={
+          <Menu.Item data-testid="rename" action={action}>
+            Rename
+          </Menu.Item>
+        }
+      />,
+    );
+    await openMenu(user);
+    await user.click(item("rename"));
+    await flushTasks(2);
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(isOpen()).toBe(true);
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+    expectNotPending(item("rename"));
+    await user.click(item("rename"));
+    await flushTasks(2);
+    expect(isOpen()).toBe(false);
+  });
+
+  it("Menu.CheckboxItem: the check rolls back and the menu stays open", async () => {
+    const user = setupUser();
+    const reportError = stubReport();
+    const caught = vi.fn();
+    const d = deferred();
+    render(
+      <Harness
+        boundary={caught}
+        content={
+          <Menu.CheckboxItem
+            data-testid="box"
+            defaultChecked={false}
+            checkedChangeAction={async (_next, details) => {
+              await d.promise;
+              details.reject();
+            }}
+          >
+            Compact
+          </Menu.CheckboxItem>
+        }
+      />,
+    );
+    await openMenu(user);
+    await user.click(item("box"));
+    expect(item("box")).toHaveAttribute("aria-checked", "true");
+    await act(async () => d.resolve());
+    await flushTasks(2);
+    expect(item("box")).toHaveAttribute("aria-checked", "false");
+    expect(isOpen()).toBe(true);
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("Menu.RadioGroup: the selection rolls back and the menu stays open", async () => {
+    const user = setupUser();
+    const reportError = stubReport();
+    const caught = vi.fn();
+    render(
+      <Harness
+        boundary={caught}
+        content={
+          <Menu.RadioGroup
+            defaultValue="name"
+            valueChangeAction={(_next, details) => details.reject()}
+          >
+            <Menu.RadioItem data-testid="by-name" value="name">
+              Name
+            </Menu.RadioItem>
+            <Menu.RadioItem data-testid="by-date" value="date">
+              Date
+            </Menu.RadioItem>
+          </Menu.RadioGroup>
+        }
+      />,
+    );
+    await openMenu(user);
+    await user.click(item("by-date"));
+    await flushTasks(2);
+    expect(item("by-name")).toHaveAttribute("aria-checked", "true");
+    expect(item("by-date")).toHaveAttribute("aria-checked", "false");
+    expect(isOpen()).toBe(true);
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
   });
 });

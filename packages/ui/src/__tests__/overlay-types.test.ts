@@ -130,28 +130,28 @@ describe("details type names (conventions 9.4)", () => {
   type ActionArg<F extends ((...args: any[]) => unknown) | undefined> = Parameters<NonNullable<F>>;
 
   it("pure triggers: <Component><Part>ActionDetails", () => {
-    expectTypeOf<
-      ActionArg<UI.PopoverCloseProps["action"]>[0]
-    >().toEqualTypeOf<UI.PopoverCloseActionDetails>();
-    expectTypeOf<
-      ActionArg<UI.DialogCloseProps["action"]>[0]
-    >().toEqualTypeOf<UI.DialogCloseActionDetails>();
+    expectTypeOf<ActionArg<UI.PopoverCloseProps["action"]>[0]>().toEqualTypeOf<
+      UI.PopoverCloseActionDetails & UI.Rejectable
+    >();
+    expectTypeOf<ActionArg<UI.DialogCloseProps["action"]>[0]>().toEqualTypeOf<
+      UI.DialogCloseActionDetails & UI.Rejectable
+    >();
     expectTypeOf<UI.DrawerCloseActionDetails>().toEqualTypeOf<UI.DialogCloseActionDetails>();
     expectTypeOf<UI.AlertDialogCancelActionDetails>().toEqualTypeOf<UI.DialogCloseActionDetails>();
-    expectTypeOf<
-      ActionArg<UI.MenuItemProps["action"]>[0]
-    >().toEqualTypeOf<UI.MenuItemActionDetails>();
+    expectTypeOf<ActionArg<UI.MenuItemProps["action"]>[0]>().toEqualTypeOf<
+      UI.MenuItemActionDetails & UI.Rejectable
+    >();
     expectTypeOf<UI.PopoverCloseActionDetails>().toExtend<UI.ActionDetails>();
     expectTypeOf<UI.MenuItemActionDetails>().toExtend<UI.ActionDetails>();
   });
 
   it("change actions: <Component><Part><State>ChangeDetails with reason", () => {
-    expectTypeOf<
-      ActionArg<UI.MenuCheckboxItemProps["checkedChangeAction"]>[1]
-    >().toEqualTypeOf<UI.MenuCheckboxItemCheckedChangeDetails>();
-    expectTypeOf<
-      ActionArg<UI.MenuRadioGroupProps["valueChangeAction"]>[1]
-    >().toEqualTypeOf<UI.MenuRadioGroupValueChangeDetails>();
+    expectTypeOf<ActionArg<UI.MenuCheckboxItemProps["checkedChangeAction"]>[1]>().toEqualTypeOf<
+      UI.MenuCheckboxItemCheckedChangeDetails & UI.Rejectable
+    >();
+    expectTypeOf<ActionArg<UI.MenuRadioGroupProps["valueChangeAction"]>[1]>().toEqualTypeOf<
+      UI.MenuRadioGroupValueChangeDetails & UI.Rejectable
+    >();
     expectTypeOf<
       UI.MenuCheckboxItemCheckedChangeDetails["reason"]
     >().toEqualTypeOf<UI.ChangeReason>();

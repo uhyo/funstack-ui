@@ -882,6 +882,35 @@ describe("TextField", () => {
       expect(validate).toHaveBeenLastCalledWith("ada", expect.any(FormData));
       expect(field().validity.customError).toBe(false);
     });
+
+    // #207 (conventions 2.4.1 item 11): `valid` and `reject()` compose into the two inline-save
+    // choices for an invalid value.
+    it.each([
+      ["return: the empty text stays, nothing saved", false, ""],
+      ["return details.reject(): the saved text is back", true, "Groceries"],
+    ] as const)("required and cleared, %s", async (_label, rollBack, shown) => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const save = vi.fn();
+      render(
+        <Field.Root name="title" required>
+          <TextField
+            aria-label="Title"
+            defaultValue="Groceries"
+            valueCommitAction={async (next, details) => {
+              if (!details.valid) return rollBack ? details.reject() : undefined;
+              save(next);
+            }}
+          />
+        </Field.Root>,
+      );
+      typeText("");
+      blur();
+      await flushMicrotasks(2);
+      expect(save).not.toHaveBeenCalled();
+      expect(field().value).toBe(shown);
+      expect(reportError).not.toHaveBeenCalled();
+    });
   });
 
   // --- Form --------------------------------------------------------------------------------------

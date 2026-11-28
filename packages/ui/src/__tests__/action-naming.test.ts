@@ -433,6 +433,42 @@ type Offenders = {
 };
 type OwnHandlers = { [K in keyof PublicProps]: OwnHandlerKeys<PublicProps[K]> }[keyof PublicProps];
 
+/** The last parameter of each function member (an action's or a handler's `details`). */
+type LastParameter<F> = F extends (...args: infer A) => unknown
+  ? A extends readonly [...unknown[], infer L]
+    ? L
+    : never
+  : never;
+
+/**
+ * Action keys whose `details` lacks `reject` (conventions 2.4.1). Form actions are excluded: they
+ * receive `FormData` and no `details` (2.7).
+ */
+type KeysWithoutReject<P> = {
+  [K in ActionKeys<P>]-?: LastParameter<FunctionPart<P[K]>> extends infer D
+    ? [D] extends [FormData]
+      ? never
+      : [D] extends [UI.Rejectable]
+        ? never
+        : K
+    : never;
+}[ActionKeys<P>];
+type WithoutReject = {
+  [
+    K in keyof PublicProps as [KeysWithoutReject<PublicProps[K]>] extends [never] ? never : K
+  ]: KeysWithoutReject<PublicProps[K]>;
+};
+/** Own `on*` keys whose `details` has `reject` (a handler reports a fact: none may). */
+type HandlersWithReject = {
+  [K in keyof PublicProps]: {
+    [H in OwnHandlerKeys<PublicProps[K]>]-?: "reject" extends keyof LastParameter<
+      FunctionPart<PublicProps[K][H]>
+    >
+      ? H
+      : never;
+  }[OwnHandlerKeys<PublicProps[K]>];
+}[keyof PublicProps];
+
 describe("action naming (conventions 10.1)", () => {
   it("the guard types catch an urgent handler named as an action, and own `on*` keys", () => {
     expectTypeOf<
@@ -523,6 +559,35 @@ describe("action naming (conventions 10.1)", () => {
     expectTypeOf<UI.NavigationMenuItemProps["onOpenChange"]>().toEqualTypeOf<
       UI.UrgentChangeHandler<boolean, UI.NavigationMenuOpenChangeDetails> | undefined
     >();
+  });
+
+  // #207 (conventions 2.4.1): `Details & Rejectable` on every action prop, never on a handler.
+  it("every action prop's `details` has `reject`; no handler's does", () => {
+    // The guard's self-test: a planted action without `reject` is caught, a form action is not.
+    expectTypeOf<
+      KeysWithoutReject<{
+        plainAction?: UI.Action<[details: UI.ActionDetails]>;
+        valueChangeAction?: UI.ChangeAction<string>;
+        action?: string | ((formData: FormData) => unknown);
+      }>
+    >().toEqualTypeOf<"plainAction">();
+    expectTypeOf<WithoutReject>().toEqualTypeOf<{}>();
+    expectTypeOf<HandlersWithReject>().toEqualTypeOf<never>();
+    expectTypeOf<UI.ToastActionOptions["action"]>().parameter(0).toHaveProperty("reject");
+    expectTypeOf<NonNullable<UI.ToastOptions["onClose"]>>()
+      .parameter(0)
+      .not.toHaveProperty("reject");
+    // The named details types stay without it: handlers share them (conventions 9.4).
+    expectTypeOf<UI.SwitchCheckedChangeDetails>().not.toHaveProperty("reject");
+    expectTypeOf<UI.ButtonActionDetails>().not.toHaveProperty("reject");
+    // A function written apart from the JSX annotates `Details & Rejectable`.
+    const standalone = async (
+      _next: boolean,
+      details: UI.SwitchCheckedChangeDetails & UI.Rejectable,
+    ) => {
+      details.reject();
+    };
+    expectTypeOf(standalone).toExtend<NonNullable<UI.SwitchProps["checkedChangeAction"]>>();
   });
 
   it("a toast's close callback is the `onClose` handler, not an action (#148)", () => {

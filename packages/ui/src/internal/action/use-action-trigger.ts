@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useTransition } from "react";
+import { isHandledRejection } from "./call-action.js";
 import { reportDropped } from "./report-dropped.js";
 import { useConnected } from "./use-connected.js";
 
@@ -26,7 +27,9 @@ export interface ActionTrigger {
   readonly pending: boolean;
   /**
    * Runs `work` inside the part's own transition and, once it resolves, `then` (still inside the
-   * transition: a Close part's close, a menu item's close). With overlapping runs, `then` runs
+   * transition: a Close part's close, a menu item's close). `work` calls a consumer's action
+   * through `callAction`, so an action that called `details.reject()` counts as rejected: `then`
+   * is skipped and nothing reaches a boundary or `reportError` (conventions 2.4.1). With overlapping runs, `then` runs
    * once, when the last run in flight settles, and only if the latest run resolved: it is the
    * latest run's `then` (#146 review F1). A rejection skips `then` and reaches
    * the nearest Error Boundary above the part; a run that a later run superseded, or any run
@@ -92,6 +95,12 @@ export function useActionTrigger(options: ActionTriggerOptions = {}): ActionTrig
       try {
         await work();
       } catch (error) {
+        // The work's action called `details.reject()` (`callAction`, 2.4.1): as a rejection,
+        // `then` does not run, but nothing is rethrown or reported.
+        if (isHandledRejection(error)) {
+          settled();
+          return;
+        }
         // The latest run's rejection takes React's own route to the boundary while the part is
         // there to render it; otherwise React would drop it, as it drops a superseded one (2.4).
         const rethrow = id === latest.current && connected.current;

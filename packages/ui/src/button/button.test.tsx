@@ -302,6 +302,32 @@ describe("Button", () => {
       expectNotPending(button("Other"));
     });
 
+    // #207 (conventions 2.4.1): a Button has no continuation, so reject() only ends pending.
+    it("details.reject(): data-pending ends, nothing reaches a boundary or reportError", async () => {
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const d = deferred();
+      const onError = vi.fn();
+      render(
+        <ErrorCatcher onError={onError}>
+          <Button
+            action={async (details) => {
+              await d.promise;
+              details.reject();
+            }}
+          >
+            Go
+          </Button>
+        </ErrorCatcher>,
+      );
+      await setupUser().click(button("Go"));
+      expectPending(button("Go"));
+      await act(async () => d.resolve());
+      expectNotPending(button("Go"));
+      expect(onError).not.toHaveBeenCalled();
+      expect(reportError).not.toHaveBeenCalled();
+    });
+
     it("caught inside: the action resolves and the next click runs (no stuck guard)", async () => {
       const deferreds = sequencedDeferreds(2);
       const action = vi.fn(async () => {

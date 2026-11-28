@@ -60,8 +60,12 @@ import {
   popoverLikeDriver,
 } from "../__tests__/overlay-open-state-suite.js";
 import { ComboboxContext } from "./combobox-context.js";
+import type { Rejectable } from "../internal/types.js";
 
-type ValueAction = (next: string | null, details: ComboboxValueChangeDetails) => unknown;
+type ValueAction = (
+  next: string | null,
+  details: ComboboxValueChangeDetails & Rejectable,
+) => unknown;
 type TextAction = (next: string, details: ComboboxInputValueChangeDetails) => void;
 type OpenAction = (next: boolean, details: ComboboxOpenChangeDetails) => unknown;
 
@@ -1218,6 +1222,47 @@ describe("Combobox", () => {
       expect(input().value).toBe("Japan");
       expect(hidden()!.value).toBe("jp");
     });
+  });
+
+  // #207 (conventions 2.4.1): a handled rejection rolls the text back like a thrown one (and
+  // keeps the popup open: the close is the continuation of a resolved selection).
+  it("details.reject(): the selection and text roll back, the popup stays open, no boundary", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const save = deferred();
+    const caught = vi.fn();
+    const texts = vi.fn<TextAction>();
+    const user = setupUser();
+    render(
+      <ValueHarness
+        mode="uncontrolled"
+        action={async (_next, details) => {
+          await save.promise;
+          details.reject();
+        }}
+        boundary={caught}
+        root={{
+          defaultValue: "fr",
+          defaultInputValue: "France",
+          onInputValueChange: texts,
+          name: "country",
+        }}
+      />,
+    );
+    await user.click(input());
+    await user.clear(input());
+    await user.keyboard("ja");
+    await flushTasks(2);
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(input().value).toBe("Japan");
+    await act(async () => save.resolve());
+    await flushTasks(2);
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+    expect(texts).toHaveBeenLastCalledWith("France", expect.anything());
+    expect(texts.mock.lastCall![1].reason).toBe("dismiss");
+    expect(hidden()!.value).toBe("fr");
+    expect(isOpen()).toBe(true);
   });
 
   it("a controlled parent that refuses the value: text and selection revert", async () => {

@@ -13,7 +13,7 @@ import { useState } from "react";
 import type { ComponentPropsWithRef, ComponentType, ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
-import type { ActionDetails, WhilePending } from "../internal/types.js";
+import type { ActionDetails, Rejectable, WhilePending } from "../internal/types.js";
 import {
   deferred,
   ErrorCatcher,
@@ -156,6 +156,53 @@ export function describeOverlayClosePart<D extends OverlayDetailsLike>(
         expect(close).not.toHaveBeenCalled();
         expect(action).toHaveBeenCalledTimes(1);
         expect(isOpen()).toBe(true);
+      });
+
+      // #207 (conventions 2.4.1): the action shows its own message and keeps the popup open.
+      it("details.reject(): no close, no boundary, focus stays on the part; the next click runs again", async () => {
+        const user = setupUser();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const action = vi.fn<Action>();
+        const caught = vi.fn();
+        const work = deferred();
+        let call = 0;
+        render(
+          <Harness
+            mode={mode}
+            action={action}
+            content={
+              <ErrorCatcher onError={caught}>
+                {withClose({
+                  action: async (details) => {
+                    if (call++ > 0) return;
+                    await work.promise;
+                    (details as ActionDetails & Rejectable).reject();
+                  },
+                })}
+              </ErrorCatcher>
+            }
+          />,
+        );
+        await openThroughTrigger(user);
+        const close = spyClose();
+        await user.click(part());
+        expectPending(part());
+        await act(async () => work.resolve());
+        await flushTasks(2);
+        expect(isOpen()).toBe(true);
+        expect(close).not.toHaveBeenCalled();
+        expect(action).toHaveBeenCalledTimes(1);
+        expect(caught).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expectNotPending(part());
+        expect(part()).not.toHaveAttribute("aria-disabled");
+        expect(document.activeElement).toBe(part());
+        // Usable again: the next click's action resolves and the library closes.
+        await user.click(part());
+        await flushTasks(2);
+        expect(close).toHaveBeenCalledTimes(1);
+        expect(isOpen()).toBe(false);
       });
 
       it("a rejection reaches the boundary; after a reset the Close runs again", async () => {

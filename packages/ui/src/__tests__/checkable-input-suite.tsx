@@ -28,6 +28,7 @@ import {
   Gate,
 } from "./helpers.js";
 import type { ControlMode } from "./helpers.js";
+import type { Rejectable } from "../internal/types.js";
 
 /** The props and state both components share (Checkbox's are a superset). */
 type ControlProps = SwitchProps;
@@ -72,6 +73,8 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
     action?: ActionFn;
     /** Catch errors thrown by `action` (turns a rejection into success for the library). */
     catchErrors?: boolean;
+    /** With `catchErrors`: call `details.reject()` after catching (conventions 2.4.1). */
+    rejectCaught?: boolean;
     /** Controlled only: adopt `"platform"` dispatches (default) or refuse them. */
     refusePlatform?: boolean;
     /** Wrap only the control in an `ErrorCatcher` that reports to this callback. */
@@ -92,6 +95,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
     initial = false,
     action,
     catchErrors = false,
+    rejectCaught = false,
     refusePlatform = false,
     boundary,
     suspender,
@@ -107,6 +111,7 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       } catch (e) {
         if (!catchErrors) throw e;
         startTransition(() => setError(e));
+        if (rejectCaught) (details as Details & Rejectable).reject();
         return;
       }
       if (mode === "controlled" && refusePlatform && details.reason === "platform") return;
@@ -432,6 +437,38 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
         expect(committed()).toHaveTextContent("false");
         // Only a controlled parent can veto: uncontrolled commits `true`.
         expect(input().checked).toBe(mode === "uncontrolled");
+      });
+
+      // #207 (conventions 2.4.1): the native `checked` is back too, in both modes.
+      it("caught, then details.reject(): rolls back, the DOM too, without the boundary or reportError", async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const onError = vi.fn();
+        const d = deferred();
+        render(
+          <Harness
+            mode={mode}
+            action={() => d.promise}
+            catchErrors
+            rejectCaught
+            boundary={onError}
+          />,
+        );
+        const user = setupUser();
+
+        await user.click(input());
+        expect(input().checked).toBe(true);
+        expectPending(input());
+        await act(async () => {
+          d.reject(new Error("vetoed"));
+        });
+        expectNotPending(input());
+        expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
+        expect(onError).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expect(committed()).toHaveTextContent("false");
+        expect(input().checked).toBe(false);
+        expect(input()).not.toHaveAttribute("data-checked");
       });
     });
 

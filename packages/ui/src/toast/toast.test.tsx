@@ -51,6 +51,7 @@ import type {
   ToastViewportState,
 } from "./index.js";
 import { resetToastServerWarning } from "./toast.js";
+import type { Rejectable } from "../internal/types.js";
 
 // --- Harness -----------------------------------------------------------------------------------
 
@@ -974,6 +975,146 @@ describe("Toast", () => {
       await act(async () => d.reject(new Error("x")));
       await flushMicrotasks(2);
       expect(last?.toasts.map((t) => [t.id, t.ending, t.pending])).toEqual([[id, false, false]]);
+    });
+
+    // #207 (conventions 2.4.1, design 3.2): the recipe. The Undo shows its own message and
+    // calls `details.reject()`: the toast stays, nothing reaches a boundary.
+    it("details.reject(): the toast stays, the timer resumes, a second press runs; no boundary", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      const errors: unknown[] = [];
+      const onClose = vi.fn();
+      const d = deferred();
+      let runs = 0;
+      const undo = vi.fn(async (details: ToastActionDetails & Rejectable) => {
+        if (runs++ > 0) return;
+        await d.promise;
+        details.reject();
+      });
+      render(<Harness manager={manager} boundary={(e) => errors.push(e)} />);
+      const id = await call(() =>
+        manager({
+          title: "Archived",
+          duration: 1000,
+          action: { label: "Undo", action: undo },
+          onClose,
+        }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`action-${id}`));
+      });
+      await act(async () => d.resolve());
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).not.toBeNull();
+      expectNotPending(screen.getByTestId(`action-${id}`));
+      expect(errors).toEqual([]);
+      expect(reportError).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+      // A second press runs the action again (the part is no longer pending) and closes.
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`action-${id}`));
+      });
+      await flushMicrotasks(2);
+      expect(undo).toHaveBeenCalledTimes(2);
+      expect(queryRoot(id)).toBeNull();
+      expect(onClose.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
+    });
+
+    it("details.reject(): the auto-dismiss timer resumes after the settle", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+      const onClose = vi.fn();
+      const d = deferred();
+      render(<Harness manager={manager} />);
+      const id = await call(() =>
+        manager({
+          title: "Archived",
+          duration: 1000,
+          action: {
+            label: "Undo",
+            action: async (details) => {
+              await d.promise;
+              details.reject();
+            },
+          },
+          onClose,
+        }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`action-${id}`));
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      expect(queryRoot(id)).not.toBeNull();
+      await act(async () => d.resolve());
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).not.toBeNull();
+      await act(async () => {
+        vi.advanceTimersByTime(5000);
+      });
+      await flushMicrotasks(2);
+      expect(queryRoot(id)).toBeNull();
+      expect(onClose.mock.calls[0]![0]).toMatchObject({ reason: "timeout" });
+    });
+
+    // #207 design 3.2: where a boundary goes for a rethrowing Undo. Around the Action only, the
+    // toast keeps its Title and Close; around one Root, the other toasts stay.
+    it("a rejecting Undo with the boundary around the Action: the Title and Close stay", async () => {
+      silenceErrors();
+      const d = deferred();
+      render(
+        <Harness
+          manager={manager}
+          list={({ toasts }) =>
+            toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`}>
+                <Toast.Title data-testid={`title-${t.id}`} />
+                <ErrorCatcher>
+                  <Toast.Action data-testid={`action-${t.id}`} />
+                </ErrorCatcher>
+                <Toast.Close data-testid={`close-${t.id}`} aria-label="Close" />
+              </Toast.Root>
+            ))
+          }
+        />,
+      );
+      const id = await call(() =>
+        manager({ title: "Archived", action: { label: "Undo", action: () => d.promise } }),
+      );
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`action-${id}`));
+      });
+      await act(async () => d.reject(new Error("undo failed")));
+      await flushMicrotasks(2);
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("undo failed");
+      expect(screen.getByTestId(`title-${id}`)).toHaveTextContent("Archived");
+      expect(screen.getByTestId(`close-${id}`)).toBeInTheDocument();
+    });
+
+    it("a rejecting Undo with the boundary around one Root: the other toasts stay", async () => {
+      silenceErrors();
+      const d = deferred();
+      render(
+        <Harness
+          manager={manager}
+          list={({ toasts }) =>
+            toasts.map((t) => <ErrorCatcher key={t.id}>{renderToast(t)}</ErrorCatcher>)
+          }
+        />,
+      );
+      const a = await call(() =>
+        manager({ title: "A", action: { label: "Undo", action: () => d.promise } }),
+      );
+      const b = await call(() => manager({ title: "B" }));
+      await act(async () => {
+        fireEvent.click(screen.getByTestId(`action-${a}`));
+      });
+      await act(async () => d.reject(new Error("undo failed")));
+      await flushMicrotasks(2);
+      expect(screen.getByTestId("error-catcher")).toHaveTextContent("undo failed");
+      expect(queryRoot(a)).toBeNull();
+      expect(root(b)).toBeInTheDocument();
     });
 
     // #152, walkthrough 6: the Action left with its toast, so React has no render to route the

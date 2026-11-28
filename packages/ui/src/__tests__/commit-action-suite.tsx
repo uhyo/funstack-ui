@@ -23,6 +23,7 @@ import {
   hydrateFromServer,
   silenceErrors,
 } from "./helpers.js";
+import type { Rejectable } from "../internal/types.js";
 
 /** The details fields the suite reads from both channels. */
 export interface ChannelDetails {
@@ -336,6 +337,64 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
         });
         render(<Fixture mode={mode} initial={values[0]} onCommit={onCommit} />);
         await gesture(0);
+        driver.expectShown(values[1]);
+        expectNotPending(root());
+      });
+    });
+
+    // #207 (conventions 2.4.1): each channel's `details.reject()` is that channel's rejection,
+    // minus the boundary and `reportError`; the other channel is unaffected.
+    describe("details.reject() (uncontrolled)", () => {
+      it('in valueCommitAction: the control returns to the committed value through a "dismiss" step, no boundary', async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const caught = vi.fn();
+        const d = deferred();
+        const onChange = vi.fn<ChangeFn>();
+        render(
+          <Fixture
+            mode="uncontrolled"
+            initial={values[0]}
+            onChange={onChange}
+            onCommit={async (_next, details) => {
+              await d.promise;
+              (details as M & Rejectable).reject();
+            }}
+            boundary={caught}
+          />,
+        );
+        await gesture(0);
+        driver.expectShown(values[1]);
+        onChange.mockClear();
+        await act(async () => d.resolve());
+        await flushMicrotasks();
+        expect(caught).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expect(screen.getByTestId("root")).toBeInTheDocument();
+        driver.expectShown(values[0]);
+        for (const el of driver.pendingOn(0)) expectNotPending(el);
+        expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(1);
+      });
+
+      it("in valueChangeAction: nothing reaches a boundary; the commit channel still commits", async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const caught = vi.fn();
+        const onCommit = vi.fn<CommitFn>();
+        render(
+          <Fixture
+            mode="uncontrolled"
+            initial={values[0]}
+            onChange={(_next, details) => (details as C & Rejectable).reject()}
+            onCommit={onCommit}
+            boundary={caught}
+          />,
+        );
+        await gesture(0);
+        await act(async () => {});
+        expect(caught).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expect(onCommit).toHaveBeenCalledTimes(1);
         driver.expectShown(values[1]);
         expectNotPending(root());
       });

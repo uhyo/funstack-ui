@@ -6,6 +6,9 @@ import { act, render } from "@testing-library/react";
 import { Activity } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { deferred, ErrorCatcher, silenceErrors } from "../../__tests__/helpers.js";
+import type { Rejectable } from "../types.js";
+import { createActionDetails } from "./action-details.js";
+import { callAction } from "./call-action.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import type { ActionTrigger, ActionTriggerOptions } from "./use-action-trigger.js";
 
@@ -349,6 +352,152 @@ describe("useActionTrigger: the latest rejection once the part left", () => {
     const failure = new Error("latest");
     await act(async () => run.reject(failure));
     expect(caught).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(reportError).not.toHaveBeenCalled();
+  });
+});
+
+// #207 (conventions 2.4.1): the parts call their action through `callAction`, so a
+// `details.reject()` arrives here as the internal sentinel.
+describe("useActionTrigger: details.reject()", () => {
+  /** A work that calls the action through `callAction`, as the parts do. */
+  const work = (action: (details: Rejectable) => unknown) => () =>
+    callAction("Probe", createActionDetails(undefined, {}), action);
+
+  function setupReject(options?: ActionTriggerOptions) {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const caught = vi.fn();
+    return { ...setup(options, caught), reportError, caught };
+  }
+
+  it("skips `then`; no boundary, no reportError; pending ends at the settle", async () => {
+    const { hook, pending, reportError, caught } = setupReject({ ignoreWhilePending: true });
+    const run = deferred();
+    const then = vi.fn();
+    act(() => {
+      hook().run(
+        work(async (d) => {
+          d.reject();
+          await run.promise;
+        }),
+        then,
+      );
+    });
+    expect(pending()).toBe("true");
+    await act(async () => run.resolve());
+    expect(pending()).toBe("false");
+    expect(then).not.toHaveBeenCalled();
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it('"ignore": the part runs again after the settle', async () => {
+    const { hook } = setupReject({ ignoreWhilePending: true });
+    const then = vi.fn();
+    await act(async () => {
+      hook().run(
+        work((d) => d.reject()),
+        then,
+      );
+    });
+    let again!: boolean;
+    await act(async () => {
+      again = hook().run(
+        work(() => {}),
+        then,
+      );
+    });
+    expect(again).toBe(true);
+    expect(then).toHaveBeenCalledTimes(1);
+  });
+
+  it('"run": the latest calls reject(), an older run resolves: `then` does not run', async () => {
+    const { hook, reportError, caught } = setupReject();
+    const runs = [deferred(), deferred()];
+    const thens = [vi.fn(), vi.fn()];
+    act(() => {
+      hook().run(
+        work(() => runs[0]!.promise),
+        thens[0],
+      );
+      hook().run(
+        work(async (d) => {
+          d.reject();
+          await runs[1]!.promise;
+        }),
+        thens[1],
+      );
+    });
+    await act(async () => runs[1]!.resolve());
+    await act(async () => runs[0]!.resolve());
+    expect(thens[0]).not.toHaveBeenCalled();
+    expect(thens[1]).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+    expect(caught).not.toHaveBeenCalled();
+  });
+
+  it('"run": an older run calls reject(), the latest resolves: `then` runs once', async () => {
+    const { hook, reportError } = setupReject();
+    const runs = [deferred(), deferred()];
+    const thens = [vi.fn(), vi.fn()];
+    act(() => {
+      hook().run(
+        work(async (d) => {
+          d.reject();
+          await runs[0]!.promise;
+        }),
+        thens[0],
+      );
+      hook().run(
+        work(() => runs[1]!.promise),
+        thens[1],
+      );
+    });
+    await act(async () => runs[1]!.resolve());
+    await act(async () => runs[0]!.resolve());
+    expect(thens[0]).not.toHaveBeenCalled();
+    expect(thens[1]).toHaveBeenCalledTimes(1);
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("the open generation is unaffected: a later resolved run still closes", async () => {
+    let generation = 1;
+    const { hook } = setupReject({ openGeneration: () => generation });
+    const then = vi.fn();
+    await act(async () => {
+      hook().run(
+        work((d) => d.reject()),
+        then,
+      );
+    });
+    expect(then).not.toHaveBeenCalled();
+    expect(generation).toBe(1);
+    await act(async () => {
+      hook().run(
+        work(() => {}),
+        then,
+      );
+    });
+    expect(then).toHaveBeenCalledTimes(1);
+    generation = 2;
+  });
+
+  it("owner gone: unmounted when it settles, nothing reported", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    let hook!: ActionTrigger;
+    const view = render(<Probe onHook={(h) => (hook = h)} />);
+    const run = deferred();
+    act(() => {
+      hook.run(
+        work(async (d) => {
+          await run.promise;
+          d.reject();
+        }),
+      );
+    });
+    view.unmount();
+    await act(async () => run.resolve());
     expect(reportError).not.toHaveBeenCalled();
   });
 });
