@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
-import { SelectContext, useSelectContext } from "./select-context.js";
+import { rootStateAttributes, SelectContext, useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
@@ -38,7 +38,8 @@ export interface SelectGroupProps extends Omit<
 }
 
 /**
- * An `<optgroup>` of options. Its state is the Root's state. Owned key: `label`. Its `disabled`
+ * An `<optgroup>` of options. Its state is the Root's state. Owned keys: `label`,
+ * `data-pending`, `data-disabled` (the Root's `disabled`), `data-invalid`. Its `disabled`
  * reaches the Options' `state.disabled` / `data-disabled` through context, as `:disabled` does.
  *
  * @see https://ui.funstack.work/components/select
@@ -68,7 +69,7 @@ export function SelectGroup({
     style,
     children,
     props: { ...rest, disabled },
-    libraryProps: { label },
+    libraryProps: { label, ...rootStateAttributes(ctx) },
     ref,
   });
   // Nested groups are not valid HTML, so this only ever turns `false` into the group's value.

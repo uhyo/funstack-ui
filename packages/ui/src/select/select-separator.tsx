@@ -2,7 +2,7 @@
 import type { ComponentPropsWithRef, CSSProperties } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
-import { useSelectContext } from "./select-context.js";
+import { rootStateAttributes, useSelectContext } from "./select-context.js";
 import type { SelectRootState } from "./select-root.js";
 
 /**
@@ -24,7 +24,8 @@ export interface SelectSeparatorProps extends Omit<
 
 /**
  * A decorative `<hr>` between options or groups (exposed as `separator` by Chromium's
- * customizable select; a line in native pickers). Owns no keys.
+ * customizable select; a line in native pickers). Owned keys: `data-pending`, `data-disabled`,
+ * `data-invalid` (the Root's).
  *
  * @see https://ui.funstack.work/components/select
  */
@@ -44,6 +45,7 @@ export function SelectSeparator({ className, style, render, ...rest }: SelectSep
     style,
     children: undefined,
     props: rest,
+    libraryProps: rootStateAttributes(ctx),
   });
 }
 

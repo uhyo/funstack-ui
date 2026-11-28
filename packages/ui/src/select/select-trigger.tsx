@@ -1,9 +1,9 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
-import { dataAttr } from "../internal/data-attr.js";
+
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
-import { useSelectContext } from "./select-context.js";
+import { rootStateAttributes, useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
@@ -47,7 +47,7 @@ function firstChildOfSelect(el: HTMLButtonElement): string | null {
  * the Root's state, so a pending indicator next to `<Select.Value />` goes in its function
  * `children`.
  *
- * Owned keys: `type` (always `"button"`), `data-pending`, `data-disabled`.
+ * Owned keys: `type` (always `"button"`), `data-pending`, `data-disabled`, `data-invalid`.
  *
  * @see https://ui.funstack.work/components/select
  */
@@ -75,8 +75,7 @@ export function SelectTrigger({ className, style, children, render, ...rest }: S
     libraryProps: {
       // Explicit: Chromium 156 reports `.type === "submit"` for a select's button.
       type: "button",
-      "data-pending": dataAttr(ctx.pending),
-      "data-disabled": dataAttr(ctx.disabled),
+      ...rootStateAttributes(ctx),
     },
     ref,
   });

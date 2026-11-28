@@ -1,5 +1,7 @@
 "use client";
 import { createContext, use } from "react";
+import { dataAttr } from "../internal/data-attr.js";
+import type { DataAttributes } from "../internal/render-element.js";
 
 export interface SelectContextValue {
   /** Optimistic value: Options render `data-selected` from it. */
@@ -20,6 +22,19 @@ export interface SelectContextValue {
 }
 
 export const SelectContext = createContext<SelectContextValue | null>(null);
+
+/**
+ * The attributes of a part whose state is the Root's (Trigger, Value, Group, GroupLabel,
+ * Separator): `data-pending`, `data-disabled` and `data-invalid`, the boolean members of
+ * `SelectRootState` (conventions 4.1 rule 2).
+ */
+export function rootStateAttributes(ctx: SelectContextValue): DataAttributes {
+  return {
+    "data-pending": dataAttr(ctx.pending),
+    "data-disabled": dataAttr(ctx.disabled),
+    "data-invalid": dataAttr(ctx.invalid),
+  };
+}
 
 export function useSelectContext(part: string): SelectContextValue {
   const context = use(SelectContext);

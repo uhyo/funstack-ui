@@ -169,7 +169,7 @@ export function SelectPage() {
       />
       <PartFacts
         state={"`SelectRootState`."}
-        owned={'`type` (always `"button"`), `data-pending`, `data-disabled`.'}
+        owned={'`type` (always `"button"`), `data-pending`, `data-disabled`, `data-invalid`.'}
         note={
           "Must be the select's first child. Engines without customizable select do not render it, so a spinner inside it also needs a `select[data-pending]` style."
         }
@@ -187,7 +187,7 @@ export function SelectPage() {
       <PartFacts
         state={"`SelectRootState`."}
         owned={
-          "`children` (none: the browser fills the element), and the hydration-related props of that content."
+          "`children` (none: the browser fills the element), the hydration-related props of that content, and the Root state's `data-pending`, `data-disabled`, `data-invalid`."
         }
         note={
           "The browser copies the selected option's content in on every selection change, and the parser does so before hydration (the element is rendered so that hydration accepts that content). The library keeps the copy fresh: when the selected option's content changes through React (a translated label, a count, the option's own function children, a Suspense boundary resolving inside it) or a form reset changes the selection, it asks the browser to copy again. The copy is a snapshot: style it as `selectedcontent .icon`, not `option:checked .icon`."
@@ -249,7 +249,12 @@ export function SelectPage() {
           },
         ]}
       />
-      <PartFacts state={"`SelectRootState`."} owned={"`label`."} />
+      <PartFacts
+        state={"`SelectRootState`."}
+        owned={
+          "`label`, and the Root state's `data-pending`, `data-disabled` (the Root's `disabled`, not the Group's own: the Group's is `:disabled`), `data-invalid`."
+        }
+      />
 
       <h4>
         <code>Select.GroupLabel</code>
@@ -260,7 +265,10 @@ export function SelectPage() {
           renderProp("legend", "SelectRootState"),
         ]}
       />
-      <PartFacts state={"`SelectRootState`."} owned={"none."} />
+      <PartFacts
+        state={"`SelectRootState`."}
+        owned={"the Root state's `data-pending`, `data-disabled`, `data-invalid`."}
+      />
 
       <h4>
         <code>Select.Separator</code>
@@ -268,13 +276,22 @@ export function SelectPage() {
       <PropsTable
         rows={[...stylingProps("SelectRootState"), renderProp("hr", "SelectRootState")]}
       />
-      <PartFacts state={"`SelectRootState`."} owned={"none."} note={"Takes no children."} />
+      <PartFacts
+        state={"`SelectRootState`."}
+        owned={"the Root state's `data-pending`, `data-disabled`, `data-invalid`."}
+        note={"Takes no children."}
+      />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Hook", "On", "Pseudo-class", "Meaning"]}
         rows={[
-          ["`data-pending`", "Root, Trigger", "–", "`valueChangeAction` is in flight."],
+          [
+            "`data-pending`",
+            "Root, Trigger, Value, Group, GroupLabel, Separator",
+            "–",
+            "`valueChangeAction` is in flight.",
+          ],
           ["`data-pending`", "Option", "–", "The option the in-flight dispatch is selecting."],
           [
             "`data-selected`",
@@ -284,9 +301,15 @@ export function SelectPage() {
           ],
           [
             "`data-disabled`",
-            "Root, Trigger, Option",
+            "Root, Trigger, Value, Group, GroupLabel, Separator, Option",
             "`:disabled`",
-            "Disabled by prop; on an Option, by its own prop, a disabled Group or `Root disabled`.",
+            "Disabled by prop (`Root disabled`, or the Field's); on an Option, by its own prop, a disabled Group or `Root disabled`.",
+          ],
+          [
+            "`data-invalid`",
+            "Root, Trigger, Value, Group, GroupLabel, Separator",
+            "`:user-invalid` (Root)",
+            "Inside a `Field.Root`: the Field shows an error for the select.",
           ],
           [
             "–",

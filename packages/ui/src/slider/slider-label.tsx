@@ -38,7 +38,8 @@ export interface SliderLabelProps<T extends SliderValue = SliderValue> extends O
  * The visible name of the slider: `<label for>` naming the only thumb's input, or, with several
  * thumbs, the element whose `id` the Root's `aria-labelledby` (`role="group"`) points at, emitted
  * only while a Label is mounted. Owned keys: `id`, `htmlFor`, `data-disabled`, `data-pending`
- * (the Root's, conventions 4.1 rule 4).
+ * (the Root's, conventions 4.1 rule 4), `data-dragging`, `data-orientation` (its state is the
+ * Root's, rule 2).
  *
  * @see https://ui.funstack.work/components/slider
  */
@@ -78,6 +79,8 @@ export function SliderLabel<T extends SliderValue = SliderValue>({
       htmlFor: single ? ctx.thumbId(0) : undefined,
       "data-disabled": dataAttr(ctx.state.disabled),
       "data-pending": dataAttr(ctx.state.pending),
+      "data-dragging": dataAttr(ctx.state.dragging),
+      "data-orientation": ctx.state.orientation,
     } as ComponentPropsWithRef<"label"> & DataAttributes,
   });
 }

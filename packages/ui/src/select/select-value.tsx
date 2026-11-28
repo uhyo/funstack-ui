@@ -4,7 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useFormReset } from "../internal/form/use-form-reset.js";
 import { useRender } from "../internal/use-render.js";
-import { useSelectContext } from "./select-context.js";
+import { rootStateAttributes, useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
@@ -65,7 +65,8 @@ function refresh(select: HTMLSelectElement): void {
  * form reset, which Chromium does not re-clone for. Not installed where
  * `HTMLSelectedContentElement` is undefined (Firefox today, jsdom): nothing is cloned there.
  *
- * Owned keys: `dangerouslySetInnerHTML`, `suppressHydrationWarning`, `children`.
+ * Owned keys: `dangerouslySetInnerHTML`, `suppressHydrationWarning`, `children`, `data-pending`,
+ * `data-disabled`, `data-invalid`.
  *
  * @see https://ui.funstack.work/components/select
  */
@@ -142,6 +143,7 @@ export function SelectValue({ className, style, render, ...rest }: SelectValuePr
     libraryProps: {
       suppressHydrationWarning: true,
       dangerouslySetInnerHTML: { __html: "" },
+      ...rootStateAttributes(ctx),
     },
     ref,
   });

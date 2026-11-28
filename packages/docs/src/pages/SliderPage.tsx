@@ -311,7 +311,9 @@ export function SliderPage() {
       />
       <PartFacts
         state={"`SliderLabelState`, an alias of `SliderRootState`."}
-        owned={"`id`, `htmlFor`, `data-disabled`, `data-pending` (the Root's)."}
+        owned={
+          "`id`, `htmlFor`, `data-disabled`, `data-pending`, `data-dragging`, `data-orientation` (the Root's)."
+        }
         note={
           "The Label must stay a `<label>` with one thumb (it names the input through `for`); with several thumbs the Root is named by the Label's id. Its state is not tied to the Root's value type: `value` is typed `number | readonly number[]`; narrow it with `<Slider.Label<number>>` or read `values`."
         }
@@ -353,7 +355,7 @@ export function SliderPage() {
           ["`data-pending`", "Label", "The Root's `pending`."],
           [
             "`data-dragging`",
-            "Root, Track, Indicator, Thumb",
+            "Root, Label, Track, Indicator, Thumb",
             "A pointer is captured (on the Thumb: on this thumb).",
           ],
           ["`data-orientation`", "every part", "`horizontal` or `vertical`."],

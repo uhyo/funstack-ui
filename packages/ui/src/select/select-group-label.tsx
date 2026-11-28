@@ -2,7 +2,7 @@
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
-import { useSelectContext } from "./select-context.js";
+import { rootStateAttributes, useSelectContext } from "./select-context.js";
 import { useSelectPartRef } from "./select-dom.js";
 import type { SelectRootState } from "./select-root.js";
 
@@ -37,7 +37,8 @@ function firstChildOfGroup(el: HTMLLegendElement): string | null {
 /**
  * The rich label of a `Select.Group`: a `<legend>`, rendered by engines with customizable select.
  * Optional; must be the **first child** of its Group. Keep its text equal to the Group's `label`,
- * which native pickers and assistive technology use. Owns no keys.
+ * which native pickers and assistive technology use. Owned keys: `data-pending`,
+ * `data-disabled`, `data-invalid` (the Root's).
  *
  * @see https://ui.funstack.work/components/select
  */
@@ -68,6 +69,7 @@ export function SelectGroupLabel({
     style,
     children,
     props: rest,
+    libraryProps: rootStateAttributes(ctx),
     ref,
   });
 }

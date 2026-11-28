@@ -1819,3 +1819,27 @@ describe("Slider alignment rows", () => {
     expectTypeOf<SliderLabelState<number>>().toEqualTypeOf<SliderRootState<number>>();
   });
 });
+
+// Conventions 4.1 rule 2: the Label's state is the Root's, so it renders `dragging` and
+// `orientation` too.
+describe("Slider.Label renders the Root state's attributes", () => {
+  it("data-orientation always, data-dragging while a pointer is captured", async () => {
+    render(
+      <Slider.Root data-testid="root" defaultValue={40} orientation="vertical">
+        <Slider.Label data-testid="label">Volume</Slider.Label>
+        <Slider.Track data-testid="track">
+          <Slider.Thumb data-testid="thumb-0" />
+        </Slider.Track>
+      </Slider.Root>,
+    );
+    const label = screen.getByTestId("label");
+    expect(label).toHaveAttribute("data-orientation", "vertical");
+    expect(label).not.toHaveAttribute("data-dragging");
+    const track = mockTrack();
+    pointer("pointerDown", track, 50, { y: 50 });
+    expect(label).toHaveAttribute("data-dragging", "");
+    pointer("pointerUp", track, 50, { y: 50 });
+    await flushMicrotasks();
+    expect(label).not.toHaveAttribute("data-dragging");
+  });
+});

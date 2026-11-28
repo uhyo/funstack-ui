@@ -1630,3 +1630,81 @@ describe("Select alignment rows", () => {
     expectTypeOf<SelectSeparatorState>().toEqualTypeOf<SelectRootState>();
   });
 });
+
+// Conventions 4.1 rule 2: every part whose state is the Root's renders its boolean members.
+describe("Select parts render the Root state's attributes", () => {
+  const parts = () =>
+    ["trigger", "value", "group", "group-label", "separator"].map((id) => screen.getByTestId(id));
+
+  function Parts({ root }: { root?: Partial<SelectRootProps> }) {
+    return (
+      <Select.Root aria-label="Plan" data-testid="select" defaultValue="a" {...root}>
+        <Select.Trigger data-testid="trigger">
+          <Select.Value data-testid="value" />
+        </Select.Trigger>
+        <Select.Option value="a">A</Select.Option>
+        <Select.Separator data-testid="separator" />
+        <Select.Group label="More" data-testid="group">
+          <Select.GroupLabel data-testid="group-label">More</Select.GroupLabel>
+          <Select.Option value="b">B</Select.Option>
+        </Select.Group>
+      </Select.Root>
+    );
+  }
+
+  it("data-pending and data-disabled agree with state on every part", async () => {
+    const d = deferred();
+    const seen: SelectRootState[] = [];
+    const { rerender } = render(
+      <Parts
+        root={{
+          valueChangeAction: () => d.promise,
+          className: (s: SelectRootState) => {
+            seen.push(s);
+            return "";
+          },
+        }}
+      />,
+    );
+    for (const part of parts()) {
+      expect(part).not.toHaveAttribute("data-pending");
+      expect(part).not.toHaveAttribute("data-disabled");
+      expect(part).not.toHaveAttribute("data-invalid");
+    }
+    const select = screen.getByTestId("select") as HTMLSelectElement;
+    await act(async () => {
+      select.value = "b";
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(seen.at(-1)?.pending).toBe(true);
+    for (const part of parts()) expect(part).toHaveAttribute("data-pending", "");
+    await act(async () => d.resolve());
+    for (const part of parts()) expect(part).not.toHaveAttribute("data-pending");
+    rerender(<Parts root={{ disabled: true }} />);
+    for (const part of parts()) expect(part).toHaveAttribute("data-disabled", "");
+  });
+
+  it("data-invalid on every part while the Field shows an error", async () => {
+    render(
+      <Form.Root errors={{ plan: "Not available" }}>
+        <Field.Root name="plan">
+          <Field.Label>Plan</Field.Label>
+          <Select.Root data-testid="select" defaultValue="a">
+            <Select.Trigger data-testid="trigger">
+              <Select.Value data-testid="value" />
+            </Select.Trigger>
+            <Select.Option value="a">A</Select.Option>
+            <Select.Separator data-testid="separator" />
+            <Select.Group label="More" data-testid="group">
+              <Select.GroupLabel data-testid="group-label">More</Select.GroupLabel>
+              <Select.Option value="b">B</Select.Option>
+            </Select.Group>
+          </Select.Root>
+        </Field.Root>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId("select")).toHaveAttribute("data-invalid", "");
+    for (const part of parts()) expect(part).toHaveAttribute("data-invalid", "");
+  });
+});

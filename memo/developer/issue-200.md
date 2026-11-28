@@ -25,9 +25,18 @@ entry "2026-11-28, #199", section "Implementation checklists", "#200".
 - The Popup `transition` JSDoc paragraph was copied from `origin/feat/201-align-overlays`
   (`popover-popup.tsx`, 4f44da5c) into `combobox-popup.tsx` and `multi-select-popup.tsx`.
 
-## Left alone (outside the checklist, noted for the report)
+## Additions after the first review (coordinator request, after merging #201 / #202)
 
-- Select's non-Root parts (Trigger, Value, Group, GroupLabel, Separator) get `state.invalid`
-  from the shared `SelectRootState` but render no `data-invalid` (and Group / GroupLabel /
-  Separator no `data-pending` / `data-disabled` either): conventions 4.1 rule 2 would want them.
-- Slider.Label's state is the Root's, so it has `dragging` / `orientation` without the attributes.
+Conventions 4.1 rule 2 applied to the gaps found above:
+
+- Select's Trigger, Value, Group, GroupLabel and Separator render `data-pending`,
+  `data-disabled` and `data-invalid` from the Root's state (`rootStateAttributes` in
+  `select-context.ts`). A Group's `data-disabled` is the Root's `disabled`, as its
+  `state.disabled` is; its own `disabled` stays `:disabled`. Rows: "Select parts render the
+  Root state's attributes" in `select.test.tsx`.
+- `Slider.Label` renders `data-dragging` and `data-orientation`. Row: "Slider.Label renders the
+  Root state's attributes" in `slider.test.tsx`.
+- The Combobox / MultiSelect Popup `transition` JSDoc was checked against master's final
+  `popover-popup.tsx`: the shared paragraph is identical, nothing to change.
+- Merge of origin/master (f8ee0fea): the one conflict was `internal/transition-boundary.test.tsx`
+  (#202's Button row kept; Toggle, Tabs.Tab, Switch, Checkbox, RadioGroup.Item rows gone).
