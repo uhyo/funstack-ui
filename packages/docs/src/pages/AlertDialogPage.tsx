@@ -113,10 +113,26 @@ export function AlertDialogPage() {
         Put it in the Action's <code>action</code>, not in <code>openChangeAction</code>. The action
         is where the pending state is on the button the user pressed, where a rejection keeps the
         dialog open, and where no dismissal can be mistaken for consent. An action that catches its
-        own error resolves, and a resolved action closes the dialog: to keep the dialog open on a
-        failure, let the error reach an Error Boundary inside the Popup (as in the example above),
-        or use the <a href="#forms">Form</a> with <code>Form.Root</code> for field errors.
+        own error resolves, and a resolved action closes the dialog. To keep the dialog open on a
+        failure you handled, show the message and call{" "}
+        <a href="/concepts/action-props#reject">
+          <code>details.reject()</code>
+        </a>{" "}
+        (as in the example above): nothing is dispatched, the dialog stays open with focus on the
+        Action, and no Error Boundary is involved. Inside an alert dialog give the message{" "}
+        <code>role="alert"</code>, or move focus to it, so it is announced. For field errors use the{" "}
+        <a href="#forms">Form</a> with <code>Form.Root</code>.
       </p>
+      <p>
+        With an Error Boundary instead (the action lets the error through), put the boundary around
+        the <strong>Action only</strong>. A boundary that also wraps the Cancel replaces it with the
+        fallback on failure, and Escape is then the only way out; one above the Root removes the
+        dialog.
+      </p>
+      <CodeBlock>{`<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+<ErrorBoundary fallback={<span>Could not delete.</span>}>
+  <AlertDialog.Action action={() => deleteProject(id)}>Delete</AlertDialog.Action>
+</ErrorBoundary>`}</CodeBlock>
       <Callout title="A pending confirmation can be dismissed">
         Dismissing a pending confirmation hides it; it does not abort it. Escape closes the dialog
         while the action runs, and the action finishes in the background. In library mode a Cancel
@@ -249,7 +265,7 @@ export function AlertDialogPage() {
           },
           {
             name: "action",
-            type: "Action<[details: AlertDialogCancelActionDetails]>",
+            type: "Action<[details: AlertDialogCancelActionDetails & Rejectable]>",
             description:
               "Rarely needed. As on `Dialog.Close`: runs in this button's own transition, then closes the dialog; a rejection leaves it open.",
           },
@@ -283,14 +299,15 @@ export function AlertDialogPage() {
         rows={[
           {
             name: "action",
-            type: "Action<[details: AlertDialogActionDetails]>",
+            type: "Action<[details: AlertDialogActionDetails & Rejectable]>",
             description: (
               <>
                 The confirmed work. Runs in this button's own transition (<code>data-pending</code>{" "}
                 on it), then closes the dialog with <code>value</code> as <code>returnValue</code>:
                 in library mode through the Root (<code>openChangeAction(false)</code> awaited, view
                 transition if set), in JS-free mode with <code>close(value)</code>. A rejection
-                reaches the nearest Error Boundary above the button and leaves the dialog open. With{" "}
+                reaches the nearest Error Boundary above the button and leaves the dialog open;{" "}
+                <code>details.reject()</code> leaves it open with no boundary. With{" "}
                 <code>action</code> the button renders no <code>commandfor</code> /{" "}
                 <code>command</code>, so a click before hydration does nothing instead of closing
                 the dialog as if the work had been done. Without <code>action</code> it only closes
@@ -454,6 +471,10 @@ export function AlertDialogPage() {
           <li>
             It rejects: nothing is dispatched, the dialog stays open, focus stays on the button, the
             error reaches the nearest Error Boundary above it.
+          </li>
+          <li>
+            It catches its error and calls <code>details.reject()</code>: the same, with no Error
+            Boundary; the message is yours to render.
           </li>
         </ol>
         <h4 id="cancel-while-pending">Cancel unavailable while the confirm runs</h4>

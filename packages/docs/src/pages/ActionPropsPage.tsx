@@ -4,6 +4,7 @@ import { Callout } from "../components/Callout.js";
 import { Example } from "../components/Example.js";
 import { DocPage } from "../components/DocPage.js";
 import { Table } from "../components/Tables.js";
+import { CheckboxReject } from "../examples/CheckboxReject.js";
 import { ToggleErrors } from "../examples/ToggleErrors.js";
 
 export function ActionPropsPage() {
@@ -101,15 +102,29 @@ interface ActionDetails {
   readonly event: Event | undefined;
 }
 
+/** What an action's details has and a handler's does not. */
+interface Rejectable {
+  /** Call before the action settles: the request counts as rejected, and nothing is thrown. */
+  readonly reject: () => void;
+}
+
 type ChangeAction<T, Details extends ActionDetails = ActionDetails> =
-  Action<[next: T, details: Details]>;`}</CodeBlock>
+  Action<[next: T, details: Details & Rejectable]>;`}</CodeBlock>
       <p>
         The first argument is the next value, so the common case stays short. The second is a{" "}
         <code>details</code> object with the native DOM event (not React's synthetic one) and any
         component-specific fields, such as <code>reason</code> (below) or Dialog's{" "}
-        <code>returnValue</code>. The return type is <code>unknown</code>: return a promise and the
-        component awaits it, return anything else and it is ignored. That means a function that
-        returns data (a Server Function, a <code>fetch</code>) type-checks without wrapping.
+        <code>returnValue</code>. An action's <code>details</code> also has{" "}
+        <a href="#reject">
+          <code>reject()</code>
+        </a>
+        . The named details types (<code>SwitchCheckedChangeDetails</code>) do not include it,
+        because handlers share them: a function written apart from the JSX annotates{" "}
+        <code>details: SwitchCheckedChangeDetails &amp; Rejectable</code> (both exported from{" "}
+        <code>@funstack/ui/types</code> and the root entry). The return type is <code>unknown</code>
+        : return a promise and the component awaits it, return anything else and it is ignored. That
+        means a function that returns data (a Server Function, a <code>fetch</code>) type-checks
+        without wrapping.
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
         <p>
@@ -270,8 +285,9 @@ type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: De
         It is information, not a gate: the library dispatches an invalid value like any other (the
         control holds what the user entered, and a Field shows the error). An action that saves
         checks it. Uncontrolled, the early return keeps the invalid value in the control and saves
-        nothing; a controlled parent that does not adopt it rolls back instead. It is an ordinary
-        boolean field, so a Server Function passed directly receives it.
+        nothing; a controlled parent that does not adopt it rolls back instead. To put the saved
+        value back instead, return <code>details.reject()</code> (<a href="#reject-valid">below</a>
+        ). It is an ordinary boolean field, so a Server Function passed directly receives it.
       </p>
 
       <h3>What happens on a click</h3>
@@ -511,16 +527,119 @@ useEffect(() => {
         leaves it untouched.
       </p>
       <p>
-        For inline error UI instead, catch inside the action. A caught error makes the action
-        resolve, which counts as success: in uncontrolled mode the new value is committed. Use
-        controlled mode when the parent must be able to veto.
+        For inline error UI instead, catch inside the action and call{" "}
+        <a href="#reject">
+          <code>details.reject()</code>
+        </a>
+        . Without that call a caught error makes the action resolve, which counts as success: in
+        uncontrolled mode the new value is committed, and a menu item or a toast's Undo closes its
+        container.
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
-        <p>The left Toggle catches its errors inline; the right one lets them reach a boundary.</p>
+        <p>
+          The left Toggle catches its errors inline and vetoes in controlled mode; the right one
+          lets them reach a boundary.
+        </p>
         <Example file="ToggleErrors.tsx">
           <ToggleErrors />
         </Example>
       </ConceptExample>
+
+      <h3 id="reject">Handling a failed save without an Error Boundary</h3>
+      <p>
+        An action that catches its own error, shows its own message and then calls{" "}
+        <code>details.reject()</code> before it settles is treated as if it had rejected, except
+        that nothing is thrown and nothing is reported:
+      </p>
+      <ul>
+        <li>the optimistic value reverts, in uncontrolled mode too (nothing is committed);</li>
+        <li>
+          a part that closes its container after its action does not close it: a{" "}
+          <code>Menu.Item</code> leaves the menu open, a <code>Toast.Action</code> keeps its toast,
+          a Close part or <code>AlertDialog.Action</code> keeps the dialog open;
+        </li>
+        <li>
+          an overlay's <code>openChangeAction</code> leaves <code>open</code> as it was;
+        </li>
+        <li>
+          no Error Boundary, no <code>reportError</code>, no <code>data-rejected</code>: the message
+          is yours to render.
+        </li>
+      </ul>
+      <ConceptExample component="Checkbox" href="/components/checkbox">
+        <p>
+          Uncontrolled checkboxes that save on change. Tick &quot;Make the next save fail&quot;,
+          then a task: the box rolls back and the message appears next to it.
+        </p>
+        <Example file="CheckboxReject.tsx" css="checkbox.css">
+          <CheckboxReject />
+        </Example>
+      </ConceptExample>
+      <p>The rules:</p>
+      <ul>
+        <li>
+          <strong>Read when the action settles.</strong> A synchronous action calls it before
+          returning, an async one at any point before its promise resolves. Pending does not end
+          early: the part stays <code>data-pending</code> until the action settles.
+        </li>
+        <li>
+          <strong>Call it before the action settles.</strong> A call afterwards (from a promise the
+          action did not return or await, or a timer) does nothing and logs a development warning.
+          The usual mistake is <code>{"void save().catch(() => details.reject())"}</code>: return or
+          await the promise instead.
+        </li>
+        <li>
+          <strong>Twice is once, and a throw wins.</strong> It cannot be taken back; an action that
+          calls it and then throws anyway is an ordinary rejection and reaches the boundary.
+        </li>
+        <li>
+          <strong>Overlaps.</strong> It belongs to its own dispatch. On an older action that a newer
+          one superseded it changes nothing on screen; in a set-valued component (CheckboxGroup)
+          that one change is dropped and the others are kept.
+        </li>
+        <li>
+          <strong>Controlled mode.</strong> The parent's prop stays the truth: for the value,{" "}
+          <code>reject()</code> equals not adopting. It is still what keeps a menu, a toast or a
+          dialog open.
+        </li>
+        <li>
+          <strong>Actions only.</strong> An <code>on*</code> handler reports a fact and has no{" "}
+          <code>reject</code>. A form action (<code>Form.Root action</code>,{" "}
+          <code>Dialog.Form action</code>) receives <code>FormData</code> and no details; it returns
+          errors instead (<a href="/components/field">Field and Form</a>).
+        </li>
+      </ul>
+      <h4 id="reject-server">With a Server Function</h4>
+      <p>
+        Like <code>event</code>, <code>reject</code> is not an own property of <code>details</code>,
+        so it is not sent to the server: a Server Function passed directly has no{" "}
+        <code>details.reject</code>, and refuses by throwing. To show a message instead, wrap it on
+        the client:
+      </p>
+      <CodeBlock>{`checkedChangeAction={async (next, details) => {
+  const result = await setTaskDone(task.id, next); // "use server", returns { ok, message }
+  if (!result.ok) {
+    toast({ title: result.message });
+    details.reject();
+  }
+}}`}</CodeBlock>
+      <p>
+        <code>reject</code> does not depend on <code>this</code>:{" "}
+        <code>{"async (next, { reject }) => …"}</code> works. A copy (
+        <code>{"{ ...details }"}</code>) has no <code>reject</code>.
+      </p>
+      <h4 id="reject-valid">
+        With <code>details.valid</code>
+      </h4>
+      <p>
+        The two give the two things an inline-save action can do with an invalid value: keep it in
+        the control and save nothing, or put the saved value back.
+      </p>
+      <CodeBlock>{`valueCommitAction={async (next, details) => {
+  if (!details.valid) return;                  // the text stays; the Field shows why
+  // or: if (!details.valid) return details.reject();   // the saved text is back
+  await saveTitle(next);
+}}`}</CodeBlock>
 
       <h3 id="overlapping-actions">Overlapping actions: the latest intent wins</h3>
       <p>
@@ -580,8 +699,12 @@ useEffect(() => {
         A Server Function (<code>"use server"</code>) can be passed straight to any action prop,
         from a Server Component or a Client Component, without a client wrapper. The server receives
         the same arguments, <code>(next, details)</code>, with one difference: a DOM event cannot be
-        sent to the server, so <code>details.event</code> is <code>undefined</code> there. Every
-        other field of <code>details</code> (<code>reason</code>, for example) arrives intact.
+        sent to the server, so <code>details.event</code> is <code>undefined</code> there, and{" "}
+        <a href="#reject-server">
+          <code>details.reject</code>
+        </a>{" "}
+        is missing. Every other field of <code>details</code> (<code>reason</code>, for example)
+        arrives intact.
       </p>
       <ConceptExample component="Toggle" href="/components/toggle">
         <CodeBlock>{`// app/post.tsx: a Server Component
@@ -599,7 +722,8 @@ import { setFavorite } from "./actions"; // "use server"
           and <code>JSON.stringify</code> do not include <code>event</code>;{" "}
           <code>"event" in details</code> and <code>details.event</code> do.{" "}
           <code>structuredClone(details)</code> throws. In tests, assert <code>details.event</code>{" "}
-          directly rather than <code>toEqual({"{ event }"})</code>.
+          directly rather than <code>toEqual({"{ event }"})</code>. An action's{" "}
+          <code>details.reject</code> is served the same way.
         </p>
       </Callout>
 

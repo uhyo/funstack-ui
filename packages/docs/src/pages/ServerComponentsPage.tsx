@@ -105,6 +105,13 @@ import { saveOpenSections } from "./actions"; // "use server"
   ...
 </Accordion.Root>`}</CodeBlock>
       <p>
+        On the server, <code>details</code> has no <code>event</code> and no <code>reject</code>:
+        neither crosses the wire. A Server Function refuses a change by throwing (the nearest Error
+        Boundary); to show your own message and roll back instead, wrap it on the client and call{" "}
+        <code>details.reject()</code> there (see{" "}
+        <a href="/concepts/action-props#reject-server">With a Server Function</a>).
+      </p>
+      <p>
         A Server Function can be passed to an{" "}
         <a href="/concepts/action-props#on-handler">
           <code>on*</code> handler

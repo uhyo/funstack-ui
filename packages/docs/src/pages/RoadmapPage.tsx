@@ -29,6 +29,20 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
+          <a href="/concepts/action-props#reject">
+            <code>details.reject()</code>
+          </a>{" "}
+          (<a href={issue(207)}>#207</a>): an action that catches its own error and calls it before
+          it settles is treated as rejected (the optimistic value reverts, uncontrolled state is not
+          written, a menu, toast or dialog stays open, an overlay keeps its <code>open</code>)
+          without reaching an Error Boundary or <code>reportError</code>. Types: every action
+          prop&apos;s <code>details</code> is now <code>Details &amp; Rejectable</code> (
+          <code>ChangeAction</code> included); the named details types are unchanged, and handlers
+          have no <code>reject</code>. A rejecting <code>Toast.Action</code> reaches the boundary
+          above the Action part, as it always did; the docs now say so (they said &quot;above the
+          Viewport&quot;) and recommend a boundary around the Action.
+        </li>
+        <li>
           <a href="/components/text-field">TextField</a> in a textarea: Ctrl+Enter / Cmd+Enter
           commits, as a blur does, and is always prevented; it submits no form, and Enter is still a
           new line (<a href={issue(196)}>#196</a>). <code>type="search"</code> stays unsupported;

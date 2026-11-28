@@ -114,11 +114,16 @@ export function MenuPage() {
         Root (<code>openChangeAction(false, {'{ reason: "activate" }'})</code>, then{" "}
         <code>hidePopover()</code> in the commit, with a view transition if the Popup has{" "}
         <code>transition</code>). A synchronous action closes in the same tick. A rejection leaves
-        the menu open and reaches the nearest Error Boundary above the item. A second click, Enter
-        or Space while the action is pending is ignored (and cancelled), and the item is{" "}
-        <code>aria-disabled="true"</code> meanwhile: the first activation already ends in the menu's
-        close. A <code>{"closeOnActivate={false}"}</code> item is different: nothing of the
-        library's follows its action, so it runs every activation (a "Zoom in" item counts each
+        the menu open and reaches the nearest Error Boundary above the item; an action that shows
+        its own message and calls{" "}
+        <a href="/concepts/action-props#reject">
+          <code>details.reject()</code>
+        </a>{" "}
+        leaves it open with no boundary (a CheckboxItem or RadioItem also rolls its check back). A
+        second click, Enter or Space while the action is pending is ignored (and cancelled), and the
+        item is <code>aria-disabled="true"</code> meanwhile: the first activation already ends in
+        the menu's close. A <code>{"closeOnActivate={false}"}</code> item is different: nothing of
+        the library's follows its action, so it runs every activation (a "Zoom in" item counts each
         press), with <code>data-pending</code> until the last run settles and no{" "}
         <code>aria-disabled</code>. <code>whilePending</code> overrides either default. A pending
         item is an ordinary item for navigation; only the open focus skips items with the{" "}
@@ -379,7 +384,7 @@ export function MenuPage() {
         rows={[
           {
             name: "action",
-            type: "Action<[details: MenuItemActionDetails]>",
+            type: "Action<[details: MenuItemActionDetails & Rejectable]>",
             description:
               'Runs in the item\'s own transition (`data-pending` on the item); the menu closes when it settles. A second activation while it is pending is ignored, and the item is `aria-disabled="true"` meanwhile, unless `whilePending` is `"run"` (the default with `closeOnActivate={false}`). May be a Server Function (`details.event` is virtual). A rejection keeps the menu open and reaches the nearest Error Boundary above the item.',
           },

@@ -149,20 +149,71 @@ toast({ title: "Link copied" });`}</CodeBlock>
         Undo, one Retry. With <code>closeOnActivate={"{false}"}</code> the toast stays and the
         Action is your own trigger, so every click runs (add <code>whilePending="ignore"</code> for
         a Retry that must not overlap). A rejection keeps the toast and reaches the nearest Error
-        Boundary <strong>above the Viewport</strong>: put one around the list. Not when the Action
-        is gone or hidden by the time it rejects: the toast was closed while the action ran, or a{" "}
-        <code>toast.update</code> gave it content that is still suspending. The error then goes to
-        the global <code>reportError</code> (a window <code>error</code> event) instead.
+        Boundary <strong>above the Action part</strong>, the part that owns the transition. Not when
+        the Action is gone or hidden by the time it rejects: the toast was closed while the action
+        ran, or a <code>toast.update</code> gave it content that is still suspending. The error then
+        goes to the global <code>reportError</code> (a window <code>error</code> event) instead.
       </p>
+      <p>
+        To show the failure in the toast, catch inside the action, update the toast and call{" "}
+        <a href="/concepts/action-props#reject">
+          <code>details.reject()</code>
+        </a>
+        : the toast stays with no Error Boundary involved, <code>data-pending</code> leaves, the
+        timer resumes, and the Action can be pressed again (a Retry).
+      </p>
+      <CodeBlock>{`toast({
+  title: "Archived",
+  action: {
+    label: "Undo",
+    action: async (details) => {
+      try {
+        await unarchive(itemId);
+      } catch (e) {
+        toast.update(details.id, { title: "Could not undo", description: String(e), priority: "high" });
+        details.reject(); // keep the toast: a resolved action would close it
+      }
+    },
+  },
+});`}</CodeBlock>
       <Callout kind="warning" title="A caught error closes the toast">
         <p>
           A <code>catch</code> inside the action resolves it, and a resolved action closes the
           toast, so a "Could not undo" written with <code>toast.update</code> in the{" "}
-          <code>catch</code> is never seen. Rethrow after the update (the toast stays; the boundary
-          above the Viewport gets the error), or use <code>closeOnActivate={"{false}"}</code>,{" "}
-          <code>whilePending="ignore"</code> and <code>toast.dismiss(details.id)</code> on success.
+          <code>catch</code> is never seen unless the action also calls{" "}
+          <code>details.reject()</code>. Rethrowing after the update does not help: any boundary
+          that contains the toast replaces the toast you just updated.
         </p>
       </Callout>
+      <p>
+        For an action that lets its error through, where the Error Boundary sits decides what a
+        failed Undo takes with it:
+      </p>
+      <Table
+        head={["Boundary", "A failed Undo shows"]}
+        rows={[
+          [
+            "around `Toast.Action`, inside the Root",
+            "the fallback instead of the button; the toast, its Title and its Close stay. **The recommended place.**",
+          ],
+          [
+            "around one `Toast.Root` (one per toast, in the Viewport's `children` function)",
+            "the fallback instead of that toast; the others stay",
+          ],
+          ["around the list inside the Viewport", "one fallback instead of every toast"],
+          [
+            "around `Toast.Viewport`, or none nearer than the app's",
+            "the region is gone, or the page is",
+          ],
+        ]}
+      />
+      <CodeBlock>{`<Toast.Root toast={t}>
+  <Toast.Title />
+  <ErrorBoundary fallback={<span>Could not undo</span>}>
+    <Toast.Action />
+  </ErrorBoundary>
+  <Toast.Close aria-label="Close">×</Toast.Close>
+</Toast.Root>`}</CodeBlock>
       <p>
         A toast's <code>onClose</code> is called once, synchronously, in the moment the toast is
         closed (its exit animation, if any, has not run yet): <code>"activate"</code> (its Action
@@ -290,7 +341,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
           },
           {
             name: "action",
-            type: "{ label: ReactNode; action: Action<[ToastActionDetails]> }",
+            type: "{ label: ReactNode; action: Action<[details: ToastActionDetails & Rejectable]> }",
             description:
               "What `Toast.Action` renders and runs. `details.id` is the toast's id, so an inline action can update or dismiss its own toast.",
           },
@@ -416,7 +467,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
         rows={[
           {
             name: "action",
-            type: "Action<[ToastActionDetails]>",
+            type: "Action<[details: ToastActionDetails & Rejectable]>",
             default: "toast.action.action",
             description:
               "Runs in this part's transition. The part renders nothing when neither it nor the toast has an action.",
