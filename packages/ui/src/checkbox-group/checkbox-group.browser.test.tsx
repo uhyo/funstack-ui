@@ -373,4 +373,82 @@ describe("CheckboxGroup (browser)", () => {
       expect(prop(await node("b", "checkbox"), "invalid") ?? "false").toBe("false");
     });
   });
+
+  // #203 probes P1, P7 and P8 on the group (conventions 3.6.1 rules 5, 6, 13).
+  describe("readOnly", () => {
+    function ReadOnlyGroup({ action }: { action?: ActionFn }) {
+      return (
+        <form data-testid="form" onSubmit={(e) => e.preventDefault()}>
+          <CheckboxGroup.Root
+            aria-label="T"
+            name="t"
+            readOnly
+            required
+            defaultValue={["a"]}
+            valueChangeAction={action}
+          >
+            <label>
+              <CheckboxGroup.Parent values={["a", "b"]} /> all
+            </label>
+            <CheckboxGroup.Item value="a" aria-label="a" />
+            <CheckboxGroup.Item value="b" aria-label="b" />
+          </CheckboxGroup.Root>
+        </form>
+      );
+    }
+
+    it("a click on an Item, the Parent, its label or Space changes nothing; no input / change", async () => {
+      const action = vi.fn<ActionFn>();
+      const { container } = render(<ReadOnlyGroup action={action} />);
+      const seen: string[] = [];
+      for (const type of ["input", "change"])
+        container.addEventListener(type, () => seen.push(type));
+      await user.click(box("b"));
+      await user.click(box("a"));
+      await user.click(screen.getByText("all"));
+      box("b").focus();
+      await user.keyboard(" ");
+      await flushMicrotasks();
+      expect(checkedValues()).toEqual(["a"]);
+      expect(box("all").matches(":indeterminate")).toBe(true);
+      expect(seen).toEqual([]);
+      expect(action).not.toHaveBeenCalled();
+      const form = screen.getByTestId("form") as HTMLFormElement;
+      expect(new FormData(form).getAll("t")).toEqual(["a"]);
+    });
+
+    it("an empty read-only required group does not block requestSubmit()", async () => {
+      const onSubmit = vi.fn();
+      render(
+        <form
+          data-testid="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+        >
+          <CheckboxGroup.Root aria-label="T" name="t" readOnly required>
+            <CheckboxGroup.Item value="a" aria-label="a" />
+          </CheckboxGroup.Root>
+        </form>,
+      );
+      await act(async () => {
+        (screen.getByTestId("form") as HTMLFormElement).requestSubmit();
+      });
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(box("a").matches(":user-invalid")).toBe(false);
+    });
+
+    it("real clicks before hydration are undone at mount; nothing is dispatched", async () => {
+      const action = vi.fn<ActionFn>();
+      await hydrateFromServer(<ReadOnlyGroup action={action} />, {
+        mutate: async (container) => {
+          await user.click(container.querySelector<HTMLInputElement>('input[value="b"]')!);
+        },
+      });
+      expect(checkedValues()).toEqual(["a"]);
+      expect(box("all").matches(":indeterminate")).toBe(true);
+      expect(action).not.toHaveBeenCalled();
+    });
+  });
 });

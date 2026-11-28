@@ -217,5 +217,87 @@ export function describeCheckableInputInBrowser(config: CheckableInputBrowserCon
       expect(consoleError).not.toHaveBeenCalled();
       consoleError.mockRestore();
     });
+
+    // #203 probe P1 (conventions 3.6.1 rule 6): the cancelled click restores `checked` and fires
+    // neither `input` nor `change`, for the mouse, Space and a label alike.
+    it("readOnly: a click, Space and a label click change nothing; no input / change", async () => {
+      const action = vi.fn<ActionFn>();
+      const { container } = render(
+        <form>
+          <label>
+            <Control readOnly checkedChangeAction={action} />
+            Wi-Fi
+          </label>
+        </form>,
+      );
+      const seen: string[] = [];
+      for (const type of ["input", "change"]) {
+        container.addEventListener(type, () => seen.push(type));
+      }
+      await user.click(input());
+      expect(input().checked).toBe(false);
+      input().focus();
+      await user.keyboard(" ");
+      expect(input().checked).toBe(false);
+      await user.click(screen.getByText("Wi-Fi"));
+      await flushMicrotasks();
+      expect(input().checked).toBe(false);
+      expect(input().matches(":checked")).toBe(false);
+      expect(input()).toHaveFocus();
+      expect(seen).toEqual([]);
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it("readOnly: a checked box stays checked after a click and is submitted", async () => {
+      const { container } = render(
+        <form>
+          <Control aria-label="Wi-Fi" name="wifi" readOnly defaultChecked />
+        </form>,
+      );
+      await user.click(input());
+      await flushMicrotasks();
+      expect(input().checked).toBe(true);
+      expect(new FormData(container.querySelector("form")!).get("wifi")).toBe("on");
+    });
+
+    // #203 probe P8 (rule 5): a required read-only box renders no native `required`, and the
+    // platform's own bar on a `readonly` text input, for reference.
+    it("readOnly: a required unchecked box and a required empty readonly text do not block requestSubmit()", async () => {
+      const onSubmit = vi.fn();
+      const { container } = render(
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            onSubmit();
+          }}
+        >
+          <Control aria-label="Wi-Fi" readOnly required />
+          <input aria-label="Text" required readOnly value="" />
+        </form>,
+      );
+      const form = container.querySelector("form")!;
+      expect(form.checkValidity()).toBe(true);
+      await act(async () => {
+        form.requestSubmit();
+      });
+      expect(onSubmit).toHaveBeenCalledTimes(1);
+      expect(input().matches(":user-invalid")).toBe(false);
+    });
+
+    // #203 probe P7 (rule 13): a real click before hydration is undone at mount, not dispatched.
+    it("readOnly: a real click before hydration is undone at mount; nothing is dispatched", async () => {
+      const action = vi.fn<ActionFn>();
+      const ui: ReactNode = <Control aria-label="Wi-Fi" readOnly checkedChangeAction={action} />;
+      await hydrateFromServer(ui, {
+        mutate: async (container) => {
+          const server = container.querySelector("input")!;
+          await user.click(server);
+          expect(server.checked).toBe(true);
+        },
+      });
+      expect(input().checked).toBe(false);
+      expect(input()).not.toHaveAttribute("data-checked");
+      expect(action).not.toHaveBeenCalled();
+    });
   });
 }

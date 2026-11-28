@@ -20,7 +20,7 @@ import type {
   SliderValueChangeDetails,
   SliderValueCommitDetails,
 } from "./index.js";
-import { flushMicrotasks } from "../__tests__/helpers.js";
+import { flushMicrotasks, hydrateFromServer } from "../__tests__/helpers.js";
 import { spyViewTransitions } from "../__tests__/browser-helpers.js";
 
 type Value = number | readonly number[];
@@ -601,5 +601,96 @@ describe("Slider inside a Field (browser)", () => {
     await flushMicrotasks();
     expect(action).toHaveBeenCalledTimes(1);
     expect(action.mock.calls[0]![0].getAll("price")).toEqual(["10", "50"]);
+  });
+});
+
+// #203 probes P5, P6 and P7 (conventions 3.6.1 rules 6, 13), kept as the component's rows.
+describe("Slider readOnly (browser)", () => {
+  function recordEvents(container: HTMLElement): string[] {
+    const seen: string[] = [];
+    for (const type of ["input", "change"]) container.addEventListener(type, () => seen.push(type));
+    return seen;
+  }
+
+  it("P5: the arrows, Home, End, Page Up and Page Down step nothing; no input fires", async () => {
+    const onChange = vi.fn<ChangeFn>();
+    const onCommit = vi.fn<CommitFn>();
+    const { container } = render(
+      <Fixture
+        defaultValue={50}
+        readOnly
+        valueChangeAction={onChange}
+        valueCommitAction={onCommit}
+      />,
+    );
+    const seen = recordEvents(container);
+    await focusThumb();
+    for (const keys of [
+      "{ArrowLeft}",
+      "{ArrowRight}",
+      "{ArrowUp}",
+      "{ArrowDown}",
+      "{Home}",
+      "{End}",
+      "{PageUp}",
+      "{PageDown}",
+      "{Shift>}{ArrowRight}{/Shift}",
+    ]) {
+      await user.keyboard(keys);
+      expect(input().value).toBe("50");
+    }
+    await flushMicrotasks();
+    expect(input()).toHaveFocus();
+    expect(seen).toEqual([]);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("P6: a native input with no key before it (an assistive technology) is written back", async () => {
+    const onChange = vi.fn<ChangeFn>();
+    render(<Fixture defaultValue={50} readOnly valueChangeAction={onChange} />);
+    const field = input();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(field, "70");
+    act(() => {
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    // Written back before the event ended.
+    expect(field.value).toBe("50");
+    await flushMicrotasks();
+    expect(field.value).toBe("50");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("a real press and drag on the Track does nothing", async () => {
+    const onChange = vi.fn<ChangeFn>();
+    render(<Fixture defaultValue={50} readOnly valueChangeAction={onChange} />);
+    await user.click(screen.getByTestId("track"), { position: { x: 180, y: 10 } });
+    await flushMicrotasks();
+    expect(input().value).toBe("50");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("P7: a key pressed before hydration is undone at mount; nothing is dispatched", async () => {
+    const onChange = vi.fn<ChangeFn>();
+    const onCommit = vi.fn<CommitFn>();
+    await hydrateFromServer(
+      <Fixture
+        defaultValue={40}
+        readOnly
+        valueChangeAction={onChange}
+        valueCommitAction={onCommit}
+      />,
+      {
+        mutate: async (container) => {
+          const field = container.querySelector("input")!;
+          field.focus();
+          await userEvent.keyboard("{End}");
+          expect(field.value).toBe("100");
+        },
+      },
+    );
+    expect(input().value).toBe("40");
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onCommit).not.toHaveBeenCalled();
   });
 });

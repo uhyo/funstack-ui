@@ -69,6 +69,7 @@ export interface RadioGroupRootProps extends Omit<
   | "name"
   | "disabled"
   | "form"
+  | "aria-readonly"
 > {
   /**
    * Controlled checked value. `null` checks nothing; `undefined` means uncontrolled.

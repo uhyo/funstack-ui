@@ -371,3 +371,93 @@ describe("RadioGroup (browser)", () => {
     expect(checkedValues()).toEqual(["a"]);
   });
 });
+
+// #203 probes P2, P3 and P7 (conventions 3.6.1 rules 3, 6, 13), kept as the component's rows.
+describe("RadioGroup readOnly (browser)", () => {
+  function ReadOnlyFruits({ action }: { action?: ActionFn }) {
+    return (
+      <div>
+        <button type="button">before</button>
+        <RadioGroup.Root aria-label="Fruit" readOnly defaultValue="b" valueChangeAction={action}>
+          {["a", "b", "c"].map((v) => (
+            <label key={v} style={{ display: "inline-block", marginInline: "1em" }}>
+              <RadioGroup.Item value={v} /> {v}
+            </label>
+          ))}
+        </RadioGroup.Root>
+        <button type="button">after</button>
+      </div>
+    );
+  }
+
+  function recordEvents(container: HTMLElement): string[] {
+    const seen: string[] = [];
+    for (const type of ["input", "change"]) container.addEventListener(type, () => seen.push(type));
+    return seen;
+  }
+
+  it("P2: a click on a radio or its label checks nothing; no input / change, no dispatch", async () => {
+    const action = vi.fn<ActionFn>();
+    const { container } = render(<ReadOnlyFruits action={action} />);
+    const seen = recordEvents(container);
+    await user.click(radio("a"));
+    expect(checkedValues()).toEqual(["b"]);
+    await user.click(screen.getByText("c"));
+    await flushMicrotasks();
+    expect(checkedValues()).toEqual(["b"]);
+    expect(seen).toEqual([]);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it.each([["{ArrowDown}"], ["{ArrowRight}"], ["{ArrowUp}"], ["{ArrowLeft}"]])(
+    "P3: %s moves focus and checks nothing; the checked radio stays the Tab stop",
+    async (key) => {
+      const action = vi.fn<ActionFn>();
+      const { container } = render(<ReadOnlyFruits action={action} />);
+      const seen = recordEvents(container);
+      radio("b").focus();
+      await user.keyboard(key);
+      await flushMicrotasks();
+      const forward = key === "{ArrowDown}" || key === "{ArrowRight}";
+      expect(document.activeElement).toBe(radio(forward ? "c" : "a"));
+      expect(checkedValues()).toEqual(["b"]);
+      expect(seen).toEqual([]);
+      expect(action).not.toHaveBeenCalled();
+      // Tab out, and Shift+Tab back in: the checked radio is the group's stop. From an unchecked
+      // radio before it, Chromium and Firefox stop on the checked radio first (their own
+      // behaviour without any handler); no unchecked radio is ever a stop.
+      const after = screen.getByRole("button", { name: "after" });
+      for (let i = 0; i < 3 && document.activeElement !== after; i++) {
+        await user.tab();
+        expect(document.activeElement === after || document.activeElement === radio("b")).toBe(
+          true,
+        );
+      }
+      expect(after).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(radio("b")).toHaveFocus();
+    },
+  );
+
+  it("P3: at the end of the group an arrow behaves as without readOnly (WebKit stops)", async () => {
+    const { container } = render(<ReadOnlyFruits />);
+    const seen = recordEvents(container);
+    radio("c").focus();
+    await user.keyboard("{ArrowDown}");
+    await flushMicrotasks();
+    expect(document.activeElement).toBe(arrowsWrap ? radio("a") : radio("c"));
+    expect(checkedValues()).toEqual(["b"]);
+    expect(seen).toEqual([]);
+  });
+
+  it("P7: a real click before hydration is undone at mount; nothing is dispatched", async () => {
+    const action = vi.fn<ActionFn>();
+    await hydrateFromServer(<ReadOnlyFruits action={action} />, {
+      mutate: async (container) => {
+        await user.click(container.querySelector<HTMLInputElement>('input[value="c"]')!);
+      },
+    });
+    expect(checkedValues()).toEqual(["b"]);
+    expect(action).not.toHaveBeenCalled();
+  });
+});

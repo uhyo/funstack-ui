@@ -77,6 +77,7 @@ function Fruits({
   children?: ReactNode;
   name?: string;
   required?: boolean;
+  readOnly?: boolean;
 }) {
   return (
     <Select.Root
@@ -643,4 +644,105 @@ describe("Select (browser)", () => {
       expect(content().textContent).toBe("Apple");
     });
   });
+});
+
+// #203 probe P4 (conventions 3.6.1 rule 6): the unselected options are natively disabled, so no
+// pick, arrow, Home / End or typeahead leaves the current option, in every engine; the select is
+// in the Tab order, posts its value and follows a form reset.
+describe("Select readOnly (browser)", () => {
+  function recordEvents(container: HTMLElement): string[] {
+    const seen: string[] = [];
+    for (const type of ["input", "change"]) container.addEventListener(type, () => seen.push(type));
+    return seen;
+  }
+
+  it("the keys on the closed select change nothing; Tab order; FormData; a reset follows", async () => {
+    const action = vi.fn<ActionFn>();
+    const { container } = render(
+      <form data-testid="form">
+        <button type="button">before</button>
+        <Fruits action={action} name="fruit" readOnly defaultValue="a" value="b" />
+      </form>,
+    );
+    const seen = recordEvents(container);
+    screen.getByRole("button", { name: "before" }).focus();
+    await user.tab();
+    expect(sel()).toHaveFocus();
+    for (const key of ["{ArrowDown}", "{ArrowUp}", "{Home}", "{End}", "c", "a"]) {
+      await user.keyboard(key);
+      // A key may open the picker (customizable select); close it without committing.
+      if (isOpen()) await user.keyboard("{Escape}");
+      expect(sel().value).toBe("b");
+    }
+    await flushFor();
+    expect(seen).toEqual([]);
+    expect(action).not.toHaveBeenCalled();
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    expect(new FormData(form).get("fruit")).toBe("b");
+  });
+
+  it("a form reset selects the reset target, which becomes the enabled, posted option", async () => {
+    function Controlled() {
+      const [value, setValue] = useState("b");
+      return (
+        <form data-testid="form">
+          <Fruits
+            name="fruit"
+            readOnly
+            value={value}
+            action={(next) => startTransition(() => setValue(next))}
+          />
+          <button type="button" onClick={() => setValue("a")}>
+            Set A
+          </button>
+          <button type="reset">Reset</button>
+        </form>
+      );
+    }
+    // The mount-time value ("b") is the controlled reset target; the parent then sets "a".
+    render(<Controlled />);
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    const options = () => [...sel().options].map((o) => [o.value, o.disabled]);
+    await user.click(screen.getByRole("button", { name: "Set A" }));
+    expect(sel().value).toBe("a");
+    expect(options()).toEqual([
+      ["a", false],
+      ["b", true],
+      ["c", true],
+    ]);
+    expect(new FormData(form).get("fruit")).toBe("a");
+    await user.click(screen.getByRole("button", { name: "Reset" }));
+    await flushFor();
+    expect(sel().value).toBe("b");
+    expect(options()).toEqual([
+      ["a", true],
+      ["b", false],
+      ["c", true],
+    ]);
+    expect(new FormData(form).get("fruit")).toBe("b");
+  });
+
+  it.runIf(supportsBaseSelect)(
+    "the open picker: a click on a disabled option changes nothing",
+    async () => {
+      const action = vi.fn<ActionFn>();
+      const { container } = render(<Fruits action={action} readOnly defaultValue="a" />);
+      const seen = recordEvents(container);
+      await user.click(sel());
+      await expect.poll(() => isOpen()).toBe(true);
+      const cherry = sel().querySelector<HTMLOptionElement>('option[value="c"]')!;
+      expect(cherry.disabled).toBe(true);
+      await act(async () => {
+        await userEvent.click(cherry, { force: true });
+      });
+      await flushFor();
+      expect(sel().value).toBe("a");
+      if (isOpen()) await user.keyboard("{ArrowDown}{Enter}");
+      await flushFor();
+      expect(sel().value).toBe("a");
+      expect(content().textContent).toBe("Apple");
+      expect(seen).toEqual([]);
+      expect(action).not.toHaveBeenCalled();
+    },
+  );
 });
