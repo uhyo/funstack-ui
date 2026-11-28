@@ -28,7 +28,7 @@ export type {
   CheckboxGroupRootState,
   CheckboxGroupValueChangeDetails,
 } from "./checkbox-group-root.js";
-export type { CheckboxGroupLabelProps } from "./checkbox-group-label.js";
+export type { CheckboxGroupLabelProps, CheckboxGroupLabelState } from "./checkbox-group-label.js";
 export type { CheckboxGroupItemProps, CheckboxGroupItemState } from "./checkbox-group-item.js";
 export type {
   CheckboxGroupParentProps,

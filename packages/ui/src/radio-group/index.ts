@@ -25,5 +25,5 @@ export type {
   RadioGroupRootState,
   RadioGroupValueChangeDetails,
 } from "./radio-group-root.js";
-export type { RadioGroupLabelProps } from "./radio-group-label.js";
+export type { RadioGroupLabelProps, RadioGroupLabelState } from "./radio-group-label.js";
 export type { RadioGroupItemProps, RadioGroupItemState } from "./radio-group-item.js";

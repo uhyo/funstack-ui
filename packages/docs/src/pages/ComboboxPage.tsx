@@ -782,8 +782,13 @@ export function ComboboxPage() {
           ["Escape", "open", "The platform closes the listbox; focus and text stay."],
           [
             "Escape",
+            "opening (requested, not shown yet)",
+            'As if it were shown: the coming open is cancelled (`openChangeAction(false)`, `"activate"`), the text stays, and the key is consumed, so an enclosing Dialog or Popover stays open.',
+          ],
+          [
+            "Escape",
             "closed, edited text",
-            'Reverts the text to what a blur would leave (the selection\'s label, the committed custom value with `allowCustomValue`, `""` with no selection; with `multiple` the search text is cleared and the chips stay), through `onInputValueChange` with `reason: "dismiss"`; no value is dispatched. The key is consumed: an enclosing Dialog or Popover stays open.',
+            'Reverts the text to the committed value\'s text (the selection\'s label, the committed custom value with `allowCustomValue`, `""` with no selection; with `multiple` the search text is cleared and the chips stay), through `onInputValueChange` with `reason: "dismiss"`; no value is dispatched. The key is consumed: an enclosing Dialog or Popover stays open.',
           ],
           [
             "Escape",

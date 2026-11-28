@@ -40,3 +40,18 @@ Conventions 4.1 rule 2 applied to the gaps found above:
   `popover-popup.tsx`: the shared paragraph is identical, nothing to change.
 - Merge of origin/master (f8ee0fea): the one conflict was `internal/transition-boundary.test.tsx`
   (#202's Button row kept; Toggle, Tabs.Tab, Switch, Checkbox, RadioGroup.Item rows gone).
+
+## Review fixes (memo/reviewer/issue-200.md on review/200)
+
+- Combobox Escape with an open on its way (`popover.intended() && !popover.committed`, the
+  condition of the `multiple` Enter row): the listbox's, as if shown: `requestClose(event,
+  "activate")`, text kept, consumed. `form-reset-button.browser.test.tsx` is back to its master
+  form (no wait). jsdom rows that typed and pressed Escape in one `user.keyboard` call now flush
+  the open first. Design: combobox.md 8 (new row, "the committed value's text"), 2.2, 5.4;
+  testing.md "Draft revert"; a CHANGELOG entry. Conventions 15 still says "what a blur would
+  leave" (left to the architect, noted in the entry).
+- `CheckboxGroupLabelState`, `RadioGroupLabelState` exported and used on the Labels.
+- `CheckboxProps` / `SwitchProps` `readOnly` and `transition` pinned in their own test files.
+- `Slider.Label`, `NumberField.Label`: `data-invalid`.
+- `Slider.Thumb`: the single-thumb missing-name warning (`CONTROL_NAME` on the input); the
+  multi-thumb per-thumb warning is unchanged and the new one stays silent there.

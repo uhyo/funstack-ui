@@ -256,7 +256,7 @@ export function SliderPage() {
             name: "aria-label, aria-labelledby, aria-describedby",
             type: "string",
             description:
-              "Forwarded to the input. Every thumb of a multi-thumb slider needs a name (development warning).",
+              "Forwarded to the input. Every thumb of a multi-thumb slider needs a name, and a single thumb needs one from these, a `Slider.Label` or a `Field.Label` (development warnings).",
           },
           {
             name: "inputRef",
@@ -312,7 +312,7 @@ export function SliderPage() {
       <PartFacts
         state={"`SliderLabelState`, an alias of `SliderRootState`."}
         owned={
-          "`id`, `htmlFor`, `data-disabled`, `data-pending`, `data-dragging`, `data-orientation` (the Root's)."
+          "`id`, `htmlFor`, `data-disabled`, `data-pending`, `data-dragging`, `data-orientation`, `data-invalid` (the Root's)."
         }
         note={
           "The Label must stay a `<label>` with one thumb (it names the input through `for`); with several thumbs the Root is named by the Label's id. Its state is not tied to the Root's value type: `value` is typed `number | readonly number[]`; narrow it with `<Slider.Label<number>>` or read `values`."

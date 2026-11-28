@@ -13,7 +13,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -38,6 +38,7 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { CheckboxGroup } from "./index.js";
 import type {
+  CheckboxGroupLabelState,
   CheckboxGroupItemProps,
   CheckboxGroupItemState,
   CheckboxGroupParentProps,
@@ -2451,6 +2452,20 @@ describe("CheckboxGroup inside a Field.Root", () => {
 
 // #200, the consistency alignment: conventions 3.1, 3.6, 4.1 rule 5, 5.1, 9.5; testing.md 10.1.
 describe("CheckboxGroup alignment rows", () => {
+  it("types: the Label has its state type (conventions 9.4)", () => {
+    expectTypeOf<CheckboxGroupLabelState>().toEqualTypeOf<CheckboxGroupRootState>();
+    void (
+      <CheckboxGroup.Root aria-label="x">
+        <CheckboxGroup.Label
+          className={(s) => {
+            expectTypeOf(s).toEqualTypeOf<CheckboxGroupLabelState>();
+            return "";
+          }}
+        />
+      </CheckboxGroup.Root>
+    );
+  });
+
   it("types: no `transition` or `readOnly` on Item / Parent; readonly arrays", () => {
     // @ts-expect-error A value control whose attributes are all optimistic takes no `transition`.
     const item: CheckboxGroupItemProps = { value: "a", transition: "fade" };

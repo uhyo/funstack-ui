@@ -88,7 +88,6 @@ export interface SwitchProps extends Omit<
    * @defaultValue `"on"` (platform)
    */
   value?: string;
-
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SwitchState>;
   /** Inline style, or a function of the part's state that returns one. */

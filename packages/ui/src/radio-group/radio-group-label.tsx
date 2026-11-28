@@ -5,6 +5,9 @@ import { useRender } from "../internal/use-render.js";
 import { useRadioGroupContext } from "./radio-group-context.js";
 import type { RadioGroupRootState } from "./radio-group-root.js";
 
+/** State of `RadioGroup.Label`: the Root's (conventions 9.4). */
+export type RadioGroupLabelState = RadioGroupRootState;
+
 /**
  * Props of `RadioGroup.Label`.
  *
@@ -15,13 +18,13 @@ export interface RadioGroupLabelProps extends Omit<
   "className" | "style" | "children"
 > {
   /** Class name, or a function of the part's state that returns one. */
-  className?: StateValue<string | undefined, RadioGroupRootState>;
+  className?: StateValue<string | undefined, RadioGroupLabelState>;
   /** Inline style, or a function of the part's state that returns one. */
-  style?: StateValue<CSSProperties | undefined, RadioGroupRootState>;
+  style?: StateValue<CSSProperties | undefined, RadioGroupLabelState>;
   /** Receives the Root's state: a group-level pending indicator goes here. */
-  children?: StateValue<ReactNode, RadioGroupRootState>;
+  children?: StateValue<ReactNode, RadioGroupLabelState>;
   /** Replace the default `<legend>` (element form) or take over rendering (function form). */
-  render?: RenderProp<ComponentPropsWithRef<"legend">, RadioGroupRootState>;
+  render?: RenderProp<ComponentPropsWithRef<"legend">, RadioGroupLabelState>;
 }
 
 /**
@@ -38,7 +41,7 @@ export function RadioGroupLabel({
   ...rest
 }: RadioGroupLabelProps) {
   const { state } = useRadioGroupContext("RadioGroup.Label");
-  return useRender<ComponentPropsWithRef<"legend">, RadioGroupRootState>({
+  return useRender<ComponentPropsWithRef<"legend">, RadioGroupLabelState>({
     defaultElement: "legend",
     render,
     state,

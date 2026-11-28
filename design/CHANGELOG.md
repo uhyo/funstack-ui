@@ -16268,3 +16268,28 @@ edit, each in its own components' blocks.
   `CollapsiblePage.tsx`, `ToolbarPage.tsx` (the disabled rows), `TabsPage.tsx`,
   `ToggleGroupPage.tsx`, `MenubarPage.tsx`; `packages/example/src/accordion-demo.tsx`,
   `toolbar-demo.tsx`.
+
+## 2026-11-28, #200 review: Escape while a Combobox open is on its way; the revert target's wording
+
+Developer, on the review of #200 (`memo/reviewer/issue-200.md` on `review/200`, finding 1 and 6),
+at the coordinator's request. Changed: `design/components/combobox.md` section 8 (a new Escape
+row, the revert rows' wording), its 2.2 text-write table and 5.4 Escape row;
+`design/testing.md` 10.1 "Draft revert".
+
+- **The gap.** The #199 rule decided Escape on `:popover-open` alone. An Escape that arrives
+  while the keystroke's own open is still rendering (or a slow `openChangeAction` is pending)
+  found the listbox "closed", reverted the text, and the open then landed: the listbox showed
+  with the reverted text. Probed in Chromium and Firefox, also inside a modal Dialog.
+- **The rule.** An open requested but not shown yet (intended open, committed closed, the
+  condition the Enter row of 15.6 already uses) makes the Escape the listbox's, as if it were
+  shown: the open is cancelled by a close request (`openChangeAction(false)`, `"activate"`, the
+  `keydown`; nothing was shown, so it is not a dismissal), the text stays, the key is consumed.
+  The next Escape follows the closed rows. So the sequence is the same whether the listbox was
+  shown or only on its way: close (or cancel), revert, then the enclosing layer.
+- **Wording.** The revert target is "the committed value's text", not "what a blur would leave":
+  with `allowCustomValue` a blur commits the typed text while Escape goes back to the committed
+  value (as TextField's draft revert does). The targets themselves are unchanged. Conventions 15
+  still says "what a blur would leave" in its Combobox paragraph; the architect may align it.
+- Tests: a jsdom row with a deferred `openChangeAction`, a browser row (Escape right after the
+  keystroke inside a modal Dialog). `form-reset-button.browser.test.tsx` no longer needs to wait
+  for the listbox before its Escape.

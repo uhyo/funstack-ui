@@ -363,7 +363,7 @@ export function NumberFieldPage() {
       />
       <PartFacts
         state={"`NumberFieldState`."}
-        owned={"`id`, `htmlFor`, `data-pending`, `data-disabled`."}
+        owned={"`id`, `htmlFor`, `data-pending`, `data-disabled`, `data-invalid`."}
         note={
           "Must stay a `<label>`: it names the visible input through `for` and, through its id, the Root group."
         }
@@ -388,7 +388,7 @@ export function NumberFieldPage() {
             "every part",
             "Disabled (the buttons also at their bound and when read-only).",
           ],
-          ["`data-invalid`", "Root, Input", "Inside a Field that shows an error."],
+          ["`data-invalid`", "Root, Label, Input", "Inside a Field that shows an error."],
           [
             "`:user-invalid`, `:read-only`, `:disabled`, `:placeholder-shown`",
             "the visible input",

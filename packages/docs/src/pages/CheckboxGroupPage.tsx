@@ -207,11 +207,17 @@ export function CheckboxGroupPage() {
       </h4>
       <PropsTable
         rows={[
-          ...functionProps("CheckboxGroupRootState", "Content, or a function of the Root's state."),
-          renderProp("legend", "CheckboxGroupRootState"),
+          ...functionProps(
+            "CheckboxGroupLabelState",
+            "Content, or a function of the Root's state.",
+          ),
+          renderProp("legend", "CheckboxGroupLabelState"),
         ]}
       />
-      <PartFacts state={"the Root's."} owned={"none."} />
+      <PartFacts
+        state={"`CheckboxGroupLabelState`, an alias of `CheckboxGroupRootState`."}
+        owned={"none."}
+      />
 
       <h4>
         <code>CheckboxGroup.Item</code>

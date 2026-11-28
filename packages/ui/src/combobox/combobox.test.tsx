@@ -3564,7 +3564,10 @@ describe("Combobox alignment rows", () => {
       );
       const user = setupUser();
       await user.click(input());
-      await user.keyboard("ja{Escape}");
+      await user.keyboard("ja");
+      // The keystroke's open settles first (an open on its way takes the Escape).
+      await flushTasks(2);
+      await user.keyboard("{Escape}");
       expect(input().value).toBe("");
       expect(onText.mock.lastCall?.[1].reason).toBe("dismiss");
     });
@@ -3579,7 +3582,10 @@ describe("Combobox alignment rows", () => {
       await user.click(input());
       await user.keyboard("Atlantis{Enter}");
       await flushTasks(2);
-      await user.keyboard("x{Escape}");
+      await user.keyboard("x");
+      // The keystroke's open settles first (an open on its way takes the Escape).
+      await flushTasks(2);
+      await user.keyboard("{Escape}");
       expect(input().value).toBe("Atlantis");
     });
 
@@ -3636,7 +3642,10 @@ describe("Combobox alignment rows", () => {
       );
       const user = setupUser();
       await user.click(input());
-      await user.keyboard("fr{Escape}");
+      await user.keyboard("fr");
+      // The keystroke's open settles first (an open on its way takes the Escape).
+      await flushTasks(2);
+      await user.keyboard("{Escape}");
       expect(input().value).toBe("");
       expect(onText.mock.lastCall).toEqual(["", expect.objectContaining({ reason: "dismiss" })]);
       expect(onValue).not.toHaveBeenCalled();
@@ -3836,5 +3845,48 @@ describe("Combobox alignment rows", () => {
     >();
     expectTypeOf<ComboboxRootSingleProps>().toMatchTypeOf<ComboboxRootBaseProps>();
     expect([readOnly, multiple]).toHaveLength(2);
+  });
+});
+
+// Design 8, the Escape row "open requested, not shown": an open on its way is the listbox's as
+// if it were shown. The browser rows (the keystroke's own open, a modal Dialog) are in
+// combobox.browser.test.tsx.
+describe("Combobox: Escape while an open is on its way", () => {
+  it("cancels the open by a close request, keeps the text and consumes the key; the next Escape reverts", async () => {
+    const opening = deferred();
+    const openAction = vi.fn<OpenAction>((next) => (next ? opening.promise : undefined));
+    const onText = vi.fn<TextAction>();
+    render(
+      <Harness
+        root={{
+          defaultValue: "jp",
+          defaultInputValue: "Japan",
+          openChangeAction: openAction,
+          onInputValueChange: onText,
+        }}
+      />,
+    );
+    const user = setupUser();
+    await user.click(input());
+    await user.keyboard("x");
+    expect(openAction).toHaveBeenLastCalledWith(true, expect.anything());
+    expect(isOpen()).toBe(false);
+    onText.mockClear();
+    const seen: KeyboardEvent[] = [];
+    document.addEventListener("keydown", (e) => seen.push(e), { once: true });
+    await user.keyboard("{Escape}");
+    expect(seen[0]?.defaultPrevented).toBe(true);
+    expect(input().value).toBe("Japanx");
+    expect(onText).not.toHaveBeenCalled();
+    const [next, details] = openAction.mock.lastCall!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event?.type).toBe("keydown");
+    await act(async () => opening.resolve());
+    await flushTasks(2);
+    expect(isOpen()).toBe(false);
+    await user.keyboard("{Escape}");
+    expect(input().value).toBe("Japan");
+    expect(onText.mock.lastCall?.[1].reason).toBe("dismiss");
   });
 });

@@ -12,7 +12,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { StrictMode, Suspense, startTransition, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -37,6 +37,7 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { RadioGroup } from "./index.js";
 import type {
+  RadioGroupLabelState,
   RadioGroupItemProps,
   RadioGroupItemState,
   RadioGroupRootProps,
@@ -1390,6 +1391,20 @@ describe("RadioGroup inside a Field.Root", () => {
 
 // #200, the consistency alignment: conventions 3.6, 4.1 rule 5, 5.1, 9.5; testing.md 10.1.
 describe("RadioGroup alignment rows", () => {
+  it("types: the Label has its state type (conventions 9.4)", () => {
+    expectTypeOf<RadioGroupLabelState>().toEqualTypeOf<RadioGroupRootState>();
+    void (
+      <RadioGroup.Root aria-label="x">
+        <RadioGroup.Label
+          className={(s) => {
+            expectTypeOf(s).toEqualTypeOf<RadioGroupLabelState>();
+            return "";
+          }}
+        />
+      </RadioGroup.Root>
+    );
+  });
+
   it("types: `transition` and `readOnly` are not Item props", () => {
     // @ts-expect-error A value control whose attributes are all optimistic takes no `transition`.
     const withTransition: RadioGroupItemProps = { value: "a", transition: "fade" };

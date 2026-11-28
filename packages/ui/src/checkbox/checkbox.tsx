@@ -102,7 +102,6 @@ export interface CheckboxProps extends Omit<
    * @defaultValue `"on"` (platform)
    */
   value?: string;
-
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CheckboxState>;
   /** Inline style, or a function of the part's state that returns one. */

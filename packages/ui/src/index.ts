@@ -269,6 +269,7 @@ export type {
   CheckboxGroupRootState,
   CheckboxGroupValueChangeDetails,
   CheckboxGroupLabelProps,
+  CheckboxGroupLabelState,
   CheckboxGroupItemProps,
   CheckboxGroupItemState,
   CheckboxGroupParentProps,
@@ -279,6 +280,7 @@ export type {
   RadioGroupRootState,
   RadioGroupValueChangeDetails,
   RadioGroupLabelProps,
+  RadioGroupLabelState,
   RadioGroupItemProps,
   RadioGroupItemState,
 } from "./radio-group/index.js";

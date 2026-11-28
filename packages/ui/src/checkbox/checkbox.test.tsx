@@ -19,7 +19,7 @@ import {
 } from "../__tests__/helpers.js";
 import type { ControlMode } from "../__tests__/helpers.js";
 import { Checkbox } from "./index.js";
-import type { CheckboxCheckedChangeDetails, CheckboxState } from "./index.js";
+import type { CheckboxCheckedChangeDetails, CheckboxProps, CheckboxState } from "./index.js";
 
 describeCheckableInput({
   name: "Checkbox",
@@ -83,6 +83,17 @@ function MixedHarness({
     control
   );
 }
+
+// Conventions 5.1 and 3.6, pinned on CheckboxProps itself (the shared suite types SwitchProps).
+describe("Checkbox types", () => {
+  it("`readOnly` and `transition` are type errors", () => {
+    // @ts-expect-error HTML's `readonly` does not apply to a checkbox input.
+    const readOnly: CheckboxProps = { readOnly: true };
+    // @ts-expect-error A value control whose attributes are all optimistic takes no `transition`.
+    const transition: CheckboxProps = { transition: "fade" };
+    expect([readOnly, transition]).toHaveLength(2);
+  });
+});
 
 describe("Checkbox indeterminate", () => {
   // C1

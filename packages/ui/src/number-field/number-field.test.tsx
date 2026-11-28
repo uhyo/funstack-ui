@@ -1773,3 +1773,31 @@ describe("NumberField alignment rows", () => {
     expect(String(calls[0]?.[0])).toMatch(/^NumberField\.Input: /);
   });
 });
+
+// Conventions 4.1 rule 2: the Label's state is the Root's, `invalid` included.
+describe("NumberField.Label data-invalid", () => {
+  it("renders data-invalid while the Field shows an error", async () => {
+    render(
+      <Form.Root errors={{ qty: "Too many" }}>
+        <Field.Root name="qty">
+          <NumberField.Root>
+            <NumberField.Label data-testid="nf-label">Quantity</NumberField.Label>
+            <NumberField.Input />
+          </NumberField.Root>
+        </Field.Root>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId("nf-label")).toHaveAttribute("data-invalid", "");
+  });
+
+  it("renders no data-invalid outside a Field", () => {
+    render(
+      <NumberField.Root>
+        <NumberField.Label data-testid="nf-label">Quantity</NumberField.Label>
+        <NumberField.Input />
+      </NumberField.Root>,
+    );
+    expect(screen.getByTestId("nf-label")).not.toHaveAttribute("data-invalid");
+  });
+});

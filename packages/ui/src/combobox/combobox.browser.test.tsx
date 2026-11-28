@@ -315,6 +315,36 @@ describe("Combobox (browser)", () => {
       expect(isOpen()).toBe(false);
     });
 
+    // Design 8: an Escape that arrives before the keystroke's open is shown is the listbox's as
+    // if it were shown (the open is cancelled, the text stays, the key is consumed). Whichever
+    // way the race goes, the outcome is the same.
+    it("Escape right after typing, inside a modal Dialog: text kept, no listbox, the Dialog stays", async () => {
+      render(
+        <Dialog.Root>
+          <Dialog.Trigger data-testid="dialog-trigger">Edit</Dialog.Trigger>
+          <Dialog.Popup data-testid="dialog">
+            <Dialog.Title>Edit</Dialog.Title>
+            <Box />
+          </Dialog.Popup>
+        </Dialog.Root>,
+      );
+      await user.click(screen.getByTestId("dialog-trigger"));
+      const dialog = screen.getByTestId("dialog") as HTMLDialogElement;
+      await settle(() => expect(dialog.open).toBe(true));
+      await user.click(input());
+      await user.keyboard("ja{Escape}");
+      await quietPeriod(300, "a cancelled open must not show the listbox later");
+      expect(isOpen()).toBe(false);
+      expect(input().value).toBe("ja");
+      expect(dialog.open).toBe(true);
+      await user.keyboard("{Escape}");
+      await settle(() => expect(input().value).toBe(""));
+      await quietPeriod(80, "the Dialog must not close on the reverting Escape");
+      expect(dialog.open).toBe(true);
+      await user.keyboard("{Escape}");
+      await settle(() => expect(dialog.open).toBe(false));
+    });
+
     it("inside a modal Dialog: the listbox closes, the text reverts, then the Dialog closes", async () => {
       render(
         <Dialog.Root>

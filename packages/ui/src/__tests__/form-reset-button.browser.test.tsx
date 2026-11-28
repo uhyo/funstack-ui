@@ -77,10 +77,6 @@ function Countries() {
   );
 }
 
-/** A Combobox listbox is in the top layer. */
-const listboxShown = () =>
-  [...document.querySelectorAll("[popover]")].some((p) => p.matches(":popover-open"));
-
 describe("a real reset button", () => {
   describe("Combobox", () => {
     const text = () => screen.getByTestId("input") as HTMLInputElement;
@@ -664,11 +660,7 @@ describe("a real reset button", () => {
 
     async function edit(): Promise<void> {
       await user.click(screen.getByTestId("input"));
-      await user.keyboard("{Control>}a{/Control}xyz");
-      // Escape closes the shown listbox and keeps the text; with the listbox not shown yet it
-      // would revert the edited text (conventions 15).
-      await settle(() => expect(listboxShown()).toBe(true));
-      await user.keyboard("{Escape}");
+      await user.keyboard("{Control>}a{/Control}xyz{Escape}");
       await user.click(screen.getByTestId("c"));
       await user.click(screen.getByTestId("s"));
       await user.click(screen.getByTestId("number"));
@@ -822,9 +814,7 @@ describe("a real reset button", () => {
         </Form>,
       );
       await user.click(control());
-      await user.keyboard("{Control>}a{/Control}xyz");
-      await settle(() => expect(listboxShown()).toBe(true));
-      await user.keyboard("{Escape}");
+      await user.keyboard("{Control>}a{/Control}xyz{Escape}");
       await settle(() => expect(control().value).toBe("xyz"));
       await user.click(screen.getByTestId("other"));
       await user.keyboard("bad");

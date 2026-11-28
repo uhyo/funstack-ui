@@ -1843,3 +1843,84 @@ describe("Slider.Label renders the Root state's attributes", () => {
     expect(label).not.toHaveAttribute("data-dragging");
   });
 });
+
+// Conventions 4.1 rule 2 (the Label's `invalid`) and 9.5 (an unnamed thumb).
+describe("Slider: Label data-invalid, thumb name warning", () => {
+  it("Slider.Label renders data-invalid while the Field shows an error", async () => {
+    render(
+      <Form.Root errors={{ volume: "Too loud" }}>
+        <Field.Root name="volume">
+          <Slider.Root defaultValue={40}>
+            <Slider.Label data-testid="label">Volume</Slider.Label>
+            <Slider.Thumb data-testid="thumb-0" />
+          </Slider.Root>
+        </Field.Root>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    expect(screen.getByTestId("label")).toHaveAttribute("data-invalid", "");
+  });
+
+  it("an unnamed single thumb warns once, prefixed with the part", async () => {
+    const error = silenceErrors();
+    const { rerender } = render(
+      <Slider.Root defaultValue={40}>
+        <Slider.Thumb />
+      </Slider.Root>,
+    );
+    await act(async () => {});
+    rerender(
+      <Slider.Root defaultValue={41}>
+        <Slider.Thumb />
+      </Slider.Root>,
+    );
+    await act(async () => {});
+    const calls = error.mock.calls.filter(([m]) => String(m).includes("no accessible name"));
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toMatch(/^Slider\.Thumb: /);
+  });
+
+  it.each([
+    [
+      "a Slider.Label",
+      <Slider.Root key="l" defaultValue={40}>
+        <Slider.Label>Volume</Slider.Label>
+        <Slider.Thumb />
+      </Slider.Root>,
+    ],
+    [
+      "aria-label",
+      <Slider.Root key="a" defaultValue={40}>
+        <Slider.Thumb aria-label="Volume" />
+      </Slider.Root>,
+    ],
+    [
+      "Field.Label",
+      <Field.Root key="f" name="volume">
+        <Field.Label>Volume</Field.Label>
+        <Slider.Root defaultValue={40}>
+          <Slider.Thumb />
+        </Slider.Root>
+      </Field.Root>,
+    ],
+  ])("a thumb named by %s does not warn", async (_, ui) => {
+    const error = silenceErrors();
+    render(ui);
+    await act(async () => {});
+    expect(error.mock.calls.some(([m]) => String(m).includes("no accessible name"))).toBe(false);
+  });
+
+  it("several thumbs keep their own per-thumb warning, not this one", async () => {
+    const error = silenceErrors();
+    render(
+      <Slider.Root defaultValue={[20, 80]} aria-label="Price">
+        <Slider.Thumb index={0} />
+        <Slider.Thumb index={1} />
+      </Slider.Root>,
+    );
+    await act(async () => {});
+    const messages = error.mock.calls.map(([m]) => String(m));
+    expect(messages.some((m) => m.includes("no accessible name"))).toBe(false);
+    expect(messages.some((m) => m.includes("needs its own name"))).toBe(true);
+  });
+});

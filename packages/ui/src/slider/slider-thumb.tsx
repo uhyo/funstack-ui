@@ -12,7 +12,9 @@ import { dataAttr } from "../internal/data-attr.js";
 import { mergeTokenLists } from "../internal/merge-props.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
+import type { ElementCheck } from "../internal/use-element-check.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { CONTROL_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { percent, thumbBounds } from "./slider-arithmetic.js";
@@ -158,10 +160,21 @@ export function SliderThumb({
   const inputRef = useRef<HTMLInputElement | null>(null);
   // Inside a Field with one thumb, Thumb 0's input is the Field's control (design 9.4.1).
   const fieldInputRef = index === 0 ? ctx.field?.inputRef : undefined;
+  // Development check (conventions 9.5): the only thumb's input needs a name, from the
+  // `Slider.Label` (`for`), a `Field.Label`, `aria-label` or `aria-labelledby`. Several thumbs
+  // have their own warning below (each needs its own name).
+  const checkName: ElementCheck<HTMLInputElement> | undefined = useNameWarning(
+    isDev &&
+      ctx.shown.length === 1 &&
+      "Slider.Thumb: the slider has no accessible name. Render a Slider.Label (or a Field.Label), " +
+        "or give the Thumb an `aria-label` / `aria-labelledby`.",
+    CONTROL_NAME,
+  );
   const mergedInputRef = useMergedRefs<HTMLInputElement | null>(
     inputRef,
     consumerInputRef,
     fieldInputRef,
+    checkName,
   );
 
   // Registration with the Root (pointer focus, reconciliation, reset), from a layout effect so

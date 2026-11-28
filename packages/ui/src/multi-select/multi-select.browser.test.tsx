@@ -190,7 +190,7 @@ describe("MultiSelect (browser)", () => {
     ]);
   });
 
-  it("a foreign popovertarget invoker's close is an 'activate' fact with the toggle event", async () => {
+  it("a foreign popovertarget invoker's close is an 'activate' fact with the beforetoggle event", async () => {
     const onOpenChange = vi.fn<OpenHandler>();
     const openChangeAction = vi.fn();
     render(<Harness root={{ onOpenChange, openChangeAction }} />);

@@ -146,11 +146,14 @@ export function RadioGroupPage() {
       </h4>
       <PropsTable
         rows={[
-          ...functionProps("RadioGroupRootState", "Content, or a function of the Root's state."),
-          renderProp("legend", "RadioGroupRootState"),
+          ...functionProps("RadioGroupLabelState", "Content, or a function of the Root's state."),
+          renderProp("legend", "RadioGroupLabelState"),
         ]}
       />
-      <PartFacts state={"the Root's."} owned={"none."} />
+      <PartFacts
+        state={"`RadioGroupLabelState`, an alias of `RadioGroupRootState`."}
+        owned={"none."}
+      />
 
       <h4>
         <code>RadioGroup.Item</code>

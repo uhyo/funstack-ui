@@ -1028,8 +1028,8 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   };
 
   /**
-   * Escape with the listbox closed (design 8, conventions 15): the text goes back to what a blur
-   * would leave. Single: the optimistic selection's label (with `allowCustomValue`, the committed
+   * Escape with the listbox closed (design 8, conventions 15): the text goes back to the committed
+   * value's text. Single: the optimistic selection's label (with `allowCustomValue`, the committed
    * custom value is its own label), `""` with no selection; `multiple`: `""`, the search is
    * cleared and the chips stay. Urgent, `"dismiss"`, no value dispatched.
    */

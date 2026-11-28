@@ -5,6 +5,9 @@ import { useRender } from "../internal/use-render.js";
 import { useCheckboxGroupContext } from "./checkbox-group-context.js";
 import type { CheckboxGroupRootState } from "./checkbox-group-root.js";
 
+/** State of `CheckboxGroup.Label`: the Root's (conventions 9.4). */
+export type CheckboxGroupLabelState = CheckboxGroupRootState;
+
 /**
  * Props of `CheckboxGroup.Label`.
  *
@@ -15,13 +18,13 @@ export interface CheckboxGroupLabelProps extends Omit<
   "className" | "style" | "children"
 > {
   /** Class name, or a function of the part's state that returns one. */
-  className?: StateValue<string | undefined, CheckboxGroupRootState>;
+  className?: StateValue<string | undefined, CheckboxGroupLabelState>;
   /** Inline style, or a function of the part's state that returns one. */
-  style?: StateValue<CSSProperties | undefined, CheckboxGroupRootState>;
+  style?: StateValue<CSSProperties | undefined, CheckboxGroupLabelState>;
   /** Receives the Root's state: a group-level pending indicator goes here. */
-  children?: StateValue<ReactNode, CheckboxGroupRootState>;
+  children?: StateValue<ReactNode, CheckboxGroupLabelState>;
   /** Replace the default `<legend>` (element form) or take over rendering (function form). */
-  render?: RenderProp<ComponentPropsWithRef<"legend">, CheckboxGroupRootState>;
+  render?: RenderProp<ComponentPropsWithRef<"legend">, CheckboxGroupLabelState>;
 }
 
 /**
@@ -38,7 +41,7 @@ export function CheckboxGroupLabel({
   ...rest
 }: CheckboxGroupLabelProps) {
   const { state } = useCheckboxGroupContext("CheckboxGroup.Label");
-  return useRender<ComponentPropsWithRef<"legend">, CheckboxGroupRootState>({
+  return useRender<ComponentPropsWithRef<"legend">, CheckboxGroupLabelState>({
     defaultElement: "legend",
     render,
     state,
