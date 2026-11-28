@@ -30,7 +30,7 @@ export interface ToastActionState {
  */
 export interface ToastActionProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "className" | "style" | "children"
+  "onClick" | "type" | "aria-disabled" | "className" | "style" | "children"
 > {
   /**
    * Runs in this part's own transition: `data-pending` on the Action and the Root, the toast's
@@ -86,8 +86,8 @@ export interface ToastActionProps extends Omit<
  * disabled while pending: a second click meanwhile is ignored and the Action is `aria-disabled`,
  * unless `whilePending` is `"run"` (the default with `closeOnActivate={false}`).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `onClick`,
- * `aria-disabled`, `data-pending`, `data-disabled`.
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `onClick`, `aria-disabled`. Also owned: `disabled`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/toast
  */

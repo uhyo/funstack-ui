@@ -142,15 +142,17 @@ export function useDialogTrigger(
       // React renders no value for it in this mode, so the write is never overwritten. The
       // dialog is the one the Trigger's `commandfor` names (also without the command: non-modal).
       const dialog = element.ownerDocument.getElementById(ids.popup);
-      if (!(dialog instanceof HTMLDialogElement)) return unregister;
+      // A tag check, not `instanceof`: the dialog may belong to another realm (an iframe).
+      if (dialog === null || dialog.tagName !== "DIALOG") return unregister;
+      const target = dialog as HTMLDialogElement;
       const sync = (): void => {
-        element.toggleAttribute("data-open", dialog.open);
+        element.toggleAttribute("data-open", target.open);
       };
       // A dialog already open (before hydration, or a Trigger mounted later) shows at once.
       sync();
-      dialog.addEventListener("toggle", sync);
+      target.addEventListener("toggle", sync);
       return () => {
-        dialog.removeEventListener("toggle", sync);
+        target.removeEventListener("toggle", sync);
         unregister();
       };
     },

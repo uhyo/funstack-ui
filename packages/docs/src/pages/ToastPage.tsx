@@ -450,7 +450,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
           "`ToastActionState` is `{ pending, disabled, toast }`; `disabled` is the prop, never set by pending."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `onClick`, `aria-disabled`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `onClick`, `aria-disabled`, `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `onClick`."
         }
         note={
           'By default (`whilePending="ignore"` unless `closeOnActivate={false}`) a second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is then `aria-disabled="true"` while it shows `data-pending`; it is never natively disabled, so it keeps focus.'
@@ -476,7 +476,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <PartFacts
         state={"`ToastCloseState` is `{ disabled, toast }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `onClick`."
         }
         note={
           'Closes the toast with `reason: "dismiss"`, like Escape. Give it a name (text or `aria-label`); development warns otherwise.'

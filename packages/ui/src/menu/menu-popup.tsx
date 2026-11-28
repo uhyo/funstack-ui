@@ -80,7 +80,7 @@ export interface MenuPopupProps extends Omit<
   | "id"
   | "popover"
   | "role"
-  | "aria-labelledby"
+  | "tabIndex"
   | "onKeyDown"
   | "onFocus"
   | "onBlur"
@@ -177,12 +177,13 @@ const FOCUSABLE_SELECTOR =
  * shown, those are where the browser placed it (conventions 13.2), otherwise the requested
  * values.
  *
- * Owned keys (conventions 1.2): `id`, `popover`, `role`, `aria-labelledby` (token-merged),
- * `tabIndex`, `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
+ * Owned keys (conventions 1.2): `id`, `popover`, `role`, `tabIndex`, `focusgroup` (with the
+ * flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press on
  * non-item space keeps focus on the current item), `onContextMenu` (no native menu over this
  * one), `onPointerEnter` / `onPointerLeave`, `data-side` / `data-align` unless `side` is `null`
  * or the menu is placed at a point, `data-context` for an open from a `Menu.ContextTrigger`,
- * and `data-submenu` on a submenu's popup.
+ * and `data-submenu` on a submenu's popup. `aria-labelledby` (the Trigger's id) is token-merged
+ * with yours, so it stays in the props type.
  * Such an open is placed at the pointer: `--menu-point-x` / `--menu-point-y` inline and, unless
  * `side` is `null`, `top` and `left` (`right` for an RTL popup) at the point with the library's
  * `@position-try` fallbacks, whose rules it renders as a hoisted `<style>`. A top-level menu

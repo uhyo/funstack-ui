@@ -52,6 +52,40 @@ describe("overlay owned keys are not in the props types (conventions 1.5)", () =
     expectTypeOf<UI.ToastRootProps>().toHaveProperty("aria-describedby");
   });
 
+  it("Toast.Action / Close, the Menu items, Menu.Popup: the overwritten keys are type errors", () => {
+    const rows = [
+      // @ts-expect-error -- owned: the Action writes `type="button"`
+      { type: "submit" } satisfies UI.ToastActionProps,
+      // @ts-expect-error -- owned: `aria-disabled` follows `disabled` and pending
+      { "aria-disabled": true } satisfies UI.ToastActionProps,
+      // @ts-expect-error -- owned: the Close writes `type="button"`
+      { type: "submit" } satisfies UI.ToastCloseProps,
+      // @ts-expect-error -- owned: `aria-disabled` follows `disabled`
+      { "aria-disabled": true } satisfies UI.ToastCloseProps,
+      // @ts-expect-error -- owned: `role="menuitem"`
+      { role: "button" } satisfies UI.MenuItemProps,
+      // @ts-expect-error -- owned: the roving `tabIndex`
+      { tabIndex: 0 } satisfies UI.MenuItemProps,
+      // @ts-expect-error -- owned: `type="button"`
+      { type: "submit" } satisfies UI.MenuItemProps,
+      // @ts-expect-error -- owned: `aria-disabled` follows `disabled`
+      { "aria-disabled": true } satisfies UI.MenuItemProps,
+      // @ts-expect-error -- owned by inheritance from Menu.Item
+      { role: "menuitem" } satisfies UI.MenuCheckboxItemProps,
+      // @ts-expect-error -- owned by inheritance from Menu.Item
+      { tabIndex: 0 } satisfies UI.MenuRadioItemProps,
+      // @ts-expect-error -- owned by inheritance from Menu.Item
+      { type: "button" } satisfies UI.MenuSubmenuTriggerProps,
+      // @ts-expect-error -- owned: the submenu's `aria-labelledby` names it
+      { id: "x" } satisfies UI.MenuSubmenuTriggerProps,
+      // @ts-expect-error -- owned: `tabIndex={-1}`
+      { tabIndex: 0 } satisfies UI.MenuPopupProps,
+    ];
+    void rows;
+    // Token-merged, so it stays (conventions 1.5).
+    expectTypeOf<UI.MenuPopupProps>().toHaveProperty("aria-labelledby");
+  });
+
   it("a dialog Popup: popover", () => {
     expectTypeOf<UI.DialogPopupProps>().not.toHaveProperty("popover");
     expectTypeOf<UI.AlertDialogPopupProps>().not.toHaveProperty("popover");

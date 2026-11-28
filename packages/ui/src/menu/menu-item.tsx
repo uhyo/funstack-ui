@@ -34,7 +34,17 @@ export interface MenuItemState {
  */
 export interface MenuItemProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "onKeyDown" | "onPointerMove" | "disabled" | "className" | "style" | "children"
+  | "onClick"
+  | "onKeyDown"
+  | "onPointerMove"
+  | "disabled"
+  | "type"
+  | "role"
+  | "tabIndex"
+  | "aria-disabled"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * Runs inside this item's own transition (`data-pending` on the item); the menu stays open
@@ -87,8 +97,9 @@ export interface MenuItemProps extends Omit<
  * through the top-level Root (`openChangeAction(false, { reason: "activate" })` awaited, view
  * transition if set). Hovering the item focuses it.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>`), `role`, `tabIndex`, `disabled`
- * (always absent), `aria-disabled`, `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`,
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>`), `role`,
+ * `tabIndex` (roving), `aria-disabled`, `onClick`, `onKeyDown`, `onPointerMove`. Also owned:
+ * `disabled` (always absent; the prop of the same name is the item's own), `data-pending`,
  * `data-disabled`, `data-fsui-typeahead`.
  *
  * @see https://ui.funstack.work/components/menu

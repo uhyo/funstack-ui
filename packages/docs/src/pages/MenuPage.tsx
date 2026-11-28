@@ -365,7 +365,7 @@ export function MenuPage() {
           "`MenuPopupState` is `{ open, side, align, submenu, context }`; `open` is committed; `submenu` (`data-submenu`) is true on a submenu's popup; `context` is true and `side` is `null` for an open from a `Menu.ContextTrigger`. While the menu is shown, `side` / `align` are where the browser placed it (a physical side, after any flip: a submenu reads `right` in LTR and `left` in RTL); otherwise your props."
         }
         owned={
-          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged), `tabIndex` (`-1`), `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
+          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged with yours), `tabIndex` (`-1`; not in the props type), `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
         }
         note={
           "A menu shown on the physical side you asked for costs no render for the placement; a logical side (every submenu, by default `inline-end`) costs one render on show and one on hide, since `data-side` turns physical while shown. Style it with `:popover-open`; it emits no `data-open`. Render a `<div>`, not a `<dialog>`."
@@ -396,7 +396,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuItemState` is `{ pending, disabled }`."}
         owned={
-          '`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending with `whilePending="ignore"`), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-fsui-typeahead`.'
+          '`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending with `whilePending="ignore"`), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-fsui-typeahead`. Not in the props type: `type`, `role`, `tabIndex`, `aria-disabled` and the three handlers.'
         }
       />
 
@@ -540,7 +540,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`; these, `popoverTarget` and `aria-expanded` are not in the props type) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-fsui-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
+          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`; these, `popoverTarget` and `aria-expanded` are not in the props type) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-fsui-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`). `id`, `type`, `role`, `tabIndex`, `aria-disabled` and these handlers are not in the props type."
         }
         note={
           "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. A disabled SubmenuTrigger stays focusable (`aria-disabled`), so it is no invoker while disabled and renders `aria-expanded` from the shown submenu. Use it in a submenu Root only."

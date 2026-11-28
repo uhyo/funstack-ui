@@ -78,9 +78,9 @@ export interface DrawerPopupProps extends Omit<
  * "dismiss", event: <the pointerup> })`. A press inside a scroll container along the drawer's
  * axis scrolls it and never drags.
  *
- * Owned keys (conventions 1.2): Dialog.Popup's (`id`, `open`, `closedby`, `aria-labelledby` and
- * `aria-describedby` token-merged, `data-modal`, `suppressHydrationWarning`), `data-side`,
- * `data-swiping`; the inline `touch-action` is merged under your `style`.
+ * Owned keys (conventions 1.2): Dialog.Popup's (`id`, `open`, `closedby`, `popover` (never
+ * written), `onToggle`, `onBeforeToggle`, `data-modal`, `suppressHydrationWarning`;
+ * `aria-labelledby` and `aria-describedby` token-merged), `data-side`, `data-swiping`; the inline `touch-action` is merged under your `style`.
  *
  * @see https://ui.funstack.work/components/drawer
  */

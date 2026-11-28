@@ -43,8 +43,9 @@ export interface AlertDialogPopupProps extends Omit<
  * prop to turn it off. Opens with focus on the first enabled `AlertDialog.Cancel` unless
  * `initialFocus` is given.
  *
- * Owned keys (conventions 1.2): Dialog.Popup's (`id`, `open`, `closedby`, `aria-labelledby` and
- * `aria-describedby` token-merged, `data-modal`, `suppressHydrationWarning`) and `role`.
+ * Owned keys (conventions 1.2): Dialog.Popup's (`id`, `open`, `closedby`, `popover` (never
+ * written), `onToggle`, `onBeforeToggle`, `data-modal`, `suppressHydrationWarning`;
+ * `aria-labelledby` and `aria-describedby` token-merged) and `role`.
  *
  * @see https://ui.funstack.work/components/alert-dialog
  */

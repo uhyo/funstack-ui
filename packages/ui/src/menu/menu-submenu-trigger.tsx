@@ -37,6 +37,7 @@ export interface MenuSubmenuTriggerProps extends Omit<
   MenuItemProps,
   | "action"
   | "closeOnActivate"
+  | "id"
   | "aria-expanded"
   | "aria-haspopup"
   | "commandfor"
@@ -68,11 +69,11 @@ export interface MenuSubmenuTriggerProps extends Omit<
  * item focused; hovering it opens the submenu after the Root's `delay` and leaves focus where it
  * is.
  *
- * Owned keys (conventions 1.2): the Trigger's (`type`, `id`, `popoverTarget`, `aria-haspopup`,
- * `aria-expanded`, `data-open`, `data-pending`; `commandfor`, `command` and `popoverTargetAction`,
- * never written) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`,
- * `data-disabled`, `data-fsui-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`,
- * `onPointerLeave`).
+ * Owned keys (conventions 1.2), omitted from the props type: the Trigger's (`type`, `id`,
+ * `popoverTarget`, `aria-haspopup`, `aria-expanded`; `commandfor`, `command` and
+ * `popoverTargetAction`, never written) and the item's (`role`, `tabIndex`, `aria-disabled`,
+ * `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`). Also owned:
+ * `disabled` (absent), `data-open`, `data-pending`, `data-disabled`, `data-fsui-typeahead`.
  *
  * @see https://ui.funstack.work/components/menu
  */

@@ -40,3 +40,9 @@ HoverCard, NavigationMenu).
 | --- | --- | --- |
 | Menu | `id` and `role` on `Menu.Trigger` are type errors (they were overwritten) | remove them; the Trigger's id is generated |
 | Toast | `tabIndex` and `inert` on `Toast.Root` are type errors (they were overwritten) | remove them |
+| Toast | `type` and `aria-disabled` on `Toast.Action` and `Toast.Close` are type errors | remove them; use `disabled` |
+| Menu | `type`, `role`, `tabIndex`, `aria-disabled` on `Menu.Item`, `CheckboxItem`, `RadioItem` and `SubmenuTrigger` are type errors; `id` on `SubmenuTrigger` too | remove them; use `disabled` |
+| Menu | `tabIndex` on `Menu.Popup` is a type error (it is always `-1`) | remove it |
+
+Not breaking: `aria-labelledby` is back in `MenuPopupProps` (it is token-merged with the
+Trigger's id, conventions 1.5).

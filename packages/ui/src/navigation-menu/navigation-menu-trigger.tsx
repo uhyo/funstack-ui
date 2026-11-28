@@ -25,9 +25,10 @@ export type NavigationMenuTriggerProps = PopoverTriggerProps;
  * in library mode the click is cancelled and dispatched through the Item's transition, with
  * optimistic `data-open` and `data-pending` until the change has landed.
  *
- * Owned keys (conventions 1.2): Popover.Trigger's: `type`, `disabled`, `popoverTarget`,
- * `aria-expanded`, `onClick` (library mode), `data-open`, `data-pending`, `data-disabled`;
- * `commandfor`, `command` and `popoverTargetAction` reserved.
+ * Owned keys (conventions 1.2), Popover.Trigger's, omitted from the props type: `type`,
+ * `aria-disabled` (library mode, link or component `render`), `popoverTarget`, `aria-expanded`,
+ * `onClick` (library mode); `commandfor`, `command` and `popoverTargetAction` (never written).
+ * Also owned: `disabled`, `data-open`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/navigation-menu
  */
