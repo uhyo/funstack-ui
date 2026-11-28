@@ -43,7 +43,10 @@ import type {
   ToastCloseDetails,
   ToastCloseProps,
   ToastItem,
+  ToastDescriptionState,
   ToastManager,
+  ToastRootState,
+  ToastTitleState,
   ToastViewportProps,
   ToastViewportState,
 } from "./index.js";
@@ -166,6 +169,7 @@ describe("Toast", () => {
       expect(r).toHaveAttribute("role", "dialog");
       expect(r).toHaveAttribute("tabindex", "0");
       expect(r).toHaveAttribute("data-type", "success");
+      expect(r).toHaveAttribute("data-priority", "normal");
       expect(r).not.toHaveAttribute("data-pending");
       expect(r).not.toHaveAttribute("data-ending");
       const title = screen.getByTestId(`title-${id}`);
@@ -185,7 +189,52 @@ describe("Toast", () => {
       render(<Harness manager={manager} />);
       const id = await call(() => manager({ title: "Failed", priority: "high" }));
       expect(root(id)).toHaveAttribute("role", "alertdialog");
+      expect(root(id)).toHaveAttribute("data-priority", "high");
       expect(screen.getByRole("alertdialog", { name: "Failed" })).toBe(root(id));
+    });
+
+    // Conventions 4.1 rule 1 and 9.4 (#201): every attribute has a same-named state field, every
+    // part a state type.
+    it("state.empty mirrors data-empty; Title and Description get the Root's state under their own names", async () => {
+      const seen: {
+        empty: boolean;
+        priority?: string;
+        title?: ToastTitleState;
+        desc?: ToastDescriptionState;
+      }[] = [];
+      render(
+        <Toast.Viewport manager={manager} data-testid="viewport">
+          {(state) => {
+            seen.push({ empty: state.empty });
+            return state.toasts.map((t) => (
+              <Toast.Root key={t.id} toast={t}>
+                <Toast.Title
+                  className={(s) => {
+                    expectTypeOf(s).toEqualTypeOf<ToastRootState>();
+                    seen.push({ empty: state.empty, priority: s.priority, title: s });
+                    return undefined;
+                  }}
+                />
+                <Toast.Description
+                  className={(s: ToastDescriptionState) => {
+                    seen.push({ empty: state.empty, desc: s });
+                    return undefined;
+                  }}
+                >
+                  text
+                </Toast.Description>
+              </Toast.Root>
+            ));
+          }}
+        </Toast.Viewport>,
+      );
+      expect(seen.at(-1)?.empty).toBe(true);
+      expect(region()).toHaveAttribute("data-empty", "");
+      await call(() => manager({ title: "Hi", priority: "high" }));
+      expect(region()).not.toHaveAttribute("data-empty");
+      expect(seen.at(-1)?.empty).toBe(false);
+      expect(seen.some((e) => e.title?.priority === "high")).toBe(true);
+      expect(seen.some((e) => e.desc?.priority === "high")).toBe(true);
     });
 
     it("omits the Description and the Action when the toast has neither", async () => {
@@ -858,7 +907,7 @@ describe("Toast", () => {
       expect(onClose.mock.calls[0]![0]).toMatchObject({ reason: "activate" });
     });
 
-    it("closeOnSettle={false} keeps the toast", async () => {
+    it("closeOnActivate={false} keeps the toast", async () => {
       const d = deferred();
       render(
         <Harness
@@ -866,7 +915,7 @@ describe("Toast", () => {
           list={({ toasts }) =>
             toasts.map((t) => (
               <Toast.Root key={t.id} toast={t} data-testid="root">
-                <Toast.Action data-testid="act" closeOnSettle={false} />
+                <Toast.Action data-testid="act" closeOnActivate={false} />
               </Toast.Root>
             ))
           }
@@ -1028,7 +1077,7 @@ describe("Toast", () => {
   });
 
   // Overlap and Superseded rejection are N/A for a `Toast.Action` whose `whilePending` is "ignore"
-  // (the default with `closeOnSettle`): it never has two of its own runs in flight (#79, #81).
+  // (the default with `closeOnActivate`): it never has two of its own runs in flight (#79, #81).
   // These rows pin it (design/components/button.md 16.4 T1, T2, T4); "whilePending (#146)" below
   // has the rows for "run" mode, where they are required.
   describe("re-entry", () => {
@@ -1111,7 +1160,7 @@ describe("Toast", () => {
     });
 
     // T2
-    it('closeOnSettle={false} whilePending="ignore", an ignored second click, then a rejection: one error', async () => {
+    it('closeOnActivate={false} whilePending="ignore", an ignored second click, then a rejection: one error', async () => {
       silenceErrors();
       const errors: unknown[] = [];
       const d = deferred();
@@ -1123,7 +1172,7 @@ describe("Toast", () => {
             <ErrorCatcher onError={(e) => errors.push(e)}>
               {toasts.map((t) => (
                 <Toast.Root key={t.id} toast={t}>
-                  <Toast.Action data-testid="act" closeOnSettle={false} whilePending="ignore" />
+                  <Toast.Action data-testid="act" closeOnActivate={false} whilePending="ignore" />
                 </Toast.Root>
               ))}
             </ErrorCatcher>
@@ -1194,7 +1243,7 @@ describe("Toast", () => {
     });
   });
 
-  // #146, conventions 2.5.1: the default follows closeOnSettle; "run" mode overlaps runs.
+  // #146, conventions 2.5.1: the default follows closeOnActivate; "run" mode overlaps runs.
   describe("whilePending (#146)", () => {
     function KeepOpen({ errors }: { errors: unknown[] }) {
       return (
@@ -1204,7 +1253,7 @@ describe("Toast", () => {
             <ErrorCatcher onError={(e) => errors.push(e)}>
               {toasts.map((t) => (
                 <Toast.Root key={t.id} toast={t} data-testid={`toast-${t.id}`}>
-                  <Toast.Action data-testid="act" closeOnSettle={false} />
+                  <Toast.Action data-testid="act" closeOnActivate={false} />
                 </Toast.Root>
               ))}
             </ErrorCatcher>
@@ -1214,7 +1263,7 @@ describe("Toast", () => {
     }
 
     // W6 flips
-    it("closeOnSettle={false} runs every click by default; timer paused and Root pending until both settle", async () => {
+    it("closeOnActivate={false} runs every click by default; timer paused and Root pending until both settle", async () => {
       vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
       const runs = [deferred(), deferred()];
       let call_ = 0;
@@ -1397,6 +1446,11 @@ describe("Toast", () => {
       >();
       expectTypeOf<ToastCloseProps>().not.toHaveProperty("whilePending");
       expectTypeOf<ToastActionOptions>().not.toHaveProperty("whilePending");
+    });
+
+    it("types: closeOnActivate is the close-after-action flag; closeOnSettle is not a prop (conventions 2.5.1, #201)", () => {
+      expectTypeOf<NonNullable<ToastActionProps["closeOnActivate"]>>().toEqualTypeOf<boolean>();
+      expectTypeOf<ToastActionProps>().not.toHaveProperty("closeOnSettle");
     });
   });
 

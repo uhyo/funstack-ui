@@ -1,3 +1,6 @@
+// Ships the platform attribute typings with this subpath (conventions 7.4). Type-only: the
+// built JS has no import of it.
+import "../internal/platform-attributes.js";
 import { ToastAction } from "./toast-action.js";
 import { ToastClose } from "./toast-close.js";
 import { ToastDescription } from "./toast-description.js";
@@ -35,7 +38,7 @@ export type {
 } from "./toast.js";
 export type { ToastViewportProps, ToastViewportState } from "./toast-viewport.js";
 export type { ToastRootProps, ToastRootState } from "./toast-root.js";
-export type { ToastTitleProps } from "./toast-title.js";
-export type { ToastDescriptionProps } from "./toast-description.js";
+export type { ToastTitleProps, ToastTitleState } from "./toast-title.js";
+export type { ToastDescriptionProps, ToastDescriptionState } from "./toast-description.js";
 export type { ToastActionProps, ToastActionState } from "./toast-action.js";
 export type { ToastCloseProps, ToastCloseState } from "./toast-close.js";

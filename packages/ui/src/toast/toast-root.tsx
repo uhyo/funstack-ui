@@ -27,7 +27,7 @@ export interface ToastRootState {
   readonly ending: boolean;
   /** `toast.type`, rendered as `data-type`. */
   readonly type: string | undefined;
-  /** `toast.priority`, resolved (`"normal"` when absent). */
+  /** `toast.priority`, resolved (`"normal"` when absent), rendered as `data-priority`. */
   readonly priority: ToastPriority;
 }
 
@@ -82,7 +82,7 @@ function SuspenseGuard({ children }: { children: ReactNode }) {
  * When the toast closes it stays with `data-ending` (and `inert`) until its exit animations end.
  *
  * Owned keys (conventions 1.2): `role`, `tabIndex`, `aria-labelledby`, `aria-describedby`,
- * `inert`, `data-type`, `data-pending`, `data-ending`, `onKeyDown`.
+ * `inert`, `data-type`, `data-priority`, `data-pending`, `data-ending`, `onKeyDown`.
  *
  * @see https://ui.funstack.work/components/toast
  */
@@ -292,6 +292,7 @@ export function ToastRoot({
     "aria-describedby": ids.description,
     inert: item.ending || undefined,
     "data-type": item.type,
+    "data-priority": priority,
     "data-pending": dataAttr(pending),
     "data-ending": dataAttr(item.ending),
     onKeyDown,

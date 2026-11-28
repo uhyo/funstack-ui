@@ -7,6 +7,12 @@ import { useToastRootContext } from "./toast-context.js";
 import type { ToastRootState } from "./toast-root.js";
 
 /**
+ * State of `Toast.Title`, passed to the function forms of `className`, `style`, `children` and
+ * `render`: the Root's state.
+ */
+export type ToastTitleState = ToastRootState;
+
+/**
  * Props of `Toast.Title`.
  *
  * @see https://ui.funstack.work/components/toast
@@ -20,13 +26,13 @@ export interface ToastTitleProps extends Omit<
    *
    * @defaultValue the toast's `title`
    */
-  children?: StateValue<ReactNode, ToastRootState>;
+  children?: StateValue<ReactNode, ToastTitleState>;
   /** Class name, or a function of the part's state that returns one. */
-  className?: StateValue<string | undefined, ToastRootState>;
+  className?: StateValue<string | undefined, ToastTitleState>;
   /** Inline style, or a function of the part's state that returns one. */
-  style?: StateValue<CSSProperties | undefined, ToastRootState>;
+  style?: StateValue<CSSProperties | undefined, ToastTitleState>;
   /** Replace the default `<div>` (element form) or take over rendering (function form). */
-  render?: RenderProp<ComponentPropsWithRef<"div">, ToastRootState>;
+  render?: RenderProp<ComponentPropsWithRef<"div">, ToastTitleState>;
 }
 
 /**
@@ -43,7 +49,7 @@ export function ToastTitle({ children, className, style, render, ...rest }: Toas
   // Mounted, or revealed by a Suspense boundary inside the Root: announce the text now present.
   const { contentCommitted } = root;
   useLayoutEffect(() => contentCommitted(), [contentCommitted]);
-  return useRender<ComponentPropsWithRef<"div">, ToastRootState>({
+  return useRender<ComponentPropsWithRef<"div">, ToastTitleState>({
     defaultElement: "div",
     render,
     state: root.state,

@@ -12,7 +12,7 @@ export interface PureTriggerOptions {
   /**
    * The part's default when `whilePending` is omitted, which follows who owns the action
    * (conventions 2.5.1): `"run"` for `Button`, `"ignore"` for a Close part, by `closeOnActivate`
-   * / `closeOnSettle` for `Menu.Item` / `Toast.Action`. A closing part without an `action` of its
+   * for `Menu.Item` / `Toast.Action`. A closing part without an `action` of its
    * own passes `whilePending: "run"` instead: nothing of its own is in flight to ignore, so it
    * shows `data-pending` while the close waits but never the pending `aria-disabled`.
    */
