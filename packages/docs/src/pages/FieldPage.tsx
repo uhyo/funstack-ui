@@ -194,13 +194,17 @@ import { Form } from "@funstack/ui/form";
         (that is about a value already submitted, and the change is the edit that dismisses it).
       </p>
       <p>
-        It is information, not a gate: the library dispatches an invalid value like any other, and
-        the Field shows the error. An action that saves checks it. Uncontrolled, the early return
-        keeps the invalid value in the control and saves nothing; a controlled parent that does not
-        adopt the value rolls back instead. <code>valid</code> is an ordinary boolean field, so a
-        Server Function passed directly receives it. Handlers (<code>onValueChange</code>,{" "}
-        <code>onInputValueChange</code>) and the actions of components that are not form controls
-        (Toggle, Tabs, menus) have none.
+        It is information, not a gate: the action is always called, also for an invalid value, and
+        the Field shows the error. An action that saves checks it; the control keeps showing what
+        the user entered, and nothing is saved. In an uncontrolled TextField or NumberField, typed
+        text that is invalid stays a <strong>draft</strong>: it is not written, so the saved value
+        stays what a later failed save rolls back to (and the browser keeps flagging{" "}
+        <code>minLength</code>, which it checks only for edited text). The other controls have no
+        draft and keep an invalid value as they keep any other (a <code>required</code> checkbox can
+        be unchecked). A controlled parent that does not adopt the value rolls back instead.{" "}
+        <code>valid</code> is an ordinary boolean field, so a Server Function passed directly
+        receives it. Handlers (<code>onValueChange</code>, <code>onInputValueChange</code>) and the
+        actions of components that are not form controls (Toggle, Tabs, menus) have none.
       </p>
 
       <h4>Submission and server errors</h4>

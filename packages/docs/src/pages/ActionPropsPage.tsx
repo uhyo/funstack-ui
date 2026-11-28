@@ -282,11 +282,15 @@ type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: De
   }}
 />`}</CodeBlock>
       <p>
-        It is information, not a gate: the library dispatches an invalid value like any other (the
+        It is information, not a gate: the action is always called, also for an invalid value (the
         control holds what the user entered, and a Field shows the error). An action that saves
-        checks it. Uncontrolled, the early return keeps the invalid value in the control and saves
-        nothing; a controlled parent that does not adopt it rolls back instead. To put the saved
-        value back instead, return <code>details.reject()</code> (<a href="#reject-valid">below</a>
+        checks it. The early return keeps what the user entered in the control and saves nothing; a
+        controlled parent that does not adopt it rolls back instead. One exception, for typed text:
+        in an uncontrolled TextField or NumberField, invalid text is not written at all. It stays a
+        draft, and the saved value stays what a later failed save rolls back to (
+        <a href="/components/text-field">TextField</a>,{" "}
+        <a href="/components/number-field">NumberField</a>). To put the saved value back instead,
+        return <code>details.reject()</code> (<a href="#reject-valid">below</a>
         ). It is an ordinary boolean field, so a Server Function passed directly receives it.
       </p>
 
@@ -633,11 +637,12 @@ useEffect(() => {
       </h4>
       <p>
         The two give the two things an inline-save action can do with an invalid value: keep it in
-        the control and save nothing, or put the saved value back.
+        the control and save nothing, or put the saved value back. For typed text the first keeps it
+        as a draft and the second drops the draft.
       </p>
       <CodeBlock>{`valueCommitAction={async (next, details) => {
-  if (!details.valid) return;                  // the text stays; the Field shows why
-  // or: if (!details.valid) return details.reject();   // the saved text is back
+  if (!details.valid) return;                  // the text stays as a draft; the Field shows why
+  // or: if (!details.valid) return details.reject();   // the draft is dropped, the saved text is back
   await saveTitle(next);
 }}`}</CodeBlock>
 

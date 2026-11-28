@@ -176,6 +176,22 @@ export function NumberFieldPage() {
         <code>{"if (!details.valid) return;"}</code>; see{" "}
         <a href="/components/field#details-valid">details.valid</a>).
       </p>
+      <p>
+        <strong>An invalid typed value stays a draft</strong> (uncontrolled). Both actions are
+        called with <code>valid: false</code> and <code>data-pending</code> shows, but nothing is
+        written: the text stays as typed (not re-formatted), <code>state.value</code> is still the
+        saved number, and the hidden input holds the typed number for as long as the draft is kept,
+        so the mirrored message, <code>:user-invalid</code>, a Field's error and a form submission
+        all follow the text on screen. A second blur or Enter on the unchanged text calls nothing.
+        Escape shows the saved number again; a step starts from the typed number and replaces it; a
+        valid typed value commits normally; a form reset, <code>disabled</code> or{" "}
+        <code>readOnly</code> drops it. A later save that fails rolls back to the{" "}
+        <strong>saved</strong> number, never to the invalid one. If the commit action rejects the
+        invalid commit itself (a throw, or <code>return details.reject()</code>), the draft is
+        dropped, the saved number shows and <code>valueChangeAction</code> hears one{" "}
+        <code>"dismiss"</code>. Steps have no draft and are written as before; so is a form reset.
+        Controlled, nothing of this applies: the draft is cleared and the parent decides.
+      </p>
 
       <h3 id="props">Props</h3>
       <h4>

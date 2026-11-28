@@ -114,14 +114,27 @@ export function TextFieldPage() {
       />
       <ul>
         <li>
-          The commit does not wait for validity: text that fails <code>required</code> or{" "}
-          <code>pattern</code> is committed like any other, and the action is told:{" "}
-          <code>details.valid</code> is <code>false</code> (the native constraints of the committed
-          text and, inside a Field, <code>validate</code>). An action that must not save it returns
-          early: <code>{"if (!details.valid) return;"}</code>. Uncontrolled, the text then stays on
-          screen with the Field's error and the next valid commit saves; a controlled parent that
-          does not adopt it shows the saved text again. See{" "}
+          The action is always called, also for text that fails <code>required</code>,{" "}
+          <code>pattern</code>, <code>minLength</code> or a Field's <code>validate</code>, and it is
+          told: <code>details.valid</code> is <code>false</code>. An action that must not save it
+          returns early: <code>{"if (!details.valid) return;"}</code>. See{" "}
           <a href="/components/field#details-valid">details.valid</a>.
+        </li>
+        <li>
+          <strong>Invalid text stays a draft</strong> (uncontrolled). The commit runs the action
+          (with <code>data-pending</code>) but writes nothing: the text stays in the field as typed,
+          also after the blur, with the Field's error; <code>state.text</code> is that text and{" "}
+          <code>state.value</code> is still the saved one. A second blur or Enter on the unchanged
+          text calls nothing. Escape shows the saved text again; fixing the text and committing is a
+          normal save; a form reset, or <code>disabled</code> / <code>readOnly</code> turning on,
+          drops it. A later save that fails rolls back to the <strong>saved</strong> text, never to
+          the invalid one. If the action rejects the invalid commit itself (a throw, or{" "}
+          <code>return details.reject()</code>), the draft is dropped and the saved text shows.
+          Because the library never rewrites the draft, the browser keeps flagging{" "}
+          <code>minLength</code> / <code>maxLength</code>, which it checks only for text the user
+          edited. Controlled, nothing of this applies: the draft is cleared at the commit and a
+          parent that does not adopt the text shows the saved one. A form reset is written whatever
+          its validity.
         </li>
         <li>
           A controlled <code>value</code> that changes from outside shows at once when no draft is
