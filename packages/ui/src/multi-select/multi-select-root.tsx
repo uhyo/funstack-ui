@@ -244,7 +244,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
   const nextValidity = useNextValidity();
   const validOf = (next: ReadonlySet<string>): boolean =>
     nextValidity(
-      !(required && !readOnly && next.size === 0),
+      !(required && !readOnly && !disabled && next.size === 0),
       setEntries(name, [...next], disabled),
     );
 

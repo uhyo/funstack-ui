@@ -56,20 +56,28 @@ function defaultChildren(state: FormErrorState): ReactNode {
  *
  * @see https://ui.funstack.work/components/field
  */
-export function FormError({
+export function FormError(props: FormErrorProps) {
+  const form = use(FormContext);
+  if (form === null) throw new Error("Form.Error must be rendered inside a Form.Root.");
+  const { registerFormError } = form;
+  // Registered while mounted, also while it renders nothing (the announcement is the part's).
+  useLayoutEffect(registerFormError, [registerFormError]);
+  // The element (and every function prop) only while there is a message, so the state a
+  // function receives never has empty `messages`.
+  return form.error.length > 0 ? <FormErrorElement {...props} messages={form.error} /> : null;
+}
+
+function FormErrorElement({
+  messages,
   className,
   style,
   children = defaultChildren,
   render,
   ...rest
-}: FormErrorProps) {
-  const form = use(FormContext);
-  if (form === null) throw new Error("Form.Error must be rendered inside a Form.Root.");
-  const { registerFormError } = form;
-  useLayoutEffect(registerFormError, [registerFormError]);
+}: FormErrorProps & { readonly messages: readonly string[] }) {
   const { pending } = useFormStatus();
-  const state: FormErrorState = { messages: form.error, pending };
-  const element = useRender<ComponentPropsWithRef<"div">, FormErrorState>({
+  const state: FormErrorState = { messages, pending };
+  return useRender<ComponentPropsWithRef<"div">, FormErrorState>({
     defaultElement: "div",
     render,
     state,
@@ -79,7 +87,6 @@ export function FormError({
     props: rest,
     libraryProps: { "data-pending": dataAttr(pending) },
   });
-  return form.error.length > 0 ? element : null;
 }
 
 FormError.displayName = "FormError";

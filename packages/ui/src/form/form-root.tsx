@@ -220,8 +220,10 @@ export function FormRoot({
         const fieldMessages = first.field.serverMessages().join(" ");
         announce(first.target, [formMessages, fieldMessages].filter((m) => m !== "").join(" "));
       } else {
-        announce(form, formMessages);
+        // Focus first: a focus change flushes the screen reader's speech queue, and a normal
+        // `ariaNotify` queues behind the focus announcement.
         first.target.focus();
+        announce(form, formMessages);
       }
       return;
     }

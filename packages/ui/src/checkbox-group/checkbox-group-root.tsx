@@ -317,7 +317,10 @@ export function CheckboxGroupRoot({
     const registry = summarize(itemRegistry.current);
     const submitted = sortByDocument(next).filter((v) => registry.get(v) === true);
     const missing =
-      required && !readOnly && (registry.size === 0 ? next.size === 0 : submitted.length === 0);
+      required &&
+      !readOnly &&
+      !disabled &&
+      (registry.size === 0 ? next.size === 0 : submitted.length === 0);
     return nextValidity(!missing, setEntries(name, submitted, disabled));
   };
 

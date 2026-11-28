@@ -8,6 +8,7 @@ import { user } from "../__tests__/browser-user.js";
 import { flushTasks } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
 import { NumberField } from "../number-field/index.js";
+import { RadioGroup } from "../radio-group/index.js";
 import { Switch } from "../switch/index.js";
 import { TextField } from "../text-field/index.js";
 import type { TextFieldValueCommitDetails } from "../text-field/index.js";
@@ -47,6 +48,58 @@ describe("details.valid in a real engine", () => {
         await flushTasks(2);
         expect(valids(box)).toEqual([false, true]);
       }
+    },
+  );
+
+  it("Checkbox and Switch, required and controlled unchecked: a click gives true", async () => {
+    // The browser toggled `checked` before the handler; React restores the controlled value only
+    // after it, so the read sees the requested state.
+    const box = vi.fn();
+    const sw = vi.fn();
+    render(
+      <form>
+        <Checkbox aria-label="Box" required checked={false} checkedChangeAction={box} />
+        <Switch aria-label="Switch" required checked={false} checkedChangeAction={sw} />
+      </form>,
+    );
+    const boxInput = screen.getByRole("checkbox", { name: "Box" }) as HTMLInputElement;
+    await user.click(boxInput);
+    await user.click(screen.getByRole("switch", { name: "Switch" }));
+    await flushTasks(2);
+    expect(box.mock.calls.map((c) => c[0])).toEqual([true]);
+    expect(valids(box)).toEqual([true]);
+    expect(valids(sw)).toEqual([true]);
+    // The parent did not adopt: the box is unchecked again, and invalid.
+    expect(boxInput.checked).toBe(false);
+    expect(boxInput.validity.valueMissing).toBe(true);
+  });
+
+  it.each(["uncontrolled", "controlled"] as const)(
+    "RadioGroup, required: the click-time read sees the checked radio (%s)",
+    async (mode) => {
+      const action = vi.fn();
+      render(
+        <form>
+          <RadioGroup.Root
+            aria-label="Size"
+            name="size"
+            required
+            {...(mode === "controlled" ? { value: null } : {})}
+            valueChangeAction={action}
+          >
+            <RadioGroup.Item value="s" aria-label="s" />
+            <RadioGroup.Item value="m" aria-label="m" />
+          </RadioGroup.Root>
+        </form>,
+      );
+      const first = screen.getByRole("radio", { name: "s" }) as HTMLInputElement;
+      expect(first.validity.valueMissing).toBe(true);
+      await user.click(screen.getByRole("radio", { name: "m" }));
+      await flushTasks(2);
+      expect(action.mock.calls.map((c) => c[0])).toEqual(["m"]);
+      expect(valids(action)).toEqual([true]);
+      // Controlled and not adopted: nothing is checked again.
+      expect(first.validity.valueMissing).toBe(mode === "controlled");
     },
   );
 

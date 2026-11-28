@@ -8,7 +8,10 @@ import { Suspense, startTransition, useActionState, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal, useFormStatus } from "react-dom";
 import { describe, expect, it, vi } from "vitest";
+import { getAXNodes } from "../__tests__/ax-tree.js";
+import { onCleanup } from "../__tests__/browser-helpers.js";
 import { user } from "../__tests__/browser-user.js";
+import { browserName, supportsAriaNotify } from "../__tests__/engine.js";
 import { deferred, expectNotPending, expectPending, flushTasks } from "../__tests__/helpers.js";
 import type { Deferred } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
@@ -199,11 +202,29 @@ describe("Form: a form-level error (field-form.md 3.7, #208)", () => {
     const run = vi.fn(async () => ({ error: "Could not reach the server." }));
     render(<ErrorForm run={run} />);
     const form = screen.getByTestId("form") as HTMLFormElement;
-    const notifying = form as unknown as { ariaNotify: (message: string) => void };
-    // Every supported engine has `ariaNotify` (announce.ts), a test build may lag; the spy keeps
-    // the real call.
-    const notify =
-      typeof notifying.ariaNotify === "function" ? vi.spyOn(notifying, "ariaNotify") : null;
+    // Every supported engine has `ariaNotify` (announce.ts); a Playwright build may lag, and then
+    // a stand-in on the form records the call the library makes (it checks for the method at the
+    // call), so the assertions below run in every engine.
+    const calls: { target: Element; message: string }[] = [];
+    type Notifying = { ariaNotify(message: string, options?: object): void };
+    if (supportsAriaNotify) {
+      const proto = Element.prototype as unknown as Notifying;
+      const real = proto.ariaNotify;
+      vi.spyOn(proto, "ariaNotify").mockImplementation(function (this: Element, message: string) {
+        calls.push({ target: this, message });
+        real.call(this, message);
+      });
+    } else {
+      Object.defineProperty(Element.prototype, "ariaNotify", {
+        configurable: true,
+        value(this: Element, message: string) {
+          calls.push({ target: this, message });
+        },
+      });
+      onCleanup(() => {
+        delete (Element.prototype as { ariaNotify?: unknown }).ariaNotify;
+      });
+    }
     await user.type(screen.getByTestId("title"), "Groceries");
     await user.click(submit());
     await flushTasks();
@@ -213,15 +234,22 @@ describe("Form: a form-level error (field-form.md 3.7, #208)", () => {
     expect(document.activeElement).toBe(submit());
     expect((screen.getByTestId("title") as HTMLInputElement).value).toBe("Groceries");
     expect(form.checkValidity()).toBe(true);
-    if (notify !== null) {
-      expect(notify).toHaveBeenCalledTimes(1);
-      expect(notify).toHaveBeenCalledWith("Could not reach the server.");
+    expect(calls).toEqual([{ target: form, message: "Could not reach the server." }]);
+    // The message is in the accessibility tree (Chromium's, through CDP; the others have no
+    // protocol for it here).
+    if (browserName === "chromium") {
+      const nodes = await getAXNodes();
+      const text = nodes.filter(
+        (n) => n.ignored !== true && n.name?.value === "Could not reach the server.",
+      );
+      expect(text.length).toBeGreaterThan(0);
     }
 
     await user.click(submit());
     await flushTasks();
     expect(run).toHaveBeenCalledTimes(2);
-    if (notify !== null) expect(notify).toHaveBeenCalledTimes(2);
+    expect(calls).toHaveLength(2);
+    expect(calls[1]).toEqual({ target: form, message: "Could not reach the server." });
     expect(document.activeElement).toBe(submit());
   });
 });

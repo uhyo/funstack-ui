@@ -496,7 +496,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   const nextValidity = useNextValidity();
   const validOf = (next: readonly string[]): boolean =>
     nextValidity(
-      !(requiredRef.current && !readOnly && next.length === 0),
+      !(requiredRef.current && !readOnly && !disabled && next.length === 0),
       setEntries(name, multiple ? next : [next[0] ?? ""], disabled),
     );
 

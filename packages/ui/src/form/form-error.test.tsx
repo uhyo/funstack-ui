@@ -150,6 +150,22 @@ describe("Form.Error: a mirror of Form.Root error (3.7 rule 1)", () => {
     expect(formError()).toHaveStyle({ opacity: "1" });
   });
 
+  it("function props are not called while the part renders nothing", () => {
+    const children = vi.fn((s: FormErrorState) => s.messages[0]);
+    const className = vi.fn(() => "x");
+    const renderFn = vi.fn();
+    render(
+      <Form.Root action={async () => {}} error={null}>
+        <Form.Error className={className} render={renderFn}>
+          {children}
+        </Form.Error>
+      </Form.Root>,
+    );
+    expect(children).not.toHaveBeenCalled();
+    expect(className).not.toHaveBeenCalled();
+    expect(renderFn).not.toHaveBeenCalled();
+  });
+
   it("outside a Form.Root it throws", () => {
     silenceErrors();
     expect(() => render(<Form.Error />)).toThrow("Form.Error must be rendered inside a Form.Root.");
