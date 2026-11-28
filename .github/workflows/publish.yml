@@ -36,10 +36,10 @@ jobs:
       - name: Check package contents
         run: pnpm --filter @funstack/ui pack:check
 
-      # Stable versions go to `latest`. A prerelease gets its prerelease name as the dist-tag
-      # ("alpha" for 0.1.0-alpha.30). Until 1.0 (a 0.x prerelease, or a 1.0.0-* one) it is
-      # published under `latest` as well, so `npm i @funstack/ui` installs the newest release;
-      # from 1.0 on a prerelease gets only its prerelease tag.
+      # Stable versions go to `latest`. A prerelease is published under its prerelease name
+      # ("alpha" for 0.1.0-alpha.30). Until 1.0 (a 0.x prerelease, or a 1.0.0-* one) `latest` is
+      # then moved to it as well, so `npm i @funstack/ui` installs the newest release; from 1.0
+      # on a prerelease gets only its prerelease tag.
       - name: Determine npm tags
         id: npm-tag
         run: |
@@ -53,11 +53,10 @@ jobs:
               exit 1
             fi
             CORE="${VERSION%%-*}"
+            echo "tag=$PRERELEASE_TAG" >> "$GITHUB_OUTPUT"
             if [[ "$CORE" == 0.* || "$CORE" == "1.0.0" ]]; then
-              echo "tag=latest" >> "$GITHUB_OUTPUT"
-              echo "extra-tag=$PRERELEASE_TAG" >> "$GITHUB_OUTPUT"
+              echo "extra-tag=latest" >> "$GITHUB_OUTPUT"
             else
-              echo "tag=$PRERELEASE_TAG" >> "$GITHUB_OUTPUT"
               echo "extra-tag=" >> "$GITHUB_OUTPUT"
             fi
           else
@@ -68,11 +67,12 @@ jobs:
       - name: Publish
         run: pnpm --filter @funstack/ui publish --access public --tag ${{ steps.npm-tag.outputs.tag }} --no-git-checks
 
-      # Keeps the prerelease tag (for example `alpha`) current for `npm i @funstack/ui@alpha`
-      # when the publish above went to `latest`. OIDC covers dist-tag operations only with the
+      # Moves `latest` to a pre-1.0 prerelease published above under its prerelease tag. The
+      # publish goes first so that, if this step fails, the tag the docs install (`@alpha`) is
+      # still current and only `latest` is stale. OIDC covers dist-tag operations only with the
       # "Allow npm dist-tag" option of the trusted publisher configuration and npm 11.21.0 or
-      # later, hence npx.
-      - name: Add prerelease dist-tag
+      # later, hence npx. No continue-on-error: a failure must be visible.
+      - name: Move latest dist-tag
         if: steps.npm-tag.outputs.extra-tag != ''
         working-directory: packages/ui
         env:
