@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type {
   ComponentPropsWithRef,
   CSSProperties,
@@ -241,11 +241,25 @@ export function useStepButtonElement(
         `(the default is "${LABELS[direction]}").`,
   );
 
-  // The built-in name is a default the consumer's `aria-label` or `aria-labelledby` replaces.
-  const props$ = {
-    ...(rest["aria-labelledby"] === undefined ? { "aria-label": LABELS[direction] } : {}),
-    ...rest,
-  };
+  // Design 8.4: the name is the button's own `aria-label` (a default the consumer's replaces)
+  // followed by the field's label, through `aria-labelledby="<own id> <label ids>"` ("Increase
+  // Quantity"). A consumer `aria-labelledby` replaces the library's whole and drops the default
+  // `aria-label`; a consumer `id` is used in the self-reference.
+  const { id: idProp, "aria-label": ariaLabelProp, "aria-labelledby": labelledByProp } = rest;
+  // Each button's own `useId`, so two Increments in one Root never share an id.
+  const defaultId = useId();
+  const id = idProp ?? `${defaultId}-${direction}`;
+  const naming =
+    labelledByProp !== undefined
+      ? { id }
+      : {
+          id,
+          "aria-label": ariaLabelProp ?? LABELS[direction],
+          ...(ctx.buttonLabelIds !== ""
+            ? { "aria-labelledby": `${id} ${ctx.buttonLabelIds}` }
+            : {}),
+        };
+  const props$ = { ...rest, ...naming };
 
   return useRender<ComponentPropsWithRef<"button">, NumberFieldButtonState>({
     defaultElement: "button",

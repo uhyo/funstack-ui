@@ -235,7 +235,7 @@ export async function UploadStatus({ done }: { done: number }) {
           ],
           [
             "[NumberField](/components/number-field#props)",
-            '`"Increase"` / `"Decrease"`, the buttons\' names',
+            '`"Increase"` / `"Decrease"`, the first word of the buttons\' names (the label follows: "Increase Quantity")',
             "`aria-label` on `Increment` / `Decrement`",
           ],
         ]}

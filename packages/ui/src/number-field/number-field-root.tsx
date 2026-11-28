@@ -278,9 +278,10 @@ function readVisible(
  * gesture (`live`), the press-and-hold, the formatter and parser, the announcements, mount
  * reconciliation and form reset (through the hidden input the Input renders).
  *
- * Owned keys (conventions 1.2): `role="group"`, `aria-labelledby` (token-merged: the consumer's,
- * then `NumberField.Label`'s id while one is mounted, then a Field's label id), `data-pending`,
- * `data-disabled`, `data-invalid` (inside a Field).
+ * Owned keys (conventions 1.2): `role="group"`, `data-pending`, `data-disabled`, `data-invalid`
+ * (inside a Field). The group has no name of its own (design 1); a consumer's `aria-label` or
+ * `aria-labelledby` passes through. The label names the Increment and Decrement buttons instead
+ * (design 8.4).
  *
  * @see https://ui.funstack.work/components/number-field
  */
@@ -632,6 +633,12 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   // --- Labels ---------------------------------------------------------------------------------
 
   const { count: labelCount, register: registerLabel } = useRegisterCount();
+  // The label the step buttons append to their names (design 8.4): `NumberField.Label` while one
+  // is mounted, then a Field's label.
+  const buttonLabelIds = mergeTokenLists(
+    labelCount > 0 ? labelId : undefined,
+    fieldContext?.ids.label,
+  );
 
   // --- Residual browser paths: mount reconciliation and form reset (design 4.5, 6.4) ----------
 
@@ -706,6 +713,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       pendingSource: pending ? pendingSource : null,
       inputId,
       labelId,
+      buttonLabelIds,
       name,
       form,
       allowsFractions: formatter.allowsFractions || !Number.isInteger(stepSize),
@@ -734,6 +742,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       pendingSource,
       inputId,
       labelId,
+      buttonLabelIds,
       name,
       form,
       formatter,
@@ -755,10 +764,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     ],
   );
 
-  const labelledBy = mergeTokenLists(labelCount > 0 ? labelId : undefined, fieldContext?.ids.label);
   const libraryProps: Partial<ComponentPropsWithRef<"div">> & DataAttributes = {
     role: "group",
-    ...(labelledBy !== "" ? { "aria-labelledby": labelledBy } : {}),
     ...(fieldContext !== null ? { "data-invalid": dataAttr(fieldInvalid === true) } : {}),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),

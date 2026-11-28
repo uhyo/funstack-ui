@@ -40,11 +40,11 @@ export function NumberFieldPage() {
       <CodeBlock>{`import { NumberField } from "@funstack/ui/number-field";
 
 <NumberField.Root name="quantity" defaultValue={1} min={1} max={99} locale="en-US"
-  valueCommitAction={saveQuantity}>             {/* div role=group, named by the Label */}
+  valueCommitAction={saveQuantity}>             {/* div role=group, no name of its own */}
   <NumberField.Label>Quantity</NumberField.Label> {/* label for= the visible input */}
-  <NumberField.Decrement>−</NumberField.Decrement> {/* button tabindex=-1 aria-label="Decrease" */}
+  <NumberField.Decrement>−</NumberField.Decrement> {/* button tabindex=-1, named "Decrease Quantity" */}
   <NumberField.Input />                         {/* input type=text + hidden input type=number */}
-  <NumberField.Increment>+</NumberField.Increment> {/* button tabindex=-1 aria-label="Increase" */}
+  <NumberField.Increment>+</NumberField.Increment> {/* button tabindex=-1, named "Increase Quantity" */}
 </NumberField.Root>`}</CodeBlock>
 
       <h3 id="how-it-works">How it works</h3>
@@ -288,7 +288,7 @@ export function NumberFieldPage() {
           "`NumberFieldState` (every part but the buttons; aliased as `NumberFieldRootState`, `NumberFieldInputState` and `NumberFieldLabelState`) is `{ value, text, pending, disabled, readOnly, required, invalid }`; `value` is the shown value (the gesture's while one is open or in flight) and `text` the shown text (the draft while editing); `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid` on the Root and the Input), `false` outside a Field."
         }
         owned={
-          "`role` (`\"group\"`), `aria-labelledby` (your tokens, then the Label's id while one is mounted, then a Field label's), `data-pending`, `data-disabled`, `data-readonly`, `data-invalid` (inside a Field)."
+          '`role` (`"group"`), `data-pending`, `data-disabled`, `data-readonly`, `data-invalid` (inside a Field). The group has no name of its own; your `aria-label` or `aria-labelledby` passes through.'
         }
         note={
           'Details are `{ reason, source, valid, event }`, typed `NumberFieldValueChangeDetails` for `valueChangeAction` and `NumberFieldValueCommitDetails` for `valueCommitAction` (never `"dismiss"`): `reason` is `"activate"`, `"platform"` (a form reset, text found at hydration) or `"dismiss"` (the revert after a failed save, steps only); `source` is a `NumberFieldSource` (`"input"`, `"increment"`, `"decrement"`, `"keyboard"`, `"wheel"`), or `null` on platform paths and the revert; `valid` is whether the field would be valid holding the value (`required`, `min`, `max`, `step` and the Field\'s `validate`: a typed `0` with `min={1}` is dispatched with `valid: false`; see [details.valid](/components/field#details-valid)); `event` is the DOM event, and `undefined` for the repeats of a held button, a hold that ended at its bound, hydration and the revert. There is no `transition` prop on any part; the dispatches carry the types `fsui-number-field` plus `fsui-number-field-change` (step) or `fsui-number-field-commit` (gesture) for your own boundaries.'
@@ -344,7 +344,21 @@ export function NumberFieldPage() {
             type: "string",
             default: '"Increase" / "Decrease"',
             description:
-              "The built-in English names. Your `aria-label` (or `aria-labelledby`) replaces them; pass the same text as `aria-label` to let a text label name the button.",
+              'The built-in English word. Your `aria-label` replaces the word and keeps the label: `aria-label="Erhöhen"` next to a "Menge" label gives "Erhöhen Menge". Pass the same text as `aria-label` to let a text child name the button.',
+          },
+          {
+            name: "aria-labelledby",
+            type: "string",
+            default: '"<own id> <label id>"',
+            description:
+              'The button itself, then `NumberField.Label` (while one is mounted) and the Field\'s label, so the name is "Increase Quantity" (with both labels, both texts: "Increase Qty Quantity"). Not rendered outside a Field when no `NumberField.Label` is mounted. Before hydration only the Field\'s label is referenced; `NumberField.Label` joins at hydration. Yours replaces the whole and drops the default `aria-label`: for another word order, pass the full text as `aria-label` and `aria-labelledby` set to the button\'s own `id`.',
+          },
+          {
+            name: "id",
+            type: "string",
+            default: "generated per button",
+            description:
+              "Yours replaces it and is used in the self-reference of `aria-labelledby`.",
           },
           ...functionProps("NumberFieldButtonState"),
           renderProp("button", "NumberFieldButtonState"),
@@ -369,7 +383,7 @@ export function NumberFieldPage() {
         state={"`NumberFieldState`."}
         owned={"`id`, `htmlFor`, `data-pending`, `data-disabled`, `data-readonly`, `data-invalid`."}
         note={
-          "Must stay a `<label>`: it names the visible input through `for` and, through its id, the Root group."
+          "Must stay a `<label>`: it names the visible input through `for`, and the Increment and Decrement buttons add its id to their `aria-labelledby`."
         }
       />
 
@@ -486,8 +500,23 @@ export function NumberFieldPage() {
           </strong>{" "}
           On a text input VoiceOver announces the wrong value for a spinbutton and its gestures
           rewrite the text, so the visible input is a plain textbox (as in React Aria and Base UI).
-          The formatted text is its value, the group tells the user what the buttons change, and
-          each step is <strong>announced</strong>.
+          The formatted text is its value, the buttons' names say what they change, and each step is{" "}
+          <strong>announced</strong>.
+        </li>
+        <li>
+          <strong>The label is part of three names</strong>: the visible input's ("Quantity") and
+          the buttons' ("Decrease Quantity", "Increase Quantity", through{" "}
+          <code>aria-labelledby</code> pointing at the button itself and then the label, as React
+          Aria does). Inside a Field, <code>Field.Label</code> plays the label's part. The Root
+          group has no name, so the label is read once on entering the field, and browse mode still
+          tells a screen-reader user what each button changes. Without any label (an Input named by{" "}
+          <code>aria-label</code>), the buttons keep the short names; pass full ones (
+          <code>aria-label="Increase quantity"</code>). In tests, find the input by role and exact
+          name: Testing Library's <code>{'getByRole("textbox", { name: "Quantity" })'}</code>, or
+          Playwright's <code>{'getByRole("textbox", { name: "Quantity", exact: true })'}</code>{" "}
+          (Playwright matches names by substring otherwise). A query by label (Testing Library's{" "}
+          <code>getByLabelText</code>, Playwright's <code>getByLabel</code>) finds the input and
+          both buttons.
         </li>
         <li>
           <strong>Announcements</strong> go through <code>ariaNotify()</code> on the input (every
@@ -598,7 +627,8 @@ export function NumberFieldPage() {
         <li>
           The visible input is the Field's control: it takes the Field's id (so{" "}
           <code>Field.Label</code>'s <code>for</code> names it), its description and error, and the
-          focus of a blocked submission. The Root's group is named by <code>Field.Label</code> too.
+          focus of a blocked submission. <code>Field.Label</code> also completes the buttons' names
+          (<a href="#keyboard-and-aria">"Increase Quantity"</a>).
         </li>
         <li>
           The validity is the <strong>hidden input's</strong>: <code>Field.Error</code>'s function{" "}

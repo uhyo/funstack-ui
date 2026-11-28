@@ -562,7 +562,7 @@ describe("NumberField (browser)", () => {
   });
 
   it.runIf(browserName === "chromium")(
-    "accessibility tree: a textbox with no value range, a group, two named buttons, no hidden input",
+    "accessibility tree: a textbox with no value range, an unnamed group, buttons named with the label, no hidden input",
     async () => {
       render(<Fixture defaultValue={3} />);
       type AXValue = { value?: unknown };
@@ -589,9 +589,12 @@ describe("NumberField (browser)", () => {
       const textbox = live.find((n) => n.role?.value === "textbox");
       expect(textbox?.name?.value).toBe("Quantity");
       expect(textbox?.properties?.some((p) => p.name === "valuenow")).toBe(false);
-      expect(live.find((n) => n.role?.value === "group")?.name?.value).toBe("Quantity");
+      // #216: the group has no name; the label is part of the buttons' names.
+      const group = live.find((n) => n.role?.value === "group");
+      expect(group).toBeDefined();
+      expect(group?.name?.value ?? "").toBe("");
       const buttons = live.filter((n) => n.role?.value === "button").map((n) => n.name?.value);
-      expect(buttons).toEqual(["Decrease", "Increase"]);
+      expect(buttons).toEqual(["Decrease Quantity", "Increase Quantity"]);
       expect(live.some((n) => n.role?.value === "spinbutton")).toBe(false);
     },
   );

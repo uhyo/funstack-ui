@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
+import { documentOf } from "./event-document.js";
 import { useLatest } from "./use-latest.js";
 
 export interface DeferredLeaveOptions {
@@ -61,10 +62,9 @@ export function useDeferredLeave({
     presses.current.clear();
     afterPress.current = null;
   };
-  const watchPresses = (element: HTMLElement): void => {
+  const watchPresses = (doc: Document): void => {
     presses.current.clear();
     if (unwatchPresses.current !== null) return;
-    const doc = element.ownerDocument;
     const win = doc.defaultView;
     const released = (): void => {
       const check = afterPress.current;
@@ -97,13 +97,18 @@ export function useDeferredLeave({
   useEffect(() => {
     // Focused before the Root mounted (autofocus, typing before hydration): no `focus` follows.
     const input = inputRef.current;
-    if (input !== null && input.ownerDocument.activeElement === input) watchPresses(input);
+    if (input !== null && input.ownerDocument.activeElement === input) {
+      watchPresses(input.ownerDocument);
+    }
     return unwatch;
     // `inputRef` is the Root's own ref object: the effect runs once, at mount.
   }, [inputRef]);
 
   const focusIn = (event: FocusEvent): void => {
-    watchPresses(event.currentTarget as HTMLElement);
+    // The focused element's document, read from `target`: the native event's `currentTarget` is
+    // React's root container, which is the document itself under `hydrateRoot(document)` (#215).
+    const doc = documentOf(event.target);
+    if (doc !== null) watchPresses(doc);
   };
 
   const focusOut = (event: FocusEvent): void => {
