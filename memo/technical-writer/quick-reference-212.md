@@ -48,3 +48,11 @@ Most of those lines are the hero's demo CSS (combobox: lines 130-314).
 Pilot on Combobox, Field and Menu (the largest), measure the Anatomy offset again, then roll out.
 This is a converter change plus a page-standards amendment (section 1 gets a note on the Markdown
 order), so it needs the PO's go-ahead.
+
+## Applied (2026-11-29, PO request: every page, not a pilot)
+
+`pageToMarkdown` (`packages/docs/src/markdown/htmlToMarkdown.ts`, `anatomyFirst`) moves the
+section headed `#anatomy` (to the next heading of its level) before the first example figure that
+precedes it. Every component page now has `## Anatomy` at line 5-7 of its `.md` (Combobox: 316 ->
+7). HTML pages unchanged: the live demo first suits a person scanning; an agent reads top-down.
+Point 3 (short Anatomy bullets) is still open. Tests in `htmlToMarkdown.test.tsx`.

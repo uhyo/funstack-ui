@@ -91,6 +91,56 @@ describe("pageToMarkdown", () => {
     expect(markdown).toBe("# Demo\n\nBody.\n");
   });
 
+  test("prints a component page's Anatomy before its hero example", async () => {
+    const markdown = pageToMarkdown(
+      await renderPage(
+        <>
+          <h2>Demo</h2>
+          <p className="page-intro">Intro.</p>
+          <Example file="ToggleFavorite.tsx" css="toggle.css">
+            <button type="button">Live demo DOM</button>
+          </Example>
+          <BehaviourIndex />
+          <h3 id="anatomy">Anatomy</h3>
+          <CodeBlock>{"<Toggle />"}</CodeBlock>
+          <h4>A part</h4>
+          <p>Anatomy bullet.</p>
+          <h3 id="props">Props</h3>
+          <p>Props body.</p>
+        </>,
+      ),
+    ).markdown;
+    const order = [
+      "Intro.",
+      "## Anatomy",
+      "<Toggle />",
+      "### A part",
+      "Anatomy bullet.",
+      '```tsx title="ToggleFavorite.tsx"',
+      '```css title="toggle.css"',
+      "## Props",
+    ].map((text) => markdown.indexOf(text));
+    expect(order).not.toContain(-1);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  test("leaves a page without an example before its Anatomy as it is", async () => {
+    const markdown = pageToMarkdown(
+      await renderPage(
+        <>
+          <h2>Demo</h2>
+          <h3 id="anatomy">Anatomy</h3>
+          <p>Parts.</p>
+          <Example file="ToggleFavorite.tsx" css="toggle.css">
+            <button type="button">Live demo DOM</button>
+          </Example>
+        </>,
+      ),
+    ).markdown;
+    expect(markdown.indexOf("Parts.")).toBeLessThan(markdown.indexOf("ToggleFavorite.tsx"));
+    expect(markdown.startsWith("# Demo\n\n## Anatomy\n\nParts.")).toBe(true);
+  });
+
   test("keeps an example's source as code blocks and drops its live demo", async () => {
     const markdown = pageToMarkdown(
       await renderPage(

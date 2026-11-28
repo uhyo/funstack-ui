@@ -24,6 +24,9 @@ the required ones are never left out.
 | 12 | `browser-notes` | Browser notes | no |
 | 13 | `not-included` | Not included | no; what the component does not do, and what to use instead |
 
+Markdown edition: the converter prints the Anatomy section before the hero example (#212), so an
+agent reading the `.md` meets the parts first. The HTML order above is unchanged.
+
 ## 2. Keyboard tables
 
 - Columns: `Key | Behaviour`. Optional, always with these names and in this order:

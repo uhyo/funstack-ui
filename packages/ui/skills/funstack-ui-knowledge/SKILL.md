@@ -9,7 +9,7 @@ description: Use this skill when you write, review or debug code that uses `@fun
 
 Requirements: `react` and `react-dom` `>=19.3.0`. ESM only. Latest stable Chrome/Edge, Safari and Firefox; no fallbacks for older ones.
 
-**Read the component's page before you use it.** The docs are bundled as Markdown at `node_modules/@funstack/ui/dist/docs/<route>.md` (start from `index.md`, which lists every page). Each component page starts with an example and its Anatomy. Without the package, use https://ui.funstack.work/llms.txt (each page is at its URL plus `.md`). Paths below are relative to the docs root.
+**Read the component's page before you use it.** The docs are bundled as Markdown at `node_modules/@funstack/ui/dist/docs/<route>.md` (start from `index.md`, which lists every page). In this Markdown edition each component page starts with its Anatomy (the parts and main props), then a full example with CSS. Without the package, use https://ui.funstack.work/llms.txt (each page is at its URL plus `.md`). Paths below are relative to the docs root.
 
 ## Mental model
 

@@ -127,6 +127,48 @@ function replaceElement(
   );
 }
 
+/** The element whose children include `target`, or undefined. */
+function parentOf(node: HastRoot | Element, target: Element): HastRoot | Element | undefined {
+  if (node.children.includes(target)) return node;
+  for (const child of node.children) {
+    if (!isElement(child)) continue;
+    const found = parentOf(child, target);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
+ * Component pages open with a hero example (its full source and stylesheet), then the Anatomy.
+ * An agent reads top-down and may stop early, so the Markdown edition prints the Anatomy section
+ * (its heading up to the next heading of the same or a higher level) right before the first
+ * example that precedes it (#212, F2). The HTML page keeps the live demo first.
+ */
+function anatomyFirst(main: Element): void {
+  const heading = select("#anatomy", main);
+  if (heading === undefined || !/^h[1-6]$/.test(heading.tagName)) return;
+  const parent = parentOf(main, heading);
+  if (parent === undefined) return;
+  const children = parent.children;
+  const start = children.indexOf(heading);
+  const level = Number(heading.tagName[1]);
+  const next = children.findIndex(
+    (child, index) =>
+      index > start &&
+      isElement(child) &&
+      /^h[1-6]$/.test(child.tagName) &&
+      Number(child.tagName[1]) <= level,
+  );
+  const end = next === -1 ? children.length : next;
+  const example = children.findIndex(
+    (child, index) =>
+      index < start && isElement(child) && child.tagName === "figure" && hasClass(child, "example"),
+  );
+  if (example === -1) return;
+  const section = children.splice(start, end - start);
+  children.splice(example, 0, ...section);
+}
+
 const anchor: Handle = (state, node) => {
   const result: Html = { type: "html", value: `<a id="${String(node.properties.id)}"></a>` };
   state.patch(node, result);
@@ -271,6 +313,7 @@ export function pageToMarkdown(html: string, options: PageToMarkdownOptions = {}
     throw new Error("The page has unresolved Suspense content");
   }
   removeAll(main, new Set(selectAll(strippedSelector, main)));
+  anatomyFirst(main);
 
   // A heading inside a list item (the home page's principles) becomes the item's bold lead.
   for (const heading of selectAll("li :is(h1, h2, h3, h4, h5, h6)", main)) {
