@@ -86,12 +86,13 @@ function MixedHarness({
 
 // Conventions 5.1 and 3.6, pinned on CheckboxProps itself (the shared suite types SwitchProps).
 describe("Checkbox types", () => {
-  it("`readOnly` and `transition` are type errors", () => {
-    // @ts-expect-error HTML's `readonly` does not apply to a checkbox input.
-    const readOnly: CheckboxProps = { readOnly: true };
+  it("`aria-readonly` and `transition` are type errors; `readOnly` is the library's", () => {
+    // @ts-expect-error `aria-readonly` is owned: rendered from `readOnly` (conventions 3.6.1).
+    const ariaReadOnly: CheckboxProps = { "aria-readonly": "true" };
     // @ts-expect-error A value control whose attributes are all optimistic takes no `transition`.
     const transition: CheckboxProps = { transition: "fade" };
-    expect([readOnly, transition]).toHaveLength(2);
+    const readOnly: CheckboxProps = { readOnly: true };
+    expect([ariaReadOnly, transition, readOnly]).toHaveLength(3);
   });
 });
 
@@ -297,6 +298,7 @@ describe("Checkbox indeterminate", () => {
       indeterminate: true,
       pending: false,
       disabled: false,
+      readOnly: false,
       invalid: false,
     };
     expect(className).toHaveBeenLastCalledWith(idle);
@@ -310,6 +312,7 @@ describe("Checkbox indeterminate", () => {
       indeterminate: false,
       pending: true,
       disabled: false,
+      readOnly: false,
       invalid: false,
     };
     expect(className).toHaveBeenLastCalledWith(pending);

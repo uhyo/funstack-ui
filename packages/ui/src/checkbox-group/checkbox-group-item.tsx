@@ -20,6 +20,8 @@ export interface CheckboxGroupItemState {
   readonly pending: boolean;
   /** Disabled by its own prop or by `Root disabled`. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or its Field's): `data-readonly`, `aria-readonly`. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -38,6 +40,7 @@ export interface CheckboxGroupItemProps extends Omit<
   | "form"
   | "required"
   | "aria-checked"
+  | "aria-readonly"
   | "readOnly"
   | "onChange"
   | "className"
@@ -70,8 +73,9 @@ export interface CheckboxGroupItemProps extends Omit<
  *
  * Owned keys (conventions 1.2; a `render` element's value is overridden): `type`, `name`,
  * `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`
- * (computed by the Root from its `required` prop), `aria-checked` (removed), `data-checked`,
- * `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-invalid` (the Field's).
+ * (computed by the Root from its `required` prop; withheld while read-only), `aria-checked`
+ * (removed), `readOnly` (never the HTML attribute), `aria-readonly` (the Root's read-only),
+ * `data-checked`, `data-pending`, `data-disabled`, `data-readonly`; inside a `Field.Root` also `aria-invalid` (the Field's).
  * `onChange` is merged: a `render` element's own handler runs
  * first, then the library's. `role` passes through.
  *
@@ -89,6 +93,7 @@ export function CheckboxGroupItem({
   const checked = ctx.optimistic.has(value);
   const pending = ctx.state.pending && checked !== ctx.committed.has(value);
   const disabled = ctx.state.disabled || disabledProp;
+  const readOnly = ctx.state.readOnly;
   const required = ctx.required;
 
   // The Root needs every Item's own `disabled` for the Parents and `required` (design 6.2, 7).
@@ -110,6 +115,7 @@ export function CheckboxGroupItem({
           "data-checked": checked,
           "data-pending": pending,
           "data-disabled": disabled,
+          "data-readonly": readOnly,
           required,
         });
       }
@@ -118,7 +124,7 @@ export function CheckboxGroupItem({
     defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue.has(value),
   });
 
-  const state: CheckboxGroupItemState = { value, checked, pending, disabled };
+  const state: CheckboxGroupItemState = { value, checked, pending, disabled, readOnly };
 
   return useRender<ComponentPropsWithRef<"input">, CheckboxGroupItemState>({
     defaultElement: "input",
@@ -141,6 +147,8 @@ export function CheckboxGroupItem({
       pending,
       effectiveDisabled: disabled,
       ownDisabled: disabledProp,
+      readOnly,
+      ariaReadOnly: true,
       // Inside a Field (owned there): the group's invalid state, since the fieldset cannot carry it.
       invalid: ctx.fieldInvalid,
       activate: (event) => ctx.toggle(value, !checked, event),

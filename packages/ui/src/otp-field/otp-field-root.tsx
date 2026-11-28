@@ -264,7 +264,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     form,
     required: requiredProp = false,
     disabled: disabledProp = false,
-    readOnly = false,
+    readOnly: readOnlyProp = false,
     // design/components/otp-field.md 4.4, conventions 14.1 rule 8: a pass-through prop with a
     // default, so a `render` element's own `dir` wins over it (conventions 1.2).
     dir = "ltr",
@@ -289,10 +289,11 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
 
   // OTPField.Input registers the control (design 7); the Root resolves the defaults.
   const fieldContext = use(FieldContext);
-  const { disabled, required, name } = resolveFieldDefaults(fieldContext, {
+  const { disabled, required, readOnly, name } = resolveFieldDefaults(fieldContext, {
     name: nameProp,
     disabled: disabledProp,
     required: requiredProp,
+    readOnly: readOnlyProp,
   });
   const fieldInvalid = fieldContext === null ? undefined : fieldContext.state.invalid;
 
@@ -565,6 +566,11 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     const dom = input.value;
     const next = normalizeCode(dom, cs, len);
     if (dom !== next) input.value = next;
+    // Read-only (internal-hooks 3.8 rule 10): text restored by the browser is put back.
+    if (propsRef.current.readOnly) {
+      if (input.value !== valueRef.current) input.value = valueRef.current;
+      return;
+    }
     // No completion for adopted text (design 9): a restored code is not a fresh one.
     if (next !== valueRef.current) commitValue(next, "platform", undefined, false);
   }, [commitValue, propsRef]);
@@ -711,6 +717,7 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
     "data-complete": dataAttr(state.complete),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(readOnly),
   };
 
   const element = useRender<ComponentPropsWithRef<"div">, OTPFieldState>({

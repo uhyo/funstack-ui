@@ -96,6 +96,8 @@ export interface SliderRootState<T extends SliderValue = number> {
   readonly orientation: SliderOrientation;
   /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
+  /** The `readOnly` prop, or the enclosing Field's (`data-readonly`). */
+  readonly readOnly: boolean;
   /**
    * Inside a `Field.Root`: an error is shown for the field (`data-invalid` on the Root and the
    * Thumbs). `false` outside.
@@ -204,6 +206,16 @@ export interface SliderRootProps<T extends SliderValue = number> extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
+  /**
+   * Every input stays focusable and is submitted, and nothing steps or commits: the pointer
+   * does nothing, the keys that move a range are cancelled, and a native change that arrives
+   * anyway is written back. Renders `aria-readonly="true"` on every input and `data-readonly` on
+   * every part. Turning it on during a drag ends the stepping; the gesture commits where it
+   * stopped. Inside a `Field.Root`, the Field's `readOnly` also applies.
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SliderRootState<T>>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -217,6 +229,18 @@ export interface SliderRootProps<T extends SliderValue = number> extends Omit<
 const isDev = process.env.NODE_ENV !== "production";
 
 const STEP_TYPES = transitionTypes("slider", "change");
+
+/** The keys that move a native range; cancelled while read-only (conventions 3.6.1 rule 6). */
+const RANGE_KEYS: ReadonlySet<string> = new Set([
+  "ArrowLeft",
+  "ArrowRight",
+  "ArrowUp",
+  "ArrowDown",
+  "Home",
+  "End",
+  "PageUp",
+  "PageDown",
+]);
 const COMMIT_TYPES = transitionTypes("slider", "commit");
 
 /** The `details` fields of both actions. */
@@ -256,13 +280,14 @@ interface ActiveGesture {
  *
  * Owned keys (conventions 1.2): `role` (`"group"` with several thumbs), `aria-labelledby` (the
  * Label's id while a Label is mounted and there are several thumbs; token-merged with the
- * consumer's), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`. The custom
+ * consumer's), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`,
+ * `data-readonly`. The custom
  * properties are merged into `style`, where the consumer's entries win.
  *
  * Inside a `Field.Root` (design 9.4) the Root calls `useFieldControl`: with one thumb, Thumb 0's
  * input is the Field's labelable control; with several, the Root registers itself as the group
  * and also owns the Field label in `aria-labelledby`, the Field's `aria-describedby` and
- * `data-invalid`. `name` / `disabled` default from the Field.
+ * `data-invalid`. `name` / `disabled` / `readOnly` default from the Field.
  */
 function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T>) {
   const {
@@ -279,6 +304,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     name: nameProp,
     form,
     disabled: disabledProp = false,
+    readOnly: readOnlyProp = false,
     className,
     style,
     children,
@@ -344,11 +370,13 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     labelable: thumbCount === 1,
     name: nameProp,
     disabled: disabledProp,
+    readOnly: readOnlyProp,
     component: "Slider.Root",
   });
   const fieldName = field.fieldName;
   const name = field.name;
   const disabled = field.disabled;
+  const readOnly = field.readOnly;
   const fieldId = field.id;
   const thumbId = useCallback(
     (index: number) => (index === 0 && fieldId !== undefined ? fieldId : `${id}-thumb-${index}`),
@@ -392,6 +420,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     gap,
     orientation,
     disabled,
+    readOnly,
   });
 
   // --- Thumb registry ------------------------------------------------------------------------
@@ -447,6 +476,14 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       stepTo(next, null, "platform", event);
       commitGesture(null, "platform", event);
     },
+    // Read-only (internal-hooks 3.8 rule 10): a key pressed before hydration is undone.
+    readOnly,
+    restore: () => {
+      shownRef.current.forEach((v, index) => {
+        const input = registry.get(index);
+        if (input !== undefined && input.value !== String(v)) input.value = String(v);
+      });
+    },
     onResetEvent: () => {
       // react-dom writes `defaultValue = value` after every update of a controlled input, so the
       // reset target is written here, right before the browser's reset algorithm reads it.
@@ -473,9 +510,11 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     (index: number, event: Event) => {
       // A pointer gesture commits at its release.
       if (activeGesture.current !== null) return;
+      // Read-only: nothing was stepped, so there is nothing to commit (a stray native `change`).
+      if (latest.current.readOnly) return;
       commitGesture(index, "activate", event);
     },
-    [commitGesture],
+    [commitGesture, latest],
   );
 
   const inputKeyDown = useCallback(
@@ -487,8 +526,15 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
         max: hi,
         step: inc,
         gap: g,
+        readOnly: ro,
       } = latest.current;
       if (off) return;
+      // Read-only (conventions 3.6.1 rule 6): the keys that move a range are cancelled, with a
+      // modifier too, so the browser steps nothing and no native `input` fires.
+      if (ro) {
+        if (RANGE_KEYS.has(event.key)) event.preventDefault();
+        return;
+      }
       if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       // Vertical: Firefox decreases a vertical range on ArrowRight; the APG says increase.
@@ -529,8 +575,8 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
   const warnedNoTrack = useRef(false);
   const beginGesture = useCallback(
     (index: number | null, event: PointerEvent, element: HTMLElement) => {
-      const { disabled: off } = latest.current;
-      if (off || event.button !== 0 || activeGesture.current !== null) return;
+      const { disabled: off, readOnly: ro } = latest.current;
+      if (off || ro || event.button !== 0 || activeGesture.current !== null) return;
       // Disabled by the platform (an ancestor `<fieldset disabled>`): the range inputs match
       // `:disabled` while the Root's state does not see it, and the Track and Thumb spans still
       // take the pointer (conventions 3.6, #180). Read at the press, like the direction.
@@ -558,7 +604,10 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
         return pointerValue(rect, clientX, clientY, axis, rtl, lo, hi);
       };
       const moveTo = (thumb: number, raw: number, cause: Event): void => {
-        const { min: lo, max: hi, step: inc, gap: g } = latest.current;
+        const { min: lo, max: hi, step: inc, gap: g, readOnly: ro } = latest.current;
+        // Read-only turned on during the gesture (conventions 3.6.1 rule 12): no further step;
+        // the release commits where it stopped.
+        if (ro) return;
         const before = shownRef.current;
         if (thumb >= before.length) return;
         stepTo(
@@ -685,12 +734,25 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       dragging,
       orientation,
       disabled,
+      readOnly,
       invalid,
       min,
       max,
       step,
     }),
-    [shownValue, shown, pending, dragging, orientation, disabled, invalid, min, max, step],
+    [
+      shownValue,
+      shown,
+      pending,
+      dragging,
+      orientation,
+      disabled,
+      readOnly,
+      invalid,
+      min,
+      max,
+      step,
+    ],
   );
 
   // Memoised: the functions are stable, so this changes only with the state below.
@@ -704,6 +766,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       gap,
       orientation,
       disabled,
+      readOnly,
       pending,
       draggingThumb: gestureThumb,
       pendingThumb,
@@ -731,6 +794,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       gap,
       orientation,
       disabled,
+      readOnly,
       pending,
       gestureThumb,
       pendingThumb,
@@ -768,6 +832,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
     "data-dragging": dataAttr(dragging),
     "data-orientation": orientation,
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(readOnly),
   };
 
   const element = useRender<ComponentPropsWithRef<"div">, SliderRootState<T>>({

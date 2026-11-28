@@ -20,6 +20,13 @@ export interface GroupMemberPropsOptions {
   readonly effectiveDisabled: boolean;
   /** The member's own `disabled` prop only: the Root's reaches it through `<fieldset disabled>`. */
   readonly ownDisabled: boolean;
+  /** The Root's `readOnly` (own or the Field's): the click is cancelled (conventions 3.6.1). */
+  readonly readOnly: boolean;
+  /**
+   * `aria-readonly="true"` on the input while read-only: a checkbox (CheckboxGroup), whose role
+   * has the state; not a radio (the `radiogroup` carries it).
+   */
+  readonly ariaReadOnly: boolean;
   /** CheckboxGroup inside a Field: the group's `aria-invalid` (the fieldset cannot carry it). */
   readonly invalid?: "true" | "false" | undefined;
   /** The user checked (radio) or toggled (checkbox) the input. */
@@ -29,13 +36,15 @@ export interface GroupMemberPropsOptions {
 /**
  * The owned layer (conventions 1.2) of a group Item's `<input>`: `type`, the group's `name` /
  * `form`, `value`, `checked` (the optimistic state), `defaultChecked` (never rendered), a
- * checkbox's `aria-checked` (removed), `disabled`, `required`, the state `data-*` attributes,
- * and the guarded `onChange`.
+ * checkbox's `aria-checked` (removed), `disabled`, `required` (withheld while read-only),
+ * `readOnly` (never the HTML attribute), `aria-readonly` (a checkbox's, while read-only), the
+ * state `data-*` attributes, and the guarded `onChange`.
  */
 export function groupMemberProps(
   options: GroupMemberPropsOptions,
 ): Partial<ComponentPropsWithRef<"input">> & DataAttributes {
-  const { type, component, checked, pending, effectiveDisabled, invalid, activate } = options;
+  const { type, component, checked, pending, effectiveDisabled, readOnly, invalid, activate } =
+    options;
   return {
     type,
     name: options.name,
@@ -47,17 +56,21 @@ export function groupMemberProps(
     // agree. Only the Item's own prop: `Root disabled` reaches the input through the fieldset.
     disabled: options.ownDisabled,
     form: options.form,
-    required: options.required,
+    // Read-only bars the group from validation (conventions 3.6.1 rule 5).
+    required: options.required && !readOnly,
+    readOnly: undefined,
+    ...(options.ariaReadOnly && { "aria-readonly": readOnly ? ("true" as const) : undefined }),
     "data-checked": dataAttr(checked),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(effectiveDisabled),
+    "data-readonly": dataAttr(readOnly),
     ...(invalid !== undefined && { "aria-invalid": invalid }),
     onChange: (event: ChangeEvent<HTMLInputElement>) => {
       // A natively disabled input fires no click; this covers `render` elements that do not
       // honour `disabled`.
       if (effectiveDisabled) return;
       const nativeEvent = event.nativeEvent;
-      guardCheckableChange(nativeEvent, () => activate(nativeEvent), component);
+      guardCheckableChange(nativeEvent, () => activate(nativeEvent), component, readOnly);
     },
   };
 }

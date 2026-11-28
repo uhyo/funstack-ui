@@ -1096,6 +1096,7 @@ describe("RadioGroup", () => {
         disabled: false,
         invalid: false,
         required: false,
+        readOnly: false,
       });
       expect(group()).toHaveClass("g");
       expect(screen.getByText("Fruit a")).toHaveClass("l-a");
@@ -1107,6 +1108,7 @@ describe("RadioGroup", () => {
         checked: false,
         pending: false,
         disabled: true,
+        readOnly: false,
       });
 
       const user = setupUser();
@@ -1117,6 +1119,7 @@ describe("RadioGroup", () => {
         disabled: false,
         invalid: false,
         required: false,
+        readOnly: false,
       });
       expect(group()).toHaveClass("g", "busy");
       expect(group()).toHaveStyle({ opacity: "0.5" });
@@ -1227,7 +1230,7 @@ describe("RadioGroup", () => {
       );
       expect(renderFn).toHaveBeenLastCalledWith(
         expect.objectContaining({ type: "radio", checked: false, value: "a" }),
-        { value: "a", checked: false, pending: false, disabled: false },
+        { value: "a", checked: false, pending: false, disabled: false, readOnly: false },
       );
       const user = setupUser();
       await user.click(radio("a"));

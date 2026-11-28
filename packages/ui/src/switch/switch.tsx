@@ -24,6 +24,8 @@ export interface SwitchState {
   readonly pending: boolean;
   /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
+  /** The `readOnly` prop (or the enclosing `Field.Root`'s): `data-readonly`. */
+  readonly readOnly: boolean;
   /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
   readonly invalid: boolean;
 }
@@ -52,6 +54,7 @@ export interface SwitchProps extends Omit<
   | "defaultChecked"
   | "onChange"
   | "aria-checked"
+  | "aria-readonly"
   | "readOnly"
   | "className"
   | "style"
@@ -83,6 +86,16 @@ export interface SwitchProps extends Omit<
    */
   disabled?: boolean;
   /**
+   * The switch keeps its state: focusable, submitted, never toggled by the user and never
+   * dispatching (the click is cancelled, so no `input` or `change` fires). Rendered as
+   * `aria-readonly="true"` and `data-readonly`, never as the HTML attribute, which does not
+   * apply to a checkbox input; native `required` is withheld (a read-only control never blocks a
+   * submission). Also `true` when the enclosing `Field.Root` is read-only.
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
+  /**
    * Submitted as the input's value when checked.
    *
    * @defaultValue `"on"` (platform)
@@ -106,11 +119,13 @@ export interface SwitchProps extends Omit<
  * Animate the flip with CSS on `:checked`; there is no `transition` prop (a value control whose
  * attributes are all optimistic, conventions 5.1). Every dispatch carries the View Transition
  * types `fsui-switch` and `fsui-switch-check` / `fsui-switch-uncheck` for your own
- * `<ViewTransition>`. `readOnly` is not accepted: it does not apply to a checkbox input.
+ * `<ViewTransition>`. `readOnly` is the library's: the click is cancelled and the input carries
+ * `aria-readonly` (HTML's attribute does not apply to a checkbox input).
  *
  * Owned keys (a `render` element's value is overridden): `type`, `role`, `checked`,
- * `defaultChecked`, `aria-checked` (always removed), `disabled`, `data-checked`, `data-pending`,
- * `data-disabled`; inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`,
+ * `defaultChecked`, `aria-checked` (always removed), `disabled`, `readOnly` (never the HTML
+ * attribute), `aria-readonly`, `data-checked`, `data-pending`, `data-disabled`, `data-readonly`;
+ * `required` while read-only (withheld); inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`,
  * `aria-describedby` (token-merged) and `data-invalid`, and `disabled` / `name` / `required`
  * default from the Field. Event handlers are merged rather than owned: a `render` element's own
  * `onChange` (or `onClick`) runs first, then the library's; an `onClick` that calls
@@ -123,6 +138,7 @@ export function Switch({
   defaultChecked,
   checkedChangeAction,
   disabled,
+  readOnly,
   className,
   style,
   render,
@@ -134,6 +150,7 @@ export function Switch({
     defaultChecked,
     checkedChangeAction,
     disabled,
+    readOnly,
     own: rest,
     transitionTypes: (next) => transitionTypes("switch", next ? "check" : "uncheck"),
     role: "switch",
@@ -143,6 +160,7 @@ export function Switch({
     checked: input.optimistic,
     pending: input.pending,
     disabled: input.disabled,
+    readOnly: input.readOnly,
     invalid: input.invalid,
   };
 

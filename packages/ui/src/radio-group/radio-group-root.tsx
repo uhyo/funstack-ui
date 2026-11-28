@@ -50,6 +50,8 @@ export interface RadioGroupRootState {
   readonly invalid: boolean;
   /** The `required` prop, or the enclosing Field's. */
   readonly required: boolean;
+  /** The `readOnly` prop, or the enclosing Field's (`data-readonly`). */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -122,6 +124,16 @@ export interface RadioGroupRootProps extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
+  /**
+   * The checked radio stays checked: every radio is focusable (the arrows still move focus) and
+   * the group is submitted, but no click, Space, label or arrow checks another one (the click is
+   * cancelled, so no `input` or `change` fires) and nothing dispatches. Renders
+   * `aria-readonly="true"` on the radiogroup and `data-readonly` on every part; native
+   * `required` is withheld. Also `true` when the enclosing `Field.Root` is read-only.
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, RadioGroupRootState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -154,8 +166,8 @@ function readGroup(
  * the form-reset listener and the mount reconciliation (design/components/radio-group.md 13.3).
  * Carries `data-pending` while `valueChangeAction` is in flight.
  *
- * Owned keys (conventions 1.2): `role`, `aria-required`, `disabled`, `form`, `data-pending`,
- * `data-disabled`; inside a `Field.Root` also `aria-labelledby` (→ `Field.Label`, token-merged),
+ * Owned keys (conventions 1.2): `role`, `aria-required`, `aria-readonly`, `disabled`, `form`,
+ * `data-pending`, `data-disabled`, `data-readonly`; inside a `Field.Root` also `aria-labelledby` (→ `Field.Label`, token-merged),
  * `aria-describedby` (token-merged), `aria-invalid` and `data-invalid`, and `name` / `required` /
  * `disabled` default from the Field.
  *
@@ -175,18 +187,21 @@ export function RadioGroupRoot({
   form,
   required: requiredProp,
   disabled: disabledProp,
+  readOnly: readOnlyProp,
   className,
   style,
   children,
   render,
   ...rest
 }: RadioGroupRootProps) {
-  const { field, name, required, disabled, invalid, fieldsetRef, rootRef } = useFieldsetGroup({
-    component: "RadioGroup.Root",
-    name: nameProp,
-    disabled: disabledProp,
-    required: requiredProp,
-  });
+  const { field, name, required, disabled, readOnly, invalid, fieldsetRef, rootRef } =
+    useFieldsetGroup({
+      component: "RadioGroup.Root",
+      name: nameProp,
+      disabled: disabledProp,
+      required: requiredProp,
+      readOnly: readOnlyProp,
+    });
 
   const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     string | null,
@@ -216,6 +231,16 @@ export function RadioGroupRoot({
     base,
     onPlatformChange: (next, event) =>
       dispatch(next, createActionDetails(event, { reason: "platform" })),
+    // Read-only: a radio checked before hydration is unchecked again, nothing dispatched.
+    readOnly,
+    restore: () => {
+      const fieldset = fieldsetRef.current;
+      if (fieldset === null) return;
+      const want = base();
+      for (const radio of fieldset.querySelectorAll<HTMLInputElement>('input[type="radio"]')) {
+        if (radio.name === name) radio.checked = radio.value === want;
+      }
+    },
   });
 
   // Dev-only partial-hydration detection. The radios present in the fieldset when the Root
@@ -259,8 +284,8 @@ export function RadioGroupRoot({
   // the state and the props below.
   const contextDefault = value === undefined ? (defaultValue ?? null) : undefined;
   const state = useMemo<RadioGroupRootState>(
-    () => ({ value: optimistic, pending, disabled, invalid, required }),
-    [optimistic, pending, disabled, invalid, required],
+    () => ({ value: optimistic, pending, disabled, invalid, required, readOnly }),
+    [optimistic, pending, disabled, invalid, required, readOnly],
   );
   const context = useMemo<RadioGroupContextValue>(
     () => ({
@@ -291,10 +316,13 @@ export function RadioGroupRoot({
       ...field.attributes,
       role: "radiogroup",
       "aria-required": required ? "true" : undefined,
+      // The `radiogroup` role has the read-only state; the radios do not (conventions 3.6.1).
+      "aria-readonly": readOnly ? "true" : undefined,
       disabled,
       form,
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
+      "data-readonly": dataAttr(readOnly),
     },
     ref: rootRef,
   });

@@ -22,6 +22,8 @@ export interface MultiSelectValueState {
   readonly empty: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's). */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -76,10 +78,12 @@ export function MultiSelectValue({
     labels: ctx.labels,
     empty,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
   };
   const libraryProps: ComponentPropsWithRef<"span"> & DataAttributes = {
     "data-empty": dataAttr(empty),
     "data-disabled": dataAttr(ctx.disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
   };
   return useRender<ComponentPropsWithRef<"span">, MultiSelectValueState>({
     defaultElement: "span",

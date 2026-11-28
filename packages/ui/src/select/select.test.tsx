@@ -1108,7 +1108,13 @@ describe("Select", () => {
           />
         </Select.Root>,
       );
-      expect(states.at(-1)).toEqual({ value: "a", selected: true, pending: false, disabled: true });
+      expect(states.at(-1)).toEqual({
+        value: "a",
+        selected: true,
+        pending: false,
+        disabled: true,
+        readOnly: false,
+      });
     });
 
     it("Option state.disabled and data-disabled include a disabled Group (as :disabled does)", () => {
@@ -1197,7 +1203,7 @@ describe("Select", () => {
       );
       expect(renderFn).toHaveBeenLastCalledWith(
         expect.objectContaining({ value: "a", "data-selected": "" }),
-        { value: "a", selected: true, pending: false, disabled: false },
+        { value: "a", selected: true, pending: false, disabled: false, readOnly: false },
       );
       expect(opt("a")).toHaveAttribute("data-state", "on");
     });

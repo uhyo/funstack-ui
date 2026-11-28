@@ -37,6 +37,8 @@ export interface ComboboxChipsState {
   readonly empty: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's). */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -111,6 +113,7 @@ export function ComboboxChips({ className, style, children, render, ...rest }: C
     pending: ctx.multiple && ctx.valuePending,
     empty,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
   };
 
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
@@ -133,6 +136,7 @@ export function ComboboxChips({ className, style, children, render, ...rest }: C
     "data-empty": dataAttr(empty),
     "data-pending": dataAttr(state.pending),
     "data-disabled": dataAttr(ctx.disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
   };
 
   return useRender<ComponentPropsWithRef<"div">, ComboboxChipsState>({
@@ -167,6 +171,8 @@ export interface ComboboxChipState {
   readonly pending: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's). */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -253,6 +259,7 @@ export function ComboboxChip({
     label: ctx.chips.labelOf(value),
     pending: ctx.multiple && ctx.isPending(value),
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
   };
 
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
@@ -260,6 +267,7 @@ export function ComboboxChip({
     tabIndex: -1,
     "data-pending": dataAttr(state.pending),
     "data-disabled": dataAttr(ctx.disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
   };
 
   const element = useRender<ComponentPropsWithRef<"div">, ComboboxChipState>({
@@ -287,8 +295,10 @@ export interface ComboboxChipRemoveState {
   readonly value: string;
   /** As the Chip's `pending`. */
   readonly pending: boolean;
-  /** The Root's `disabled` (or the Field's). */
+  /** The Root's `disabled` (or the Field's), or while the Root is read-only. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): the button is disabled too. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -362,11 +372,13 @@ export function ComboboxChipRemove({
     [registerRemove],
   );
   const ref = useMergedRefs<HTMLElement>(registerRef, nameWarning);
-  const disabled = ctx.disabled;
+  // Read-only (conventions 3.6.1 rule 7): a part whose only job is to change the value.
+  const disabled = ctx.disabled || ctx.readOnly;
   const state: ComboboxChipRemoveState = {
     value,
     pending: ctx.multiple && ctx.isPending(value),
     disabled,
+    readOnly: ctx.readOnly,
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -385,6 +397,7 @@ export function ComboboxChipRemove({
     },
     "data-pending": dataAttr(state.pending),
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
   };
 
   return useRender<ComponentPropsWithRef<"button">, ComboboxChipRemoveState>({

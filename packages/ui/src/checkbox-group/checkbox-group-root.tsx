@@ -66,6 +66,8 @@ export interface CheckboxGroupRootState {
   readonly invalid: boolean;
   /** The `required` prop, or the enclosing Field's. */
   readonly required: boolean;
+  /** The `readOnly` prop, or the enclosing Field's (`data-readonly`). */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -139,6 +141,17 @@ export interface CheckboxGroupRootProps extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
+  /**
+   * The checked boxes stay as they are: every Item and Parent is focusable and the group is
+   * submitted, but no click, Space or label toggles a box (the click is cancelled, so no `input`
+   * or `change` fires) and nothing dispatches. Renders `aria-readonly="true"` on every Item and
+   * Parent (the `group` role has no such state) and `data-readonly` on every part; the computed
+   * "at least one" `required` is withheld. Also `true` when the enclosing `Field.Root` is
+   * read-only.
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, CheckboxGroupRootState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -192,7 +205,8 @@ function readItems(fieldset: HTMLFieldSetElement | null, name: string): HTMLInpu
  * (design/components/checkbox-group.md 14.3). Carries `data-pending` while `valueChangeAction`
  * is in flight. Its implicit role is `group`; no `role` is written.
  *
- * Owned keys (conventions 1.2): `disabled`, `form`, `data-pending`, `data-disabled`; inside a
+ * Owned keys (conventions 1.2): `disabled`, `form`, `data-pending`, `data-disabled`,
+ * `data-readonly`; inside a
  * `Field.Root` also `aria-labelledby` (→ `Field.Label`, token-merged), `aria-describedby`
  * (token-merged), `aria-invalid` and `data-invalid`, and `name` / `required` / `disabled` default
  * from the Field.
@@ -210,6 +224,7 @@ export function CheckboxGroupRoot({
   form,
   required: requiredProp,
   disabled: disabledProp,
+  readOnly: readOnlyProp,
   className,
   style,
   children,
@@ -217,12 +232,14 @@ export function CheckboxGroupRoot({
   ...rest
 }: CheckboxGroupRootProps) {
   // `required` is "at least one" (design section 7).
-  const { field, name, required, disabled, invalid, fieldsetRef, rootRef } = useFieldsetGroup({
-    component: "CheckboxGroup.Root",
-    name: nameProp,
-    disabled: disabledProp,
-    required: requiredProp,
-  });
+  const { field, name, required, disabled, readOnly, invalid, fieldsetRef, rootRef } =
+    useFieldsetGroup({
+      component: "CheckboxGroup.Root",
+      name: nameProp,
+      disabled: disabledProp,
+      required: requiredProp,
+      readOnly: readOnlyProp,
+    });
   /** Parent reports waiting for the next mount read (design 8.1). */
   const parentReports = useRef<{ values: readonly string[]; checked: boolean }[]>([]);
 
@@ -377,6 +394,15 @@ export function CheckboxGroupRoot({
       const removed = [...from].filter((v) => !next.has(v));
       dispatchPatch(from, { added, removed }, "platform", event, path === "reset");
     },
+    // Read-only: boxes clicked before hydration are put back, nothing dispatched (the Parents
+    // undo their own click when they mount).
+    readOnly,
+    restore: () => {
+      const want = base();
+      for (const item of readItems(fieldsetRef.current, name)) {
+        item.checked = want.has(item.value);
+      }
+    },
   });
 
   useLayoutEffect(() => {
@@ -409,8 +435,10 @@ export function CheckboxGroupRoot({
         `CheckboxGroup.Root. Item values must be unique; both boxes follow the same value.`),
   });
 
+  // Read-only bars the group from validation (conventions 3.6.1 rule 5): no computed `required`.
   const itemsRequired =
     required &&
+    !readOnly &&
     (items === null ? optimistic.size === 0 : ![...optimistic].some((v) => items.get(v) === true));
   // Inside a Field: the Items' `checked` and derived `required` are written by React after the
   // click's `change` (a Parent checks Items with no event of their own), so the Field re-reads
@@ -425,8 +453,15 @@ export function CheckboxGroupRoot({
   // `renderedValue` is a fresh array on every render: keyed on its contents.
   const renderedKey = JSON.stringify(renderedValue);
   const state = useMemo<CheckboxGroupRootState>(
-    () => ({ value: JSON.parse(renderedKey) as string[], pending, disabled, invalid, required }),
-    [renderedKey, pending, disabled, invalid, required],
+    () => ({
+      value: JSON.parse(renderedKey) as string[],
+      pending,
+      disabled,
+      invalid,
+      required,
+      readOnly,
+    }),
+    [renderedKey, pending, disabled, invalid, required, readOnly],
   );
 
   // The context's callbacks are stable (handlers and member effects only: they read the last
@@ -500,6 +535,7 @@ export function CheckboxGroupRoot({
       form,
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
+      "data-readonly": dataAttr(readOnly),
     },
     ref: rootRef,
   });

@@ -56,6 +56,14 @@ export interface UseNativeGroupReconciliationOptions<T> {
    * current value after every update (conventions 3.8 rule 6).
    */
   readonly onResetEvent?: ((event: Event) => void) | undefined;
+  /**
+   * The group is read-only (own or the Field's; read at the reconciliation). Mount
+   * reconciliation, the late-member path included, then calls `restore()` instead of
+   * `onPlatformChange` (internal-hooks 3.8 rule 10); a form reset is unchanged.
+   */
+  readonly readOnly?: boolean | undefined;
+  /** Read-only mount reconciliation: write `base()` back to the members' DOM state. */
+  readonly restore?: (() => void) | undefined;
 }
 
 export interface UseNativeGroupReconciliationResult {
@@ -78,7 +86,8 @@ export interface UseNativeGroupReconciliationResult {
  *
  * - Mount reconciliation, once, in a layout effect: `readCurrent()` vs `base()`. The members'
  *   `useNativeChecked({ group: true })` leaves `checked` alone in their mount commit, so this
- *   effect, which runs after the members' (children first), still reads the hydrated DOM.
+ *   effect, which runs after the members' (children first), still reads the hydrated DOM. A
+ *   read-only group restores instead of dispatching (`restore`).
  * - Late members: a member mounting in a later commit (a Suspense boundary that hydrates after the
  *   Root, where a click before hydration changed the DOM) reports through `onItemMounted`, and the
  *   group is reconciled again the same way (see `UseNativeGroupReconciliationResult`).
@@ -149,5 +158,7 @@ function reconcile<T>(
   event?: Event,
 ) {
   const equals = options.equals ?? Object.is;
-  if (!equals(next, options.base())) options.onPlatformChange(next, event, path);
+  if (equals(next, options.base())) return;
+  if (path === "mount" && options.readOnly === true) options.restore?.();
+  else options.onPlatformChange(next, event, path);
 }

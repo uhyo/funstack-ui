@@ -22,6 +22,8 @@ export interface UseCheckableInputOptions {
   readonly checkedChangeAction: ChangeAction<boolean, CheckableChangeDetails> | undefined;
   /** The `disabled` prop. */
   readonly disabled: boolean | undefined;
+  /** The `readOnly` prop (the library's, conventions 3.6.1). */
+  readonly readOnly: boolean | undefined;
   /** The control's own `name` / `required` / `id` (the Field's "own or the Field's"). */
   readonly own: Pick<ComponentPropsWithRef<"input">, "name" | "required" | "id">;
   /** View Transition types of a dispatch of `next`. */
@@ -37,6 +39,8 @@ export interface CheckableInput {
   readonly pending: boolean;
   /** Own `disabled` or the Field's. */
   readonly disabled: boolean;
+  /** Own `readOnly` or the Field's. */
+  readonly readOnly: boolean;
   /** Inside a `Field.Root`: the Field shows an error (`data-invalid`). `false` outside. */
   readonly invalid: boolean;
   /** `indeterminate && !pending`. */
@@ -58,6 +62,7 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     defaultChecked,
     checkedChangeAction,
     disabled: disabledProp,
+    readOnly: readOnlyProp,
     own,
     transitionTypes,
     role,
@@ -70,10 +75,12 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     name: own.name,
     disabled: disabledProp,
     required: own.required,
+    readOnly: readOnlyProp,
     id: own.id,
     component,
   });
   const disabled = field.disabled;
+  const readOnly = field.readOnly;
 
   const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     boolean,
@@ -105,12 +112,14 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     latestInFlight,
     onPlatformChange: (next, event) =>
       dispatch(next, createActionDetails(event, { reason: "platform" })),
+    readOnly,
   });
 
   const ref = useMergedRefs<HTMLInputElement>(inputRef, field.ref);
 
   const libraryProps = {
-    ...fieldInputProps(field),
+    // Read-only withholds native `required` (conventions 3.6.1 rule 5).
+    ...fieldInputProps(field, true),
     type: "checkbox",
     ...(role !== undefined && { role }),
     // The DOM state is the optimistic state (conventions 3.2): react-dom restores a controlled
@@ -121,6 +130,9 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     // own `indeterminate` prop (which react-dom would warn about) is stripped.
     ...(mixed && { indeterminate: undefined }),
     "aria-checked": undefined,
+    // The library's read-only (3.6.1 rule 9): never the HTML attribute, which does not apply.
+    readOnly: undefined,
+    "aria-readonly": readOnly ? ("true" as const) : undefined,
     // Owned so that native disabledness, `data-disabled` and the click guard always agree: a
     // `render` element cannot re-enable (`disabled={false}`) or disable the input on its own.
     disabled,
@@ -128,6 +140,7 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
     ...(mixed && { "data-indeterminate": dataAttr(shownIndeterminate) }),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(readOnly),
     onChange: (event: ChangeEvent<HTMLInputElement>) => {
       // A natively disabled input fires no click; this covers `render` elements that do not
       // honour `disabled`.
@@ -138,10 +151,20 @@ export function useCheckableInput(options: UseCheckableInputOptions): CheckableI
         nativeEvent,
         () => dispatch(!optimistic, createActionDetails(nativeEvent, { reason: "activate" })),
         component,
+        readOnly,
       );
     },
   };
 
   const invalid = field.state?.invalid ?? false;
-  return { optimistic, pending, disabled, invalid, shownIndeterminate, ref, libraryProps };
+  return {
+    optimistic,
+    pending,
+    disabled,
+    readOnly,
+    invalid,
+    shownIndeterminate,
+    ref,
+    libraryProps,
+  };
 }

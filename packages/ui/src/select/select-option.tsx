@@ -20,8 +20,13 @@ export interface SelectOptionState {
   readonly selected: boolean;
   /** The Root is pending and this option is the optimistic target. */
   readonly pending: boolean;
-  /** Disabled by its own prop, a disabled `Select.Group`, or `Root disabled` (as `:disabled`). */
+  /**
+   * Disabled by its own prop, a disabled `Select.Group`, or `Root disabled` (as `:disabled`); also
+   * an unselected option while the Root is read-only.
+   */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or its Field's): `data-readonly`. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -60,8 +65,9 @@ export interface SelectOptionProps extends Omit<
  * plus the Root's re-apply for options that mount after the select's own commit (a Suspense
  * boundary or `use()` inside the select), which the Option reports from its mount layout effect.
  *
- * Owned keys: `value`, `selected` (never rendered), `disabled`, `data-selected`, `data-pending`,
- * `data-disabled`.
+ * Owned keys: `value`, `selected` (never rendered), `disabled` (also while the Root is read-only
+ * and this option is not the selected one), `data-selected`, `data-pending`, `data-disabled`,
+ * `data-readonly`.
  *
  * @see https://ui.funstack.work/components/select
  */
@@ -77,7 +83,11 @@ export function SelectOption({
   const ctx = useSelectContext("Select.Option");
   const selected = ctx.optimistic === value;
   const pending = ctx.pending && selected;
-  const disabled = ctx.disabled || ctx.groupDisabled || disabledProp;
+  const readOnly = ctx.readOnly;
+  // Read-only (conventions 3.6.1 rule 6): the platform refuses a pick of a disabled option, so
+  // every option but the selected one is disabled while the Root is read-only.
+  const lockedOut = readOnly && !selected;
+  const disabled = ctx.disabled || ctx.groupDisabled || disabledProp || lockedOut;
   const hydrated = useHydratedMount();
   const { ref, node } = useSelectPartRef<HTMLOptionElement>("Select.Option", "option");
 
@@ -91,6 +101,7 @@ export function SelectOption({
       syncPresence(el, "data-selected", selected);
       syncPresence(el, "data-pending", pending);
       syncPresence(el, "data-disabled", disabled);
+      syncPresence(el, "data-readonly", readOnly);
     }
     ctx.optionMounted(el, hydrated);
   });
@@ -98,7 +109,7 @@ export function SelectOption({
     reportMount();
   }, []);
 
-  const state: SelectOptionState = { value, selected, pending, disabled };
+  const state: SelectOptionState = { value, selected, pending, disabled, readOnly };
 
   return useRender<ComponentPropsWithRef<"option">, SelectOptionState>({
     defaultElement: "option",
@@ -111,11 +122,13 @@ export function SelectOption({
     libraryProps: {
       value,
       selected: undefined,
-      // Only the Option's own prop: `Root disabled` and the Group disable natively themselves.
-      disabled: disabledProp,
+      // The Option's own prop and read-only: `Root disabled` and the Group disable natively
+      // themselves.
+      disabled: disabledProp || lockedOut,
       "data-selected": dataAttr(selected),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
+      "data-readonly": dataAttr(readOnly),
     },
     ref,
   });

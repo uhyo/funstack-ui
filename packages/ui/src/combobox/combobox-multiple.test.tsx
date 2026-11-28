@@ -922,6 +922,7 @@ describe("Combobox multiple (jsdom)", () => {
         label: "France",
         pending: true,
         disabled: false,
+        readOnly: false,
       });
       expect(screen.getByTestId("remove-fr")).toHaveClass("r-fr-true");
       expect(screen.getByTestId("remove-jp")).toHaveClass("r-jp-false");

@@ -1663,7 +1663,7 @@ describe("NumberField", () => {
       expect(root()).toHaveClass("pending");
       expect(inc()).toHaveTextContent("…");
       expect(inc()).toHaveClass("off");
-      expect(buttonStates.at(-1)).toEqual({ pending: true, disabled: true });
+      expect(buttonStates.at(-1)).toEqual({ pending: true, disabled: true, readOnly: false });
       await act(async () => d.resolve());
       expect(root()).toHaveClass("idle");
     });

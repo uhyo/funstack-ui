@@ -14,6 +14,8 @@ import { useMultiSelectContext } from "./multi-select-context.js";
 export interface MultiSelectLabelState {
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's). */
+  readonly readOnly: boolean;
   /** The Root's `pending`: a value or open transition is in flight. */
   readonly pending: boolean;
 }
@@ -65,12 +67,13 @@ export function MultiSelectLabel({
       ctx.labelClick(event.nativeEvent);
     },
     "data-disabled": dataAttr(ctx.disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
     "data-pending": dataAttr(ctx.pending),
   };
   return useRender<ComponentPropsWithRef<"label">, MultiSelectLabelState>({
     defaultElement: "label",
     render,
-    state: { disabled: ctx.disabled, pending: ctx.pending },
+    state: { disabled: ctx.disabled, readOnly: ctx.readOnly, pending: ctx.pending },
     className,
     style,
     children,

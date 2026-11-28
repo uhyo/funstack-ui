@@ -54,6 +54,8 @@ export interface ComboboxContextValue {
   /** The enclosing `Field.Label`'s id: names the List when no `Combobox.Label` is mounted. */
   readonly fieldLabelId: string | undefined;
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): the popup never opens, nothing dispatches. */
+  readonly readOnly: boolean;
   readonly inputRef: RefObject<HTMLInputElement | null>;
   readonly listRef: RefObject<HTMLElement | null>;
   /** Registers a mounted Option; returns the unregistration. */

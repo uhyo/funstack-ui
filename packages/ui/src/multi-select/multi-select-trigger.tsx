@@ -37,6 +37,8 @@ export interface MultiSelectTriggerState {
   readonly pending: boolean;
   /** Disabled by its own prop or by the Root. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): `aria-readonly`, `data-readonly`. */
+  readonly readOnly: boolean;
   /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
   readonly invalid: boolean;
   /** The Root's `required`, or the enclosing Field's (`data-required`). */
@@ -64,6 +66,7 @@ export interface MultiSelectTriggerProps extends Omit<
   | "aria-controls"
   | "aria-activedescendant"
   | "aria-required"
+  | "aria-readonly"
   | "form"
   | "disabled"
   | "className"
@@ -144,6 +147,7 @@ export function MultiSelectTrigger({
     labelable: true,
     required,
     disabled,
+    readOnly: ctx.readOnly,
     id: rest.id,
     component: part,
     validityElement: required ? readValidity : undefined,
@@ -229,6 +233,7 @@ export function MultiSelectTrigger({
     open: popover.optimistic,
     pending: ctx.pending,
     disabled,
+    readOnly: ctx.readOnly,
     invalid: field.state?.invalid ?? false,
     required,
   };
@@ -247,6 +252,8 @@ export function MultiSelectTrigger({
     "aria-activedescendant":
       ctx.activeValue === null ? undefined : optionId(ids.optionPrefix, ctx.activeValue),
     "aria-required": required || undefined,
+    // The `combobox` role has the read-only state (conventions 3.6.1 rule 9).
+    "aria-readonly": ctx.readOnly ? "true" : undefined,
     // Owned: the ref writes `popovertarget` after hydration; a render element sets none of these.
     popoverTarget: undefined,
     ...RESERVED_INVOKER_KEYS,
@@ -265,6 +272,7 @@ export function MultiSelectTrigger({
     "data-open": dataAttr(popover.optimistic),
     "data-pending": dataAttr(ctx.pending),
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
     // A `<button>` has no `:required` (conventions 4.1 rule 2).
     "data-required": dataAttr(required),
   };
@@ -294,7 +302,8 @@ export function MultiSelectTrigger({
         autoComplete="off"
         form={ctx.form}
         disabled={disabled}
-        required={ctx.values.length === 0}
+        // Read-only bars the control from validation (conventions 3.6.1 rule 5).
+        required={!ctx.readOnly && ctx.values.length === 0}
         style={VALIDITY_STYLE}
         onFocus={() => triggerRef.current?.focus()}
         onPointerDown={preventDefault}

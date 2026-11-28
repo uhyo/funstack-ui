@@ -31,8 +31,10 @@ export interface ComboboxTriggerState {
   readonly open: boolean;
   /** The open (or close) transition is in flight. */
   readonly pending: boolean;
-  /** Disabled by its own prop or by the Root. */
+  /** Disabled by its own prop or by the Root, or while the Root is read-only. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): the Trigger is disabled too. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -106,7 +108,8 @@ export function ComboboxTrigger({
   const part = "Combobox.Trigger";
   const ctx = useComboboxContext(part);
   const { popover } = ctx;
-  const disabled = ownDisabled || ctx.disabled;
+  // Read-only (conventions 3.6.1 rule 7): a part whose only job is to change the value.
+  const disabled = ownDisabled || ctx.disabled || ctx.readOnly;
   // Development check (design 9): an icon-only Trigger needs a name from the consumer.
   const checkName = useNameWarning(
     isDev && "Combobox.Trigger: the button has no accessible name. Give it an `aria-label`.",
@@ -143,6 +146,7 @@ export function ComboboxTrigger({
     open: popover.optimistic,
     pending: popover.pending,
     disabled,
+    readOnly: ctx.readOnly,
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -173,6 +177,7 @@ export function ComboboxTrigger({
     "data-open": dataAttr(popover.optimistic),
     "data-pending": dataAttr(popover.pending),
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
   };
 
   return useRender<ComponentPropsWithRef<"button">, ComboboxTriggerState>({

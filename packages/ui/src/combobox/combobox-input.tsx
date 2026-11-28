@@ -42,6 +42,8 @@ export interface ComboboxInputState {
   readonly empty: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): native `readonly`, `data-readonly`. */
+  readonly readOnly: boolean;
   /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
   readonly invalid: boolean;
   /** The Input's own `required`, or the enclosing Field's. */
@@ -147,6 +149,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     labelable: true,
     required: rest.required,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
     id: rest.id,
     component: "Combobox.Input",
   });
@@ -171,6 +174,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     stale: ctx.stale,
     empty: ctx.values.length === 0,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
     invalid: field.state?.invalid ?? false,
     required,
   };
@@ -190,6 +194,9 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     "aria-activedescendant":
       ctx.activeValue === null ? undefined : optionId(ids.optionPrefix, ctx.activeValue),
     disabled: ctx.disabled,
+    // The Root's read-only: native `readonly`, the platform's mark, no `aria-readonly` next to it
+    // (conventions 3.6.1 rule 9); it also bars the input from constraint validation.
+    readOnly: ctx.readOnly,
     onChange: (event: ChangeEvent<HTMLInputElement>) => {
       ctx.typed(event.currentTarget.value, event.nativeEvent);
     },
@@ -213,6 +220,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     "data-empty": dataAttr(state.empty),
     "data-stale": dataAttr(ctx.stale),
     "data-disabled": dataAttr(ctx.disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
   };
 
   return useRender<ComponentPropsWithRef<"input">, ComboboxInputState>({

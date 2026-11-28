@@ -19,8 +19,8 @@ describe("Switch specifics", () => {
     const props: SwitchProps = { children: "x" };
     // @ts-expect-error A switch is binary: no `indeterminate` (design section 10).
     const props2: SwitchProps = { indeterminate: true };
-    // @ts-expect-error HTML's `readonly` does not apply to a checkbox input (conventions 3.6).
-    const props3: SwitchProps = { readOnly: true };
+    // @ts-expect-error `aria-readonly` is owned: rendered from `readOnly` (conventions 3.6.1).
+    const props3: SwitchProps = { "aria-readonly": "true" };
     // @ts-expect-error No `transition` on a value control (conventions 5.1).
     const props4: SwitchProps = { transition: "fade" };
     expect([props, props2, props3, props4]).toHaveLength(4);

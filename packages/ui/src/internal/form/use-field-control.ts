@@ -16,6 +16,8 @@ export interface UseFieldControlOptions {
   readonly name?: string | undefined;
   readonly disabled?: boolean | undefined;
   readonly required?: boolean | undefined;
+  /** The control's own `readOnly` (conventions 3.6.1). */
+  readonly readOnly?: boolean | undefined;
   /** The consumer's own `id` prop: ignored inside a Field (the Field owns it), with a warning. */
   readonly id?: string | undefined;
   /** Dev warning tag. */
@@ -52,6 +54,8 @@ export interface FieldControlBinding {
   readonly disabled: boolean;
   /** Own `required` || the Field's. */
   readonly required: boolean;
+  /** Own `readOnly` || the Field's (conventions 3.6.1). */
+  readonly readOnly: boolean;
   /**
    * Owned attributes: `id` (labelable controls), `aria-invalid`, `data-invalid`,
    * `aria-labelledby` (groups) and `aria-describedby` (both token-merged by the owned layer, the
@@ -64,21 +68,31 @@ export interface FieldControlBinding {
 
 /**
  * "Own or the Field's" (design/components/field-form.md 7.1): `name` falls back to the Field's,
- * `disabled` and `required` are either's. Outside a Field (`field === null`) the own props.
+ * `disabled`, `required` and `readOnly` are either's. Outside a Field (`field === null`) the own
+ * props.
  */
 export function resolveFieldDefaults(
-  field: Pick<FieldContextValue, "name" | "disabled" | "required"> | null,
+  field: Pick<FieldContextValue, "name" | "disabled" | "required" | "readOnly"> | null,
   own: {
     readonly name: string | undefined;
     readonly disabled: boolean;
     readonly required: boolean;
+    readonly readOnly: boolean;
   },
-): { name: string | undefined; disabled: boolean; required: boolean } {
-  if (field === null) return { name: own.name, disabled: own.disabled, required: own.required };
+): { name: string | undefined; disabled: boolean; required: boolean; readOnly: boolean } {
+  if (field === null) {
+    return {
+      name: own.name,
+      disabled: own.disabled,
+      required: own.required,
+      readOnly: own.readOnly,
+    };
+  }
   return {
     name: own.name ?? field.name,
     disabled: own.disabled || field.disabled,
     required: own.required || field.required,
+    readOnly: own.readOnly || field.readOnly,
   };
 }
 
@@ -86,13 +100,21 @@ export function resolveFieldDefaults(
  * The owned props of a labelable native control (`<input>`, `<select>`) inside a Field: the
  * ARIA wiring plus `name` and `required` ("own or the Field's"). Empty outside a Field, so the
  * consumer's own `id` / `name` / `required` keep passing through untouched there.
+ *
+ * `withholdRequired`: a control the platform does not bar from validation while read-only (a
+ * checkbox, a `<select>`) passes `true`; native `required` is then owned and absent while the
+ * control is read-only, inside a Field and outside (conventions 3.6.1 rule 5).
  */
-export function fieldInputProps(field: FieldControlBinding): FieldControlAttributes & {
+export function fieldInputProps(
+  field: FieldControlBinding,
+  withholdRequired = false,
+): FieldControlAttributes & {
   name?: string | undefined;
   required?: boolean;
 } {
-  if (!field.inField) return {};
-  return { ...field.attributes, name: field.name, required: field.required };
+  const withheld = withholdRequired && field.readOnly ? { required: false } : null;
+  if (!field.inField) return withheld ?? {};
+  return { ...field.attributes, name: field.name, required: field.required, ...withheld };
 }
 
 /**
@@ -110,19 +132,29 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
     name,
     disabled = false,
     required = false,
+    readOnly = false,
     id,
     component,
     validityElement,
   } = options;
   const field = use(FieldContext);
   const registerControl = field?.registerControl;
+  // Registered resolved: the Field bars the control from validation whichever of the two set it.
+  const resolvedReadOnly = readOnly || (field?.readOnly ?? false);
 
   const ref = useCallback(
     (element: HTMLElement) => {
       if (registerControl === undefined) return () => {};
-      return registerControl({ element, labelable, required, disabled, validityElement });
+      return registerControl({
+        element,
+        labelable,
+        required,
+        disabled,
+        readOnly: resolvedReadOnly,
+        validityElement,
+      });
     },
-    [registerControl, labelable, required, disabled, validityElement],
+    [registerControl, labelable, required, disabled, resolvedReadOnly, validityElement],
   );
 
   useDevWarning(
@@ -147,6 +179,7 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
       fieldName: undefined,
       disabled,
       required,
+      readOnly,
       attributes: {},
       state: undefined,
     };
@@ -165,7 +198,7 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
     inField: true,
     ref,
     id: labelable ? ids.control : undefined,
-    ...resolveFieldDefaults(field, { name, disabled, required }),
+    ...resolveFieldDefaults(field, { name, disabled, required, readOnly }),
     fieldName: field.name,
     attributes,
     state,

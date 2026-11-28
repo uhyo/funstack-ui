@@ -47,7 +47,8 @@ function firstChildOfSelect(el: HTMLButtonElement): string | null {
  * the Root's state, so a pending indicator next to `<Select.Value />` goes in its function
  * `children`.
  *
- * Owned keys: `type` (always `"button"`), `data-pending`, `data-disabled`, `data-invalid`.
+ * Owned keys: `type` (always `"button"`), `data-pending`, `data-disabled`, `data-readonly`,
+ * `data-invalid`.
  *
  * @see https://ui.funstack.work/components/select
  */
@@ -57,6 +58,7 @@ export function SelectTrigger({ className, style, children, render, ...rest }: S
     value: ctx.optimistic,
     pending: ctx.pending,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
     invalid: ctx.invalid,
   };
   const { ref } = useSelectPartRef<HTMLButtonElement>(

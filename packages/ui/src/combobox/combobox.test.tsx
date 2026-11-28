@@ -3117,6 +3117,7 @@ describe("Combobox", () => {
         open: true,
         pending: true,
         disabled: false,
+        readOnly: false,
       });
       expect(seen.input).toEqual({
         value: "a",
@@ -3127,15 +3128,22 @@ describe("Combobox", () => {
         stale: false,
         empty: false,
         disabled: false,
+        readOnly: false,
         invalid: false,
         required: false,
       });
-      expect(seen.trigger).toEqual({ open: true, pending: false, disabled: false });
+      expect(seen.trigger).toEqual({
+        open: true,
+        pending: false,
+        disabled: false,
+        readOnly: false,
+      });
       expect(seen.clear).toEqual({
         value: "a",
         values: ["a"],
         inputValue: "A",
         disabled: false,
+        readOnly: false,
       });
       expect(seen.popup).toEqual({ open: true, stale: false, query: "A" });
       expect(seen.list).toEqual({ query: "A", stale: false, empty: false });

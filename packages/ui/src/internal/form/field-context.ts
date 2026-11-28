@@ -15,6 +15,11 @@ export interface FieldState {
   readonly disabled: boolean;
   /** `Field.Root required` or the control's own `required`. */
   readonly required: boolean;
+  /**
+   * `Field.Root readOnly` or the control's own `readOnly` (conventions 3.6.1): the value is
+   * focusable and submitted, the user cannot change it, and it never blocks a submission.
+   */
+  readonly readOnly: boolean;
   /** The enclosing form's submission is in flight (`useFormStatus().pending`); `false` outside a form. */
   readonly pending: boolean;
 }
@@ -35,6 +40,8 @@ export interface FieldControlRegistration {
   /** The control's own `required` / `disabled` props (for the Field's `data-*` state). */
   readonly required: boolean;
   readonly disabled: boolean;
+  /** The control's `readOnly`, own or the Field's (conventions 3.6.1): barred from validation. */
+  readonly readOnly: boolean;
   /**
    * Where `validity`, `validationMessage` and the custom-validity slot are read and written when
    * that is not the registered element (NumberField: the hidden `input[type=number]` after the
@@ -49,9 +56,10 @@ export interface FieldContextValue {
   readonly ids: FieldIds;
   /** `Field.Root name`. */
   readonly name: string | undefined;
-  /** `Field.Root disabled` / `required` (the props, not the merged state). */
+  /** `Field.Root disabled` / `required` / `readOnly` (the props, not the merged state). */
   readonly disabled: boolean;
   readonly required: boolean;
+  readonly readOnly: boolean;
   readonly state: FieldState;
   /** The registered control is labelable (default `true`, also before any registration). */
   readonly labelable: boolean;
@@ -108,12 +116,13 @@ export interface FormContextValue {
 
 export const FormContext = createContext<FormContextValue | null>(null);
 
-/** The four state attributes every Field part renders (design 6.1). */
+/** The five state attributes every Field part renders (design 6.1). */
 export function fieldDataAttributes(state: FieldState) {
   return {
     "data-invalid": dataAttr(state.invalid),
     "data-disabled": dataAttr(state.disabled),
     "data-required": dataAttr(state.required),
+    "data-readonly": dataAttr(state.readOnly),
     "data-pending": dataAttr(state.pending),
   };
 }

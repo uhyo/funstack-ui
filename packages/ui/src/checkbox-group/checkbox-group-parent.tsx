@@ -29,6 +29,8 @@ export interface CheckboxGroupParentState {
   readonly pending: boolean;
   /** Disabled by its own prop or by `Root disabled`. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or its Field's): `data-readonly`, `aria-readonly`. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -48,6 +50,7 @@ export interface CheckboxGroupParentProps extends Omit<
   | "required"
   | "autoComplete"
   | "aria-checked"
+  | "aria-readonly"
   | "readOnly"
   | "onChange"
   | "className"
@@ -99,8 +102,9 @@ function derive(values: readonly string[], set: ReadonlySet<string>) {
  *
  * Owned keys (conventions 1.2): `type`, `name` (removed), `value` (removed), `checked`,
  * `defaultChecked`, `indeterminate` (stripped; the property is set), `required` (removed), `form`
- * (removed), `autoComplete` (`"off"`), `disabled`, `aria-checked` (removed), `data-checked`, `data-indeterminate`,
- * `data-pending`, `data-disabled`. `onChange` is merged.
+ * (removed), `autoComplete` (`"off"`), `disabled`, `aria-checked` (removed), `readOnly` (never
+ * the HTML attribute), `aria-readonly` (the Root's read-only), `data-checked`,
+ * `data-indeterminate`, `data-pending`, `data-disabled`, `data-readonly`. `onChange` is merged.
  *
  * @see https://ui.funstack.work/components/checkbox-group
  */
@@ -127,6 +131,7 @@ export function CheckboxGroupParent({
   const pending =
     ctx.state.pending && values.some((v) => ctx.optimistic.has(v) !== ctx.committed.has(v));
   const disabled = ctx.state.disabled || disabledProp;
+  const readOnly = ctx.state.readOnly;
 
   // The APG restore memory: the last partial combination of `values` the group committed
   // (design 6.2). Committed, not optimistic, so a partial state that only ever rolled back is
@@ -151,12 +156,17 @@ export function CheckboxGroupParent({
         // A click before hydration flipped the box (design 8.1): report it as the Parent's
         // semantic before the Root reads the group (which leaves disabled Items alone). Firefox's
         // form-state restoration cannot cause this: the Parent renders `autocomplete="off"`.
-        if (el.checked !== checked) ctx.reportParent(values, el.checked);
+        // Read-only (internal-hooks 3.8 rule 10): the click is undone instead.
+        if (el.checked !== checked) {
+          if (readOnly) el.checked = checked;
+          else ctx.reportParent(values, el.checked);
+        }
         syncPresences(el, {
           "data-checked": checked,
           "data-indeterminate": indeterminate,
           "data-pending": pending,
           "data-disabled": disabled,
+          "data-readonly": readOnly,
         });
       }
       ctx.onItemMounted(el);
@@ -198,7 +208,14 @@ export function CheckboxGroupParent({
     return { added: restore.length > 0 ? restore : [...effective], removed: [] };
   };
 
-  const state: CheckboxGroupParentState = { values, checked, indeterminate, pending, disabled };
+  const state: CheckboxGroupParentState = {
+    values,
+    checked,
+    indeterminate,
+    pending,
+    disabled,
+    readOnly,
+  };
 
   return useRender<ComponentPropsWithRef<"input">, CheckboxGroupParentState>({
     defaultElement: "input",
@@ -225,11 +242,14 @@ export function CheckboxGroupParent({
       // `indeterminate` prop (which react-dom would warn about) is stripped.
       ...{ indeterminate: undefined },
       "aria-checked": undefined,
+      readOnly: undefined,
+      "aria-readonly": readOnly ? "true" : undefined,
       disabled: disabledProp,
       "data-checked": dataAttr(checked),
       "data-indeterminate": dataAttr(indeterminate),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
+      "data-readonly": dataAttr(readOnly),
       onChange: (event: ChangeEvent<HTMLInputElement>) => {
         if (disabled) return;
         const nativeEvent = event.nativeEvent;
@@ -237,6 +257,7 @@ export function CheckboxGroupParent({
           nativeEvent,
           () => ctx.apply(cyclePatch(), nativeEvent),
           "CheckboxGroup.Parent",
+          readOnly,
         );
       },
     },

@@ -79,6 +79,15 @@ export interface FieldRootProps extends Omit<
    */
   required?: boolean;
   /**
+   * Makes the control read-only (conventions 3.6.1) and marks every part `data-readonly`: the
+   * value is focusable and submitted, the user cannot change it, and it never blocks a
+   * submission (the control is barred from validation: `validate` and a server error do not
+   * block, a server error is still shown).
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
+  /**
    * A custom constraint, written into the control with `setCustomValidity`. Sync. Receives the
    * field's submitted value (`formData.get(name)` as a string, `""` when absent) and the whole
    * form's `FormData`, so a cross-field rule can read the other field. Runs at mount, on every
@@ -148,7 +157,8 @@ function entryStrings(entries: readonly FormDataEntryValue[]): string[] {
  * (`useFormStatus`), the one part that folds the form channel into its own state, because a
  * Field has no action of its own.
  *
- * Owned keys (conventions 1.2): `data-invalid`, `data-disabled`, `data-required`, `data-pending`.
+ * Owned keys (conventions 1.2): `data-invalid`, `data-disabled`, `data-required`,
+ * `data-readonly`, `data-pending`.
  *
  * @see https://ui.funstack.work/components/field
  */
@@ -156,6 +166,7 @@ export function FieldRoot({
   name,
   disabled = false,
   required = false,
+  readOnly = false,
   validate,
   className,
   style,
@@ -254,7 +265,19 @@ export function FieldRoot({
   /** The element the slot was last written on (a group's first member can change). */
   const slotElement = useRef<ValidatableElement | null>(null);
 
-  const latest = useLatest({ name, validate, serverMessages, serverShown, formPending, form });
+  // Read-only, by the Field's prop or the control's own (the registration carries the resolved
+  // value): barred from constraint validation, as HTML bars a read-only text input (conventions
+  // 3.6.1 rule 5). The slot stays empty and the control's own events are not edits.
+  const stateReadOnly = readOnly || (control?.readOnly ?? false);
+  const latest = useLatest({
+    name,
+    validate,
+    serverMessages,
+    serverShown,
+    formPending,
+    form,
+    readOnly: stateReadOnly,
+  });
   /** An edit of the control whose state write is pending (`refreshAfterEdit`): its dismissal. */
   const pendingEdit = useRef<(() => void) | null>(null);
 
@@ -272,13 +295,14 @@ export function FieldRoot({
       const surface = validityElementOf(registration.element);
       const el = registration.validityElement?.() ?? surface;
       if (el === null) return null;
-      const { name, validate, serverMessages, serverShown } = latest.current;
+      const { name, validate, serverMessages, serverShown, readOnly } = latest.current;
 
       const owner = el.form;
       const formData = owner === null ? new FormData() : new FormData(owner);
       const entry = name === undefined ? null : formData.get(name);
       const value = typeof entry === "string" ? entry : "";
-      const custom = validate === undefined ? NONE : normaliseErrorValue(validate(value, formData));
+      const custom =
+        validate === undefined || readOnly ? NONE : normaliseErrorValue(validate(value, formData));
 
       // The slot (design 2.1): the server message while shown, else `validate`'s. An edit whose
       // dismissal is not written yet (2.4) already counts: a submission attempt before it
@@ -288,7 +312,10 @@ export function FieldRoot({
         slotElement.current.setCustomValidity("");
       }
       slotElement.current = el;
-      el.setCustomValidity(showServer ? serverMessages.join("\n") : custom.join("\n"));
+      // Read-only: nothing in the slot, so neither `validate` nor a server error blocks.
+      el.setCustomValidity(
+        readOnly ? "" : showServer ? serverMessages.join("\n") : custom.join("\n"),
+      );
       // Mirror onto the surface so its `:user-invalid` read below sees the new state (the control
       // writes the same derived value after each of its own writes).
       if (
@@ -392,7 +419,7 @@ export function FieldRoot({
   // avoids it); the form's own values are covered by the listeners below.
   useLayoutEffect(() => {
     refresh();
-  }, [refresh, control, serverShown, serverKey, validate]);
+  }, [refresh, control, serverShown, serverKey, validate, stateReadOnly]);
 
   // Clear the slot when the control goes away (it may be reused outside the Field).
   useLayoutEffect(
@@ -407,7 +434,9 @@ export function FieldRoot({
   const element = control?.element ?? null;
   useLayoutEffect(() => {
     if (element === null) return;
-    const onEdit = (event: Event) => refreshAfterEdit(event, true);
+    // A read-only control's `input` / `change` is not an edit (conventions 3.6.1 rule 6: the
+    // write-back of a stray native change); a shown server error stays.
+    const onEdit = (event: Event) => refreshAfterEdit(event, !latest.current.readOnly);
     const onBlur = () => refresh();
     const onInvalid = (event: Event) => {
       const target = event.target as ValidatableElement;
@@ -415,7 +444,8 @@ export function FieldRoot({
       // `reportValidity()` do not (design 2.5). The fallback cannot tell them apart.
       const attempt = supportsUserInvalid() ? target.matches(":user-invalid") : true;
       if (!supportsUserInvalid()) attempted.current = true;
-      if (attempt && errorCount.current > 0) {
+      // A read-only control is skipped by the first-invalid focus (conventions 3.6.1 rule 5).
+      if (attempt && errorCount.current > 0 && !latest.current.readOnly) {
         event.preventDefault();
         const messages = refresh();
         collectInvalid(focusTargetOf(element), messages.join(" "), target);
@@ -442,7 +472,7 @@ export function FieldRoot({
       element.removeEventListener("invalid", onInvalid, true);
       if (listenOutside) outside.removeEventListener("invalid", onInvalid, true);
     };
-  }, [element, control, refresh, refreshAfterEdit]);
+  }, [element, control, refresh, refreshAfterEdit, latest]);
 
   // The form owner's events: another field's edit re-runs `validate` (cross-field rules); a reset
   // clears the user-validity flag, re-read when the controls hold their reset values.
@@ -477,7 +507,9 @@ export function FieldRoot({
   useLayoutEffect(() => {
     if (registerField === undefined) return;
     const registration: FormFieldRegistration = {
-      getFocusTarget: () => focusTargetOf(controlRef.current?.element ?? null),
+      // A read-only control is not focused for a server error: there is nothing to correct.
+      getFocusTarget: () =>
+        latest.current.readOnly ? null : focusTargetOf(controlRef.current?.element ?? null),
       // An edit whose dismissal is not written yet already counts (design 2.4).
       showsServerError: () => latest.current.serverShown && pendingEdit.current === null,
       serverMessages: () => latest.current.serverMessages,
@@ -525,9 +557,10 @@ export function FieldRoot({
       validity,
       disabled: stateDisabled,
       required: stateRequired,
+      readOnly: stateReadOnly,
       pending: formPending,
     }),
-    [invalid, messages, validity, stateDisabled, stateRequired, formPending],
+    [invalid, messages, validity, stateDisabled, stateRequired, stateReadOnly, formPending],
   );
 
   const labelable = control?.labelable ?? true;
@@ -538,6 +571,7 @@ export function FieldRoot({
       name,
       disabled,
       required,
+      readOnly,
       state: memoState,
       labelable,
       controlElement,
@@ -550,6 +584,7 @@ export function FieldRoot({
       name,
       disabled,
       required,
+      readOnly,
       memoState,
       labelable,
       controlElement,

@@ -171,6 +171,8 @@ export interface NumberFieldButtonState {
   readonly pending: boolean;
   /** The prop, the Root's `disabled` or `readOnly`, or the next step would change nothing. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or its Field's): `data-readonly`. The button is disabled too. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -229,7 +231,7 @@ export function useStepButtonElement(
   const atBound = isAtBound(ctx.stepBase, direction === "increment" ? 1 : -1, ctx.bounds);
   const disabled = disabledProp || state.disabled || state.readOnly || atBound;
   const pending = ctx.pendingSource === direction;
-  const buttonState: NumberFieldButtonState = { pending, disabled };
+  const buttonState: NumberFieldButtonState = { pending, disabled, readOnly: state.readOnly };
   const handlers = useStepButton(ctx, direction, disabled);
 
   useDevWarning(
@@ -265,6 +267,7 @@ export function useStepButtonElement(
       onContextMenu: handlers.onContextMenu,
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
+      "data-readonly": dataAttr(state.readOnly),
     } as Partial<ComponentPropsWithRef<"button">> & DataAttributes,
   });
 }

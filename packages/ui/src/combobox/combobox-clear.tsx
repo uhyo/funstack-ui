@@ -26,8 +26,10 @@ export interface ComboboxClearState {
   readonly values: readonly string[];
   /** The text in the input (urgent). */
   readonly inputValue: string;
-  /** Disabled by its own prop or by the Root. */
+  /** Disabled by its own prop or by the Root, or while the Root is read-only. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): Clear is disabled too. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -85,7 +87,8 @@ export function ComboboxClear({
   ...rest
 }: ComboboxClearProps) {
   const ctx = useComboboxContext("Combobox.Clear");
-  const disabled = ownDisabled || ctx.disabled;
+  // Read-only (conventions 3.6.1 rule 7): a part whose only job is to change the value.
+  const disabled = ownDisabled || ctx.disabled || ctx.readOnly;
   const ref = useNameWarning(
     isDev && "Combobox.Clear: the button has no accessible name. Give it an `aria-label`.",
     BUTTON_NAME,
@@ -95,6 +98,7 @@ export function ComboboxClear({
     values: ctx.values,
     inputValue: ctx.inputValue,
     disabled,
+    readOnly: ctx.readOnly,
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -116,6 +120,7 @@ export function ComboboxClear({
       ctx.clear(event.nativeEvent);
     },
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
   };
 
   return useRender<ComponentPropsWithRef<"button">, ComboboxClearState>({

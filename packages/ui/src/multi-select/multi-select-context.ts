@@ -36,6 +36,8 @@ export interface MultiSelectContextValue {
   /** The enclosing `Field.Label`'s id: names the List when no `MultiSelect.Label` is mounted. */
   readonly fieldLabelId: string | undefined;
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): the popup never opens, nothing dispatches. */
+  readonly readOnly: boolean;
   /** `required` (own or the Field's): the Trigger renders the validity element (B.10). */
   readonly required: boolean;
   /** The Root's `form`, for the validity element. */

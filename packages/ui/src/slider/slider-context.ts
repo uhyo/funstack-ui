@@ -29,6 +29,8 @@ export interface SliderContextValue {
   readonly gap: number;
   readonly orientation: SliderOrientation;
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): nothing steps or commits (conventions 3.6.1). */
+  readonly readOnly: boolean;
   /** A step or commit dispatched through this Slider is in flight. */
   readonly pending: boolean;
   /** The thumb a pointer is captured on, or `null`. */

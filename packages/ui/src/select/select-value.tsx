@@ -130,6 +130,7 @@ export function SelectValue({ className, style, render, ...rest }: SelectValuePr
     value: ctx.optimistic,
     pending: ctx.pending,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
     invalid: ctx.invalid,
   };
   return useRender<ComponentPropsWithRef<"selectedcontent">, SelectRootState>({

@@ -44,6 +44,12 @@ export interface UseNativeCheckedOptions {
    * The part dispatches with `reason: "platform"`.
    */
   readonly onPlatformChange?: ((next: boolean, event: Event | undefined) => void) | undefined;
+  /**
+   * Single controls only: the control is read-only (own or the Field's). Mount reconciliation
+   * then writes the intended value back instead of reporting it (internal-hooks 3.8 rule 10);
+   * the reset path is unchanged.
+   */
+  readonly readOnly?: boolean | undefined;
 }
 
 /**
@@ -54,7 +60,7 @@ export interface UseNativeCheckedOptions {
  *    the expected `type`.
  * 2. Mount reconciliation (single controls): a click before hydration or Firefox's form-state
  *    restoration left the DOM different from what the user intends; reported once with
- *    `event: undefined`.
+ *    `event: undefined`, or, while read-only, undone (the intended value is written back).
  * 3. Re-apply after every commit: `checked` (optimistic, or the latest in-flight value),
  *    `indeterminate` and `defaultChecked`, none of which React manages for a controlled input
  *    except `checked`.
@@ -100,7 +106,11 @@ export function useNativeChecked(options: UseNativeCheckedOptions): RefCallback<
     if (group) return;
     const el = node.current;
     if (el === null) return;
-    if (el.checked !== readBase()) report(el.checked, undefined);
+    const base = readBase();
+    if (el.checked === base) return;
+    // Read-only (rule 10): a change made before hydration to a control the user may not change.
+    if (options.readOnly === true) el.checked = base;
+    else report(el.checked, undefined);
   });
   useLayoutEffect(() => {
     reconcileMount();
@@ -179,12 +189,20 @@ const warnedPreventDefault = new WeakSet<EventTarget>();
  * - Otherwise `dispatch()` runs (the action's sync prefix included); if the event is cancelled
  *   now, the action's sync prefix called `preventDefault()`, which desyncs the input while the
  *   action is pending. Development warns once per input element.
+ * - While the owner is read-only (`readOnly`), the guard cancels the click itself and returns:
+ *   the browser's cancelled-activation steps restore `checked` and fire neither `input` nor
+ *   `change` (conventions 3.6.1 rule 6). Nothing is dispatched and nothing is warned.
  */
 export function guardCheckableChange(
   event: Event,
   dispatch: () => void,
   component: string = "A checkable input",
+  readOnly = false,
 ): void {
+  if (readOnly) {
+    event.preventDefault();
+    return;
+  }
   if (event.defaultPrevented) return;
   dispatch();
   if (!isDev || !event.defaultPrevented) return;

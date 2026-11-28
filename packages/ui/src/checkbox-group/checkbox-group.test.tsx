@@ -2077,6 +2077,7 @@ describe("CheckboxGroup", () => {
         disabled: false,
         invalid: false,
         required: false,
+        readOnly: false,
       });
       expect(screen.getByText("Fruit a")).toHaveClass("l-a");
       expect(screen.getByText("Fruit a")).toHaveStyle({ color: "rgb(255, 0, 0)" });
@@ -2089,6 +2090,7 @@ describe("CheckboxGroup", () => {
         indeterminate: true,
         pending: false,
         disabled: false,
+        readOnly: false,
       });
 
       const user = setupUser();
@@ -2099,6 +2101,7 @@ describe("CheckboxGroup", () => {
         disabled: false,
         invalid: false,
         required: false,
+        readOnly: false,
       });
       expect(group()).toHaveClass("g", "busy");
       expect(group()).toHaveStyle({ opacity: "0.5" });
@@ -2241,7 +2244,7 @@ describe("CheckboxGroup", () => {
       );
       expect(renderFn).toHaveBeenLastCalledWith(
         expect.objectContaining({ type: "checkbox", checked: false, value: "a" }),
-        { value: "a", checked: false, pending: false, disabled: false },
+        { value: "a", checked: false, pending: false, disabled: false, readOnly: false },
       );
       const user = setupUser();
       await user.click(box("a"));

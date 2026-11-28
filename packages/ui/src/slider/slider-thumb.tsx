@@ -40,6 +40,8 @@ export interface SliderThumbState {
   readonly orientation: SliderOrientation;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's): `data-readonly`, `aria-readonly` on the input. */
+  readonly readOnly: boolean;
   /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
   readonly invalid: boolean;
 }
@@ -61,6 +63,7 @@ export interface SliderThumbProps extends Omit<
   | "aria-valuenow"
   | "aria-valuetext"
   | "aria-orientation"
+  | "aria-readonly"
   | "className"
   | "style"
   | "children"
@@ -131,7 +134,8 @@ const VERTICAL_INPUT_STYLE: CSSProperties = {
  * input. The input's native `min` / `max` are the neighbours' values, so thumbs cannot cross.
  *
  * Owned keys on the styled element: `onPointerDown`, `data-index`, `data-orientation`,
- * `data-dragging`, `data-pending`, `data-disabled`, and `--slider-value` / `touch-action` in
+ * `data-dragging`, `data-pending`, `data-disabled`, `data-readonly`, and `--slider-value` /
+ * `touch-action` in
  * `style` (the consumer's entries win). `aria-label`, `aria-labelledby`, `aria-describedby`,
  * `name`, `form` and `autoFocus` go to the input; every other input attribute is the library's.
  *
@@ -237,6 +241,7 @@ export function SliderThumb({
     dragging,
     orientation: ctx.orientation,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
     invalid: ctx.field?.invalid === "true",
   };
 
@@ -261,9 +266,15 @@ export function SliderThumb({
         undefined
       }
       aria-invalid={ctx.field?.invalid}
+      // The `slider` role has the read-only state (conventions 3.6.1 rule 9).
+      aria-readonly={ctx.readOnly ? "true" : undefined}
       aria-valuetext={ctx.getAriaValueText?.(shownValue, index)}
       style={ctx.orientation === "vertical" ? VERTICAL_INPUT_STYLE : HIDDEN_INPUT_STYLE}
       onChange={(event: ChangeEvent<HTMLInputElement>) => {
+        // Read-only (conventions 3.6.1 rule 6, the fallback): a native `input` that no cancelled
+        // key preceded (an assistive technology's increment) steps nothing; react-dom writes the
+        // shown value back when the event ends, as for any controlled input.
+        if (ctx.readOnly) return;
         ctx.inputStep(index, Number(event.target.value), event.nativeEvent);
       }}
     />
@@ -289,6 +300,7 @@ export function SliderThumb({
       "data-dragging": dataAttr(dragging),
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(ctx.disabled),
+      "data-readonly": dataAttr(ctx.readOnly),
       ...(ctx.field !== null ? { "data-invalid": ctx.field.dataInvalid } : {}),
       onPointerDown: (event: ReactPointerEvent<HTMLSpanElement>) => {
         ctx.beginGesture(index, event.nativeEvent, event.currentTarget);

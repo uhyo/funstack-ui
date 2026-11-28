@@ -14,6 +14,8 @@ import { useComboboxContext } from "./combobox-context.js";
 export interface ComboboxLabelState {
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's). */
+  readonly readOnly: boolean;
   /** The Root's `pending`: a value or open transition is in flight. */
   readonly pending: boolean;
 }
@@ -54,12 +56,13 @@ export function ComboboxLabel({ className, style, children, render, ...rest }: C
     id: ctx.ids.label,
     htmlFor: ctx.ids.input,
     "data-disabled": dataAttr(ctx.disabled),
+    "data-readonly": dataAttr(ctx.readOnly),
     "data-pending": dataAttr(ctx.pending),
   };
   return useRender<ComponentPropsWithRef<"label">, ComboboxLabelState>({
     defaultElement: "label",
     render,
-    state: { disabled: ctx.disabled, pending: ctx.pending },
+    state: { disabled: ctx.disabled, readOnly: ctx.readOnly, pending: ctx.pending },
     className,
     style,
     children,

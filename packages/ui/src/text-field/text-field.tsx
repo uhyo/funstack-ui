@@ -114,7 +114,8 @@ export interface TextFieldProps extends Omit<
    */
   disabled?: boolean;
   /**
-   * Native `readonly`: the text cannot be edited and nothing commits.
+   * Native `readonly`: the text cannot be edited and nothing commits; `data-readonly`. Also
+   * `true` when the enclosing Field is read-only.
    *
    * @defaultValue `false`
    */
@@ -154,8 +155,8 @@ type TextElement = HTMLInputElement | HTMLTextAreaElement;
  * element: it carries `name`, the constraints and the text the form posts.
  *
  * Owned keys (conventions 1.2): `value` (the shown text), `onChange`, `onKeyDown`, `onBlur`,
- * `data-pending`, `data-disabled`; inside a `Field.Root` also `id`, `name`, `disabled`,
- * `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Everything
+ * `data-pending`, `data-disabled`, `data-readonly`; inside a `Field.Root` also `id`, `name`,
+ * `disabled`, `required`, `readOnly`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Everything
  * else passes through; the library sets no default but `type="text"` on the default element.
  *
  * @see https://ui.funstack.work/components/text-field
@@ -167,7 +168,7 @@ export function TextField(props: TextFieldProps) {
     valueCommitAction,
     name: nameProp,
     disabled: disabledProp = false,
-    readOnly = false,
+    readOnly: readOnlyProp = false,
     required: requiredProp = false,
     className,
     style,
@@ -182,10 +183,11 @@ export function TextField(props: TextFieldProps) {
     name: nameProp,
     disabled: disabledProp,
     required: requiredProp,
+    readOnly: readOnlyProp,
     id: rest.id,
     component: "TextField",
   });
-  const { disabled, required } = field;
+  const { disabled, required, readOnly } = field;
   const invalid = field.state?.invalid ?? false;
 
   // --- State (design 2) -----------------------------------------------------------------------
@@ -301,6 +303,14 @@ export function TextField(props: TextFieldProps) {
     onPlatformChange: (next, event) => {
       dispatch(next, createActionDetails(event, { reason: "platform" }));
     },
+    // Read-only (internal-hooks 3.8 rule 10): text restored by the browser is put back.
+    readOnly,
+    restore: () => {
+      clearDraft();
+      const element = elementRef.current;
+      const want = intendedValue(latestInFlight, latest.current.optimistic);
+      if (element !== null && element.value !== want) element.value = want;
+    },
     onResetEvent: () => {
       // react-dom keeps a controlled input's `defaultValue` equal to its value: the reset target
       // is written right before the reset algorithm reads it (conventions 3.8 rule 6).
@@ -372,6 +382,8 @@ export function TextField(props: TextFieldProps) {
     },
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(readOnly),
+    ...(field.inField && { readOnly }),
   };
 
   return useRender<ComponentPropsWithRef<"input">, TextFieldState>({
@@ -385,8 +397,9 @@ export function TextField(props: TextFieldProps) {
     props: {
       ...(render === undefined ? { type: "text" } : {}),
       ...rest,
-      readOnly,
-      ...(field.inField ? {} : { name: nameProp, disabled: disabledProp, required: requiredProp }),
+      ...(field.inField
+        ? {}
+        : { name: nameProp, disabled: disabledProp, required: requiredProp, readOnly }),
     },
     libraryProps,
     ref,

@@ -978,6 +978,7 @@ describe("Field.Control outside a Field.Root (design 4.3)", () => {
       validity: expect.objectContaining({ valid: true, valueMissing: false }),
       disabled: true,
       required: true,
+      readOnly: false,
       pending: false,
     });
     expect(control).not.toHaveAttribute("data-disabled");

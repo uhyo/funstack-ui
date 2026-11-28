@@ -8,8 +8,9 @@ import type { ActiveOption } from "../internal/use-active-option.js";
 import type { OptionRegistry } from "../internal/use-option-registry.js";
 
 export interface ComboboxKeyboardOptions {
-  /** The Root's `disabled`, `loop` and `allowCustomValue`. */
+  /** The Root's `disabled`, `readOnly`, `loop` and `allowCustomValue`. */
   readonly disabled: boolean;
+  readonly readOnly: boolean;
   readonly loop: boolean;
   readonly allowCustomValue: boolean;
   readonly popover: Pick<
@@ -47,6 +48,9 @@ export interface ComboboxMultipleKeys {
   readonly clearText: (event: Event) => void;
 }
 
+/** The keys a read-only Input still handles: they move the caret or focus, never the value. */
+const CARET_KEYS: ReadonlySet<string> = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
+
 /** The caret is at the start of the input with nothing selected. */
 function caretAtStart(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLInputElement)) return false;
@@ -69,6 +73,7 @@ function isInlineStartArrow(event: KeyboardEvent): boolean {
  */
 export function createComboboxKeyDown({
   disabled,
+  readOnly,
   loop,
   allowCustomValue,
   popover,
@@ -106,6 +111,10 @@ export function createComboboxKeyDown({
 
   return (event: KeyboardEvent): boolean => {
     if (disabled || event.ctrlKey || event.metaKey) return false;
+    // Read-only (conventions 3.6.1 rules 3, 8): no open, no pick, no commit, no chip removal;
+    // the keys that only move focus or the caret keep working (the inline-start arrow into the
+    // chips, Home / End). Not prevented: the input's own default (caret, submission) runs.
+    if (readOnly && !CARET_KEYS.has(event.key)) return false;
     // IME: the key belongs to the composition (Enter commits it, arrows pick a candidate).
     if (isComposingKey(event)) return false;
     // What the user sees, not what is intended: right after Escape the platform has hidden the

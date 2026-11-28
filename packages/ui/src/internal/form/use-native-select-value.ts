@@ -29,6 +29,11 @@ export interface UseNativeSelectValueOptions {
    * `reason: "platform"`.
    */
   readonly onPlatformChange: (next: string, event: Event | undefined) => void;
+  /**
+   * The Select is read-only: mount reconciliation re-selects the intended option instead of
+   * dispatching (internal-hooks 3.8 rule 10); a form reset is unchanged.
+   */
+  readonly readOnly?: boolean | undefined;
 }
 
 export interface AdoptDefault {
@@ -229,6 +234,11 @@ export function useNativeSelectValue(
     },
     base: () => intended(latest.current),
     onPlatformChange: (next, event) => latest.current.onPlatformChange(next, event),
+    readOnly: options.readOnly,
+    restore: () => {
+      const select = ref.current;
+      if (select !== null) applySelection(select, intended(latest.current), undefined);
+    },
   });
 
   // 3. After every commit. Declared after the adapter, so the mount commit's DOM is read by the

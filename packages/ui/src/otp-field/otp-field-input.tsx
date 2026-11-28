@@ -97,6 +97,7 @@ export function OTPFieldInput({ className, style, render, ...rest }: OTPFieldInp
     name: ctx.name,
     disabled: state.disabled,
     required: ctx.required,
+    readOnly: state.readOnly,
     id: rest.id,
     component: "OTPField.Input",
   });
@@ -239,6 +240,7 @@ export function OTPFieldInput({ className, style, render, ...rest }: OTPFieldInp
     "data-complete": dataAttr(state.complete),
     "data-pending": dataAttr(state.pending),
     "data-disabled": dataAttr(state.disabled),
+    "data-readonly": dataAttr(state.readOnly),
     ...dataInvalid,
   };
 

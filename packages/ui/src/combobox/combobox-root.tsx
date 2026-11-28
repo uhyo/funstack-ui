@@ -3,6 +3,7 @@ import {
   use,
   useCallback,
   useEffect,
+  useEffectEvent,
   useId,
   useLayoutEffect,
   useMemo,
@@ -109,6 +110,8 @@ export interface ComboboxRootState {
   readonly pending: boolean;
   /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
+  /** The `readOnly` prop, or the enclosing Field's (`data-readonly`). */
+  readonly readOnly: boolean;
 }
 
 /** Details passed as the second argument of `valueChangeAction` with `multiple` (design 15.2). */
@@ -226,6 +229,16 @@ export interface ComboboxRootBaseProps {
    * @defaultValue `false`
    */
   disabled?: boolean;
+  /**
+   * The selection is shown, focusable and submitted, and cannot be changed: the Input renders
+   * native `readonly` (its text stays selectable), the popup never opens, the Trigger, Clear and
+   * every `ChipRemove` are disabled, and nothing dispatches (`allowCustomValue` commits nothing).
+   * The hidden inputs are not disabled. Inside a `Field.Root`, the Field's `readOnly` also
+   * applies.
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -419,10 +432,11 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   // `disabled` default from the Field, and the List is named by `Field.Label` when no
   // `Combobox.Label` is mounted.
   const field = use(FieldContext);
-  const { name, disabled } = resolveFieldDefaults(field, {
+  const { name, disabled, readOnly } = resolveFieldDefaults(field, {
     name: props.name,
     disabled: props.disabled ?? false,
     required: false,
+    readOnly: props.readOnly ?? false,
   });
   const fieldControlId = field?.ids.control;
 
@@ -698,6 +712,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     open: popover.optimistic,
     pending: valuePending || popover.pending,
     disabled,
+    readOnly,
   };
   const state: ComboboxRootState | ComboboxMultipleRootState = multiple
     ? { ...baseState, value: multi.values }
@@ -874,7 +889,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
 
   /** Removes one value outside the listbox (Backspace, Delete, `ChipRemove`) and announces it. */
   const removeValue = (removedValue: string, event: Event): void => {
-    if (disabled || !multi.optimistic.has(removedValue)) return;
+    if (disabled || readOnly || !multi.optimistic.has(removedValue)) return;
     announceRemoval([removedValue]);
     changeValues(
       { added: [], removed: [removedValue] },
@@ -897,10 +912,20 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     pendingEdgeRef.current = null;
   };
 
+  // A popup that is open, or on its way, when `readOnly` turns on closes (conventions 3.6.1
+  // rule 8): a close request, so a controlled `open` parent decides as for any other.
+  const closeForReadOnly = useEffectEvent(() => {
+    pendingEdgeRef.current = null;
+    if (popover.intended()) popover.requestClose(undefined, "dismiss");
+  });
+  useLayoutEffect(() => {
+    if (readOnly) closeForReadOnly();
+  }, [readOnly]);
+
   // --- Interaction (design 5, 8, 15.3, 15.6) -------------------------------------------------
 
   const acceptSingle = (optionValue: string, event: Event): void => {
-    if (disabled) return;
+    if (disabled || readOnly) return;
     const entry = registry.get(optionValue);
     if (entry === undefined || entry.disabled) return;
     const label = entry.label ?? (entry.element.textContent ?? "").trim();
@@ -923,7 +948,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
 
   /** A pick with `multiple` (design 15.3): toggle, clear the text, leave the listbox open. */
   const acceptMultiple = (optionValue: string, event: Event): void => {
-    if (disabled) return;
+    if (disabled || readOnly) return;
     const entry = registry.get(optionValue);
     if (entry === undefined || entry.disabled) return;
     const label = entry.label ?? (entry.element.textContent ?? "").trim();
@@ -947,6 +972,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
 
   /** Free text as the value (design 5.3). Returns whether it dispatched. */
   const commitText = (event: Event, close: boolean): boolean => {
+    if (readOnly) return false;
     const current = selection.optimistic;
     const typed = textRef.current;
     if (typed === labelFor(current)) return false;
@@ -968,7 +994,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
    */
   const addText = (event: Event, reason: ChangeReason): void => {
     const typed = textRef.current;
-    if (typed === "") return;
+    if (typed === "" || readOnly) return;
     if (!multi.optimistic.has(typed)) {
       if (!labels.has(typed)) labels.set(typed, typed);
       learnChipLabels([[typed, labels.get(typed) ?? typed]]);
@@ -978,7 +1004,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   };
 
   const clear = (event: Event): void => {
-    if (disabled) return;
+    if (disabled || readOnly) return;
     if (textRef.current !== "") writeText("", "activate", event);
     if (multiple) {
       // One change that removes every value (design 15.3).
@@ -994,7 +1020,9 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   };
 
   const typed = (next: string, event: Event): void => {
-    if (disabled) return;
+    // Read-only: native `readonly` refuses typing; an `input` that arrives anyway (autofill) is
+    // not adopted, and react-dom writes the shown text back.
+    if (disabled || readOnly) return;
     writeText(next, "activate", event);
     pendingEdgeRef.current = null;
     // APG: editing moves visual focus back to the input; `autoHighlight` picks the first option
@@ -1045,6 +1073,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   // oxlint-disable-next-line react/refs
   const keyDown = createComboboxKeyDown({
     disabled,
+    readOnly,
     loop,
     allowCustomValue,
     popover,
@@ -1061,6 +1090,8 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     // `disabled`: nothing dispatches (disabling a focused input blurs it).
     if (disabled) return;
     hideListbox(event);
+    // Read-only: the text cannot differ from the selection's; nothing to commit or revert.
+    if (readOnly) return;
     if (multiple) {
       // The text was a search: added as a value with `allowCustomValue`, else dropped (15.9).
       if (textRef.current === "") return;
@@ -1085,6 +1116,9 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   /** The keys of a focused chip (design 15.6). */
   const chipKeyDown = (event: KeyboardEvent): void => {
     if (disabled || !multiple) return;
+    // Read-only (conventions 3.6.1 rule 3): the chip keys still move focus; Backspace and Delete
+    // remove nothing (and move nothing).
+    if (readOnly && (event.key === "Backspace" || event.key === "Delete")) return;
     const chips = orderedChips();
     const index = chips.findIndex((chip) => chip.element === event.target);
     if (index < 0) return;
@@ -1174,7 +1208,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
   };
 
   const inputClick = (event: MouseEvent): void => {
-    if (disabled || !openOnClick) return;
+    if (disabled || readOnly || !openOnClick) return;
     popover.requestOpen(event, "activate");
   };
 
@@ -1209,6 +1243,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     hasLabel: labelCount > 0,
     fieldLabelId: field?.ids.label,
     disabled,
+    readOnly,
     inputRef,
     listRef,
     registerOption,

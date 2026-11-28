@@ -23,6 +23,8 @@ export interface SliderTrackState {
   readonly dragging: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or the Field's). */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -48,7 +50,7 @@ export interface SliderTrackProps extends Omit<
  * The rail the thumbs move along. A press moves the nearest thumb, focuses its input and starts
  * its drag; its box is the geometry reference for the pointer math (its computed `direction`
  * mirrors a horizontal slider). Owned keys: `onPointerDown`, `data-orientation`,
- * `data-dragging`, `data-disabled`, and `touch-action` in `style` (`pan-y` horizontal, `pan-x` vertical; the
+ * `data-dragging`, `data-disabled`, `data-readonly`, and `touch-action` in `style` (`pan-y` horizontal, `pan-x` vertical; the
  * consumer's entry wins).
  *
  * @see https://ui.funstack.work/components/slider
@@ -70,6 +72,7 @@ export function SliderTrack({ className, style, children, render, ...rest }: Sli
     orientation: ctx.orientation,
     dragging: ctx.draggingThumb !== null,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
   };
   const touchAction: CSSProperties = {
     touchAction: ctx.orientation === "vertical" ? "pan-x" : "pan-y",
@@ -88,6 +91,7 @@ export function SliderTrack({ className, style, children, render, ...rest }: Sli
       "data-orientation": ctx.orientation,
       "data-dragging": dataAttr(state.dragging),
       "data-disabled": dataAttr(ctx.disabled),
+      "data-readonly": dataAttr(ctx.readOnly),
       onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
         // A press on a Thumb bubbles here after the Thumb began its gesture; the Root ignores it.
         ctx.beginGesture(null, event.nativeEvent, event.currentTarget);

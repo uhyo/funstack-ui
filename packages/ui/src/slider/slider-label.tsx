@@ -37,7 +37,7 @@ export interface SliderLabelProps<T extends SliderValue = SliderValue> extends O
 /**
  * The visible name of the slider: `<label for>` naming the only thumb's input, or, with several
  * thumbs, the element whose `id` the Root's `aria-labelledby` (`role="group"`) points at, emitted
- * only while a Label is mounted. Owned keys: `id`, `htmlFor`, `data-disabled`, `data-pending`
+ * only while a Label is mounted. Owned keys: `id`, `htmlFor`, `data-disabled`, `data-readonly`, `data-pending`
  * (the Root's, conventions 4.1 rule 4), `data-dragging`, `data-orientation`, `data-invalid` (its
  * state is the Root's, rule 2).
  *
@@ -78,6 +78,7 @@ export function SliderLabel<T extends SliderValue = SliderValue>({
       id: ctx.labelId,
       htmlFor: single ? ctx.thumbId(0) : undefined,
       "data-disabled": dataAttr(ctx.state.disabled),
+      "data-readonly": dataAttr(ctx.state.readOnly),
       "data-pending": dataAttr(ctx.state.pending),
       "data-dragging": dataAttr(ctx.state.dragging),
       "data-orientation": ctx.state.orientation,

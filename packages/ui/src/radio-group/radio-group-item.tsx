@@ -19,6 +19,8 @@ export interface RadioGroupItemState {
   readonly pending: boolean;
   /** Disabled by its own prop or by `Root disabled`. */
   readonly disabled: boolean;
+  /** The Root's `readOnly` (or its Field's): `data-readonly`. */
+  readonly readOnly: boolean;
 }
 
 /**
@@ -65,7 +67,8 @@ export interface RadioGroupItemProps extends Omit<
  *
  * Owned keys (conventions 1.2; a `render` element's value is overridden): `type`, `name`,
  * `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`,
- * `data-checked`, `data-pending`, `data-disabled`. `onChange` is merged: a `render` element's own
+ * `data-checked`, `data-pending`, `data-disabled`, `data-readonly`; `required` is withheld and
+ * `readOnly` is never rendered (the radiogroup carries `aria-readonly`). `onChange` is merged: a `render` element's own
  * handler runs first, then the library's.
  *
  * Form reset in controlled mode: React sets an input's `defaultChecked` once, from its initial
@@ -87,6 +90,7 @@ export function RadioGroupItem({
   const checked = ctx.state.value === value;
   const pending = ctx.state.pending && checked;
   const disabled = ctx.state.disabled || disabledProp;
+  const readOnly = ctx.state.readOnly;
 
   // Group mode: element check and re-apply only; the Root reports the residual paths once. The
   // hook calls `onItemMounted` at mount so that an Item mounting after its Root (a Suspense
@@ -106,6 +110,7 @@ export function RadioGroupItem({
           "data-checked": checked,
           "data-pending": pending,
           "data-disabled": disabled,
+          "data-readonly": readOnly,
         });
       }
       ctx.onItemMounted(el);
@@ -113,7 +118,7 @@ export function RadioGroupItem({
     defaultChecked: ctx.defaultValue === undefined ? undefined : ctx.defaultValue === value,
   });
 
-  const state: RadioGroupItemState = { value, checked, pending, disabled };
+  const state: RadioGroupItemState = { value, checked, pending, disabled, readOnly };
 
   return useRender<ComponentPropsWithRef<"input">, RadioGroupItemState>({
     defaultElement: "input",
@@ -136,6 +141,8 @@ export function RadioGroupItem({
       pending,
       effectiveDisabled: disabled,
       ownDisabled: disabledProp,
+      readOnly,
+      ariaReadOnly: false,
       activate: (event) => ctx.select(value, event),
     }),
   });

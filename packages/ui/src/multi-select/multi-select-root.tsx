@@ -1,5 +1,14 @@
 "use client";
-import { use, useCallback, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  use,
+  useCallback,
+  useEffectEvent,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode, RefObject } from "react";
 import { useMultipleSelection } from "../internal/action/use-multiple-selection.js";
 import { FieldContext } from "../internal/form/field-context.js";
@@ -68,6 +77,8 @@ export interface MultiSelectRootState {
   readonly pending: boolean;
   /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
+  /** The `readOnly` prop, or the enclosing Field's (`data-readonly`). */
+  readonly readOnly: boolean;
   /** The `required` prop, or the enclosing Field's. */
   readonly required: boolean;
 }
@@ -141,6 +152,15 @@ export interface MultiSelectRootProps {
    * @defaultValue `false`
    */
   disabled?: boolean;
+  /**
+   * The selection is shown, focusable and submitted, and cannot be changed: the Trigger stays an
+   * enabled button with `aria-readonly="true"`, the popup never opens (a press, Enter, Space,
+   * the arrows and typeahead request nothing), nothing dispatches, and the validity element's
+   * `required` is withheld. Inside a `Field.Root`, the Field's `readOnly` also applies.
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
   /** The parts, or a function of the Root's state. */
   children?: StateValue<ReactNode, MultiSelectRootState>;
 }
@@ -173,10 +193,11 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
   // (its id is the Field's, so `Field.Label` points at it); `name`, `disabled` and `required`
   // default from the Field, and the List is named by `Field.Label` when no Label is mounted.
   const field = use(FieldContext);
-  const { name, disabled, required } = resolveFieldDefaults(field, {
+  const { name, disabled, required, readOnly } = resolveFieldDefaults(field, {
     name: props.name,
     disabled: props.disabled ?? false,
     required: props.required ?? false,
+    readOnly: props.readOnly ?? false,
   });
   const fieldControlId = field?.ids.control;
 
@@ -322,7 +343,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
   // --- Interaction (B.4, B.5, B.8) -----------------------------------------------------------
 
   const toggle = (optionValue: string, event: Event): void => {
-    if (disabled) return;
+    if (disabled || readOnly) return;
     const entry = registry.get(optionValue);
     if (entry === undefined || entry.disabled) return;
     const label = optionLabel(entry);
@@ -342,8 +363,9 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
   // The factory only builds the `keydown` handler: the refs it reads are read when a key is
   // pressed, never during render.
   // oxlint-disable-next-line react/refs
+  // Read-only (conventions 3.6.1 rule 8): no key opens, toggles or types ahead.
   const keyDown = createMultiSelectKeyDown({
-    disabled,
+    disabled: disabled || readOnly,
     loop,
     popover,
     options: { registry, orderedOptions },
@@ -357,7 +379,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     // Cancelled first, whatever follows: the popover toggle of `popovertarget` never runs (the
     // library opens the listbox), so the click toggles against the state the user saw (B.4).
     event.preventDefault();
-    if (disabled) return;
+    if (disabled || readOnly) return;
     // WebKit does not focus a button on a mouse press; the keys and the leave rule need focus.
     const trigger = triggerRef.current;
     if (trigger !== null && trigger.ownerDocument.activeElement !== trigger) trigger.focus();
@@ -365,6 +387,16 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
       pendingEdgeRef.current = selectedEdge("first");
     });
   };
+
+  // A popup that is open, or on its way, when `readOnly` turns on closes (conventions 3.6.1
+  // rule 8): a close request, so a controlled `open` parent decides as for any other.
+  const closeForReadOnly = useEffectEvent(() => {
+    pendingEdgeRef.current = null;
+    if (popover.intended()) popover.requestClose(undefined, "dismiss");
+  });
+  useLayoutEffect(() => {
+    if (readOnly) closeForReadOnly();
+  }, [readOnly]);
 
   /** Focus has left the Trigger and the Popup (B.4): a shown listbox closes as a dismissal. */
   const leave = (event: Event): void => {
@@ -409,6 +441,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     hasLabel: labelCount > 0,
     fieldLabelId: field?.ids.label,
     disabled,
+    readOnly,
     required,
     form,
     triggerRef,
@@ -436,6 +469,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     open: popover.optimistic,
     pending,
     disabled,
+    readOnly,
     required,
   };
 

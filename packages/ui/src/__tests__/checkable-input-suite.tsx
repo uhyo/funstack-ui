@@ -48,7 +48,12 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
   const { name, Control, role } = config;
   const extraState = config.extraState ?? {};
   /** The full state object the component passes to its function props (`invalid`: no Field). */
-  const fullState = (s: Omit<ControlState, "invalid">) => ({ ...s, invalid: false, ...extraState });
+  const fullState = (s: Omit<ControlState, "invalid" | "readOnly">) => ({
+    ...s,
+    readOnly: false,
+    invalid: false,
+    ...extraState,
+  });
   /** The role attribute the component renders: Switch owns `role="switch"`, Checkbox none. */
   const expectRoleAttribute = (el: Element) => {
     if (role === "switch") expect(el).toHaveAttribute("role", "switch");
@@ -829,13 +834,14 @@ export function describeCheckableInput(config: CheckableInputConfig): void {
       });
     });
 
-    describe("no transition prop, no readOnly (row 18; conventions 5.1, 3.6)", () => {
-      it("`transition` and `readOnly` are type errors", () => {
+    describe("no transition prop; the library's readOnly (row 18; conventions 5.1, 3.6.1)", () => {
+      it("`transition` and `aria-readonly` are type errors; `readOnly` is the library's", () => {
         // @ts-expect-error A value control whose attributes are all optimistic has no boundary.
         const withTransition: ControlProps = { transition: "fsui-fade" };
-        // @ts-expect-error HTML's `readonly` does not apply to a checkbox input.
+        // @ts-expect-error `aria-readonly` is owned: the library renders it from `readOnly`.
+        const withAriaReadOnly: ControlProps = { "aria-readonly": true };
         const withReadOnly: ControlProps = { readOnly: true };
-        expect([withTransition, withReadOnly]).toHaveLength(2);
+        expect([withTransition, withAriaReadOnly, withReadOnly]).toHaveLength(3);
       });
 
       it("renders the input alone: no element or boundary around it", () => {

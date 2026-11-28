@@ -58,6 +58,7 @@ export function SelectGroup({
     value: ctx.optimistic,
     pending: ctx.pending,
     disabled: ctx.disabled,
+    readOnly: ctx.readOnly,
     invalid: ctx.invalid,
   };
   const { ref } = useSelectPartRef<HTMLOptGroupElement>("Select.Group", "optgroup");

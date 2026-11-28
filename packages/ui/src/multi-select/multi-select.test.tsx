@@ -1052,7 +1052,11 @@ describe("MultiSelect alignment rows", () => {
       </MultiSelect.Root>,
     );
     expect(screen.getByTestId("label")).toHaveAttribute("data-disabled", "");
-    expect(labelState).toHaveBeenLastCalledWith({ disabled: true, pending: false });
+    expect(labelState).toHaveBeenLastCalledWith({
+      disabled: true,
+      readOnly: false,
+      pending: false,
+    });
   });
 
   it("Value: data-empty and state.empty while nothing is selected; data-disabled", async () => {

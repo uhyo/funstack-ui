@@ -284,7 +284,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     name: nameProp,
     form,
     disabled: disabledProp = false,
-    readOnly = false,
+    readOnly: readOnlyProp = false,
     required: requiredProp = false,
     announce,
     className,
@@ -323,10 +323,11 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // NumberField.Input registers the control (design 7.1); the Root only resolves the defaults.
   const fieldContext = use(FieldContext);
-  const { disabled, required, name } = resolveFieldDefaults(fieldContext, {
+  const { disabled, required, readOnly, name } = resolveFieldDefaults(fieldContext, {
     name: nameProp,
     disabled: disabledProp,
     required: requiredProp,
+    readOnly: readOnlyProp,
   });
   const fieldInvalid = fieldContext === null ? undefined : fieldContext.state.invalid;
 
@@ -632,6 +633,14 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       step(next, null, "platform", event);
       commit(null, "platform", event);
     },
+    // Read-only (internal-hooks 3.8 rule 10): text restored by the browser is put back.
+    readOnly,
+    restore: () => {
+      clearDraft();
+      const visible = visibleRef.current;
+      const text = formatter.format(shownRef.current);
+      if (visible !== null && visible.value !== text) visible.value = text;
+    },
     onResetEvent: () => {
       // react-dom rewrites a controlled text input's `defaultValue` after every update; the
       // visible text's reset target is written right before the reset algorithm reads it.
@@ -728,6 +737,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     ...(fieldContext !== null ? { "data-invalid": dataAttr(fieldInvalid === true) } : {}),
     "data-pending": dataAttr(pending),
     "data-disabled": dataAttr(disabled),
+    "data-readonly": dataAttr(readOnly),
   };
 
   const element = useRender<ComponentPropsWithRef<"div">, NumberFieldState>({

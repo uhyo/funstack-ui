@@ -427,6 +427,7 @@ describe("Slider", () => {
         dragging: false,
         orientation: "horizontal",
         disabled: true,
+        readOnly: false,
         invalid: false,
         min: 10,
         max: 90,

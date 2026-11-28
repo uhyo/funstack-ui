@@ -13,10 +13,11 @@ const isDev = process.env.NODE_ENV !== "production";
 export interface UseFieldsetGroupOptions {
   /** Dev warning tag (`"RadioGroup.Root"`). */
   readonly component: string;
-  /** The Root's own `name` / `disabled` / `required` props. */
+  /** The Root's own `name` / `disabled` / `required` / `readOnly` props. */
   readonly name: string | undefined;
   readonly disabled: boolean | undefined;
   readonly required: boolean | undefined;
+  readonly readOnly: boolean | undefined;
 }
 
 export interface FieldsetGroup {
@@ -27,6 +28,8 @@ export interface FieldsetGroup {
   readonly required: boolean;
   /** Own `disabled` or the Field's. */
   readonly disabled: boolean;
+  /** Own `readOnly` or the Field's (conventions 3.6.1). */
+  readonly readOnly: boolean;
   /** Inside a `Field.Root`: the Field shows an error (`data-invalid`). `false` outside. */
   readonly invalid: boolean;
   /** The rendered `<fieldset>`. */
@@ -50,6 +53,7 @@ export function useFieldsetGroup(options: UseFieldsetGroupOptions): FieldsetGrou
     name: options.name,
     disabled: options.disabled,
     required: options.required,
+    readOnly: options.readOnly,
     component,
   });
   const fallbackName = useId();
@@ -87,6 +91,7 @@ export function useFieldsetGroup(options: UseFieldsetGroupOptions): FieldsetGrou
     name: field.name ?? fallbackName,
     required: field.required,
     disabled: field.disabled,
+    readOnly: field.readOnly,
     invalid: field.state?.invalid ?? false,
     fieldsetRef,
     rootRef,

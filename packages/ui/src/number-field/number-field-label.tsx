@@ -72,6 +72,7 @@ export function NumberFieldLabel({
       htmlFor: ctx.inputId,
       "data-pending": dataAttr(ctx.state.pending),
       "data-disabled": dataAttr(ctx.state.disabled),
+      "data-readonly": dataAttr(ctx.state.readOnly),
       "data-invalid": dataAttr(ctx.state.invalid),
     },
   });

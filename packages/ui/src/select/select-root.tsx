@@ -54,6 +54,8 @@ export interface SelectRootState {
   readonly pending: boolean;
   /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
+  /** The `readOnly` prop (or the enclosing `Field.Root`'s): `data-readonly`. */
+  readonly readOnly: boolean;
   /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
   readonly invalid: boolean;
 }
@@ -82,6 +84,7 @@ export interface SelectRootProps extends Omit<
   | "multiple"
   | "size"
   | "disabled"
+  | "aria-readonly"
   | "className"
   | "style"
   | "children"
@@ -115,6 +118,16 @@ export interface SelectRootProps extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
+  /**
+   * The selected option stays selected: the select is focusable, its picker opens and its value
+   * is submitted, but every other option renders native `disabled` (with `data-disabled`), so no
+   * pick, arrow or typeahead can change it, in every engine and before hydration, and nothing
+   * dispatches. Renders `aria-readonly="true"` and `data-readonly`; native `required` is
+   * withheld. Also `true` when the enclosing `Field.Root` is read-only.
+   *
+   * @defaultValue `false`
+   */
+  readOnly?: boolean;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, SelectRootState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -133,8 +146,8 @@ export interface SelectRootProps extends Omit<
  * `value={optimistic}`: react-dom restores a controlled select to its props after every event,
  * and only the sync-lane optimistic value survives that restore.
  *
- * Owned keys (conventions 1.2): `value`, `disabled`, `data-pending`, `data-disabled`, `onChange`;
- * inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby`
+ * Owned keys (conventions 1.2): `value`, `disabled`, `aria-readonly`, `data-pending`,
+ * `data-disabled`, `data-readonly`, `onChange`; `required` while read-only (withheld); inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby`
  * (token-merged) and `data-invalid`, and `disabled` / `name` / `required` default from the Field.
  *
  * @see https://ui.funstack.work/components/select
@@ -144,6 +157,7 @@ export function SelectRoot({
   defaultValue,
   valueChangeAction,
   disabled: disabledProp,
+  readOnly: readOnlyProp,
   className,
   style,
   children,
@@ -174,10 +188,12 @@ export function SelectRoot({
     name: rest.name,
     disabled: disabledProp,
     required: rest.required,
+    readOnly: readOnlyProp,
     id: rest.id,
     component: "Select.Root",
   });
   const disabled = field.disabled;
+  const readOnly = field.readOnly;
   const invalid = field.state?.invalid ?? false;
   // Development check (conventions 9.5): a `<select>` needs a name, from a `<label for>`, a
   // wrapping `<label>` (a `Field.Label` included), `aria-label` or `aria-labelledby`.
@@ -228,14 +244,23 @@ export function SelectRoot({
         : undefined,
     onPlatformChange: (next, event) =>
       dispatchChange(next, createActionDetails(event, { reason: "platform" })),
+    readOnly,
   });
 
   // Memoised: every member is a state value, a prop or a stable callback.
   const context = useMemo<SelectContextValue>(
-    () => ({ optimistic, pending, disabled, invalid, groupDisabled: false, optionMounted }),
-    [optimistic, pending, disabled, invalid, optionMounted],
+    () => ({
+      optimistic,
+      pending,
+      disabled,
+      readOnly,
+      invalid,
+      groupDisabled: false,
+      optionMounted,
+    }),
+    [optimistic, pending, disabled, readOnly, invalid, optionMounted],
   );
-  const state: SelectRootState = { value: optimistic, pending, disabled, invalid };
+  const state: SelectRootState = { value: optimistic, pending, disabled, readOnly, invalid };
 
   const element = useRender<ComponentPropsWithRef<"select">, SelectRootState>({
     defaultElement: "select",
@@ -246,14 +271,20 @@ export function SelectRoot({
     children,
     props: rest,
     libraryProps: {
-      ...fieldInputProps(field),
+      // Read-only withholds native `required` (conventions 3.6.1 rule 5).
+      ...fieldInputProps(field, true),
       value: optimistic,
       disabled,
+      // The `combobox` role has the read-only state (3.6.1 rule 9).
+      "aria-readonly": readOnly ? "true" : undefined,
       "data-pending": dataAttr(pending),
       "data-disabled": dataAttr(disabled),
+      "data-readonly": dataAttr(readOnly),
       onChange: (event: ChangeEvent<HTMLSelectElement>) => {
-        // A natively disabled select fires no change; this covers `render` elements.
-        if (disabled) return;
+        // A natively disabled select fires no change; this covers `render` elements. Read-only:
+        // the other options are disabled, so no pick arrives; a stray one is not a change, and
+        // react-dom restores the controlled value after the event.
+        if (disabled || readOnly) return;
         const next = event.currentTarget.value;
         // No-op rule against the optimistic value (conventions 2.3, design 4.2).
         if (next === optimistic) return;

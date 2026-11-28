@@ -105,6 +105,7 @@ export function NumberFieldInput({
     name: ctx.name,
     disabled: state.disabled,
     required: state.required,
+    readOnly: state.readOnly,
     component: "NumberField.Input",
     validityElement,
   });
@@ -220,6 +221,7 @@ export function NumberFieldInput({
     },
     "data-pending": dataAttr(state.pending),
     "data-disabled": dataAttr(state.disabled),
+    "data-readonly": dataAttr(state.readOnly),
     ...dataInvalid,
   };
 
