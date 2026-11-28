@@ -703,6 +703,133 @@ describe("MultiSelect (jsdom)", () => {
       expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
     });
 
+    describe("placeholder wins while the selection is empty (#209)", () => {
+      it("function children, empty: the placeholder is rendered and the function is not called", () => {
+        const fn = vi.fn(({ value }: MultiSelectValueState) => `${value.length} toppings`);
+        render(
+          <Harness
+            value={
+              <MultiSelect.Value data-testid="value" placeholder="Choose">
+                {fn}
+              </MultiSelect.Value>
+            }
+          />,
+        );
+        expect(shown()).toBe("Choose");
+        expect(fn).not.toHaveBeenCalled();
+        expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
+      });
+
+      it("function children, not empty: the function's result", () => {
+        render(
+          <Harness
+            root={{ defaultValue: ["ham", "corn"] }}
+            value={
+              <MultiSelect.Value data-testid="value" placeholder="Choose">
+                {({ value }) => `${value.length} toppings`}
+              </MultiSelect.Value>
+            }
+          />,
+        );
+        expect(shown()).toBe("2 toppings");
+        expect(screen.getByTestId("value")).not.toHaveAttribute("data-empty");
+      });
+
+      it("static children, empty: the placeholder is rendered", () => {
+        render(
+          <Harness
+            value={
+              <MultiSelect.Value data-testid="value" placeholder="Choose">
+                Some toppings
+              </MultiSelect.Value>
+            }
+          />,
+        );
+        expect(shown()).toBe("Choose");
+        expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
+      });
+
+      it("no placeholder, function children, empty: the function is called with empty state", () => {
+        const fn = vi.fn(({ empty }: MultiSelectValueState) => (empty ? "Any" : "Some"));
+        render(<Harness value={<MultiSelect.Value data-testid="value">{fn}</MultiSelect.Value>} />);
+        expect(shown()).toBe("Any");
+        expect(fn).toHaveBeenCalledWith(expect.objectContaining({ empty: true }));
+        expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
+      });
+
+      it("placeholder={null} is treated as not given", () => {
+        render(
+          <Harness
+            value={
+              <MultiSelect.Value data-testid="value" placeholder={null}>
+                {({ empty }) => (empty ? "Any" : "Some")}
+              </MultiSelect.Value>
+            }
+          />,
+        );
+        expect(shown()).toBe("Any");
+        expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
+      });
+
+      it("no children: the placeholder while empty, else the labels", async () => {
+        const user = setupUser();
+        render(<Harness />);
+        expect(shown()).toBe("Choose toppings");
+        expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
+        await openWithClick(user);
+        await user.click(option("ham"));
+        expect(shown()).toBe("Ham");
+      });
+
+      it("a first pick that rolls back returns to the placeholder", async () => {
+        // A rejection unmounts the control into the boundary (the value-action suite); the
+        // rollback a user sees is a controlled parent that does not adopt the pick.
+        const user = setupUser();
+        const gate = deferred();
+        render(
+          <Harness
+            root={{ value: [], valueChangeAction: () => gate.promise }}
+            value={
+              <MultiSelect.Value data-testid="value" placeholder="Choose">
+                {({ value }) => `${value.length} toppings`}
+              </MultiSelect.Value>
+            }
+          />,
+        );
+        await openWithClick(user);
+        await user.click(option("ham"));
+        expect(shown()).toBe("1 toppings");
+        expect(screen.getByTestId("value")).not.toHaveAttribute("data-empty");
+        await act(async () => {
+          gate.resolve();
+          await flushTasks(2);
+        });
+        expect(shown()).toBe("Choose");
+        expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
+      });
+
+      it("the render function receives the placeholder as props.children while empty", () => {
+        render(
+          <Harness
+            value={
+              <MultiSelect.Value
+                placeholder="Choose"
+                render={(props, state) => (
+                  <strong data-testid="value" data-empty-state={String(state.empty)}>
+                    {props.children}
+                  </strong>
+                )}
+              >
+                {({ value }) => `${value.length} toppings`}
+              </MultiSelect.Value>
+            }
+          />,
+        );
+        expect(shown()).toBe("Choose");
+        expect(screen.getByTestId("value")).toHaveAttribute("data-empty-state", "true");
+      });
+    });
+
     it("the Root's and the Trigger's function children receive the state", async () => {
       const user = setupUser();
       const states: MultiSelectRootState[] = [];
