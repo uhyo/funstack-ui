@@ -4,12 +4,12 @@
 // every reference (the Field cannot know what is rendered after the control); hydration matches
 // it and drops the ones without a part.
 import { act, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { Activity, StrictMode, Suspense, useState } from "react";
 import type { ReactNode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, onTestFinished, vi } from "vitest";
-import { flushMicrotasks } from "../__tests__/helpers.js";
+import { createSuspender, flushMicrotasks } from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
 import { CheckboxGroup } from "../checkbox-group/index.js";
 import { Combobox } from "../combobox/index.js";
@@ -373,5 +373,208 @@ describe.each(CASES)("$name inside a Field.Root (#217)", (c) => {
       expect(tokens(el, "aria-labelledby")).not.toContain(ids.label);
     }
     expect(danglingRefs(container)).toEqual([]);
+  });
+});
+
+describe("Field references: consumer tokens and the part lifecycle (#217)", () => {
+  it("no parts: a control's and a group's own tokens are kept exactly (the key is omitted, not removed)", async () => {
+    render(
+      <Form.Root errors={ERRORS}>
+        <Field.Root name="f">
+          <Field.Control data-testid="control" aria-describedby="hint" />
+        </Field.Root>
+        <Field.Root name="g">
+          <RadioGroup.Root data-testid="group" aria-labelledby="mine" aria-describedby="d2">
+            <RadioGroup.Item value="a" aria-label="A" />
+          </RadioGroup.Root>
+        </Field.Root>
+        <span id="hint">Hint</span>
+        <span id="mine">Mine</span>
+        <span id="d2">D2</span>
+      </Form.Root>,
+    );
+    await flushMicrotasks();
+    expect(screen.getByTestId("control")).toHaveAttribute("aria-describedby", "hint");
+    expect(screen.getByTestId("control")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("group")).toHaveAttribute("aria-labelledby", "mine");
+    expect(screen.getByTestId("group")).toHaveAttribute("aria-describedby", "d2");
+    expect(danglingRefs(document.body)).toEqual([]);
+  });
+
+  /** A RadioGroup Field (invalid: a server error) whose three parts `wrap` places. */
+  function Toggle({ shown, wrap }: { shown: boolean; wrap?: (parts: ReactNode) => ReactNode }) {
+    const parts = shown ? (
+      <>
+        <Field.Label>Field</Field.Label>
+        <Field.Description>Help</Field.Description>
+        <Field.Error />
+      </>
+    ) : null;
+    return (
+      <Form.Root errors={ERRORS}>
+        <Field.Root name="f">
+          <RadioGroup.Root data-testid="group" aria-label="F">
+            <RadioGroup.Item value="a" aria-label="A" />
+          </RadioGroup.Root>
+          {wrap === undefined ? parts : wrap(parts)}
+        </Field.Root>
+      </Form.Root>
+    );
+  }
+  /** The group's Field ids, derived from its description token. */
+  function groupIds(group: Element) {
+    const description = tokens(group, "aria-describedby").find((t) => t.endsWith("-description"));
+    expect(description).toBeDefined();
+    return fieldIdsOf(description!.replace(/-description$/, "-control"));
+  }
+  function expectAll(group: Element) {
+    const ids = groupIds(group);
+    expect(tokens(group, "aria-labelledby")).toEqual([ids.label]);
+    expect(tokens(group, "aria-describedby")).toEqual([ids.description, ids.error]);
+    expect(danglingRefs(document.body)).toEqual([]);
+  }
+  function expectNone(group: Element) {
+    expect(group).not.toHaveAttribute("aria-labelledby");
+    expect(group).not.toHaveAttribute("aria-describedby");
+    expect(danglingRefs(document.body)).toEqual([]);
+  }
+
+  it("StrictMode: the double effects leave the parts registered; a later unmount and mount still follow", async () => {
+    const error = vi.spyOn(console, "error");
+    const { rerender } = render(
+      <StrictMode>
+        <Toggle shown />
+      </StrictMode>,
+    );
+    await flushMicrotasks();
+    const group = screen.getByTestId("group");
+    expectAll(group);
+    rerender(
+      <StrictMode>
+        <Toggle shown={false} />
+      </StrictMode>,
+    );
+    await flushMicrotasks();
+    expectNone(group);
+    rerender(
+      <StrictMode>
+        <Toggle shown />
+      </StrictMode>,
+    );
+    await flushMicrotasks();
+    expectAll(group);
+    // No false "two Field.Error parts" warning from the re-run effects.
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("a keyed remount of the parts keeps the tokens", async () => {
+    const { rerender } = render(<Toggle shown wrap={(parts) => <div key={1}>{parts}</div>} />);
+    await flushMicrotasks();
+    const group = screen.getByTestId("group");
+    expectAll(group);
+    rerender(<Toggle shown wrap={(parts) => <div key={2}>{parts}</div>} />);
+    await flushMicrotasks();
+    expectAll(group);
+  });
+
+  it("a keyed remount of the whole Field settles the new Field's own presence", async () => {
+    const { rerender } = render(<Toggle key={1} shown />);
+    await flushMicrotasks();
+    expectAll(screen.getByTestId("group"));
+    rerender(<Toggle key={2} shown={false} />);
+    await flushMicrotasks();
+    expectNone(screen.getByTestId("group"));
+    rerender(<Toggle key={3} shown />);
+    await flushMicrotasks();
+    expectAll(screen.getByTestId("group"));
+  });
+
+  it("<Activity> hiding the parts drops their tokens while hidden; showing brings them back", async () => {
+    const error = vi.spyOn(console, "error");
+    const at = (mode: "visible" | "hidden") => (
+      <Toggle shown wrap={(parts) => <Activity mode={mode}>{parts}</Activity>} />
+    );
+    const { rerender } = render(at("visible"));
+    await flushMicrotasks();
+    const group = screen.getByTestId("group");
+    expectAll(group);
+    rerender(at("hidden"));
+    await flushMicrotasks();
+    expectNone(group);
+    rerender(at("visible"));
+    await flushMicrotasks();
+    expectAll(group);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it("parts revealed by a Suspense boundary: not referenced during the fallback, referenced once revealed", async () => {
+    const { Suspender, resolve } = createSuspender();
+    // In an async act: a render that suspends in a sync act never retries in jsdom.
+    await act(async () => {
+      render(
+        <Toggle
+          shown
+          wrap={(parts) => (
+            <Suspense fallback={<span data-testid="fallback" />}>
+              <Suspender value="x" />
+              {parts}
+            </Suspense>
+          )}
+        />,
+      );
+    });
+    await flushMicrotasks();
+    expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    const group = screen.getByTestId("group");
+    expectNone(group);
+    await act(async () => resolve("x"));
+    await flushMicrotasks();
+    expect(screen.queryByTestId("fallback")).toBeNull();
+    expectAll(group);
+  });
+
+  it("Combobox multiple: the Chips and the List are named by the Field label only while it is mounted", async () => {
+    function App({ label }: { label: boolean }) {
+      return (
+        <Field.Root name="f">
+          {label && <Field.Label>Countries</Field.Label>}
+          <Combobox.Root multiple defaultValue={["a"]}>
+            <Combobox.Chips data-testid="chips">
+              {({ value }) =>
+                value.map((v) => (
+                  <Combobox.Chip key={v} value={v}>
+                    {v}
+                  </Combobox.Chip>
+                ))
+              }
+            </Combobox.Chips>
+            <Combobox.Input data-testid="input" aria-label="F" />
+            <Combobox.Popup keepMounted>
+              <Combobox.List data-testid="list" aria-label="Options">
+                <Combobox.Option value="a">A</Combobox.Option>
+              </Combobox.List>
+            </Combobox.Popup>
+          </Combobox.Root>
+        </Field.Root>
+      );
+    }
+    const { rerender } = render(<App label={false} />);
+    await flushMicrotasks();
+    const chips = screen.getByTestId("chips");
+    expect(chips).toHaveAttribute("role", "list");
+    expect(chips).not.toHaveAttribute("aria-labelledby");
+    expect(danglingRefs(document.body)).toEqual([]);
+
+    rerender(<App label />);
+    await flushMicrotasks();
+    const ids = fieldIdsOf(screen.getByTestId("input").id);
+    expect(tokens(chips, "aria-labelledby")).toEqual([ids.label]);
+    expect(tokens(screen.getByTestId("list"), "aria-labelledby")).toContain(ids.label);
+    expect(danglingRefs(document.body)).toEqual([]);
+
+    rerender(<App label={false} />);
+    await flushMicrotasks();
+    expect(chips).not.toHaveAttribute("aria-labelledby");
+    expect(danglingRefs(document.body)).toEqual([]);
   });
 });

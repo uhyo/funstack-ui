@@ -17471,3 +17471,15 @@ NumberField, OTPField, Combobox, MultiSelect):
 | Parts mounted later, then unmounted | the label token on every element that references the Field label (groups, step buttons, the List), the description and error tokens on the described element; removed again on unmount; nothing dangles |
 | SSR with every part | the server HTML and the hydrated DOM reference all three; no recoverable error, no `console.error` |
 | SSR with no parts | the server HTML references them (the trade-off); hydration removes them; no recoverable error, no `console.error` |
+
+## 2026-11-29, #217: review follow-up
+
+From the review of `dev/217` (`memo/reviewer/review-217.md`): no code defect; test gaps and
+one docs line. field-form.md 4.2 now says a part hidden by `<Activity>` or by a boundary that
+suspends again loses its token while hidden (its layout effects disconnect) and gets it back
+when shown. Rows added to `field/field-references.test.tsx`: consumer tokens kept exactly with
+no parts mounted (`Field.Control aria-describedby`, `RadioGroup.Root aria-labelledby` and
+`aria-describedby`: the omitted-key path); StrictMode (no false two-errors warning); keyed
+remount of the parts and of the whole Field; `<Activity>` hide and show; parts revealed by a
+Suspense boundary; Combobox `multiple` with Chips (the Chips and the List follow the Field
+label).

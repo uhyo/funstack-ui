@@ -792,7 +792,9 @@ exposes these as `referencedIds` (`undefined` for a part that is not mounted) ne
 parts' own ids. A key with nothing to reference is omitted from the control's owned attributes,
 not set to `undefined`, so the consumer's own tokens stay. No reference dangles after the
 Field's first commit; a part mounted later (behind a condition, revealed by a Suspense boundary)
-adds its token when it mounts and removes it when it unmounts. `Field.Error`'s registration
+adds its token when it mounts and removes it when it unmounts. A part hidden by `<Activity>` or
+by a Suspense boundary that suspends again loses its token while hidden (its layout effects are
+disconnected, so it unregisters) and gets it back when shown. `Field.Error`'s registration
 also tells the Field it may cancel the bubble (2.5).
 
 Server rendering and hydration: **every part counts as mounted until the Field's first commit.**
