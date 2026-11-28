@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useInsertionEffect, useLayoutEffect, useState } from "react";
 import type { FocusEvent, KeyboardEvent, PointerEvent, RefObject } from "react";
-import { focusWithRing, resolveArrowKey } from "./arrow-keys.js";
+import { focusWithRing, isPlainKey, resolveArrowKey } from "./arrow-keys.js";
 import type { Orientation } from "./types.js";
 
 // The roving-focus engine shared by `Toolbar.Root` and a standalone `ToggleGroup.Root`
@@ -284,7 +284,7 @@ function createEngine(): Engine {
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!isPlainKey(event)) return;
     const options = latestOptions;
     // The browser moves focus itself where `focusgroup` is implemented.
     if (!active(options) || options.native) return;

@@ -15,8 +15,8 @@ const isDev = process.env.NODE_ENV !== "production";
  * and `render`.
  */
 export interface CollapsiblePanelState {
-  /** Committed open state. `undefined` in JS-free mode. */
-  readonly open: boolean | undefined;
+  /** Committed open state. `false` in JS-free mode (conventions 4.1 rule 3). */
+  readonly open: boolean;
   /** The Root's `disabled` prop. */
   readonly disabled: boolean;
 }
@@ -56,6 +56,8 @@ export interface CollapsiblePanelProps extends Omit<
 /**
  * The content region: a `div` inside the `<details>`, after the Trigger. Its visibility is the
  * Root's `open` attribute (`details:open > .panel`); it renders committed state.
+ *
+ * Owned keys (conventions 1.5): `data-disabled`.
  *
  * @see https://ui.funstack.work/components/collapsible
  */

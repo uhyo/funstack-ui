@@ -85,7 +85,9 @@ export function ToggleGroupPage() {
         The props are discriminated on <code>exclusive</code>: without it (or with{" "}
         <code>exclusive={"{false}"}</code>) the value is a <code>string[]</code>; with{" "}
         <code>exclusive</code> it is <code>string | null</code>, and <code>deselectable</code>{" "}
-        becomes available. The mode is fixed when the group mounts.
+        becomes available. The mode is fixed when the group mounts. The variants are typed{" "}
+        <code>ToggleGroupRootMultipleProps</code> and <code>ToggleGroupRootExclusiveProps</code>,
+        with the shared <code>ToggleGroupRootBaseProps</code>.
       </p>
       <PropsTable
         rows={[
@@ -97,13 +99,13 @@ export function ToggleGroupPage() {
           },
           {
             name: "value",
-            type: "string[] | (exclusive) string | null",
+            type: "readonly string[] | (exclusive) string | null",
             description:
               "Controlled pressed values. `[]` / `null` presses nothing; `undefined` means uncontrolled. Order is not significant.",
           },
           {
             name: "defaultValue",
-            type: "string[] | (exclusive) string | null",
+            type: "readonly string[] | (exclusive) string | null",
             default: "[] / null",
             description: "Initial pressed values in uncontrolled mode.",
           },
@@ -111,7 +113,7 @@ export function ToggleGroupPage() {
             name: "valueChangeAction",
             type: "ChangeAction<string[] | (exclusive) string | null, ToggleGroupValueChangeDetails>",
             description:
-              "Runs inside the Root's transition on every change. `next` is a fresh array in document order (exclusive: the value or `null`); `details` is `{ added, removed }` plus the virtual `event`. Rejections roll the change back and reach the nearest Error Boundary.",
+              'Runs inside the Root\'s transition on every change. `next` is a fresh array in document order (exclusive: the value or `null`); `details` is `{ reason, added, removed }` plus the virtual `event`; `reason` is always `"activate"` (a ToggleGroup has no platform path), and an exclusive switch lists the released Item in `removed`. Rejections roll the change back and reach the nearest Error Boundary.',
           },
           {
             name: "deselectable",
@@ -138,10 +140,10 @@ export function ToggleGroupPage() {
             type: "boolean",
             default: "false",
             description:
-              'Disables every Item (native `disabled`; `aria-disabled="true"` on an Item with a link or component `render`).',
+              'Disables every Item: native `disabled` standalone (`aria-disabled="true"` on an Item with a link or component `render`); inside a Toolbar `aria-disabled="true"`, so the Items stay in the arrow sequence.',
           },
           {
-            name: "experimental_focusgroup",
+            name: "experimental_focusGroup",
             type: "boolean",
             default: "false",
             description: (
@@ -181,13 +183,7 @@ export function ToggleGroupPage() {
             type: "boolean",
             default: "false",
             description:
-              'Never dispatches. Native `disabled` on a `<button>`, skipped by the arrow keys. With a link or component `render`, `aria-disabled="true"` instead: the element stays focusable and the arrow keys reach it (the APG Toolbar behaviour).',
-          },
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description:
-              "Forwarded to the Item's `<ViewTransition default>`. Animates the commit that ends the group's action, not the optimistic flip.",
+              'Never dispatches. Standalone: native `disabled` on a `<button>`, skipped by the arrow keys; with a link or component `render`, `aria-disabled="true"` instead. Inside a Toolbar (its own `disabled` or the group\'s): `aria-disabled="true"` on every element, so the Item stays focusable and the arrow keys reach it (the APG Toolbar behaviour).',
           },
           ...functionProps(
             "ToggleGroupItemState",
@@ -201,7 +197,10 @@ export function ToggleGroupPage() {
           "`ToggleGroupItemState` is `{ value, pressed, pending, disabled, orientation }`; `value` is the Item's own `value` prop."
         }
         owned={
-          '`aria-pressed`, `disabled`, `aria-disabled` (link or component `render`), `onClick`, `tabIndex` (the roving focus writes it), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, and `focusgroupstart` while the Root renders `focusgroup`. `type` defaults to `"button"`; a `render` element\'s own wins.'
+          '`aria-pressed`, `disabled`, `aria-disabled` (inside a Toolbar, or a link or component `render`), `onClick`, `tabIndex` (the roving focus writes it), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, and `focusgroupstart` while the Root renders `focusgroup`. `type` defaults to `"button"`; a `render` element\'s own wins.'
+        }
+        note={
+          "No `transition` prop: everything an Item renders is optimistic. Animate the flip with CSS on `[data-pressed]`; to animate the commit that ends the action, wrap the content in your own `<ViewTransition>` keyed on the `fsui-toggle-group` types."
         }
       />
 
@@ -237,6 +236,12 @@ export function ToggleGroupPage() {
           ],
           ["ArrowDown / ArrowUp", "Ignored", "Next / previous enabled Item", "Same."],
           ["Home / End", "First / last enabled Item", "Same", "Same."],
+          [
+            "Any of these with Alt, Ctrl or Meta, or already default-prevented",
+            "",
+            "",
+            "Not handled: the key is the browser's.",
+          ],
           ["Space / Enter", "", "", "Toggles the focused Item (native button activation)."],
           [
             "Tab / Shift+Tab",
@@ -256,10 +261,11 @@ export function ToggleGroupPage() {
           follows the optimistic state. Focus never changes it.
         </li>
         <li>
-          Disabled Items are natively disabled and leave the arrow-key sequence. An Item rendered as
-          a link or a component is <code>aria-disabled</code> instead, and the arrow keys still
-          reach it (it never dispatches). A rejected action rolls the pressed state back; focus
-          stays where it is.
+          In a standalone group, disabled Items are natively disabled and leave the arrow-key
+          sequence. An Item rendered as a link or a component is <code>aria-disabled</code> instead,
+          and the arrow keys still reach it (it never dispatches). Inside a Toolbar every disabled
+          Item is <code>aria-disabled</code> and in the Toolbar's sequence. A rejected action rolls
+          the pressed state back; focus stays where it is.
         </li>
         <li>
           Before hydration every Item is a Tab stop; the single Tab stop is set up by the first
@@ -277,7 +283,7 @@ export function ToggleGroupPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "Items show the optimistic set (`aria-pressed`, `data-pressed`). `data-pending` is on the Root while an action is in flight, and on each Item whose optimistic state differs from its committed one. An Item's `transition` animates the commit that ends the action, not the flip."
+          "Items show the optimistic set (`aria-pressed`, `data-pressed`). `data-pending` is on the Root while an action is in flight, and on each Item whose optimistic state differs from its committed one. No part has a `transition` prop; a view transition of your own around the content can animate the commit that ends the action."
         }
       />
 

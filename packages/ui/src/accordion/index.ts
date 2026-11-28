@@ -22,6 +22,7 @@ export const Accordion = {
 
 export type {
   AccordionRootProps,
+  AccordionRootBaseProps,
   AccordionRootMultipleProps,
   AccordionRootExclusiveProps,
   AccordionRootState,

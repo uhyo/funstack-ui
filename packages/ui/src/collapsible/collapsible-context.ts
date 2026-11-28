@@ -8,10 +8,10 @@ export interface CollapsibleContextValue {
   readonly disabled: boolean;
   /** The Root's transition is pending (library mode only). */
   readonly pending: boolean;
-  /** Committed open state; `undefined` in JS-free mode (browser-owned, unknown to React). */
-  readonly committedOpen: boolean | undefined;
-  /** Optimistic open state; `undefined` in JS-free mode. */
-  readonly optimisticOpen: boolean | undefined;
+  /** Committed open state; `false` in JS-free mode (browser-owned, unknown to React). */
+  readonly committedOpen: boolean;
+  /** Optimistic open state; `false` in JS-free mode. */
+  readonly optimisticOpen: boolean;
   /** The Trigger was activated: dispatch `open` with reason "activate" (library mode; stable). */
   readonly dispatch: (open: boolean, event: Event) => void;
 }

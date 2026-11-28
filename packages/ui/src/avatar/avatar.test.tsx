@@ -360,15 +360,29 @@ describe("Avatar", () => {
       expect(screen.queryByRole("img")).toBeNull();
     });
 
-    it("owns role, aria-label and aria-hidden over a render element's", () => {
+    it("owns role, aria-label, aria-labelledby and aria-hidden over a render element's", () => {
       render(
-        <Avatar.Root
-          alt="Jane"
-          render={<span role="presentation" aria-label="x" aria-hidden="true" data-testid="root" />}
-        />,
+        <>
+          <span id="other">Someone else</span>
+          <Avatar.Root
+            alt="Jane"
+            render={
+              <span
+                role="presentation"
+                aria-label="x"
+                aria-labelledby="other"
+                aria-hidden="true"
+                data-testid="root"
+              />
+            }
+          />
+        </>,
       );
       expect(root()).toHaveAttribute("role", "img");
       expect(root()).toHaveAttribute("aria-label", "Jane");
+      // One naming route, `alt` (conventions 1.5): a second name would win over it.
+      expect(root()).not.toHaveAttribute("aria-labelledby");
+      expect(root()).toHaveAccessibleName("Jane");
       expect(root()).not.toHaveAttribute("aria-hidden");
     });
 

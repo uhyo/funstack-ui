@@ -17,7 +17,7 @@ import {
 import { toggleDriver } from "../__tests__/drivers/toggle.js";
 import { describeValueAction, ValueHarness } from "../__tests__/value-action-suite.js";
 import { Toggle } from "./toggle.js";
-import type { ToggleState, TogglePressedChangeDetails } from "./toggle.js";
+import type { ToggleProps, ToggleState, TogglePressedChangeDetails } from "./toggle.js";
 
 type ActionFn = (next: boolean, details: TogglePressedChangeDetails) => unknown;
 
@@ -89,6 +89,26 @@ describe("Toggle", () => {
       render(<Toggle type="submit">Favorite</Toggle>);
       // Even when forced through, the library's type wins at runtime.
       expect(button()).toHaveAttribute("type", "button");
+    });
+
+    it("does not accept `transition` (type-level, conventions 5.1)", () => {
+      // @ts-expect-error A Toggle is all optimistic: no `transition`.
+      render(<Toggle transition="fade">Favorite</Toggle>);
+      expect(button()).toBeInTheDocument();
+    });
+
+    it("does not accept `aria-disabled` (type-level, conventions 1.5)", () => {
+      // @ts-expect-error `aria-disabled` is owned: use `disabled`.
+      const props: ToggleProps = { "aria-disabled": true };
+      expect(props).toBeTypeOf("object");
+    });
+
+    it('details carry `reason: "activate"` (conventions 2.2)', async () => {
+      const action = vi.fn<(next: boolean, details: TogglePressedChangeDetails) => void>();
+      render(<Toggle pressedChangeAction={action}>Favorite</Toggle>);
+      fireEvent.click(button());
+      await act(async () => {});
+      expect(action.mock.calls[0]?.[1].reason).toBe("activate");
     });
   });
 

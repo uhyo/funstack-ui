@@ -1,6 +1,7 @@
 "use client";
 import { useCallback } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import { dataAttr } from "../internal/data-attr.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { popoverDetails, usePopoverRoot } from "../internal/overlay/use-overlay-root.js";
 import type {
@@ -30,9 +31,15 @@ export interface NavigationMenuOpenChangeDetails extends ActionDetails {
  * `children` and `render`.
  */
 export interface NavigationMenuItemState {
-  /** Optimistic open state (library mode); `false` in JS-free mode. */
+  /**
+   * Optimistic open state (library mode, `data-open`); `false` in JS-free mode (conventions 4.1
+   * rule 3), where `:has(:popover-open)` styles the open Item.
+   */
   readonly open: boolean;
-  /** An `openChangeAction` dispatched through this Item is in flight (library mode only). */
+  /**
+   * An `openChangeAction` dispatched through this Item is in flight (library mode only,
+   * `data-pending`).
+   */
   readonly pending: boolean;
 }
 
@@ -88,6 +95,9 @@ export interface NavigationMenuItemProps extends Omit<
  * request. The `focusout` listener is attached through the ref, so `onBlur` stays the
  * consumer's. An Item with only a Link in it is a plain `<li>`.
  *
+ * Owned keys (conventions 1.5): `data-open` and `data-pending` (library mode), as the other
+ * owners that are not a Root carry their state (conventions 4.3).
+ *
  * @see https://ui.funstack.work/components/navigation-menu
  */
 export function NavigationMenuItem({
@@ -135,6 +145,7 @@ export function NavigationMenuItem({
   );
 
   const state: NavigationMenuItemState = { open: context.optimistic, pending: context.pending };
+  const library = mode === "library";
 
   const element = useRender<ComponentPropsWithRef<"li">, NavigationMenuItemState>({
     defaultElement: "li",
@@ -144,6 +155,10 @@ export function NavigationMenuItem({
     style,
     children,
     props: rest,
+    libraryProps: {
+      "data-open": dataAttr(library && state.open),
+      "data-pending": dataAttr(library && state.pending),
+    },
     ref,
   });
 

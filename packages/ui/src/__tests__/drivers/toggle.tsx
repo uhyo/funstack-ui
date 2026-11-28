@@ -10,13 +10,12 @@ const button = () => screen.getByRole("button", { name: "Favorite" });
 
 export const toggleDriver: ValueActionDriver<boolean, TogglePressedChangeDetails> = {
   name: "Toggle",
-  render: ({ value, defaultValue, changeAction, transition, extra }) => (
+  render: ({ value, defaultValue, changeAction, extra }) => (
     <Toggle
       {...definedProps({
         pressed: value,
         defaultPressed: defaultValue,
         pressedChangeAction: changeAction,
-        transition,
       })}
       {...extra}
     >
@@ -26,7 +25,7 @@ export const toggleDriver: ValueActionDriver<boolean, TogglePressedChangeDetails
   values: [false, true, false, true],
   gesture: (user) => user.click(button()),
   eventType: () => "click",
-  detailsFields: () => ({}),
+  detailsFields: () => ({ reason: "activate" }),
   expectShown: (pressed) => {
     expect(button()).toHaveAttribute("aria-pressed", String(pressed));
     if (pressed) expect(button()).toHaveAttribute("data-pressed", "");
@@ -37,6 +36,8 @@ export const toggleDriver: ValueActionDriver<boolean, TogglePressedChangeDetails
   pendingOn: () => [button()],
   queryControl: () => screen.queryByRole("button", { name: "Favorite" }),
   props: { value: "pressed", defaultValue: "defaultPressed" },
+  // All optimistic: no `transition` prop (conventions 5.1).
+  transitionProp: false,
   transitionTypes: [
     ["fsui-toggle", "fsui-toggle-press"],
     ["fsui-toggle", "fsui-toggle-release"],

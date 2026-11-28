@@ -39,6 +39,7 @@ import type {
   CollapsibleOpenChangeDetails,
   CollapsiblePanelState,
   CollapsibleRootState,
+  CollapsibleTriggerProps,
   CollapsibleTriggerState,
 } from "./index.js";
 
@@ -206,7 +207,7 @@ describe("Collapsible", () => {
       render(<JsFree />);
       const user = setupUser();
       expect(root().open).toBe(false);
-      expect(panel()).toHaveTextContent("undefined");
+      expect(panel()).toHaveTextContent("false");
       for (const el of [root(), trigger()]) {
         expect(el).not.toHaveAttribute("data-open");
         expect(el).not.toHaveAttribute("data-pending");
@@ -219,7 +220,7 @@ describe("Collapsible", () => {
       // Still nothing emitted: the browser owns `open` (use `:open` in CSS).
       expect(root()).not.toHaveAttribute("data-open");
       expect(trigger()).not.toHaveAttribute("data-open");
-      expect(panel()).toHaveTextContent("undefined");
+      expect(panel()).toHaveTextContent("false"); // `state.open` is `false` in JS-free mode (4.1 rule 3)
 
       // No click handler: the click is not default-prevented (the native toggle runs).
       expect(await clickPrevented()).toBe(false);
@@ -471,7 +472,7 @@ describe("Collapsible", () => {
       expect(panel()).toHaveClass("shown");
     });
 
-    it("JS-free mode passes `open: undefined` and `disabled`", () => {
+    it("JS-free mode passes `open: false` (conventions 4.1 rule 3) and `disabled`", () => {
       const rootChildren = vi.fn((s: CollapsibleRootState) => (
         <>
           <Collapsible.Trigger>{String(s.open)}</Collapsible.Trigger>
@@ -484,11 +485,11 @@ describe("Collapsible", () => {
         </Collapsible.Root>,
       );
       expect(rootChildren).toHaveBeenLastCalledWith({
-        open: undefined,
+        open: false,
         pending: false,
         disabled: true,
       });
-      expect(root()).toHaveTextContent("undefined/true");
+      expect(root()).toHaveTextContent("false/true");
     });
   });
 
@@ -1096,19 +1097,31 @@ describe("Collapsible", () => {
       expect(await clickPrevented()).toBe(false);
     });
 
-    it("warns on each part when `transition` is given in JS-free mode", () => {
+    it("warns on each part that has `transition` when it is given in JS-free mode", () => {
       const consoleError = silenceErrors();
       render(
         <Collapsible.Root transition="fsui-grow">
-          <Collapsible.Trigger transition="fsui-grow">A</Collapsible.Trigger>
+          <Collapsible.Trigger>A</Collapsible.Trigger>
           <Collapsible.Panel transition="fsui-grow">Alpha</Collapsible.Panel>
         </Collapsible.Root>,
       );
       const messages = consoleError.mock.calls.map((c) => String(c[0]));
-      expect(messages).toHaveLength(3);
+      expect(messages).toHaveLength(2);
       expect(messages.join("\n")).toMatch(/Collapsible\.Root: `transition` has no effect/);
-      expect(messages.join("\n")).toMatch(/Collapsible\.Trigger: `transition` has no effect/);
       expect(messages.join("\n")).toMatch(/Collapsible\.Panel: `transition` has no effect/);
+    });
+
+    it("the Trigger has no transition prop (conventions 5.1: all optimistic)", () => {
+      render(
+        <Collapsible.Root defaultOpen={false}>
+          {/* @ts-expect-error Everything a Trigger renders is optimistic: no `transition`. */}
+          <Collapsible.Trigger transition="fsui-grow">A</Collapsible.Trigger>
+        </Collapsible.Root>,
+      );
+      expect(screen.getByText("A")).toBeInTheDocument();
+      // @ts-expect-error `aria-disabled` is owned: use `disabled` on the Root (conventions 1.5).
+      const owned: CollapsibleTriggerProps = { "aria-disabled": true };
+      expect(owned).toBeTypeOf("object");
     });
 
     it("does not warn in normal use of either mode", async () => {

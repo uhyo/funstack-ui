@@ -198,7 +198,7 @@ describe("Collapsible (browser)", () => {
     await expect.poll(() => screen.queryByText("Alpha")).not.toBeNull();
     await expect.poll(() => types.length).toBeGreaterThan(0);
     expect(types.at(-1)).toEqual(
-      expect.arrayContaining(["fsui-collapsible", "fsui-collapsible-expand"]),
+      expect.arrayContaining(["fsui-collapsible", "fsui-collapsible-open"]),
     );
 
     types.length = 0;
@@ -206,7 +206,7 @@ describe("Collapsible (browser)", () => {
     await expect.poll(() => screen.queryByText("Alpha")).toBeNull();
     await expect.poll(() => types.length).toBeGreaterThan(0);
     expect(types.at(-1)).toEqual(
-      expect.arrayContaining(["fsui-collapsible", "fsui-collapsible-collapse"]),
+      expect.arrayContaining(["fsui-collapsible", "fsui-collapsible-close"]),
     );
   });
 });

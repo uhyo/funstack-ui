@@ -87,6 +87,7 @@ type OwnHandlerKeys<P> = Exclude<Extract<keyof P, `on${string}`>, DomPassThrough
 type PublicProps = {
   AccordionItemProps: UI.AccordionItemProps;
   AccordionPanelProps: UI.AccordionPanelProps;
+  AccordionRootBaseProps: UI.AccordionRootBaseProps;
   AccordionRootExclusiveProps: UI.AccordionRootExclusiveProps;
   AccordionRootMultipleProps: UI.AccordionRootMultipleProps;
   AccordionRootProps: UI.AccordionRootProps;
@@ -237,9 +238,10 @@ type PublicProps = {
   ToastRootProps: UI.ToastRootProps;
   ToastTitleProps: UI.ToastTitleProps;
   ToastViewportProps: UI.ToastViewportProps;
-  ToggleGroupExclusiveProps: UI.ToggleGroupExclusiveProps;
   ToggleGroupItemProps: UI.ToggleGroupItemProps;
-  ToggleGroupMultipleProps: UI.ToggleGroupMultipleProps;
+  ToggleGroupRootBaseProps: UI.ToggleGroupRootBaseProps;
+  ToggleGroupRootExclusiveProps: UI.ToggleGroupRootExclusiveProps;
+  ToggleGroupRootMultipleProps: UI.ToggleGroupRootMultipleProps;
   ToggleGroupRootProps: UI.ToggleGroupRootProps;
   ToggleProps: UI.ToggleProps;
   ToolbarRootProps: UI.ToolbarRootProps;
@@ -253,6 +255,7 @@ type PublicProps = {
 const listedKeys = {
   AccordionItemProps: true,
   AccordionPanelProps: true,
+  AccordionRootBaseProps: true,
   AccordionRootExclusiveProps: true,
   AccordionRootMultipleProps: true,
   AccordionRootProps: true,
@@ -403,9 +406,10 @@ const listedKeys = {
   ToastRootProps: true,
   ToastTitleProps: true,
   ToastViewportProps: true,
-  ToggleGroupExclusiveProps: true,
   ToggleGroupItemProps: true,
-  ToggleGroupMultipleProps: true,
+  ToggleGroupRootBaseProps: true,
+  ToggleGroupRootExclusiveProps: true,
+  ToggleGroupRootMultipleProps: true,
   ToggleGroupRootProps: true,
   ToggleProps: true,
   ToolbarRootProps: true,

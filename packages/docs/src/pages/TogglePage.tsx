@@ -56,8 +56,10 @@ export function TogglePage() {
               <>
                 Called with the next pressed state on every user-initiated change. Runs inside the
                 Toggle's transition; may be sync or async. Rejections reach the nearest Error
-                Boundary. <code>details</code> carries only <code>event</code> (the native click
-                event; keyboard activation also arrives as a click).
+                Boundary. <code>details</code> carries <code>reason</code>, always{" "}
+                <code>"activate"</code> (a button has no platform path; every change details type
+                has the field), and <code>event</code> (the native click event; keyboard activation
+                also arrives as a click).
               </>
             ),
           },
@@ -66,17 +68,7 @@ export function TogglePage() {
             type: "boolean",
             default: "false",
             description:
-              'Never dispatches. Native `disabled` on a `<button>`; with a link or component `render`, `aria-disabled="true"` instead (the element stays focusable).',
-          },
-          {
-            name: "transition",
-            type: "ViewTransitionClass",
-            description: (
-              <>
-                Forwarded to the Toggle's <code>&lt;ViewTransition default&gt;</code>. Animates the
-                commit that ends an action (and rollbacks), not the optimistic flip.
-              </>
-            ),
+              'Never dispatches. Native `disabled` on a `<button>`; with a link or component `render`, `aria-disabled="true"` instead (the element stays focusable). Inside a Toolbar `aria-disabled="true"` on every element, so the Toggle stays in the arrow sequence.',
           },
           ...functionProps("ToggleState", "Rendered from optimistic state; must not suspend."),
           renderProp("button", "ToggleState"),
@@ -85,10 +77,10 @@ export function TogglePage() {
       <PartFacts
         state={"`ToggleState` is `{ pressed, pending, disabled }`; `pressed` is optimistic."}
         owned={
-          "`aria-pressed`, `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-pressed`, `data-pending`, `data-disabled`."
+          "`aria-pressed`, `disabled`, `aria-disabled` (inside a Toolbar, or a link or component `render`), `onClick`, `data-pressed`, `data-pending`, `data-disabled`."
         }
         note={
-          'Every other `<button>` prop passes through; `type` defaults to `"button"` and a `render` element\'s own `type` wins.'
+          'Every other `<button>` prop passes through; `type` defaults to `"button"` and a `render` element\'s own `type` wins. No `transition` prop: everything a Toggle renders is optimistic (see Optimistic and pending).'
         }
       />
 
@@ -99,7 +91,10 @@ export function TogglePage() {
           ["`data-pressed`", "Optimistically pressed."],
           ["`aria-pressed`", '`"true"` or `"false"`, optimistic.'],
           ["`data-pending`", "`pressedChangeAction` is in flight."],
-          ["`data-disabled`", "The `disabled` prop (also matches `:disabled`)."],
+          [
+            "`data-disabled`",
+            "The `disabled` prop (also matches `:disabled`, except inside a Toolbar, where the button is `aria-disabled`).",
+          ],
         ]}
       />
 
@@ -108,7 +103,10 @@ export function TogglePage() {
         head={["Interaction", "Behaviour"]}
         rows={[
           ["Space, Enter, click", "Toggles (native button activation)."],
-          ["Tab", "Focusable unless disabled."],
+          [
+            "Tab",
+            "Focusable unless disabled (inside a Toolbar a disabled Toggle stays focusable).",
+          ],
         ]}
       />
       <ul>
@@ -134,7 +132,7 @@ export function TogglePage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "`aria-pressed` and `data-pressed` follow the optimistic state; `data-pending` is on the Toggle while `pressedChangeAction` is in flight. The `transition` prop animates the commit that ends the action (for example a spinner turning back into an icon), not the pressed flip: animate that with a CSS transition on `[data-pressed]`."
+          "`aria-pressed` and `data-pressed` follow the optimistic state; `data-pending` is on the Toggle while `pressedChangeAction` is in flight. Animate the pressed flip with a CSS transition on `[data-pressed]`. The Toggle has no `transition` prop; to animate the commit that ends the action (for example a spinner turning back into an icon), wrap the content in your own `<ViewTransition>` keyed on the `fsui-toggle` types."
         }
       >
         <h4>Walkthrough</h4>

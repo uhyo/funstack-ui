@@ -402,7 +402,7 @@ describe("Accordion", () => {
       }
     });
 
-    it("Home / End focus the first / last enabled trigger", async () => {
+    it("Home / End focus the first / last trigger", async () => {
       render(<Harness mode="uncontrolled" />);
       const user = setupUser();
       trigger("b").focus();
@@ -412,28 +412,108 @@ describe("Accordion", () => {
       expect(trigger("a")).toHaveFocus();
     });
 
-    it("skips disabled triggers (which stay focusable themselves)", async () => {
+    it("reaches disabled triggers: they are in the sequence (conventions 3.10 rule 3)", async () => {
+      const action = vi.fn<ActionFn>();
       render(
         <Harness
           mode="uncontrolled"
-          items={[{ value: "a" }, { value: "b", disabled: true }, { value: "c" }]}
+          action={action}
+          items={[{ value: "a", disabled: true }, { value: "b" }, { value: "c", disabled: true }]}
         />,
       );
       const user = setupUser();
-      trigger("a").focus();
+      trigger("b").focus();
       await user.keyboard("[ArrowDown]");
       expect(trigger("c")).toHaveFocus();
-      await user.keyboard("[ArrowUp]");
+      expect(trigger("c")).toHaveAttribute("aria-disabled", "true");
+      await user.keyboard("[ArrowDown]");
       expect(trigger("a")).toHaveFocus();
-
-      // A disabled trigger can be reached by Tab; arrows leave it for an enabled one.
-      trigger("b").focus();
-      expect(trigger("b")).toHaveFocus();
-      await user.keyboard("[ArrowDown]");
+      await user.keyboard("[ArrowUp]");
       expect(trigger("c")).toHaveFocus();
-      trigger("b").focus();
+      // Home / End go to the first / last trigger, disabled or not.
+      await user.keyboard("[Home]");
+      expect(trigger("a")).toHaveFocus();
       await user.keyboard("[End]");
       expect(trigger("c")).toHaveFocus();
+      // Reaching a disabled trigger never dispatches.
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it("loop={false} stops the arrows at the ends (conventions 3.10 rule 4)", async () => {
+      render(
+        <Accordion.Root loop={false} data-testid="root">
+          {["a", "b"].map((v) => (
+            <Accordion.Item key={v} value={v}>
+              <Accordion.Trigger data-testid={`trigger-${v}`}>{v}</Accordion.Trigger>
+            </Accordion.Item>
+          ))}
+        </Accordion.Root>,
+      );
+      expect(root()).not.toHaveAttribute("loop");
+      const user = setupUser();
+      trigger("b").focus();
+      await user.keyboard("[ArrowDown]");
+      expect(trigger("b")).toHaveFocus();
+      await user.keyboard("[ArrowUp]");
+      expect(trigger("a")).toHaveFocus();
+      await user.keyboard("[ArrowUp]");
+      expect(trigger("a")).toHaveFocus();
+      // Home / End are not affected.
+      await user.keyboard("[End]");
+      expect(trigger("b")).toHaveFocus();
+    });
+
+    it.each(["altKey", "ctrlKey", "metaKey"] as const)(
+      "a key with %s is left to the browser (conventions 3.10 rule 2)",
+      (modifier) => {
+        render(<Harness mode="uncontrolled" />);
+        trigger("a").focus();
+        for (const key of ["ArrowDown", "End"]) {
+          // `fireEvent` returns false when the event was default-prevented.
+          expect(fireEvent.keyDown(trigger("a"), { key, [modifier]: true })).toBe(true);
+          expect(trigger("a")).toHaveFocus();
+        }
+      },
+    );
+
+    it("Shift is not a modifier for the rule", () => {
+      render(<Harness mode="uncontrolled" />);
+      trigger("a").focus();
+      expect(fireEvent.keyDown(trigger("a"), { key: "ArrowDown", shiftKey: true })).toBe(false);
+      expect(trigger("b")).toHaveFocus();
+    });
+
+    it("a consumer's onKeyDown opts out with preventDefault", () => {
+      render(
+        <Accordion.Root data-testid="root">
+          {["a", "b"].map((v) => (
+            <Accordion.Item key={v} value={v}>
+              <Accordion.Trigger
+                data-testid={`trigger-${v}`}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown") event.preventDefault();
+                }}
+              >
+                {v}
+              </Accordion.Trigger>
+            </Accordion.Item>
+          ))}
+        </Accordion.Root>,
+      );
+      trigger("a").focus();
+      fireEvent.keyDown(trigger("a"), { key: "ArrowDown" });
+      expect(trigger("a")).toHaveFocus();
+      fireEvent.keyDown(trigger("a"), { key: "End" });
+      expect(trigger("b")).toHaveFocus();
+    });
+
+    it("moves focus with the focus ring (conventions 3.10 rule 5)", async () => {
+      render(<Harness mode="uncontrolled" />);
+      const focus = vi.spyOn(trigger("b"), "focus");
+      const user = setupUser();
+      trigger("a").focus();
+      await user.keyboard("[ArrowDown]");
+      expect(focus).toHaveBeenCalledWith({ focusVisible: true });
     });
 
     it("navigation keys do nothing outside a trigger and do not toggle", async () => {
@@ -652,7 +732,7 @@ describe("Accordion", () => {
       const user = setupUser();
 
       const idle: AccordionItemState = { value: "a", open: false, pending: false, disabled: false };
-      expect(rootClass).toHaveBeenLastCalledWith({ pending: false, disabled: false });
+      expect(rootClass).toHaveBeenLastCalledWith({ value: [], pending: false, disabled: false });
       expect(itemClass).toHaveBeenLastCalledWith(idle);
       expect(itemStyle).toHaveBeenLastCalledWith(idle);
       expect(triggerChildren).toHaveBeenLastCalledWith(idle);
@@ -668,7 +748,8 @@ describe("Accordion", () => {
         pending: true,
         disabled: false,
       };
-      expect(rootClass).toHaveBeenLastCalledWith({ pending: true, disabled: false });
+      // `state.value` is optimistic (C-L2).
+      expect(rootClass).toHaveBeenLastCalledWith({ value: ["a"], pending: true, disabled: false });
       expect(itemClass).toHaveBeenLastCalledWith(inFlight);
       expect(triggerChildren).toHaveBeenLastCalledWith(inFlight);
       // Panel state is committed: still closed.
@@ -688,7 +769,50 @@ describe("Accordion", () => {
       expect(panel("a")).toHaveClass("shown");
     });
 
-    it("JS-free mode passes `open: undefined` and `disabled` from the Item or Root", () => {
+    it("Root `state.value` is the optimistic set in document order, an array in both modes", async () => {
+      const multiple = vi.fn((s: AccordionRootState) => s.value.join(","));
+      const { unmount } = render(
+        <Accordion.Root defaultValue={["c", "a"]} data-testid="root">
+          {(s) => (
+            <>
+              <output data-testid="value">{multiple(s)}</output>
+              {["a", "b", "c"].map((v) => (
+                <Accordion.Item key={v} value={v}>
+                  <Accordion.Trigger data-testid={`trigger-${v}`}>{v}</Accordion.Trigger>
+                </Accordion.Item>
+              ))}
+            </>
+          )}
+        </Accordion.Root>,
+      );
+      // `defaultValue` is out of order: the layout effect after the first commit sorts it.
+      expect(screen.getByTestId("value")).toHaveTextContent("a,c");
+      await setupUser().click(trigger("b"));
+      expect(screen.getByTestId("value")).toHaveTextContent("a,b,c");
+      unmount();
+
+      const exclusive = vi.fn((s: AccordionRootState) => JSON.stringify(s.value));
+      render(
+        <Accordion.Root exclusive defaultValue="a" data-testid="root">
+          {(s) => (
+            <>
+              <output data-testid="value">{exclusive(s)}</output>
+              {["a", "b"].map((v) => (
+                <Accordion.Item key={v} value={v}>
+                  <Accordion.Trigger data-testid={`trigger-${v}`}>{v}</Accordion.Trigger>
+                </Accordion.Item>
+              ))}
+            </>
+          )}
+        </Accordion.Root>,
+      );
+      expect(screen.getByTestId("value")).toHaveTextContent('["a"]');
+      await setupUser().click(trigger("a"));
+      expect(screen.getByTestId("value")).toHaveTextContent("[]");
+    });
+
+    it("JS-free mode passes `open: false` and `disabled` from the Item or Root (conventions 4.1 rule 3)", () => {
+      const rootClass = vi.fn((_s: AccordionRootState) => undefined);
       const itemChildren = vi.fn((s: AccordionItemState) => (
         <>
           <Accordion.Trigger>{String(s.open)}</Accordion.Trigger>
@@ -696,20 +820,23 @@ describe("Accordion", () => {
         </>
       ));
       render(
-        <Accordion.Root disabled>
-          <Accordion.Item value="a" data-testid="item-a">
+        <Accordion.Root disabled className={rootClass}>
+          <Accordion.Item value="a" data-testid="item-a" defaultOpen>
             {itemChildren}
           </Accordion.Item>
         </Accordion.Root>,
       );
+      // `false` even while the browser shows the item open: React holds no value for it.
+      expect(item("a").open).toBe(true);
       expect(itemChildren).toHaveBeenLastCalledWith({
         value: "a",
-        open: undefined,
+        open: false,
         pending: false,
         disabled: true,
       });
-      expect(item("a")).toHaveTextContent("undefined");
-      expect(item("a")).toHaveTextContent("undefined/true");
+      expect(rootClass).toHaveBeenLastCalledWith({ value: [], pending: false, disabled: true });
+      expect(item("a")).toHaveTextContent("false");
+      expect(item("a")).toHaveTextContent("false/true");
     });
   });
 
@@ -932,8 +1059,8 @@ describe("Accordion", () => {
       const [next, details] = action.mock.calls[0]!;
       expect(next).toEqual(["b"]);
       expect(details.reason).toBe("platform");
-      expect(details.item).toBe("b");
-      expect(details.open).toBe(true);
+      expect(details.added).toEqual(["b"]);
+      expect(details.removed).toEqual([]);
       expect(details.event?.type).toBe("toggle");
       expect(item("b").open).toBe(true);
       expect(trigger("b")).toHaveAttribute("data-open", "");
@@ -1009,10 +1136,11 @@ describe("Accordion", () => {
       await flushToggle();
       expect(action).toHaveBeenCalledTimes(1);
       expect(action.mock.calls[0]?.[0]).toBe("b");
+      // The item the reveal closed implicitly is reported (conventions 2.2).
       expect(action.mock.calls[0]?.[1]).toMatchObject({
         reason: "platform",
-        item: "b",
-        open: true,
+        added: ["b"],
+        removed: ["a"],
       });
       expect(item("a").open).toBe(false);
       expect(item("b").open).toBe(true);
@@ -1031,8 +1159,8 @@ describe("Accordion", () => {
       expect(action.mock.calls[0]?.[0]).toEqual(["b"]);
       expect(action.mock.calls[0]?.[1]).toMatchObject({
         reason: "platform",
-        item: "a",
-        open: false,
+        added: [],
+        removed: ["a"],
       });
       expect(committed()).toEqual(["b"]);
     });
@@ -1260,8 +1388,9 @@ describe("Accordion", () => {
         expect(next).toEqual(["a", "b"]);
         expect(details.reason).toBe("platform");
         expect(details.event).toBeUndefined();
-        expect(details.item).toBe("a");
-        expect(details.open).toBe(true);
+        // The diff lists every item that changed (conventions 2.2).
+        expect(details.added).toEqual(["a", "b"]);
+        expect(details.removed).toEqual([]);
         expect(item("a").open).toBe(true);
         expect(item("b").open).toBe(true);
         expect(item("c").open).toBe(false);
@@ -1290,8 +1419,8 @@ describe("Accordion", () => {
       expect(action).toHaveBeenCalledTimes(1);
       const [next, details] = action.mock.calls[0]!;
       expect(next).toEqual(["b"]);
-      expect(details.item).toBe("a");
-      expect(details.open).toBe(false);
+      expect(details.added).toEqual(["b"]);
+      expect(details.removed).toEqual(["a"]);
       expect(item("a").open).toBe(false);
       expect(item("b").open).toBe(true);
       expect(trigger("b")).toHaveAttribute("data-open");
@@ -1606,21 +1735,32 @@ describe("Accordion", () => {
   });
 
   describe("transition prop (smoke)", () => {
-    it("warns on each part in JS-free mode", () => {
+    it("warns on each part that has it in JS-free mode", () => {
       const consoleError = silenceErrors();
       render(
         <Accordion.Root>
           <Accordion.Item value="a" transition="fsui-grow">
-            <Accordion.Trigger transition="fsui-grow">A</Accordion.Trigger>
+            <Accordion.Trigger>A</Accordion.Trigger>
             <Accordion.Panel transition="fsui-grow">Alpha</Accordion.Panel>
           </Accordion.Item>
         </Accordion.Root>,
       );
       const messages = consoleError.mock.calls.map((c) => String(c[0]));
-      expect(messages).toHaveLength(3);
+      expect(messages).toHaveLength(2);
       expect(messages.join("\n")).toMatch(/Accordion\.Item: `transition` has no effect/);
-      expect(messages.join("\n")).toMatch(/Accordion\.Trigger: `transition` has no effect/);
       expect(messages.join("\n")).toMatch(/Accordion\.Panel: `transition` has no effect/);
+    });
+
+    it("the Trigger has no transition prop (conventions 5.1: all optimistic)", () => {
+      render(
+        <Accordion.Root defaultValue={[]}>
+          <Accordion.Item value="a">
+            {/* @ts-expect-error Everything a Trigger renders is optimistic: no `transition`. */}
+            <Accordion.Trigger transition="fsui-grow">A</Accordion.Trigger>
+          </Accordion.Item>
+        </Accordion.Root>,
+      );
+      expect(screen.getByText("A")).toBeInTheDocument();
     });
   });
 
@@ -1669,7 +1809,7 @@ describe("Accordion", () => {
       );
       const user = setupUser();
       expect(item("solo").open).toBe(false);
-      expect(panel("solo")).toHaveTextContent("undefined");
+      expect(panel("solo")).toHaveTextContent("false");
       await user.click(trigger("solo"));
       await flushToggle();
       expect(item("solo").open).toBe(true);

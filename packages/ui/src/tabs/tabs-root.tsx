@@ -122,7 +122,7 @@ function findById(node: Node | null, id: string): Element | null {
  * Owns the Tabs state (`value`), the transition, the ids and the context. Renders a `div` with
  * `data-pending` while a selection is in flight (including a suspending panel's wait).
  *
- * Owned keys (conventions 1.2): `data-pending`, `data-orientation`, `data-disabled`.
+ * Owned keys (conventions 1.5): `data-pending`, `data-orientation`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/tabs
  */

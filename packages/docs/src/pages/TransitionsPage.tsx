@@ -144,9 +144,15 @@ export function TransitionsPage() {
       <Table
         head={["The part renders", "Animate with"]}
         rows={[
-          ["optimistic state (a trigger)", "a CSS `transition` on the data attribute"],
+          [
+            "optimistic state only (a trigger, a value control): no `transition` prop",
+            "a CSS `transition` on the data attribute",
+          ],
           ["committed state (a content region)", "the `transition` prop"],
-          ["the end of pending, or a rollback", "the `transition` prop"],
+          [
+            "the end of pending, or a rollback",
+            "the `transition` prop of the part around it, or your own `<ViewTransition>` keyed on the component's types",
+          ],
           [
             "[browser-owned state](/concepts/browser-owned-state)",
             "CSS: `@starting-style`, `transition-behavior: allow-discrete`",
@@ -160,8 +166,9 @@ export function TransitionsPage() {
           optimistic tab with CSS Anchor Positioning, so a plain CSS transition on its inset
           properties makes it slide on click and slide back on rollback. <code>Tabs.Panel</code>{" "}
           renders the committed selection: animate the swap with its <code>transition</code> prop. A
-          spinner rendered from the Tab's <code>pending</code> state disappears in the commit that
-          ends the action, which the Tab's own <code>transition</code> prop can animate.
+          Tab has no <code>transition</code> prop: a spinner rendered from its <code>pending</code>{" "}
+          state disappears in the commit that ends the action, which your own{" "}
+          <code>&lt;ViewTransition&gt;</code> around the Tab's content can animate.
         </p>
       </ConceptExample>
 

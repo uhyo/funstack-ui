@@ -60,7 +60,7 @@ import { Menubar } from "@funstack/ui/menubar";
         rows={[
           [
             "`Menubar`",
-            '`<div role="menubar">`',
+            '`<div role="menubar" aria-orientation="horizontal">`',
             "One Tab stop and the arrow keys between its Triggers; switches menus. Holds no open state.",
           ],
           [
@@ -96,12 +96,14 @@ import { Menubar } from "@funstack/ui/menubar";
         ]}
       />
       <PartFacts
-        state={"`MenubarState` is `{}`: the bar holds no state. Each menu's is on its `Menu.Root`."}
+        state={
+          '`MenubarState` is `{ orientation }`, always `"horizontal"`: the bar holds no open state. Each menu\'s is on its `Menu.Root`.'
+        }
         owned={
-          '`role` (`"menubar"`), `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`, and the `tabindex` of its Triggers.'
+          '`role` (`"menubar"`), `aria-orientation` and `data-orientation` (both `"horizontal"`), `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`, and the `tabindex` of its Triggers.'
         }
         note={
-          "Name the bar with `aria-label` or `aria-labelledby`. No `aria-orientation` is rendered: horizontal is the default of the role. There is no `disabled`: disable a menu on its `Menu.Trigger`."
+          "Name the bar with `aria-label` or `aria-labelledby`. `aria-orientation` is rendered although horizontal is the role's default, so a stylesheet has the same `[data-orientation]` hook as on a Toolbar or a tab list. There is no `disabled`: disable a menu on its `Menu.Trigger`."
         }
       />
 
@@ -164,10 +166,11 @@ import { Menubar } from "@funstack/ui/menubar";
           ],
           ["`data-pending`", "Menu.Trigger", "Its menu's open or close action is in flight."],
           ["`data-disabled`", "Menu.Trigger", "The `disabled` prop."],
+          ["`data-orientation`", "Menubar", 'Always `"horizontal"`.'],
         ]}
       />
       <p>
-        The bar itself renders no data attribute. The popups and items carry Menu's own (
+        The popups and items carry Menu's own (
         <a href="/components/menu#data-attributes">Menu data attributes</a>).
       </p>
 
@@ -317,7 +320,7 @@ import { Menubar } from "@funstack/ui/menubar";
           A vertical menubar (<code>orientation</code>).
         </li>
         <li>
-          <code>experimental_focusgroup</code> (<code>focusgroup="menubar"</code>).
+          <code>experimental_focusGroup</code> (<code>focusgroup="menubar"</code>).
         </li>
         <li>Typeahead between the Triggers.</li>
         <li>Items directly in the bar (a command or a link with no menu).</li>

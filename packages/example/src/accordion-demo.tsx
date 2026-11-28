@@ -185,9 +185,11 @@ function ControlledVetoDemo() {
         value={open}
         valueChangeAction={async (next, details) => {
           setError(null);
-          console.log(`[veto] reason=${details.reason} item=${details.item} open=${details.open}`);
+          console.log(
+            `[veto] reason=${details.reason} added=${details.added.join(",")} removed=${details.removed.join(",")}`,
+          );
           try {
-            await fakeSave("veto", next, { fail: details.open && details.item === "returns" });
+            await fakeSave("veto", next, { fail: details.added.includes("returns") });
             startTransition(() => setOpen(next));
           } catch (e) {
             startTransition(() => setError(e instanceof Error ? e.message : String(e)));
@@ -264,8 +266,8 @@ function TransitionDemo() {
         <code>transition="fsui-grow"</code> on every Item animates each item's box in the commit
         that ends the action, so the items below the opening one slide instead of jumping. This
         section uses no <code>::details-content</code> transition (the two must not be combined for
-        the same change). Open DevTools to see <code>fsui-accordion-expand</code> /{" "}
-        <code>-collapse</code> on <code>&lt;html&gt;</code>.
+        the same change). Open DevTools to see <code>fsui-accordion-open</code> /{" "}
+        <code>-close</code> on <code>&lt;html&gt;</code> (a switch carries both).
       </p>
       <Accordion.Root
         className="acc acc-vt"

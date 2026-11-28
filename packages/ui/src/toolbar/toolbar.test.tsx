@@ -104,6 +104,91 @@ describe("Toolbar", () => {
     });
   });
 
+  // testing.md 10.1 "Disabled in a Toolbar" (conventions 3.6): every library button-like part
+  // inside a Toolbar is `aria-disabled`, focusable and in the arrow sequence, and never dispatches;
+  // outside one, Toggle and ToggleGroup.Item stay natively disabled. The overlay Triggers' rows
+  // are in __tests__/overlay-disabled-render-suite.tsx.
+  describe("disabled in a Toolbar", () => {
+    function Disabled({ groupDisabled = false }: { groupDisabled?: boolean }) {
+      return (
+        <Toolbar.Root aria-label="T">
+          <Button disabled action={actions.button}>
+            Copy
+          </Button>
+          <Toggle disabled pressedChangeAction={actions.toggle}>
+            Bold
+          </Toggle>
+          <ToggleGroup.Root
+            aria-label="Align"
+            defaultValue={[]}
+            disabled={groupDisabled}
+            valueChangeAction={actions.group}
+          >
+            <ToggleGroup.Item value="left" disabled={!groupDisabled}>
+              Left
+            </ToggleGroup.Item>
+            <ToggleGroup.Item value="right">Right</ToggleGroup.Item>
+          </ToggleGroup.Root>
+        </Toolbar.Root>
+      );
+    }
+    const actions = { button: vi.fn(), toggle: vi.fn(), group: vi.fn() };
+
+    it.each([false, true])(
+      "Button, Toggle and ToggleGroup.Item (group disabled: %s) are aria-disabled and reached by the arrows",
+      async (groupDisabled) => {
+        for (const fn of Object.values(actions)) fn.mockClear();
+        render(<Disabled groupDisabled={groupDisabled} />);
+        const parts = groupDisabled ? ["Copy", "Bold", "Left", "Right"] : ["Copy", "Bold", "Left"];
+        for (const name of parts) {
+          expect(button(name)).toHaveAttribute("aria-disabled", "true");
+          expect(button(name)).toHaveAttribute("data-disabled", "");
+          expect(button(name)).not.toBeDisabled();
+        }
+        // Every one of them is in the sequence, Home and End included.
+        act(() => button("Copy").focus());
+        press(button("Copy"), "ArrowRight");
+        expect(button("Bold")).toHaveFocus();
+        press(button("Bold"), "ArrowRight");
+        expect(button("Left")).toHaveFocus();
+        press(button("Left"), "ArrowRight");
+        expect(button("Right")).toHaveFocus();
+        press(button("Right"), "Home");
+        expect(button("Copy")).toHaveFocus();
+        // None of them dispatches, by click, Enter or Space.
+        const user = setupUser();
+        for (const name of parts) {
+          await user.click(button(name));
+          act(() => button(name).focus());
+          await user.keyboard("{Enter}{ }");
+        }
+        expect(actions.button).not.toHaveBeenCalled();
+        expect(actions.toggle).not.toHaveBeenCalled();
+        expect(actions.group).not.toHaveBeenCalled();
+        expect(button("Bold")).toHaveAttribute("aria-pressed", "false");
+        expect(button("Left")).toHaveAttribute("aria-pressed", "false");
+      },
+    );
+
+    it("outside a Toolbar a disabled Toggle and ToggleGroup.Item are natively disabled", () => {
+      render(
+        <>
+          <Toggle disabled>Bold</Toggle>
+          <ToggleGroup.Root aria-label="Align">
+            <ToggleGroup.Item value="left" disabled>
+              Left
+            </ToggleGroup.Item>
+          </ToggleGroup.Root>
+        </>,
+      );
+      for (const name of ["Bold", "Left"]) {
+        expect(button(name)).toBeDisabled();
+        expect(button(name)).not.toHaveAttribute("aria-disabled");
+        expect(button(name)).toHaveAttribute("data-disabled", "");
+      }
+    });
+  });
+
   describe("function props and render (row 8)", () => {
     it("Root state and Button render as a link get no type; a disabled link does not navigate", async () => {
       const className = vi.fn((s: ToolbarRootState) => `tb-${s.orientation}`);
@@ -135,15 +220,26 @@ describe("Toolbar", () => {
     it("Separator className / style receive its orientation; render replaces the element", () => {
       render(
         <Toolbar.Root aria-label="T">
-          <Toolbar.Separator
-            className={(s) => `sep-${s.orientation}`}
-            render={<div role="separator" />}
-          />
+          <Toolbar.Separator className={(s) => `sep-${s.orientation}`} render={<div />} />
         </Toolbar.Root>,
       );
+      // The Separator owns `role` (conventions 1.5): a render element of another tag is one too.
       const sep = screen.getByRole("separator");
       expect(sep.tagName).toBe("DIV");
+      expect(sep).toHaveAttribute("role", "separator");
       expect(sep).toHaveClass("sep-vertical");
+    });
+
+    it("Separator owns `role`: a render element's own does not win, and it is not a prop", () => {
+      render(
+        <Toolbar.Root aria-label="T">
+          <Toolbar.Separator data-testid="sep" render={<div role="presentation" />} />
+          {/* @ts-expect-error `role` is the Separator's (conventions 1.5). */}
+          <Toolbar.Separator role="none" />
+        </Toolbar.Root>,
+      );
+      expect(screen.getByTestId("sep")).toHaveAttribute("role", "separator");
+      expect(screen.getAllByRole("separator")).toHaveLength(2);
     });
   });
 
@@ -330,7 +426,7 @@ describe("Toolbar", () => {
   });
 
   describe("ToggleGroup inside a Toolbar (row 14)", () => {
-    it("joins the Toolbar's single sequence; clicks still dispatch", async () => {
+    it("joins the Toolbar's single sequence, a disabled Item included; clicks still dispatch", async () => {
       silenceErrors();
       const action = vi.fn<(next: string[]) => void>();
       render(
@@ -354,7 +450,12 @@ describe("Toolbar", () => {
       act(() => button("Before").focus());
       press(button("Before"), "ArrowDown");
       expect(button("B")).toHaveFocus();
+      // The disabled Item is `aria-disabled` and in the sequence (conventions 3.6, 3.10).
       press(button("B"), "ArrowDown");
+      expect(button("X")).toHaveFocus();
+      expect(button("X")).toHaveAttribute("aria-disabled", "true");
+      expect(button("X")).not.toBeDisabled();
+      press(button("X"), "ArrowDown");
       expect(button("I")).toHaveFocus();
       press(button("I"), "ArrowDown");
       expect(button("After")).toHaveFocus();
@@ -374,7 +475,7 @@ describe("Toolbar", () => {
         <Toolbar.Root aria-label="T">
           <ToggleGroup.Root
             aria-label="Style"
-            experimental_focusgroup
+            experimental_focusGroup
             orientation="vertical"
             loop={false}
           >
@@ -387,7 +488,7 @@ describe("Toolbar", () => {
         <Toolbar.Root aria-label="T">
           <ToggleGroup.Root
             aria-label="Style"
-            experimental_focusgroup
+            experimental_focusGroup
             orientation="vertical"
             loop={false}
           >
@@ -400,7 +501,7 @@ describe("Toolbar", () => {
       expect(group).not.toHaveAttribute("focusgroup");
       expect(group).toHaveAttribute("data-orientation", "horizontal");
       const messages = error.mock.calls.map(([m]) => String(m));
-      for (const prop of ["`orientation`", "`loop`", "`experimental_focusgroup`"]) {
+      for (const prop of ["`orientation`", "`loop`", "`experimental_focusGroup`"]) {
         expect(messages.filter((m) => m.includes(prop) && m.includes("ignored"))).toHaveLength(1);
       }
       // Loop off on the group is ignored: the Toolbar wraps.
@@ -515,10 +616,10 @@ describe("Toolbar", () => {
     });
   });
 
-  describe("experimental_focusgroup tokens (row 16)", () => {
+  describe("experimental_focusGroup tokens (row 16)", () => {
     it("renders toolbar inline wrap; vertical + loop={false} gives block nowrap", () => {
       const { unmount } = render(
-        <Toolbar.Root aria-label="T" experimental_focusgroup>
+        <Toolbar.Root aria-label="T" experimental_focusGroup>
           <Button>A</Button>
           <Button>B</Button>
         </Toolbar.Root>,
@@ -531,7 +632,7 @@ describe("Toolbar", () => {
       unmount();
 
       render(
-        <Toolbar.Root aria-label="T" experimental_focusgroup orientation="vertical" loop={false} />,
+        <Toolbar.Root aria-label="T" experimental_focusGroup orientation="vertical" loop={false} />,
       );
       expect(toolbar()).toHaveAttribute("focusgroup", "toolbar block nowrap");
     });

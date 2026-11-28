@@ -20,7 +20,7 @@ export interface ToolbarSeparatorState {
  */
 export interface ToolbarSeparatorProps extends Omit<
   ComponentPropsWithRef<"hr">,
-  "aria-orientation" | "className" | "style" | "children"
+  "role" | "aria-orientation" | "className" | "style" | "children"
 > {
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, ToolbarSeparatorState>;
@@ -31,10 +31,11 @@ export interface ToolbarSeparatorProps extends Omit<
 }
 
 /**
- * `<hr aria-orientation>` between toolbar items: vertical in a horizontal Toolbar, horizontal in
- * a vertical one. Not focusable, not an item.
+ * `<hr role="separator" aria-orientation>` between toolbar items: vertical in a horizontal
+ * Toolbar, horizontal in a vertical one. Not focusable, not an item. The role is rendered
+ * explicitly, so a `render` element of another tag is a separator too.
  *
- * Owned keys (conventions 1.2): `aria-orientation`, `data-orientation`.
+ * Owned keys (conventions 1.5): `role`, `aria-orientation`, `data-orientation`.
  *
  * @see https://ui.funstack.work/components/toolbar
  */
@@ -53,6 +54,7 @@ export function ToolbarSeparator({ className, style, render, ...rest }: ToolbarS
     children: undefined,
     props: rest,
     libraryProps: {
+      role: "separator",
       "aria-orientation": orientation,
       "data-orientation": orientation,
     },

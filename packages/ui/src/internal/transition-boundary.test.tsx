@@ -21,12 +21,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Mock } from "vitest";
 import { setupUser, silenceErrors } from "../__tests__/helpers.js";
 import { Accordion } from "../accordion/index.js";
+import { Button } from "../button/index.js";
 import { Checkbox } from "../checkbox/index.js";
 import { Dialog } from "../dialog/index.js";
 import { RadioGroup } from "../radio-group/index.js";
 import { Switch } from "../switch/index.js";
 import { Tabs } from "../tabs/index.js";
-import { Toggle } from "../toggle/index.js";
 import { transitionBoundary } from "./transition-boundary.js";
 
 let calls: Mock<() => never>;
@@ -125,7 +125,7 @@ function mountInTransition(node: ReactNode) {
 
 describe("parts mounting at the top of an inserted subtree", () => {
   const parts: [string, (t: ViewTransitionClass | undefined) => ReactNode][] = [
-    ["Toggle", (t) => <Toggle transition={t}>B</Toggle>],
+    ["Button", (t) => <Button transition={t}>B</Button>],
     ["Switch", (t) => <Switch aria-label="s" transition={t} />],
     ["Checkbox", (t) => <Checkbox aria-label="c" transition={t} />],
   ];
@@ -152,21 +152,6 @@ describe("parts mounting at the top of an inserted subtree", () => {
           <RadioGroup.Item value="a" aria-label="a" />
           {show && <RadioGroup.Item value="b" aria-label="b" transition={t} data-testid="added" />}
         </RadioGroup.Root>
-      ),
-    ],
-    [
-      "Tabs.Tab",
-      (t, show) => (
-        <Tabs.Root defaultValue="a">
-          <Tabs.List aria-label="x">
-            <Tabs.Tab value="a">A</Tabs.Tab>
-            {show && (
-              <Tabs.Tab value="b" transition={t} data-testid="added">
-                B
-              </Tabs.Tab>
-            )}
-          </Tabs.List>
-        </Tabs.Root>
       ),
     ],
     [
@@ -267,7 +252,7 @@ describe("Accordion", () => {
   const tree = (transition: ViewTransitionClass | undefined, inner?: ReactNode) => (
     <Accordion.Root defaultValue={[]}>
       <Accordion.Item value="a" transition={transition}>
-        <Accordion.Trigger transition={transition}>A</Accordion.Trigger>
+        <Accordion.Trigger>A</Accordion.Trigger>
         <Accordion.Panel transition={transition}>{inner ?? "Alpha"}</Accordion.Panel>
       </Accordion.Item>
     </Accordion.Root>
@@ -294,7 +279,7 @@ describe("Accordion", () => {
     const { mount } = mountInTransition(
       <Accordion.Root>
         <Accordion.Item value="a" transition="none">
-          <Accordion.Trigger transition="none">A</Accordion.Trigger>
+          <Accordion.Trigger>A</Accordion.Trigger>
           <Accordion.Panel transition="none">Alpha</Accordion.Panel>
         </Accordion.Item>
       </Accordion.Root>,
@@ -395,10 +380,10 @@ describe("transition is static", () => {
 
   it("the warning names the part", async () => {
     const error = silenceErrors();
-    const { rerender } = render(<Toggle>B</Toggle>);
-    await act(async () => rerender(<Toggle transition="fade">B</Toggle>));
+    const { rerender } = render(<Button>B</Button>);
+    await act(async () => rerender(<Button transition="fade">B</Button>));
     expect(error).toHaveBeenCalledWith(
-      expect.stringContaining("Toggle: `transition` changed between undefined and a value"),
+      expect.stringContaining("Button: `transition` changed between undefined and a value"),
     );
   });
 });
