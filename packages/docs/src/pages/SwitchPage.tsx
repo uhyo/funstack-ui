@@ -80,6 +80,13 @@ export function SwitchPage() {
               "Native `disabled`, or the enclosing `Field.Root`'s; never dispatches. A disabled switch is not submitted.",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              "The library's read-only, or the enclosing `Field.Root`'s: the switch stays focusable and submitted, and a click, Space or a label click changes nothing (the click is cancelled, so no `input` or `change` fires) and dispatches nothing. Rendered as `aria-readonly=\"true\"` and `data-readonly`, never the HTML attribute (which does not apply to a checkbox input). Native `required` is not rendered while read-only, so a locked box never blocks a submission. A click made before hydration is undone at mount. `disabled` wins when both are set.",
+          },
+          {
             name: "value",
             type: "string",
             default: '"on"',
@@ -95,13 +102,13 @@ export function SwitchPage() {
       />
       <PartFacts
         state={
-          "`SwitchState` is `{ checked, pending, disabled, invalid }`; `checked` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field."
+          "`SwitchState` is `{ checked, pending, disabled, readOnly, invalid }`; `checked` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field."
         }
         owned={
-          "`type`, `role`, `checked`, `defaultChecked`, `disabled`, `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`, and `disabled` / `name` / `required` default from the Field."
+          "`type`, `role`, `checked`, `defaultChecked`, `disabled`, `aria-readonly` (while read-only), `data-checked`, `data-pending`, `data-disabled`, `data-readonly`; `aria-checked` and `readOnly` are removed, and `required` while read-only; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`, and `disabled` / `name` / `required` default from the Field."
         }
         note={
-          "Every other `<input>` prop passes through (`name`, `required`, `form`, `id`, `autoFocus`, ...). A `render` element's own `onChange` or `onClick` runs first. `readOnly` is not accepted (a type error): HTML's `readonly` does not apply to a checkbox input. There is no `transition` prop: animate the flip with CSS on `:checked`. In development a switch with no accessible name (no `<label>`, `aria-label` or `aria-labelledby`) logs a warning."
+          "Every other `<input>` prop passes through (`name`, `required`, `form`, `id`, `autoFocus`, ...). A `render` element's own `onChange` or `onClick` runs first. `readOnly` is the library's prop (above), not the HTML attribute. There is no `transition` prop: animate the flip with CSS on `:checked`. In development a switch with no accessible name (no `<label>`, `aria-label` or `aria-labelledby`) logs a warning."
         }
       />
 
@@ -121,6 +128,12 @@ export function SwitchPage() {
             "Switch",
             "`:disabled`",
             "The `disabled` prop (or the Field's). Only `:disabled` also sees `<fieldset disabled>`.",
+          ],
+          [
+            "`data-readonly`",
+            "Switch",
+            "–",
+            "The `readOnly` prop (or the Field's). `:read-only` always matches a checkbox input, so it tells nothing.",
           ],
           [
             "`data-invalid`",
@@ -143,7 +156,11 @@ export function SwitchPage() {
           ["Space", "Toggles (native)."],
           ["Click (the switch or its label)", "Toggles (native)."],
           ["Enter", "Does not toggle (native); may submit the form."],
-          ["Tab", "Focusable unless disabled."],
+          ["Tab", "Focusable unless disabled (read-only included)."],
+          [
+            "Read-only",
+            "Space, a click and a label click change nothing and fire no `input` / `change`; focus stays.",
+          ],
         ]}
       />
       <ul>

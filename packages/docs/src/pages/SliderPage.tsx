@@ -210,6 +210,13 @@ export function SliderPage() {
             description:
               "Disables every input (not submitted) and the pointer. An ancestor `<fieldset disabled>` does the same (the pointer reads the inputs' `:disabled`), but `data-disabled` and `state.disabled` stay this prop's.",
           },
+          {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              "Every input stays focusable and is submitted, and nothing steps or commits, or the enclosing `Field.Root`'s: the pointer does nothing, the keys that move a range (the arrows, Home, End, Page Up, Page Down, with a modifier too) are cancelled, and a native change that arrives anyway (an assistive technology's increment) is written back. Renders `aria-readonly=\"true\"` on every input and `data-readonly` on every part. Turning it on during a drag ends the stepping: the gesture commits where it stopped. A key pressed before hydration is undone at mount.",
+          },
           ...functionProps(
             "SliderRootState<T>",
             "The parts. The function form receives the shown value; must not suspend.",
@@ -219,10 +226,10 @@ export function SliderPage() {
       />
       <PartFacts
         state={
-          "`SliderRootState<T>` is `{ value, values, pending, dragging, orientation, disabled, invalid, min, max, step }`; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid` on the Root and the Thumbs), `false` outside a Field; `T` is `number` or `readonly number[]`, inferred from `value` / `defaultValue`; `value` is the shown value and `values` the same as an array."
+          "`SliderRootState<T>` is `{ value, values, pending, dragging, orientation, disabled, readOnly, invalid, min, max, step }`; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid` on the Root and the Thumbs), `false` outside a Field; `T` is `number` or `readonly number[]`, inferred from `value` / `defaultValue`; `value` is the shown value and `values` the same as an array."
         }
         owned={
-          '`role` (`"group"` with several thumbs), `aria-labelledby` (the Label\'s id while a Label is mounted and there are several thumbs; merged with yours), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`, and the `--slider-*` custom properties in `style` (your entries win).'
+          '`role` (`"group"` with several thumbs), `aria-labelledby` (the Label\'s id while a Label is mounted and there are several thumbs; merged with yours), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`, `data-readonly`, and the `--slider-*` custom properties in `style` (your entries win).'
         }
         note={
           'Details are `{ reason, thumb, event }`: `reason` is `"activate"`, `"platform"` (a form reset, a value found at hydration) or `"dismiss"` (the revert after a failed save, steps only), and `thumb` the index that moved (`null` on platform paths and the revert). There is no `transition` prop on any part.'
@@ -277,10 +284,10 @@ export function SliderPage() {
       />
       <PartFacts
         state={
-          "`SliderThumbState` is `{ index, value, pending, dragging, orientation, disabled, invalid }`."
+          "`SliderThumbState` is `{ index, value, pending, dragging, orientation, disabled, readOnly, invalid }`."
         }
         owned={
-          "on the styled element: `onPointerDown`, `data-index`, `data-orientation`, `data-dragging`, `data-pending`, `data-disabled`, and `--slider-value` / `touch-action` in `style` (your entries win). On the input: every attribute (`type`, `min`, `max`, `step`, `value`, `aria-valuetext`, …) except `aria-label`, `aria-labelledby`, `aria-describedby`, `name`, `form` and `autoFocus`, which are yours."
+          "on the styled element: `onPointerDown`, `data-index`, `data-orientation`, `data-dragging`, `data-pending`, `data-disabled`, `data-readonly`, and `--slider-value` / `touch-action` in `style` (your entries win). On the input: every attribute (`type`, `min`, `max`, `step`, `value`, `aria-valuetext`, `aria-readonly`, …) except `aria-label`, `aria-labelledby`, `aria-describedby`, `name`, `form` and `autoFocus`, which are yours."
         }
         note={"A `render` element never touches the input."}
       />
@@ -293,10 +300,10 @@ export function SliderPage() {
       />
       <PartFacts
         state={
-          "`SliderTrackState` and `SliderIndicatorState` are `{ orientation, dragging, disabled }`."
+          "`SliderTrackState` and `SliderIndicatorState` are `{ orientation, dragging, disabled, readOnly }`."
         }
         owned={
-          "Track: `onPointerDown`, `data-orientation`, `data-dragging`, `data-disabled`, and `touch-action` in `style` (your entry wins); Indicator: `data-orientation`, `data-dragging`, `data-disabled`."
+          "Track: `onPointerDown`, `data-orientation`, `data-dragging`, `data-disabled`, `data-readonly`, and `touch-action` in `style` (your entry wins); Indicator: `data-orientation`, `data-dragging`, `data-disabled`, `data-readonly`."
         }
         note={
           "A press on the Track moves the nearest thumb, focuses its input and starts dragging it; its box is the reference for the pointer maths. When two thumbs share a value (stacked), the one that can move toward the pointer moves, whichever of them was pressed; a press exactly on the value lets the first move decide. The commit uses the release position. The Indicator renders no position: place it from `--slider-start` / `--slider-end`."
@@ -312,7 +319,7 @@ export function SliderPage() {
       <PartFacts
         state={"`SliderLabelState`, an alias of `SliderRootState`."}
         owned={
-          "`id`, `htmlFor`, `data-disabled`, `data-pending`, `data-dragging`, `data-orientation`, `data-invalid` (the Root's)."
+          "`id`, `htmlFor`, `data-disabled`, `data-readonly`, `data-pending`, `data-dragging`, `data-orientation`, `data-invalid` (the Root's)."
         }
         note={
           "The Label must stay a `<label>` with one thumb (it names the input through `for`); with several thumbs the Root is named by the Label's id. Its state is not tied to the Root's value type: `value` is typed `number | readonly number[]`; narrow it with `<Slider.Label<number>>` or read `values`."
@@ -360,6 +367,7 @@ export function SliderPage() {
           ],
           ["`data-orientation`", "every part", "`horizontal` or `vertical`."],
           ["`data-disabled`", "every part", "The Root's `disabled`."],
+          ["`data-readonly`", "every part", "The Root's `readOnly` (or the Field's)."],
           ["`data-index`", "Thumb", "`0`, `1`, …"],
           ["`:focus-visible`", "the input", "Style the thumb with `.thumb:has(:focus-visible)`."],
         ]}
@@ -392,6 +400,11 @@ export function SliderPage() {
           ["PageUp / PageDown", "± 10 % of the range.", "Same."],
           ["Home / End", "The thumb's min / max (its neighbour with several thumbs).", "Same."],
           ["Tab / Shift+Tab", "Moves between thumbs.", "Same."],
+          [
+            "Read-only",
+            "Every key above but Tab is cancelled: nothing steps, focus stays.",
+            "Same.",
+          ],
         ]}
       />
       <ul>

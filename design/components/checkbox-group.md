@@ -986,7 +986,7 @@ controls whose attributes are all optimistic (conventions 5.1), and the check is
 CSS on `:checked` / `:indeterminate`. Dependent content elsewhere keys the type map of its own
 `<ViewTransition>` on `fsui-checkbox-group` (`-check` / `-uncheck` for direction).
 
-**`readOnly` is the Root's** (conventions 3.6.1; accepted, not implemented yet (#203)): `CheckboxGroupRootProps.readOnly?: boolean`, with `readOnly`
+**`readOnly` is the Root's** (conventions 3.6.1): `CheckboxGroupRootProps.readOnly?: boolean`, with `readOnly`
 in the state of the Root, every Item and every Parent, and `data-readonly` on each. The
 fieldset is a `group`, which has no read-only state, so `aria-readonly="true"` is on each Item
 and Parent (owned). Their `onChange` cancels the click and dispatches nothing, a Parent's

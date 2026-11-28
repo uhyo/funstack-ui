@@ -124,6 +124,13 @@ export function SelectPage() {
               "Native `disabled`. Never set by the library while pending (a disabled select would also drop out of the form data).",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              'The selected option stays selected, or the enclosing `Field.Root`\'s: the select stays focusable, its picker opens and its value is submitted, but every other option renders native `disabled` (with `data-disabled`), so no pick, arrow or typeahead can change it, in every engine and before hydration, and nothing dispatches. Renders `aria-readonly="true"` and `data-readonly`; native `required` is not rendered. After a form reset or a controlled change the newly selected option is the enabled one.',
+          },
+          {
             name: "name, required, form, autoComplete",
             type: "native",
             description:
@@ -138,10 +145,10 @@ export function SelectPage() {
       />
       <PartFacts
         state={
-          "`SelectRootState` is `{ value, pending, disabled, invalid }`; `value` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field. The other parts receive the same object; their state types are aliases of it: `SelectTriggerState`, `SelectValueState`, `SelectGroupState`, `SelectGroupLabelState`, `SelectSeparatorState`."
+          "`SelectRootState` is `{ value, pending, disabled, readOnly, invalid }`; `value` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field. The other parts receive the same object; their state types are aliases of it: `SelectTriggerState`, `SelectValueState`, `SelectGroupState`, `SelectGroupLabelState`, `SelectSeparatorState`."
         }
         owned={
-          "`value`, `disabled`, `onChange`, `data-pending`, `data-disabled`. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
+          "`value`, `disabled`, `aria-readonly` (while read-only), `onChange`, `data-pending`, `data-disabled`, `data-readonly`; `required` while read-only (not rendered). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
         }
         note={
           "`multiple` and `size` are not accepted (a type error; `multiple` is dropped with a development warning): for several values see [Several values](#several-values). `id`, `aria-*`, `onFocus` and other select props pass through. In development a `<select>` with no accessible name (no `<label>`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning."
@@ -169,7 +176,9 @@ export function SelectPage() {
       />
       <PartFacts
         state={"`SelectRootState`."}
-        owned={'`type` (always `"button"`), `data-pending`, `data-disabled`, `data-invalid`.'}
+        owned={
+          '`type` (always `"button"`), `data-pending`, `data-disabled`, `data-readonly`, `data-invalid`.'
+        }
         note={
           "Must be the select's first child. Engines without customizable select do not render it, so a spinner inside it also needs a `select[data-pending]` style."
         }
@@ -187,7 +196,7 @@ export function SelectPage() {
       <PartFacts
         state={"`SelectRootState`."}
         owned={
-          "`children` (none: the browser fills the element), the hydration-related props of that content, and the Root state's `data-pending`, `data-disabled`, `data-invalid`."
+          "`children` (none: the browser fills the element), the hydration-related props of that content, and the Root state's `data-pending`, `data-disabled`, `data-readonly`, `data-invalid`."
         }
         note={
           "The browser copies the selected option's content in on every selection change, and the parser does so before hydration (the element is rendered so that hydration accepts that content). The library keeps the copy fresh: when the selected option's content changes through React (a translated label, a count, the option's own function children, a Suspense boundary resolving inside it) or a form reset changes the selection, it asks the browser to copy again. The copy is a snapshot: style it as `selectedcontent .icon`, not `option:checked .icon`."
@@ -217,10 +226,10 @@ export function SelectPage() {
       />
       <PartFacts
         state={
-          "`SelectOptionState` is `{ value, selected, pending, disabled }`; `selected` is optimistic, `pending` is true on the option the user is waiting on, `disabled` includes a disabled `Select.Group` and `Root disabled`."
+          "`SelectOptionState` is `{ value, selected, pending, disabled, readOnly }`; `selected` is optimistic, `pending` is true on the option the user is waiting on, `disabled` includes a disabled `Select.Group`, `Root disabled` and, while the Root is read-only, every option but the selected one."
         }
         owned={
-          "`value`, `selected` (never rendered), `disabled`, `data-selected`, `data-pending`, `data-disabled`."
+          "`value`, `selected` (never rendered), `disabled` (also while the Root is read-only and the option is not selected), `data-selected`, `data-pending`, `data-disabled`, `data-readonly`."
         }
       />
 
@@ -248,7 +257,7 @@ export function SelectPage() {
       <PartFacts
         state={"`SelectRootState`."}
         owned={
-          "`label`, and the Root state's `data-pending`, `data-disabled` (the Root's `disabled`, not the Group's own: the Group's is `:disabled`), `data-invalid`."
+          "`label`, and the Root state's `data-pending`, `data-disabled` (the Root's `disabled`, not the Group's own: the Group's is `:disabled`), `data-readonly`, `data-invalid`."
         }
       />
 
@@ -263,7 +272,7 @@ export function SelectPage() {
       />
       <PartFacts
         state={"`SelectRootState`."}
-        owned={"the Root state's `data-pending`, `data-disabled`, `data-invalid`."}
+        owned={"the Root state's `data-pending`, `data-disabled`, `data-readonly`, `data-invalid`."}
       />
 
       <h4>
@@ -274,7 +283,7 @@ export function SelectPage() {
       />
       <PartFacts
         state={"`SelectRootState`."}
-        owned={"the Root state's `data-pending`, `data-disabled`, `data-invalid`."}
+        owned={"the Root state's `data-pending`, `data-disabled`, `data-readonly`, `data-invalid`."}
         note={"Takes no children."}
       />
 
@@ -299,7 +308,13 @@ export function SelectPage() {
             "`data-disabled`",
             "Root, Trigger, Value, Group, GroupLabel, Separator, Option",
             "`:disabled`",
-            "Disabled by prop (`Root disabled`, or the Field's); on an Option, by its own prop, a disabled Group or `Root disabled`.",
+            "Disabled by prop (`Root disabled`, or the Field's); on an Option, by its own prop, a disabled Group or `Root disabled`, or an unselected option of a read-only Root.",
+          ],
+          [
+            "`data-readonly`",
+            "Root, Trigger, Value, Group, GroupLabel, Separator, Option",
+            "–",
+            "The Root's `readOnly` (or the Field's). `:read-only` matches every select, so it tells nothing.",
           ],
           [
             "`data-invalid`",
@@ -367,6 +382,13 @@ export function SelectPage() {
             "Typeahead. Closed: selects the match at once. Open: moves focus to it.",
             "Typeahead: selects the match.",
             "once per match while closed",
+          ],
+          [
+            "Read-only",
+            "anywhere",
+            "The picker opens; the other options are disabled, so nothing is committed.",
+            "The arrows and typeahead skip the disabled options: the value stays.",
+            "no",
           ],
         ]}
       />

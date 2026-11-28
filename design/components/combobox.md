@@ -1242,7 +1242,7 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
   input**: a disabled Combobox is not submitted, the HTML rule for every control (conventions
   3.6). A disabled hidden input is still form-associated, so the reset listener and the Field
   registration are unaffected. Never disabled while pending.
-- **`readOnly`** on Root (its own prop or the Field's) (conventions 3.6.1; accepted, not implemented yet (#203)): the Input renders native
+- **`readOnly`** on Root (its own prop or the Field's) (conventions 3.6.1): the Input renders native
   `readonly` (no `aria-readonly` next to it), so it stays in the Tab order with its text
   selectable, and the platform bars it from constraint validation. **The popup never opens**:
   ArrowDown / ArrowUp, Alt+ArrowDown, a click on the Input and the Trigger request nothing,

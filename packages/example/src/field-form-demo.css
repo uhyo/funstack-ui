@@ -83,3 +83,39 @@
   border: 1px solid crimson;
   border-radius: 6px;
 }
+
+/* Read-only (conventions 3.6.1): every control and Field part has [data-readonly]. */
+.ff-field[data-readonly] .ff-input,
+.ff-field[data-readonly] input[type="checkbox"],
+.ff-field[data-readonly] input[type="radio"] {
+  background: #f3f3f3;
+  cursor: default;
+}
+.ff-track {
+  position: relative;
+  inline-size: 200px;
+  block-size: 6px;
+  margin-block: 10px;
+  background: #ddd;
+}
+.ff-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--slider-start);
+  inset-inline-end: calc(100% - var(--slider-end));
+  background: #4a6cf7;
+}
+.ff-thumb {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: var(--slider-value);
+  inline-size: 16px;
+  block-size: 16px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: #4a6cf7;
+}
+.ff-field[data-readonly] .ff-thumb,
+.ff-field[data-readonly] .ff-fill {
+  background: #999;
+}

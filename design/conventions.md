@@ -1525,9 +1525,6 @@ collector, and the message is `Field.Error`'s (`design/components/multi-select.m
 
 #### 3.6.1 `readOnly`
 
-Status: accepted, not implemented yet (#203). The text controls implement it today; the rest
-of this section is not in the code yet.
-
 **Every form value control takes `readOnly`, and nothing else does.** A form value control is
 a component that joins a Field (`design/components/field-form.md` 7.2): TextField,
 NumberField, OTPField, Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox,
@@ -1663,7 +1660,7 @@ only, because `"until-found"` cannot apply inside a closed `display: none` dialo
 ### 3.8 Native checkable inputs: the shared machinery
 
 Moved to `design/internal-hooks.md`, same number, with its numbered rules ("3.8 rule 1" to
-"rule 9"). In one line: the residual browser paths of 3.5 (mount reconciliation, form reset)
+"rule 10"). In one line: the residual browser paths of 3.5 (mount reconciliation, form reset)
 dispatch once per state owner with `reason: "platform"`, through shared hooks, and a form
 control joins a Field through `useFieldControl`.
 

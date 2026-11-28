@@ -179,6 +179,13 @@ export function CheckboxGroupPage() {
               "Renders `<fieldset disabled>`: every Item and Parent is disabled and unfocusable.",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              'The checked boxes stay as they are, or the enclosing `Field.Root`\'s: every Item and Parent stays focusable and the group is submitted, but no click, Space or label toggles a box (each click is cancelled, so no `input` or `change` fires) and nothing dispatches; a Parent\'s checked / mixed state still follows the set. Renders `aria-readonly="true"` on every Item and Parent (the `group` role has no such state) and `data-readonly` on every part; the computed "at least one" `required` is not rendered. Boxes clicked before hydration are put back at mount.',
+          },
+          {
             name: "form",
             type: "string",
             description: "The `form` attribute, applied to the fieldset and to every Item.",
@@ -192,10 +199,10 @@ export function CheckboxGroupPage() {
       />
       <PartFacts
         state={
-          "`CheckboxGroupRootState` is `{ value, pending, disabled, invalid, required }`; `value` is the optimistic set as an array in the Items' document order as of the Root's last render (Items reordered by a component that re-renders without the Root are picked up at its next render; `next` always reads the current order); `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the prop or the Field's."
+          "`CheckboxGroupRootState` is `{ value, pending, disabled, invalid, required, readOnly }`; `value` is the optimistic set as an array in the Items' document order as of the Root's last render (Items reordered by a component that re-renders without the Root are picked up at its next render; `next` always reads the current order); `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the prop or the Field's."
         }
         owned={
-          "`disabled`, `form`, `data-pending`, `data-disabled`; no `role` is written. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`."
+          "`disabled`, `form`, `data-pending`, `data-disabled`, `data-readonly`; no `role` is written. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`."
         }
         note={
           "Other fieldset props pass through (`aria-label` for a group without a Label, for example). In development a group with no accessible name (no `Label`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning. A disabled group (its own prop or the Field's) is not submitted."
@@ -248,13 +255,13 @@ export function CheckboxGroupPage() {
       />
       <PartFacts
         state={
-          "`CheckboxGroupItemState` is `{ value, checked, pending, disabled }`; `checked` is optimistic; `pending` is true while an action is in flight and this box's optimistic state differs from the committed one (click a box twice quickly and it is not pending, the Root still is); `disabled` includes `Root disabled`."
+          "`CheckboxGroupItemState` is `{ value, checked, pending, disabled, readOnly }`; `checked` is optimistic; `pending` is true while an action is in flight and this box's optimistic state differs from the committed one (click a box twice quickly and it is not pending, the Root still is); `disabled` includes `Root disabled`."
         }
         owned={
-          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required` (computed by the Root), `data-checked`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged. Inside a `Field.Root` also `aria-invalid`."
+          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required` (computed by the Root; not rendered while read-only), `aria-readonly` (the Root's read-only), `data-checked`, `data-pending`, `data-disabled`, `data-readonly`; `aria-checked` and `readOnly` are removed; `onChange` is merged. Inside a `Field.Root` also `aria-invalid`."
         }
         note={
-          '`id`, `role` and other input props pass through. There is no per-Item `required`: use a plain `Checkbox` for "this box must be checked". `readOnly` is not accepted (a type error) and there is no `transition` prop: animate the check with CSS on `:checked`.'
+          '`id`, `role` and other input props pass through. There is no per-Item `required`: use a plain `Checkbox` for "this box must be checked". `readOnly` is not accepted (a type error: it belongs to the Root) and there is no `transition` prop: animate the check with CSS on `:checked`.'
         }
       />
 
@@ -286,13 +293,13 @@ export function CheckboxGroupPage() {
       />
       <PartFacts
         state={
-          "`CheckboxGroupParentState` is `{ values, checked, indeterminate, pending, disabled }`; `checked`: every value is in the optimistic set (false for empty `values`); `indeterminate`: some but not all, never together with `checked`, and, unlike a plain Checkbox, not hidden while pending (it is derived from the optimistic set, so the DOM property, the attribute and `:indeterminate` always agree); `pending`: an action is in flight and one of its values is changing."
+          "`CheckboxGroupParentState` is `{ values, checked, indeterminate, pending, disabled, readOnly }`; `checked`: every value is in the optimistic set (false for empty `values`); `indeterminate`: some but not all, never together with `checked`, and, unlike a plain Checkbox, not hidden while pending (it is derived from the optimistic set, so the DOM property, the attribute and `:indeterminate` always agree); `pending`: an action is in flight and one of its values is changing."
         }
         owned={
-          '`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `autoComplete` (`"off"`: it is not a value, so a browser restoring form state on reload must not restore it), `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `name`, `value`, `form`, `required` and `aria-checked` are removed; `onChange` is merged.'
+          '`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `autoComplete` (`"off"`: it is not a value, so a browser restoring form state on reload must not restore it), `aria-readonly` (while the Root is read-only), `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`, `data-readonly`; `name`, `value`, `form`, `required`, `readOnly` and `aria-checked` are removed; `onChange` is merged.'
         }
         note={
-          "Other props pass through, such as `aria-controls` with the ids of the boxes it controls (as in the example above). `readOnly` is not accepted (a type error) and there is no `transition` prop."
+          "Other props pass through, such as `aria-controls` with the ids of the boxes it controls (as in the example above). `readOnly` is not accepted (a type error: it is the Root's) and there is no `transition` prop."
         }
       />
 
@@ -357,6 +364,12 @@ export function CheckboxGroupPage() {
             "Disabled by prop; on an Item or Parent, by its own prop or `Root disabled`.",
           ],
           [
+            "`data-readonly`",
+            "Root, Item, Parent",
+            "–",
+            "The Root's `readOnly` (or the Field's). `:read-only` matches every checkbox, so it tells nothing.",
+          ],
+          [
             "–",
             "Item",
             "`:required`, `:user-invalid`, `:focus-visible`",
@@ -381,6 +394,11 @@ export function CheckboxGroupPage() {
             "no",
           ],
           ["Space", "Toggles the focused box (a Parent follows the click cycle).", "yes"],
+          [
+            "Read-only",
+            "Space, a click and a label click toggle nothing; Tab still visits every box.",
+            "no",
+          ],
           ["Enter", "Submits the form (implicit submission).", "no"],
           [
             "Any arrow key / Home / End",

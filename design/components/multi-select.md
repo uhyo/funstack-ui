@@ -642,7 +642,7 @@ No announcement is built in. Toggling changes `aria-selected` on the element
   so the reset listener and the Field registration are unaffected.
   The validity element is disabled with the Trigger, so a disabled MultiSelect is never
   `valueMissing`.
-- **`readOnly`** on the Root (its own prop or the Field's) (conventions 3.6.1; accepted, not implemented yet (#203)): the Trigger stays an enabled,
+- **`readOnly`** on the Root (its own prop or the Field's) (conventions 3.6.1): the Trigger stays an enabled,
   focusable button with `aria-readonly="true"` (owned; `combobox` has the state) and
   `data-readonly`, and **the popup never opens**: a press, Enter, Space, the arrows and
   typeahead request nothing, `aria-expanded` stays `"false"`, and a popup open when the prop

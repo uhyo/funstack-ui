@@ -289,6 +289,13 @@ import { Form } from "@funstack/ui/form";
               "Disables the control, marks every part `data-disabled`, and keeps the control out of the submission: a native control is natively disabled, and Combobox and MultiSelect disable their hidden inputs too.",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              "Makes the control read-only and marks every part `data-readonly`: the value is focusable and submitted, the user cannot change it, and it never blocks a submission (`validate` and a server error stay out of the control's validity; a server error is still shown). Every FUNSTACK form control takes it; `Field.Control` renders native `readonly`. See [Disabled or read-only](#disabled-or-read-only).",
+          },
+          {
             name: "validate",
             type: "(value: string, formData: FormData) => FieldErrorValue",
             description:
@@ -300,9 +307,9 @@ import { Form } from "@funstack/ui/form";
       />
       <PartFacts
         state={
-          "`FieldState`, shared by every Field part, is `{ invalid, messages, validity, disabled, required, pending }`; `invalid`: an error is shown; `messages`: the shown messages (the browser's `validationMessage`, `validate`'s strings, or the server's), `[]` while valid; `validity`: a `FieldValidity` snapshot of the control's `ValidityState` (`valueMissing`, `typeMismatch`, `tooShort`, …, `customError`, `valid`); `disabled` / `required`: the Field's or the control's own; `pending`: the enclosing form's submission is in flight."
+          "`FieldState`, shared by every Field part, is `{ invalid, messages, validity, disabled, required, readOnly, pending }`; `invalid`: an error is shown; `messages`: the shown messages (the browser's `validationMessage`, `validate`'s strings, or the server's), `[]` while valid; `validity`: a `FieldValidity` snapshot of the control's `ValidityState` (`valueMissing`, `typeMismatch`, `tooShort`, …, `customError`, `valid`); `disabled` / `required` / `readOnly`: the Field's or the control's own; `pending`: the enclosing form's submission is in flight."
         }
-        owned={"`data-invalid`, `data-disabled`, `data-required`, `data-pending`."}
+        owned={"`data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending`."}
       />
 
       <h4>
@@ -322,7 +329,7 @@ import { Form } from "@funstack/ui/form";
       <PartFacts
         state={"the Field's."}
         owned={
-          "Label: `id`, `htmlFor` (absent for a group control), `onClick` (for a button control the label activation is cancelled and the button focused; a `render` element's own handler runs first); Description: `id`; both also the Field's four `data-*` attributes."
+          "Label: `id`, `htmlFor` (absent for a group control), `onClick` (for a button control the label activation is cancelled and the button focused; a `render` element's own handler runs first); Description: `id`; both also the Field's five `data-*` attributes."
         }
       />
 
@@ -344,10 +351,11 @@ import { Form } from "@funstack/ui/form";
             description: "Native `name`.",
           },
           {
-            name: "required, disabled",
+            name: "required, disabled, readOnly",
             type: "boolean",
             default: "the Field's",
-            description: "Native; the Field's value also applies (either one is enough).",
+            description:
+              "Native; the Field's value also applies (either one is enough). `readOnly` locks text-like inputs and a `<textarea>` only: on a `<select>` or a checkbox it does nothing and logs a development warning (use `Select`, `Checkbox` and the other library controls).",
           },
           ...stylingProps("FieldState"),
           renderProp(
@@ -366,10 +374,10 @@ import { Form } from "@funstack/ui/form";
       <PartFacts
         state={"the Field's."}
         owned={
-          'Inside a Field: `id`, `name`, `required`, `disabled`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description, then the error while shown), and the Field\'s four `data-*` attributes.'
+          'Inside a Field: `id`, `name`, `required`, `disabled`, `readOnly`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description, then the error while shown), and the Field\'s five `data-*` attributes.'
         }
         note={
-          "Outside a `Field.Root` it is the plain native control: every prop passes through (`id` included), the library adds no attribute, and the function props receive a `FieldState` with the control's own `disabled` / `required` and a constant valid, not-pending rest. The other Field parts still throw outside a Field. See [Field.Control on its own](#field-control-alone)."
+          "Outside a `Field.Root` it is the plain native control: every prop passes through (`id` included), the library adds no attribute, and the function props receive a `FieldState` with the control's own `disabled` / `required` / `readOnly` and a constant valid, not-pending rest. The other Field parts still throw outside a Field. See [Field.Control on its own](#field-control-alone)."
         }
       />
 
@@ -391,7 +399,7 @@ import { Form } from "@funstack/ui/form";
       />
       <PartFacts
         state={"the Field's."}
-        owned={"`id` and the Field's four `data-*` attributes."}
+        owned={"`id` and the Field's five `data-*` attributes."}
         note={
           'No `role` and no live region: after a submission focus moves to the field and reads the error with the description (a live region would read it twice). Add `aria-live="polite"` yourself if you want blur-time errors announced. One per Field.'
         }
@@ -475,6 +483,11 @@ import { Form } from "@funstack/ui/form";
             "`Field.Root required` or the control's own `required`.",
           ],
           ["`data-disabled`", "every Field part, Form.Submit", "Disabled by prop."],
+          [
+            "`data-readonly`",
+            "every Field part",
+            "`Field.Root readOnly` or the control's own `readOnly`.",
+          ],
           [
             "`aria-disabled`",
             "Form.Submit",
@@ -676,6 +689,44 @@ form[data-pending]           { cursor: progress; }
           Do not disable a fieldset while a submission is pending:{" "}
           <code>{"<fieldset disabled={pending}>"}</code> drops focus from the control the user is
           on. Mark pending with <code>form[data-pending]</code>.
+        </li>
+      </ul>
+
+      <h4 id="disabled-or-read-only">Disabled or read-only</h4>
+      <p>
+        Both lock a value; they differ in everything else. A <strong>disabled</strong> control is
+        not focusable and not submitted: the value does not count. A <strong>read-only</strong>{" "}
+        control is focusable, readable (its text selectable, its radios and chips still reachable
+        with the arrows) and submitted, and the user cannot change it. Neither dispatches for user
+        interaction, both are barred from validation, and both follow a form reset.
+      </p>
+      <ul>
+        <li>
+          <code>readOnly</code> is on every form value control (TextField, NumberField, OTPField,
+          Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, MultiSelect, Slider) and on{" "}
+          <code>Field.Root</code>, which hands it to its control as it hands <code>disabled</code>.
+          It is the owner's prop: a single radio or box that cannot be picked is{" "}
+          <code>disabled</code>.
+        </li>
+        <li>
+          Where HTML has no read-only (a checkbox, a <code>&lt;select&gt;</code>, a range), the
+          control refuses the change itself and marks it with <code>aria-readonly</code>: a click is
+          cancelled, a Select disables its other options, a Slider cancels its keys, a Combobox or
+          MultiSelect does not open its popup.
+        </li>
+        <li>
+          Style it with <code>[data-readonly]</code>, on every control and every Field part.{" "}
+          <code>:read-only</code> matches every element that is not editable (a checkbox, a{" "}
+          <code>div</code>), so it tells nothing outside a text input.
+        </li>
+        <li>
+          A read-only control never blocks a submission: its native <code>required</code> is not
+          rendered, and <code>validate</code> or a server error do not enter its validity. A server
+          error for it is still shown.
+        </li>
+        <li>
+          <code>disabled</code> wins when both are set. A <code>&lt;fieldset&gt;</code> has no{" "}
+          <code>readonly</code>: lock a group of Fields with <code>readOnly</code> on each.
         </li>
       </ul>
 

@@ -377,6 +377,13 @@ export function ComboboxPage() {
               "Disables the Input, Trigger and Clear (and every `ChipRemove`); nothing dispatches for user interaction. A disabled Combobox (this prop or the Field's) is not submitted: the hidden input(s) are `disabled` too. A form reset still reaches it.",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              'The selection is shown, focusable and submitted, and cannot be changed, or the enclosing `Field.Root`\'s: the Input renders native `readonly` (its text stays selectable; no `aria-readonly` next to it), the popup never opens (the arrows, Alt+ArrowDown, a click on the Input and the Trigger request nothing; `aria-expanded` stays `"false"`), the Trigger, Clear and every `ChipRemove` are disabled, and nothing dispatches (`allowCustomValue` commits nothing). With `multiple` the chip keys still move focus and Backspace / Delete remove nothing. The hidden inputs are not disabled. A listbox open when it turns on closes.',
+          },
+          {
             name: "children",
             type: "ReactNode | ((state: ComboboxRootState) => ReactNode); ComboboxMultipleRootState with multiple",
             description:
@@ -386,7 +393,7 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxRootState` is `{ value, inputValue, query, stale, activeValue, open, pending, disabled }`; `value` and `open` are optimistic; `stale` is `inputValue !== query`; `pending` covers the value and the open transitions. `ComboboxMultipleRootState` is the same with `value: readonly string[]` (pick order)."
+          "`ComboboxRootState` is `{ value, inputValue, query, stale, activeValue, open, pending, disabled, readOnly }`; `value` and `open` are optimistic; `stale` is `inputValue !== query`; `pending` covers the value and the open transitions. `ComboboxMultipleRootState` is the same with `value: readonly string[]` (pick order)."
         }
         owned={
           "none: the Root renders no element (no `ref`, `className` or `style`), only the hidden input(s) when `name` is given."
@@ -430,7 +437,7 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxLabelState` is `{ disabled, pending }`, the Root's; the Label renders them as `data-disabled` and `data-pending`."
+          "`ComboboxLabelState` is `{ disabled, readOnly, pending }`, the Root's; the Label renders them as `data-disabled`, `data-readonly` and `data-pending`."
         }
         owned={"`id`, `htmlFor`."}
         note={
@@ -459,13 +466,13 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxInputState` is `{ value, values, inputValue, open, pending, stale, empty, disabled, invalid, required }`. `values` is the optimistic selection as a list (`[value]` or `[]` in single mode); with `multiple`, `value` is always `null`. `empty`: nothing is selected (`data-empty`). `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the Input's own or the Field's."
+          "`ComboboxInputState` is `{ value, values, inputValue, open, pending, stale, empty, disabled, readOnly, invalid, required }`. `values` is the optimistic selection as a list (`[value]` or `[]` in single mode); with `multiple`, `value` is always `null`. `empty`: nothing is selected (`data-empty`). `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the Input's own or the Field's."
         }
         owned={
-          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-empty`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. With `multiple` also `required` and `aria-required`.'
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `readOnly` (from the Root), `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-empty`, `data-stale`, `data-disabled`, `data-readonly`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. With `multiple` also `required` and `aria-required`.'
         }
         note={
-          "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search. `readOnly` is not accepted (a type error): it would block typing while the options, the Trigger and Clear still changed the value."
+          "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search. `readOnly` is not accepted (a type error): it is the Root's, which also keeps the popup shut and disables the Trigger, Clear and `ChipRemove`."
         }
       />
 
@@ -490,10 +497,10 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, values, inputValue, disabled }` (`values` as on the Input)."
+          "`ComboboxTriggerState` is `{ open, pending, disabled, readOnly }`; `ComboboxClearState` is `{ value, values, inputValue, disabled, readOnly }` (`values` as on the Input). `disabled` includes the Root's `readOnly`: neither button has a job while the value cannot change."
         }
         owned={
-          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (only when it is no invoker: a non-button `render`, or while `aria-disabled`), `aria-controls`, `popovertarget` (written as an attribute after hydration, only on a `<button>`, while enabled or natively disabled; not while `aria-disabled`), `data-open`, `data-pending`. Owned and never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (on the Trigger)."
+          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`, `data-readonly`; the Trigger also `aria-expanded` (only when it is no invoker: a non-button `render`, or while `aria-disabled`), `aria-controls`, `popovertarget` (written as an attribute after hydration, only on a `<button>`, while enabled or natively disabled; not while `aria-disabled`), `data-open`, `data-pending`. Owned and never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (on the Trigger)."
         }
         note={
           "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). A Trigger rendered as another element is light-dismissed before its click and warns in development ([Triggers of a popup](/concepts/browser-owned-state#popup-triggers)). Clear empties the text and dispatches `null` unless nothing is selected (with `multiple`: one change removing every value, announced); it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
@@ -636,10 +643,10 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxChipsState` is `{ value, pending, empty, disabled }`; `value` is the optimistic selection in pick order, `pending` the value action in flight, `empty` no chips (`data-empty`)."
+          "`ComboboxChipsState` is `{ value, pending, empty, disabled, readOnly }`; `value` is the optimistic selection in pick order, `pending` the value action in flight, `empty` no chips (`data-empty`)."
         }
         owned={
-          '`role` (`"list"`, absent while empty), `aria-labelledby` (the Label, token-merged; absent while empty), `onKeyDown` (the chip keys), `onPointerDown`, `onMouseDown`, `onClick` (a press keeps focus where it is; a click focuses the Input), `onFocus`, `onBlur` (a chip is inside the combobox: focus on it closes the listbox and keeps the text), `data-empty`, `data-pending`, `data-disabled`.'
+          '`role` (`"list"`, absent while empty), `aria-labelledby` (the Label, token-merged; absent while empty), `onKeyDown` (the chip keys), `onPointerDown`, `onMouseDown`, `onClick` (a press keeps focus where it is; a click focuses the Input), `onFocus`, `onBlur` (a chip is inside the combobox: focus on it closes the listbox and keeps the text), `data-empty`, `data-pending`, `data-disabled`, `data-readonly`.'
         }
         note={
           "The list of chips, not the field box: render the Input next to it, in your own element. Under a Root without `multiple` it warns in development and renders empty."
@@ -671,9 +678,11 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxChipState` is `{ value, label, pending, disabled }`. `label` is the text of the option with this value as the library last saw it (written at the pick), `undefined` if no option for it was ever rendered (a preselected value before the listbox first opens). `pending`: its addition is not committed yet."
+          "`ComboboxChipState` is `{ value, label, pending, disabled, readOnly }`. `label` is the text of the option with this value as the library last saw it (written at the pick), `undefined` if no option for it was ever rendered (a preselected value before the listbox first opens). `pending`: its addition is not committed yet."
         }
-        owned={'`role` (`"listitem"`), `tabIndex` (`-1`), `data-pending`, `data-disabled`.'}
+        owned={
+          '`role` (`"listitem"`), `tabIndex` (`-1`), `data-pending`, `data-disabled`, `data-readonly`.'
+        }
         note={
           'Focused by keys only, never a Tab stop. On a focused chip: the previous / next arrow (in the inline direction) moves, the next arrow past the last chip returns to the Input, Home / End go to the first / last chip, Backspace and Delete remove it (focus moves first to the next chip, else the previous, else the Input), Escape returns to the Input, a printable key types into the Input; Enter and Space do nothing. `aria-description` passes through for a hint such as "Press Backspace to remove".'
         }
@@ -693,10 +702,10 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxChipRemoveState` is `{ value, pending, disabled }` (the Chip's value and pending)."
+          "`ComboboxChipRemoveState` is `{ value, pending, disabled, readOnly }` (the Chip's value and pending; `disabled` includes the Root's `readOnly`)."
         }
         owned={
-          "`type` (on a `<button>`), `tabIndex` (`-1`), `disabled` (the Root's), `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>`), `tabIndex` (`-1`), `disabled` (the Root's `disabled` or `readOnly`), `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-pending`, `data-disabled`, `data-readonly`."
         }
         note={
           "Inside a `Combobox.Chip` (outside one it throws). A press keeps focus in the Input; the click removes the chip's value, announces it and focuses the Input. A press while the listbox is open closes it (light dismiss), as Clear's does."
@@ -747,7 +756,12 @@ export function ComboboxPage() {
           [
             "`data-disabled`",
             "Label, Input, Trigger, Clear, Option, Chips, Chip, ChipRemove",
-            "Disabled.",
+            "Disabled (the Trigger, Clear and ChipRemove also while read-only).",
+          ],
+          [
+            "`data-readonly`",
+            "Label, Input, Trigger, Clear, Chips, Chip, ChipRemove",
+            "The Root's `readOnly` (or the Field's). On the Input `:read-only` matches too.",
           ],
           ["`:popover-open`", "Popup", "The listbox is shown (browser-owned, no attribute)."],
         ]}
@@ -809,6 +823,11 @@ export function ComboboxPage() {
             "Home / End / ArrowLeft / ArrowRight",
             "anywhere",
             "The input's caret; the active option is cleared (focus is back on the text).",
+          ],
+          [
+            "Read-only",
+            "anywhere",
+            "Only Tab, the caret keys and (with `multiple`) the move into the chips work: nothing opens, commits, reverts or removes.",
           ],
         ]}
       />

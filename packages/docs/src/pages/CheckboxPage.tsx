@@ -129,6 +129,13 @@ export function CheckboxPage() {
               "Native `disabled`, or the enclosing `Field.Root`'s; never dispatches. A disabled checkbox is not submitted.",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              "The library's read-only, or the enclosing `Field.Root`'s: the checkbox stays focusable and submitted, and a click, Space or a label click changes nothing (the click is cancelled, so no `input` or `change` fires) and dispatches nothing. Rendered as `aria-readonly=\"true\"` and `data-readonly`, never the HTML attribute (which does not apply to a checkbox input). Native `required` is not rendered while read-only, so a locked box never blocks a submission. A click made before hydration is undone at mount. `disabled` wins when both are set.",
+          },
+          {
             name: "value",
             type: "string",
             default: '"on"',
@@ -144,13 +151,13 @@ export function CheckboxPage() {
       />
       <PartFacts
         state={
-          "`CheckboxState` is `{ checked, indeterminate, pending, disabled, invalid }`; `checked` is optimistic, `indeterminate` is already `indeterminate && !pending`, and `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field."
+          "`CheckboxState` is `{ checked, indeterminate, pending, disabled, readOnly, invalid }`; `checked` is optimistic, `indeterminate` is already `indeterminate && !pending`, and `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field."
         }
         owned={
-          "`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`; `aria-checked` is removed; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`, and `disabled` / `name` / `required` default from the Field."
+          "`type`, `checked`, `defaultChecked`, `indeterminate` (the property is set), `disabled`, `aria-readonly` (while read-only), `data-checked`, `data-indeterminate`, `data-pending`, `data-disabled`, `data-readonly`; `aria-checked` and `readOnly` are removed, and `required` while read-only; `onChange` is merged (a `render` element's own handler runs first). Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`, and `disabled` / `name` / `required` default from the Field."
         }
         note={
-          "Other `<input>` props pass through, including `role`. `readOnly` is not accepted (a type error): HTML's `readonly` does not apply to a checkbox input. There is no `transition` prop: animate the check with CSS on `:checked`. In development a checkbox with no accessible name (no `<label>`, `aria-label` or `aria-labelledby`) logs a warning."
+          "Other `<input>` props pass through, including `role`. `readOnly` is the library's prop (above), not the HTML attribute. There is no `transition` prop: animate the check with CSS on `:checked`. In development a checkbox with no accessible name (no `<label>`, `aria-label` or `aria-labelledby`) logs a warning."
         }
       />
 
@@ -178,6 +185,12 @@ export function CheckboxPage() {
             "The `disabled` prop (or the Field's). Only `:disabled` also sees `<fieldset disabled>`.",
           ],
           [
+            "`data-readonly`",
+            "Checkbox",
+            "–",
+            "The `readOnly` prop (or the Field's). `:read-only` always matches a checkbox input, so it tells nothing.",
+          ],
+          [
             "`data-invalid`",
             "Checkbox",
             "`:user-invalid`",
@@ -203,7 +216,11 @@ export function CheckboxPage() {
           ["Space", "Toggles; a mixed box becomes checked (native)."],
           ["Click (the box or its label)", "Toggles (native)."],
           ["Enter", "Does not toggle; may submit the form."],
-          ["Tab", "Focusable unless disabled."],
+          ["Tab", "Focusable unless disabled (read-only included)."],
+          [
+            "Read-only",
+            "Space, a click and a label click change nothing and fire no `input` / `change`; focus stays.",
+          ],
         ]}
       />
       <ul>

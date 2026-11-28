@@ -255,7 +255,7 @@ state the Slots read, and the Field registration), everything that is about the 
 `aria-label`, `aria-describedby`, `autoFocus`, `title`, `ref`) is on the **Input**.
 
 `readOnly` (the Root's prop or the Field's) is also `data-readonly` on the Root and the Input
-(conventions 3.6.1 rule 10; accepted, not implemented yet (#203)).
+(conventions 3.6.1 rule 10).
 
 Owned keys (conventions 1.2). Root: `data-*` above; `position` in `style` unless the consumer
 sets it. Input: `type`, `value`, `pattern`, `name`, `form`, `required`, `disabled`, `readOnly`,

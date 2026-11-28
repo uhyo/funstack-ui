@@ -16788,3 +16788,70 @@ Then the implementation:
   skill's import rule, and any page that imports a shared type from the root.
 - [ ] If the script that checks 7.4's "every component `index.ts` imports the platform
   typings" exists by then, exempt the types entry as `csp` is.
+## 2026-11-28, #203: `readOnly` on every form value control (implemented)
+
+Developer. The design of the entry "2026-11-28, #203, #204: `readOnly` on every form value
+control; a subpath for the shared types (design, accepted)" is in the code; the inline markers
+"accepted, not implemented yet (#203)" are removed (conventions 3.6.1 lost its status line).
+
+### The probes, run first
+
+P1 to P8 ran as browser rows against a prototype of plain React elements, before any component
+code: Chromium and Firefox locally, all three engines in CI (a throw-away `probe/203` branch,
+deleted afterwards). **All eight passed in Chromium, Firefox and WebKit**; no rule changes. One
+observation about the platform, not about the rule: from an unchecked radio placed before the
+checked one, Tab lands on the checked radio in Chromium and Firefox (WebKit leaves the group),
+with or without the cancelled click, so "Tab out and back" is asserted as "no unchecked radio
+is ever a stop, and Shift+Tab back lands on the checked one". The probe rows became the
+components' own browser rows (Checkbox and Switch through the shared suite, RadioGroup,
+CheckboxGroup, Select, Slider).
+
+### What changed in the code
+
+- `useFieldControl` takes `readOnly` and returns "own or the Field's"; the registration carries
+  the resolved value, so `FieldState.readOnly` / `data-readonly` follow either source on every
+  Field part. `Field.Root` keeps the slot empty while read-only (`validate` is not run into it,
+  the server message is not written), skips the control in the first-invalid focus and in the
+  Form's server-error focus, and treats the control's own `input` / `change` as not an edit.
+- `guardCheckableChange` cancels the click while read-only (internal-hooks 3.8 rule 9);
+  `useNativeChecked`, `useNativeGroupReconciliation` (`readOnly` + `restore`) and
+  `useNativeSelectValue` restore at mount instead of dispatching (rule 10); the text controls
+  pass the same two options.
+- `Field.Control` gains `readOnly` (owned inside a Field, own or the Field's): field-form.md 4.3
+  now lists it in the props type and the owned keys, which 3.6.1 rule 14 already implied
+  ("renders the Field's"). The development warning runs when `readOnly` turns on, once per
+  instance.
+- conventions 3.8's pointer to internal-hooks now says "rule 1 to rule 10"; field-form.md's
+  "four attributes" of the Field parts are five (`data-readonly`).
+
+### Choices the design left open
+
+- **The popup of a Combobox or MultiSelect when `readOnly` turns on** (rule 8: "closes as it
+  does when `disabled` turns on"). Turning `disabled` on does not close the listbox actively
+  (the input loses focus, and the leave handler returns early while disabled), so there was no
+  behaviour to copy. The Root makes a close request (`requestClose(undefined, "dismiss")`) in a
+  layout effect when `readOnly` turns on: an uncontrolled popup closes, a controlled `open`
+  parent decides through `openChangeAction(false)`. The architect may want the rule to say so.
+- **Combobox keys while read-only**: the Input handles only the caret / focus keys (ArrowLeft,
+  ArrowRight, Home, End: the move into the chips included); every other key returns unhandled
+  and unprevented, so Enter still submits a form. On a chip, Backspace and Delete do nothing at
+  all (no focus move either).
+- **Slider**: `readOnly` turned on during a pointer gesture stops the steps (`moveTo` returns)
+  and the release commits where it stopped (rule 12); a native `change` with no gesture commits
+  nothing.
+
+### jsdom and the cancelled click
+
+jsdom 30 toggles `checked` again in its legacy-canceled-activation steps instead of restoring
+the saved value; react-dom has already restored the controlled value during the dispatch, so a
+cancelled click on a controlled checkbox leaves it checked in jsdom (real engines restore it:
+probe P1). The jsdom rows of the checkable controls therefore assert the dispatch, the events
+and the attributes, one gesture per render, and the DOM `checked` only in the browser rows.
+
+### Checklist, #203 (state)
+
+Done: the probes; every implementation row; the type rows; the jsdom rows per control; the
+browser rows (P1 to P8 as component rows, all three engines in CI); the docs pages (props,
+state, owned keys, data attributes, keyboard rows; "Disabled or read-only" on the Field page;
+Toggle's "no `readOnly`" note); the skill; a playground demo (Field and Form, "Read-only").
+Not done: the screen-reader pass (NVDA, JAWS, VoiceOver), which is a human task.

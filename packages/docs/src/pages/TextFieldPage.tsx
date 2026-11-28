@@ -188,7 +188,8 @@ export function TextFieldPage() {
             name: "readOnly",
             type: "boolean",
             default: "false",
-            description: "Native `readonly`: no editing, nothing commits.",
+            description:
+              "Native `readonly`, or the enclosing `Field.Root`'s: no editing, nothing commits, `data-readonly`. The text is focusable, selectable and submitted, and the platform bars it from validation. Text the browser restored at hydration is put back, not committed.",
           },
           {
             name: "required",
@@ -218,7 +219,7 @@ export function TextFieldPage() {
           "`TextFieldState` is `{ value, text, pending, disabled, readOnly, required, invalid }`: `value` is the shown value (optimistic), `text` the shown text (the draft while the user is editing, else `value`), `pending` a `valueCommitAction` in flight, `invalid` an error shown by an enclosing `Field.Root` (`data-invalid`; `false` outside one)."
         }
         owned={
-          "`value` (the shown text), `onChange`, `onKeyDown`, `onBlur` (`onInput`, `onFocus`, `onKeyUp` and the rest pass through), `data-pending`, `data-disabled`; inside a Field also `id`, `name`, `disabled`, `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`."
+          "`value` (the shown text), `onChange`, `onKeyDown`, `onBlur` (`onInput`, `onFocus`, `onKeyUp` and the rest pass through), `data-pending`, `data-disabled`, `data-readonly`; inside a Field also `id`, `name`, `disabled`, `required`, `readOnly`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`."
         }
         note={
           '`TextFieldValueCommitDetails` is `{ reason, event }`: `"activate"` for a commit (`event` is the `focusout` or the `keydown` of the commit key), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`). Serialisable: a Server Function receives `{ reason }`. In development a field with no accessible name (no `<label>`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning.'
@@ -235,6 +236,7 @@ export function TextFieldPage() {
             "A commit is in flight (including the Suspense wait of its render).",
           ],
           ["`data-disabled`", "TextField", "The `disabled` prop, or the Field's."],
+          ["`data-readonly`", "TextField", "The `readOnly` prop, or the Field's."],
           ["`data-invalid`", "TextField", "Inside a Field that shows an error; never outside one."],
           [
             "`:focus`, `:read-only`, `:placeholder-shown`, `:user-invalid`",

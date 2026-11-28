@@ -221,7 +221,8 @@ import { Separator } from "@funstack/ui/separator";
             name: "readOnly",
             type: "boolean",
             default: "false",
-            description: "Native `readonly` on the Input: no edits and no completion.",
+            description:
+              "Native `readonly` on the Input, or the enclosing `Field.Root`'s: no edits and no completion; `data-readonly` on the Root and the Input. The code is focusable and submitted. Text the browser restored at hydration is put back, not adopted.",
           },
           {
             name: "dir",
@@ -246,7 +247,7 @@ import { Separator } from "@funstack/ui/separator";
           "`OTPFieldState` (aliased as `OTPFieldRootState` and `OTPFieldInputState`) is `{ value, length, complete, pending, disabled, readOnly, invalid, required }`: `value` is the filtered text, `complete` is `value.length === length`, `pending` is a `completeAction` in flight, `invalid` an error shown by an enclosing Field (`false` outside one), `required` the prop or the Field's."
         }
         owned={
-          '`data-complete`, `data-pending`, `data-disabled`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it. `dir` defaults to `"ltr"`; yours wins.'
+          '`data-complete`, `data-pending`, `data-disabled`, `data-readonly`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it. `dir` defaults to `"ltr"`; yours wins.'
         }
         note={
           'Both details objects are `{ reason, event }`. `onValueChange`: `"activate"` for an edit (`event` is the `input` event, or the `compositionend` that ended a composition), `"platform"` for a form reset (the `reset` event), text found at hydration and a WebOTP fill (`undefined`). `completeAction`: `"activate"` for an edit, `"platform"` for a WebOTP fill. Serialisable: a Server Function receives `{ reason }`.'
@@ -272,7 +273,7 @@ import { Separator } from "@funstack/ui/separator";
       <PartFacts
         state={"`OTPFieldState`."}
         owned={
-          '`type` (`"text"`), `value`, `pattern`, `name`, `form`, `required`, `disabled`, `readOnly`, `onChange` (and native `beforeinput`, composition, selection and `click` listeners), the inline style (`position: absolute; inset: 0; …; color: transparent; caret-color: transparent; forced-color-adjust: none`; your style cannot override those keys), inside a Field `id`, `aria-describedby` (token-merged) and `aria-invalid`, and `data-complete`, `data-pending`, `data-disabled`, `data-invalid`.'
+          '`type` (`"text"`), `value`, `pattern`, `name`, `form`, `required`, `disabled`, `readOnly`, `onChange` (and native `beforeinput`, composition, selection and `click` listeners), the inline style (`position: absolute; inset: 0; …; color: transparent; caret-color: transparent; forced-color-adjust: none`; your style cannot override those keys), inside a Field `id`, `aria-describedby` (token-merged) and `aria-invalid`, and `data-complete`, `data-pending`, `data-disabled`, `data-readonly`, `data-invalid`.'
         }
         note={
           "`id`, `aria-label`, `aria-describedby`, `autoFocus`, `title` and the rest go on the Input. A `title` is appended to the browser's message for a partial code. The outline is not touched: the Input's focus ring surrounds the whole field unless you move it."
@@ -312,6 +313,7 @@ import { Separator } from "@funstack/ui/separator";
           ["`data-complete`", "Root, Input", "The text has `length` characters."],
           ["`data-pending`", "Root, Input", "A `completeAction` is in flight."],
           ["`data-disabled`", "Root, Input", "Disabled (own prop or the Field's)."],
+          ["`data-readonly`", "Root, Input", "Read-only (own prop or the Field's)."],
           ["`data-invalid`", "Root, Input", "Inside a Field that shows an error."],
           ["`data-index`", "Slot", "The slot's `index`."],
           ["`data-filled`", "Slot", "A character is at this position."],

@@ -118,6 +118,13 @@ export function RadioGroupPage() {
               "Renders `<fieldset disabled>`: every radio is disabled, unfocusable and skipped by the arrow keys.",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              'The checked radio stays checked, or the enclosing `Field.Root`\'s: every radio stays focusable and the group is submitted, but no click, Space, label or arrow checks another radio (each click is cancelled, so no `input` or `change` fires) and nothing dispatches. The arrows still move focus, and the checked radio stays the Tab stop. Renders `aria-readonly="true"` on the radiogroup (the radios have no such state) and `data-readonly` on every part; native `required` is not rendered. A radio checked before hydration is unchecked again at mount.',
+          },
+          {
             name: "form",
             type: "string",
             description: "The `form` attribute, applied to the fieldset and to every radio.",
@@ -131,10 +138,10 @@ export function RadioGroupPage() {
       />
       <PartFacts
         state={
-          "`RadioGroupRootState` is `{ value, pending, disabled, invalid, required }`; `value` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the prop or the Field's."
+          "`RadioGroupRootState` is `{ value, pending, disabled, invalid, required, readOnly }`; `value` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the prop or the Field's."
         }
         owned={
-          '`role` (`"radiogroup"`), `aria-required`, `disabled`, `form`, `data-pending`, `data-disabled`. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`.'
+          '`role` (`"radiogroup"`), `aria-required`, `aria-readonly` (while read-only), `disabled`, `form`, `data-pending`, `data-disabled`, `data-readonly`. Inside a `Field.Root` also `aria-labelledby`, `aria-describedby`, `aria-invalid` and `data-invalid`.'
         }
         note={
           "Other fieldset props pass through (`aria-label` for a group without a Label, for example). In development a group with no accessible name (no `Label`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning. A disabled group (its own prop or the Field's) is not submitted."
@@ -182,13 +189,13 @@ export function RadioGroupPage() {
       />
       <PartFacts
         state={
-          "`RadioGroupItemState` is `{ value, checked, pending, disabled }`; `checked` is optimistic, `pending` is true on the radio the user is waiting on, and `disabled` includes `Root disabled`."
+          "`RadioGroupItemState` is `{ value, checked, pending, disabled, readOnly }`; `checked` is optimistic, `pending` is true on the radio the user is waiting on, and `disabled` includes `Root disabled`."
         }
         owned={
-          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required`, `data-checked`, `data-pending`, `data-disabled`; `onChange` is merged (a `render` element's own handler runs first)."
+          "`type`, `name`, `value`, `checked`, `defaultChecked` (never rendered), `disabled`, `form`, `required` (not rendered while read-only), `readOnly` (removed), `data-checked`, `data-pending`, `data-disabled`, `data-readonly`; `onChange` is merged (a `render` element's own handler runs first)."
         }
         note={
-          "`id` and other input props pass through. `readOnly` is not accepted (a type error): HTML's `readonly` does not apply to a radio. There is no `transition` prop: animate the check with CSS on `:checked`."
+          "`id` and other input props pass through. `readOnly` is not accepted (a type error): read-only is the Root's, and one choice that cannot be picked is `disabled`. There is no `transition` prop: animate the check with CSS on `:checked`."
         }
       />
 
@@ -214,6 +221,12 @@ export function RadioGroupPage() {
             "Root, Item",
             "`:disabled`",
             "Disabled by prop; on an Item, by its own prop or `Root disabled`.",
+          ],
+          [
+            "`data-readonly`",
+            "Root, Item",
+            "–",
+            "The Root's `readOnly` (or the Field's). `:read-only` matches every radio, so it tells nothing.",
           ],
           [
             "–",
@@ -256,6 +269,11 @@ export function RadioGroupPage() {
             "yes, once per press",
           ],
           ["Enter", "Submits the form (implicit submission).", "no"],
+          [
+            "Read-only",
+            "Space, a click and a label click check nothing; the arrows move focus and check nothing. The checked radio stays the Tab stop.",
+            "no",
+          ],
         ]}
       />
       <ul>

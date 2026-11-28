@@ -227,6 +227,13 @@ export function MultiSelectPage() {
               "Disables the Trigger natively; nothing opens or dispatches. A disabled MultiSelect (this prop or the Field's) is not submitted: every hidden input is `disabled` too, as a disabled native `<select>` posts nothing. A form reset still reaches it.",
           },
           {
+            name: "readOnly",
+            type: "boolean",
+            default: "false",
+            description:
+              'The selection is shown, focusable and submitted, and cannot be changed, or the enclosing `Field.Root`\'s: the Trigger stays an enabled button with `aria-readonly="true"` and `data-readonly`, the popup never opens (a press, Enter, Space, the arrows and typeahead request nothing; `aria-expanded` stays `"false"`), and nothing dispatches. The hidden inputs are not disabled, and the validity element\'s `required` is not rendered: a read-only MultiSelect never blocks a submission. A listbox open when it turns on closes.',
+          },
+          {
             name: "children",
             type: "ReactNode | ((state: MultiSelectRootState) => ReactNode)",
             description: "The parts, or a function of the Root's state.",
@@ -235,7 +242,7 @@ export function MultiSelectPage() {
       />
       <PartFacts
         state={
-          "`MultiSelectRootState` is `{ value, activeValue, open, pending, disabled, required }`; `value` (pick order) and `open` are optimistic; `pending` covers the value and the open transitions; `required` is the prop or the Field's."
+          "`MultiSelectRootState` is `{ value, activeValue, open, pending, disabled, readOnly, required }`; `value` (pick order) and `open` are optimistic; `pending` covers the value and the open transitions; `required` is the prop or the Field's."
         }
         owned={
           "none: the Root renders no element (no `ref`, `className` or `style`), only the hidden inputs when `name` is given."
@@ -261,7 +268,7 @@ export function MultiSelectPage() {
       />
       <PartFacts
         state={
-          "`MultiSelectLabelState` is `{ disabled, pending }`, the Root's; the Label renders them as `data-disabled` and `data-pending`."
+          "`MultiSelectLabelState` is `{ disabled, readOnly, pending }`, the Root's; the Label renders them as `data-disabled`, `data-readonly` and `data-pending`."
         }
         owned={"`id`, `htmlFor`, `onClick`."}
         note={
@@ -289,10 +296,10 @@ export function MultiSelectPage() {
       />
       <PartFacts
         state={
-          "`MultiSelectTriggerState` is `{ value, open, pending, disabled, invalid, required }`; `value` and `open` are optimistic, `pending` is the Root's; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the Root's or the Field's (`data-required`: a button has no `:required`)."
+          "`MultiSelectTriggerState` is `{ value, open, pending, disabled, readOnly, invalid, required }`; `value` and `open` are optimistic, `pending` is the Root's; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the Root's or the Field's (`data-required`: a button has no `:required`)."
         }
         owned={
-          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget` (written as an attribute after hydration), `form` (from the Root), `onClick`, `onKeyDown`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`, `data-required`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Owned and never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`.'
+          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `aria-readonly` (while read-only), `popovertarget` (written as an attribute after hydration), `form` (from the Root), `onClick`, `onKeyDown`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`, `data-readonly`, `data-required`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Owned and never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`.'
         }
         note={
           "With `required` it renders the validity element right after itself: a visually hidden one-option `<select>` with no name. A `render` element must stay a `<button>` (development warns). `ref` goes to the button."
@@ -322,10 +329,10 @@ export function MultiSelectPage() {
       />
       <PartFacts
         state={
-          "`MultiSelectValueState` is `{ value, labels, empty, disabled }`; `value` is optimistic; `empty` is `value.length === 0`."
+          "`MultiSelectValueState` is `{ value, labels, empty, disabled, readOnly }`; `value` is optimistic; `empty` is `value.length === 0`."
         }
         owned={
-          "`data-empty` (while the selection is empty, the library's one word for it: there is no `data-placeholder`), `data-disabled`."
+          "`data-empty` (while the selection is empty, the library's one word for it: there is no `data-placeholder`), `data-disabled`, `data-readonly`."
         }
         note={
           "Optional: any Trigger content rendered from the Trigger's state works. A function cannot come from a Server Component; render the Trigger's content from a client component, or use the default content."
@@ -473,6 +480,7 @@ export function MultiSelectPage() {
           ["`data-empty`", "Value", "Nothing is selected (`:not([data-empty])`: something is)."],
           ["`data-empty`", "List", "No options and not loading."],
           ["`data-disabled`", "Label, Trigger, Value, Option", "Disabled."],
+          ["`data-readonly`", "Label, Trigger, Value", "The Root's `readOnly` (or the Field's)."],
           ["`data-pending`", "Label", "The Root's `pending`."],
           ["`data-required`", "Trigger", "`required` (the Root's or the Field's)."],
           ["`data-invalid`", "Trigger", "Inside a `Field.Root`, while its error is shown."],
@@ -524,6 +532,7 @@ export function MultiSelectPage() {
             "listbox open",
             "Focus moves on and the listbox closes. Tab never toggles the active option.",
           ],
+          ["Every key but Tab", "read-only", "Nothing: the listbox does not open."],
         ]}
       />
       <p>

@@ -108,11 +108,11 @@ message, and focused the control):
 
 | Part | Element | Role (native) | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
-| `Field.Root` | `div` | | `data-invalid`, `data-disabled`, `data-required`, `data-pending` (form channel) | Owns `useId`, `name`, `disabled`, `required`, `validate`, the validity mirror, the control registration and the listeners. `children(state)` receives `FieldState`. |
-| `Field.Label` | `label` | | same four attributes | `id`; `for` → the control id while the registered control is labelable (default); a group control (a `<fieldset>` Root) removes it and names itself with `aria-labelledby` → this id. |
+| `Field.Root` | `div` | | `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending` (form channel) | Owns `useId`, `name`, `disabled`, `required`, `readOnly`, `validate`, the validity mirror, the control registration and the listeners. `children(state)` receives `FieldState`. |
+| `Field.Label` | `label` | | same five attributes | `id`; `for` → the control id while the registered control is labelable (default); a group control (a `<fieldset>` Root) removes it and names itself with `aria-labelledby` → this id. |
 | `Field.Control` | `input` (`textarea` / `select` through `render`) | the element's | `data-invalid`, `data-disabled`, `data-required`, `data-pending` | `id`, `name` (the Field's unless given), `disabled` / `required` (own or the Field's), `aria-describedby` (token-merged), `aria-invalid`. The native constraint attributes are ordinary pass-through. Must stay a native form control. |
-| `Field.Description` | `p` | | same four attributes | `id` = `${id}-description`; always referenced by the control's `aria-describedby` (a dangling reference is skipped, the Dialog rule), so no registration. |
-| `Field.Error` | `div` | | same four attributes | `id` = `${id}-error`; renders **nothing** while `invalid` is false. Default content: the messages (`validationMessage` for a native or custom constraint, the server's text for a server error). Its mount registers "an error element exists" so the Field knows it may cancel the bubble. |
+| `Field.Description` | `p` | | same five attributes | `id` = `${id}-description`; always referenced by the control's `aria-describedby` (a dangling reference is skipped, the Dialog rule), so no registration. |
+| `Field.Error` | `div` | | same five attributes | `id` = `${id}-error`; renders **nothing** while `invalid` is false. Default content: the messages (`validationMessage` for a native or custom constraint, the server's text for a server error). Its mount registers "an error element exists" so the Field knows it may cancel the bubble. |
 | `Form.Root` | `form` | form | `data-pending` | Owns the submission intercept, `errors`, the submitted `FormData` (for the stale-value rule), the first-error focus, the cross-field refresh and the reset policy. `children(state)` receives `{ pending }`. |
 | `Form.Submit` | `button` | button | `data-pending`, `data-disabled` | `type="submit"`; `useFormStatus().pending` of the enclosing form. `name` / `value` pass through (the submitter's value reaches the action's `FormData`). |
 
@@ -625,7 +625,7 @@ export interface FieldRootProps
 Owned keys: `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending`.
 `Field.Root` has no `id` of its own; the ids live on the parts.
 
-**`Field.Root readOnly`** (conventions 3.6.1; accepted, not implemented yet (#203)) reaches the control the way
+**`Field.Root readOnly`** (conventions 3.6.1) reaches the control the way
 `disabled` and `required` do: `useFieldControl` takes the control's own `readOnly` and returns
 "own or the Field's", and the registration carries it, so every Field part shows
 `data-readonly` whichever of the two set it. While the control is read-only the Field treats
@@ -695,11 +695,11 @@ Owned keys: `Label`: `id`, `htmlFor` (present while the registered control is la
 the default before any control registers; removed when a group control registers), `onClick`
 (omitted from the props type, conventions 1.5, as on `MultiSelect.Label`; a `render` element's
 own `onClick` runs first and its `preventDefault()` leaves the Label's handler with nothing to
-do), the four `data-*`. **A `<button>` control** (MultiSelect's
+do), the five `data-*`. **A `<button>` control** (MultiSelect's
 Trigger, `design/components/multi-select.md` B.8): a `<label for>` would forward its click to
 the button and activate it, so the Label's click is cancelled and the button is focused instead
 (unless it is disabled), as a label focuses a `<select>` without opening it. Every other control
-keeps the platform's label activation. `Description`: `id`, the four `data-*`. `Error`: `id`, the four `data-*`. None of them
+keeps the platform's label activation. `Description`: `id`, the five `data-*`. `Error`: `id`, the five `data-*`. None of them
 takes `role`-changing props from the library: `Field.Error` has no `role="alert"` and no
 `aria-live` (research §2: the focus move reads the description; a live region would read it twice
 and has broken `aria-describedby` in older VoiceOver), and a consumer who wants an announcement for
@@ -727,6 +727,8 @@ export interface FieldControlProps
   disabled?: boolean;
   /** Native `required`; the Field's `required` also requires the control. Owned. */
   required?: boolean;
+  /** Native `readonly`; the Field's `readOnly` also applies (conventions 3.6.1 rule 14). Owned. */
+  readOnly?: boolean;
   className?: StateValue<string | undefined, FieldState>;
   style?: StateValue<CSSProperties | undefined, FieldState>;
   /** Must render an `<input>`, `<textarea>` or `<select>`: `render={<textarea rows={3} />}`. */
@@ -736,8 +738,8 @@ export interface FieldControlProps
 
 No `children` prop (`<input>` is void; a `render={<select />}` carries its options on the render
 element, as `Select.Root`'s do). Owned keys inside a Field: `id`, `name`, `disabled`, `required`,
-`aria-invalid`, `aria-describedby` (token-merged with the consumer's, the consumer's tokens
-first), `data-invalid`, `data-disabled`, `data-required`, `data-pending`. Everything else is
+`readOnly`, `aria-invalid`, `aria-describedby` (token-merged with the consumer's, the consumer's
+tokens first), `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending`. Everything else is
 pass-through: `type`, `defaultValue`, `value` / `onChange` for a controlled input, `pattern`,
 `minLength`, `autoComplete`, `inputMode`, `placeholder`, `onBlur`, … The library's own listeners
 are native (`addEventListener` through the ref, section 14), so no `on*` prop is omitted and the

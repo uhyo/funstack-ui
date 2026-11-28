@@ -80,7 +80,7 @@ export function TogglePage() {
           "`aria-pressed`, `disabled`, `aria-disabled` (inside a Toolbar, or a link or component `render`), `onClick`, `data-pressed`, `data-pending`, `data-disabled`."
         }
         note={
-          'Every other `<button>` prop passes through; `type` defaults to `"button"` and a `render` element\'s own `type` wins. No `transition` prop: everything a Toggle renders is optimistic (see Optimistic and pending).'
+          'Every other `<button>` prop passes through; `type` defaults to `"button"` and a `render` element\'s own `type` wins. No `transition` prop: everything a Toggle renders is optimistic (see Optimistic and pending). No `readOnly` either: a Toggle is not a form control and the `button` role has no read-only state; a toggle the user may not change is `disabled` (focusable inside a Toolbar).'
         }
       />
 
