@@ -1,6 +1,7 @@
 // The one rule of every Escape the library handles in JS (conventions 15). No "use client"
 // directive: reads and schedules on a DOM event only.
 import { afterDispatch } from "./after-dispatch.js";
+import { documentOf } from "./event-document.js";
 
 /** The fields of a `keydown` the rule reads; a DOM `KeyboardEvent` (React's `nativeEvent`). */
 type KeyLike = Pick<KeyboardEvent, "key" | "isComposing" | "keyCode">;
@@ -97,9 +98,7 @@ function settleEarlierEscapes(event: object): void {
 function windowOf(target: EventTarget | null): Window | null {
   if (target === null) return null;
   if (!("nodeType" in target)) return (target as Window).document?.defaultView ?? null;
-  const node = target as Node;
-  if (node.nodeType === Node.DOCUMENT_NODE) return (node as Document).defaultView;
-  return node.ownerDocument?.defaultView ?? null;
+  return documentOf(target)?.defaultView ?? null;
 }
 
 export interface DecideEscapeLastOptions {
