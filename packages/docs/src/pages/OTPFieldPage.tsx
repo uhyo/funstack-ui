@@ -214,7 +214,8 @@ import { Separator } from "@funstack/ui/separator";
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "On the Input (not submitted). Or the Field's.",
+            description:
+              "Native `disabled` on the Input, or the enclosing `Field.Root`'s; never dispatches. A disabled field is not submitted.",
           },
           {
             name: "readOnly",
@@ -306,7 +307,7 @@ import { Separator } from "@funstack/ui/separator";
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`data-complete`", "Root, Input", "The text has `length` characters."],
           ["`data-pending`", "Root, Input", "A `completeAction` is in flight."],
@@ -321,7 +322,7 @@ import { Separator } from "@funstack/ui/separator";
           ],
           [
             "`:focus-visible`, `:user-invalid`, `:disabled`",
-            "the Input",
+            "Input",
             "The platform's own states (`.root:has(:focus-visible)`).",
           ],
         ]}
@@ -360,23 +361,23 @@ import { Separator } from "@funstack/ui/separator";
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Input", "Effect"]}
+        head={["Key", "Behaviour"]}
         rows={[
           [
             "A character of `charset`",
             "Inserted, or typed over the character at the caret. Others are dropped.",
           ],
           [
-            "Backspace, Delete",
+            "Backspace / Delete",
             "Native: the character before / after the caret; the rest closes up.",
           ],
           [
-            "ArrowLeft / ArrowRight, Home / End (Shift: select)",
+            "ArrowLeft / ArrowRight / Home / End (with Shift: select)",
             "Native caret movement: one character is one slot.",
           ],
-          ["Ctrl / Cmd + A, C, X, V, Z", "Native."],
+          ["Ctrl+A / Cmd+A (also C, X, V, Z)", "Native select all, copy, cut, paste and undo."],
           ["Enter", "Native implicit submission of the form."],
-          ["A click or tap", "Focuses the Input and puts the caret at the slot under the pointer."],
+          ["Click", "Focuses the Input and puts the caret at the slot under the pointer."],
         ]}
       />
       <ul>

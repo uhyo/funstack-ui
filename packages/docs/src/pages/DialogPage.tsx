@@ -13,7 +13,7 @@ export function DialogPage() {
   return (
     <DocPage
       title="Dialog"
-      description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state; a transition-driven open with a pending trigger, Suspense-ready content, and library-owned closes with a ViewTransition exit in every engine when you do."
+      description="A dialog built on <dialog> and Invoker Commands: JS-free when you need no state; a transition-driven open with a pending Trigger, Suspense-ready content, and library-owned closes with a ViewTransition exit in every engine when you do."
     >
       <p className="page-intro">
         Built on <code>&lt;dialog&gt;</code>, <code>showModal()</code> and Invoker Commands. The
@@ -214,7 +214,7 @@ export function DialogPage() {
         state={
           "`DialogRootState` is `{ open, pending, modal }`; `open` is optimistic, and `open` and `pending` are `false` in JS-free mode."
         }
-        owned={"nothing rendered: the Root has no element (no `ref`, `className` or `style`)."}
+        owned={"none: the Root renders no element (no `ref`, `className` or `style`)."}
       />
 
       <h4>
@@ -246,7 +246,7 @@ export function DialogPage() {
           "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends, but a request still running when a dismissal superseded it keeps `pending` until that request settles. In JS-free mode `state.open` is `false` (React holds no value) while `data-open` follows the dialog, written from its `toggle` event."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a host link, a component `render` with the click handler installed, or inside a Toolbar), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`, `onClick`, `onPointerDown`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a host link, a component `render` with the click handler installed, or inside a Toolbar), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTarget`, `popoverTargetAction`."
         }
       />
 
@@ -382,7 +382,7 @@ export function DialogPage() {
           "`DialogCloseState` is `{ pending, disabled }`; `pending` runs from the click until the close this part asked for has committed, with or without `action` (library mode)."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close. Owned and never written: `popoverTarget`, `popoverTargetAction`."
         }
         note={
           'By default (`whilePending="ignore"`) a second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'
@@ -475,7 +475,7 @@ export function DialogPage() {
             name: "render",
             type: "ReactElement | ((props, state: DialogTitleState) => ReactNode)",
             description:
-              "Replace the default <h2> (Title) or <p> (Description). `render={<h3 />}` changes the heading level.",
+              "Replace the default <h2> (Title) or <p> (Description) (element form), or take over rendering (function form). `render={<h3 />}` changes the heading level.",
           },
         ]}
       />
@@ -488,7 +488,7 @@ export function DialogPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:open`", "Popup", "The dialog is open (DOM truth, both modes)."],
           ["`:modal`", "Popup", "Opened with `showModal()`."],
@@ -502,7 +502,7 @@ export function DialogPage() {
           [
             "`data-pending`",
             "Trigger",
-            "An open or a part's close is in flight (library mode only). A dismissal never pends, but a request still running when a dismissal superseded it keeps it until that request settles.",
+            "Library mode: an open or a part's close is in flight. A dismissal never pends, but a request still running when a dismissal superseded it keeps it until that request settles.",
           ],
           [
             "`data-pending`",
@@ -539,33 +539,38 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Behaviour", "Who"]}
+        head={["Key", "Where", "Behaviour", "Who"]}
         rows={[
-          ["Enter / Space on the Trigger", "Opens", "the browser (JS-free) or the Trigger"],
+          ["Enter / Space", "Trigger", "Opens.", "the browser (JS-free) or the Trigger"],
           [
-            "Tab / Shift+Tab in a modal",
-            "Cycles through the dialog and the browser UI; the page is inert",
+            "Tab / Shift+Tab",
+            "Popup, modal",
+            "Cycles through the dialog and the browser UI; the page is inert.",
             "the browser",
           ],
           [
-            "Escape (modal)",
-            'Closes and returns focus; `onOpenChange(false, { reason: "dismiss" })`',
+            "Escape",
+            "Popup, modal",
+            'Closes and returns focus; `onOpenChange(false, { reason: "dismiss" })`.',
             "the browser",
           ],
           [
-            "Escape (non-modal)",
-            "Closes with `requestClose()`",
+            "Escape",
+            "Popup, non-modal",
+            "Closes with `requestClose()`.",
             "the Popup (or `closedby` with the flag)",
           ],
-          ["Escape in a nested dialog", "Closes the innermost one only", "the browser"],
+          ["Escape", "a nested dialog", "Closes the innermost one only.", "the browser"],
           [
-            "Escape with a Popover, Menu, HoverCard or Tooltip open inside",
-            "Closes that layer only; the next Escape closes the dialog (modal and non-modal). A handler that calls `preventDefault()` on the Escape keeps the dialog open; `stopPropagation()` does not, as for the browser's own Escape",
+            "Escape",
+            "a Popover, Menu, HoverCard or Tooltip open inside",
+            "Closes that layer only; the next Escape closes the dialog (modal and non-modal). A handler that calls `preventDefault()` on the Escape keeps the dialog open; `stopPropagation()` does not, as for the browser's own Escape.",
             "the browser, the inner component, or the Popup (non-modal)",
           ],
           [
-            "Enter in a form field",
-            "Submits the Form: closes (through the Root in library mode), or runs the action and then closes",
+            "Enter",
+            "a form field in the Form",
+            "Submits the Form: closes (through the Root in library mode), or runs the action and then closes.",
             "the browser / Form",
           ],
         ]}

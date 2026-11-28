@@ -30,6 +30,20 @@ export function RenderPage() {
         <strong>Owned</strong>, the props the part sets itself, which a <code>render</code> element
         cannot override. Everything not listed passes through to the element.
       </p>
+      <p>
+        An owned key that is not one of the part&apos;s own props is also left out of its props
+        type, in every mode, so passing it is a type error: the <code>role</code>, the ARIA state
+        the part computes, <code>type</code>, a roving <code>tabIndex</code>, the invoker attributes
+        of a Trigger, and every event handler the part passes to its element (in any mode).
+        TypeScript checks a hyphenated attribute such as <code>aria-selected</code> only in an
+        object typed as the props, not as a JSX attribute; at runtime the part&apos;s value wins
+        either way. Three kinds of owned key stay in the type: the ARIA id lists the part merges
+        with yours (marked &quot;token-merged&quot;), a key the part only removes in one case and
+        otherwise passes through, and a key owned only inside another component (a control&apos;s{" "}
+        <code>id</code> inside a <code>Field.Root</code>). For the raw event of a handler the part
+        installs, put your handler on the <code>render</code> element (it runs first) or use{" "}
+        <code>ref</code> with <code>addEventListener</code>.
+      </p>
 
       <h3>Merge rules for the element form</h3>
       <ul>

@@ -344,7 +344,7 @@ export function SliderPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-pending`",
@@ -381,17 +381,17 @@ export function SliderPage() {
         rows={[
           [
             "ArrowRight / ArrowUp",
-            "+ step (Right is − step under RTL: by the library)",
-            "+ step (Right: by the library)",
+            "+ step (ArrowRight is − step under `direction: rtl`, by the library).",
+            "+ step (ArrowRight by the library).",
           ],
           [
             "ArrowLeft / ArrowDown",
-            "− step (Left is + step under RTL: by the library)",
-            "− step (Left: by the library)",
+            "− step (ArrowLeft is + step under `direction: rtl`, by the library).",
+            "− step (ArrowLeft by the library).",
           ],
-          ["PageUp / PageDown", "± 10 % of the range", "same"],
-          ["Home / End", "the thumb's min / max (its neighbour with several thumbs)", "same"],
-          ["Tab / Shift+Tab", "between thumbs", "same"],
+          ["PageUp / PageDown", "± 10 % of the range.", "Same."],
+          ["Home / End", "The thumb's min / max (its neighbour with several thumbs).", "Same."],
+          ["Tab / Shift+Tab", "Moves between thumbs.", "Same."],
         ]}
       />
       <ul>

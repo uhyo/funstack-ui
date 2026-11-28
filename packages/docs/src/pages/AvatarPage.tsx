@@ -87,7 +87,7 @@ export function AvatarPage() {
           "`role`, `aria-label`, `aria-labelledby` (always absent, also on a `render` element: the one naming route is `alt`), `aria-hidden`, `data-status`."
         }
         note={
-          "`role`, `aria-label`, `aria-labelledby` and `aria-hidden` are not in the props type: the name comes from `alt`. Everything else passes through to the `span`, `ref` included."
+          "The name comes from `alt`. Everything else passes through to the `span`, `ref` included."
         }
       />
       <h4>

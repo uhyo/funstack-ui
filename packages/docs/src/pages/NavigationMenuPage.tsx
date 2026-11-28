@@ -72,9 +72,9 @@ export function NavigationMenuPage() {
         <li>
           <strong>Root and List are structure</strong>: the <code>nav</code> landmark (name it when
           the page has more than one) and a list with an explicit <code>role="list"</code>, which
-          keeps its list semantics in Safari under <code>list-style: none</code>. Both are
-          directive-free; Item, Trigger, Popup and Link are client components with serialisable
-          props, so the whole navigation can be written in a Server Component.
+          keeps its list semantics in Safari under <code>list-style: none</code>. Neither has a{" "}
+          <code>"use client"</code> directive; Item, Trigger, Popup and Link are client components
+          with serialisable props, so the whole navigation can be written in a Server Component.
         </li>
         <li>
           An Item with only a Link in it is a plain <code>li</code>: a top-level entry.
@@ -200,9 +200,9 @@ export function NavigationMenuPage() {
       <PartFacts
         state={"`NavigationMenuRootState` is empty."}
         owned={
-          "nothing: every `<nav>` prop passes through. Name it with `aria-label` or `aria-labelledby`."
+          "none: every `<nav>` prop passes through. Name it with `aria-label` or `aria-labelledby`."
         }
-        note={"Directive-free: it reads no context and calls no hook."}
+        note={'No `"use client"`: it reads no context and calls no hook.'}
       />
 
       <h4>
@@ -216,8 +216,8 @@ export function NavigationMenuPage() {
       />
       <PartFacts
         state={"`NavigationMenuListState` is empty."}
-        owned={'nothing. `role="list"` is a default you can override.'}
-        note={"Directive-free."}
+        owned={'none. `role="list"` is a default you can override.'}
+        note={'No `"use client"`.'}
       />
 
       <h4>
@@ -298,12 +298,11 @@ export function NavigationMenuPage() {
             "NavigationMenuTriggerState",
             "Rendered from optimistic state; must not suspend.",
           ),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: NavigationMenuTriggerState) => ReactNode)",
-            description:
-              "Should render a `<button>`: only a button is a `popovertarget` invoker (another element works only in library mode).",
-          },
+          renderProp(
+            "button",
+            "NavigationMenuTriggerState",
+            "It should stay a `<button>`: only a button is a `popovertarget` invoker (another element works only in library mode).",
+          ),
         ]}
       />
       <PartFacts
@@ -377,22 +376,21 @@ export function NavigationMenuPage() {
               "Inside a Popup: following the link (primary button, no modifier key) closes the panel. Ignored outside a Popup.",
           },
           ...functionProps("NavigationMenuLinkState"),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: NavigationMenuLinkState) => ReactNode)",
-            description:
-              'Replace the `<a>`: a router\'s link component (`render={<Link to="/" />}`).',
-          },
+          renderProp(
+            "a",
+            "NavigationMenuLinkState",
+            'A router\'s link component: `render={<Link to="/" />}`.',
+          ),
         ]}
       />
       <PartFacts
         state={"`NavigationMenuLinkState` is empty."}
-        owned={"nothing: every anchor prop passes through, `onClick` and `aria-current` included."}
+        owned={"none: every anchor prop passes through, `onClick` and `aria-current` included."}
       />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:popover-open`", "Popup", "The panel is shown (DOM truth, every mode)."],
           [
@@ -420,11 +418,15 @@ export function NavigationMenuPage() {
           [
             "Tab / Shift+Tab",
             "anywhere",
-            "The document's order: a Trigger, then its open panel's links, then the next entry. Tab past the last link closes the panel behind",
+            "The document's order: a Trigger, then its open panel's links, then the next entry. Tab past the last link closes the panel behind.",
           ],
-          ["Enter, Space", "Trigger", "Toggle the panel; focus stays on the Trigger"],
-          ["Enter", "Link", "Follow it; the panel closes"],
-          ["Escape", "Trigger or panel, panel open", "Close; focus returns to the Trigger"],
+          ["Enter / Space", "Trigger", "Toggles the panel; focus stays on the Trigger."],
+          ["Enter", "Link", "Follows it; the panel closes."],
+          [
+            "Escape",
+            "Trigger or panel, panel open",
+            "Closes the panel; focus returns to the Trigger.",
+          ],
         ]}
       />
       <ul>

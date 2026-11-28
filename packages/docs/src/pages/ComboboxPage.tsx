@@ -389,7 +389,7 @@ export function ComboboxPage() {
           "`ComboboxRootState` is `{ value, inputValue, query, stale, activeValue, open, pending, disabled }`; `value` and `open` are optimistic; `stale` is `inputValue !== query`; `pending` covers the value and the open transitions. `ComboboxMultipleRootState` is the same with `value: readonly string[]` (pick order)."
         }
         owned={
-          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden input(s) when `name` is given."
+          "none: the Root renders no element (no `ref`, `className` or `style`), only the hidden input(s) when `name` is given."
         }
         note={
           "The props type is `ComboboxRootProps = ComboboxRootSingleProps | ComboboxRootMultipleProps`, discriminated on `multiple`; the props both share are `ComboboxRootBaseProps`. `Partial<ComboboxRootProps>` is not assignable to either member, so a wrapper that spreads one into `Combobox.Root` types it as `Partial<ComboboxRootSingleProps>` (or the multiple one) instead."
@@ -493,7 +493,7 @@ export function ComboboxPage() {
           "`ComboboxTriggerState` is `{ open, pending, disabled }`; `ComboboxClearState` is `{ value, values, inputValue, disabled }` (`values` as on the Input)."
         }
         owned={
-          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (only when it is no invoker: a non-button `render`, or while `aria-disabled`), `aria-controls`, `popovertarget` (written as an attribute after hydration, only on a `<button>`, while enabled or natively disabled; not while `aria-disabled`), `data-open`, `data-pending`. Owned on the Trigger and never written as props: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`; these and `aria-expanded` are not in its props type."
+          "`type` (on a `<button>`), `tabIndex` (`-1`: the input is the one Tab stop), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `onPointerDown`, `onMouseDown`, `data-disabled`; the Trigger also `aria-expanded` (only when it is no invoker: a non-button `render`, or while `aria-disabled`), `aria-controls`, `popovertarget` (written as an attribute after hydration, only on a `<button>`, while enabled or natively disabled; not while `aria-disabled`), `data-open`, `data-pending`. Owned and never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (on the Trigger)."
         }
         note={
           "Both keep focus in the input when pressed and focus it when clicked. The Trigger toggles the listbox; on a `<button>` Trigger a click while it is open keeps it shown until `openChangeAction(false)` settles (a controlled parent that keeps `open` sees no flicker). A Trigger rendered as another element is light-dismissed before its click and warns in development ([Triggers of a popup](/concepts/browser-owned-state#popup-triggers)). Clear empties the text and dispatches `null` unless nothing is selected (with `multiple`: one change removing every value, announced); it is always rendered, so hide it with CSS (`:has(input:placeholder-shown)`) or its state. A click on Clear while the listbox is open closes it (light dismiss: the button is outside the popup)."
@@ -607,7 +607,8 @@ export function ComboboxPage() {
           {
             name: "render",
             type: "ReactElement | ((props, state) => ReactNode)",
-            description: "Replace the default <div>.",
+            description:
+              "Replace the default <div> (element form) or take over rendering (function form).",
           },
         ]}
       />
@@ -704,7 +705,7 @@ export function ComboboxPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-open`",
@@ -754,55 +755,59 @@ export function ComboboxPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Listbox", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
-            "Typing, Backspace, paste",
-            "any",
+            "A printable character / Backspace / Paste",
+            "anywhere",
             "Changes the text (urgent), clears the active option and opens the listbox.",
           ],
-          ["ArrowDown / ArrowUp", "closed", "Opens with the first / last enabled option active."],
           [
             "ArrowDown / ArrowUp",
-            "open",
+            "listbox closed",
+            "Opens with the first / last enabled option active.",
+          ],
+          [
+            "ArrowDown / ArrowUp",
+            "listbox open",
             "Next / previous enabled option; stops at the ends (wraps with `loop`).",
           ],
-          ["Alt+ArrowDown", "closed", "Opens with no option active."],
-          ["Alt+ArrowUp", "open", "Accepts the active option, or closes."],
+          ["Alt+ArrowDown", "listbox closed", "Opens with no option active."],
+          ["Alt+ArrowUp", "listbox open", "Accepts the active option, or closes."],
           [
             "Enter",
-            "open",
+            "listbox open",
             "Accepts the active option; with none, commits free text (`allowCustomValue`) or does nothing.",
           ],
           [
             "Enter",
-            "closed",
+            "listbox closed",
             "Not handled (a form submits); commits changed free text first with `allowCustomValue`.",
           ],
-          ["Escape", "open", "The platform closes the listbox; focus and text stay."],
+          ["Escape", "listbox open", "The platform closes the listbox; focus and text stay."],
           [
             "Escape",
-            "opening (requested, not shown yet)",
+            "listbox opening (requested, not shown yet)",
             'As if it were shown: the coming open is cancelled (`openChangeAction(false)`, `"activate"`), the text stays, and the key is consumed, so an enclosing Dialog or Popover stays open.',
           ],
           [
             "Escape",
-            "closed, edited text",
+            "listbox closed, text edited",
             'Reverts the text to the committed value\'s text (the selection\'s label, the committed custom value with `allowCustomValue`, `""` with no selection; with `multiple` the search text is cleared and the chips stay), through `onInputValueChange` with `reason: "dismiss"`; no value is dispatched. The key is consumed: an enclosing Dialog or Popover stays open.',
           ],
           [
             "Escape",
-            "closed, text unchanged",
+            "listbox closed, text unchanged",
             "Not handled: reaches an enclosing Dialog or Popover.",
           ],
           [
             "Tab / Shift+Tab",
-            "any",
+            "anywhere",
             "Focus moves on and the listbox closes; the text reverts or, with `allowCustomValue`, commits. Tab never accepts the active option.",
           ],
           [
-            "Home / End, Left / Right",
-            "any",
+            "Home / End / ArrowLeft / ArrowRight",
+            "anywhere",
             "The input's caret; the active option is cleared (focus is back on the text).",
           ],
         ]}
@@ -816,32 +821,32 @@ export function ComboboxPage() {
         <a href="#props">Combobox.Chip</a>):
       </p>
       <Table
-        head={["Key", "When", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
-          ["Enter", "open, active option", "Toggles it; the listbox stays open."],
+          ["Enter", "listbox open, an option active", "Toggles it; the listbox stays open."],
           [
             "Enter",
-            "open, no active option",
+            "listbox open, no option active",
             "Adds the text as a value with `allowCustomValue`; otherwise nothing.",
           ],
           [
             "Enter",
-            "opening (requested, not shown yet), text typed",
+            "listbox opening (requested, not shown yet), text typed",
             "Nothing: prevented, the text is kept (you are about to pick). Right after Escape the closed rule below applies.",
           ],
           [
             "Enter",
-            "closed, text typed",
+            "listbox closed, text typed",
             "`allowCustomValue`: adds the text (prevented, the form does not submit). Otherwise clears the text, then a form submits.",
           ],
-          ["Alt+ArrowUp", "open", "Closes; the active option is not toggled."],
+          ["Alt+ArrowUp", "listbox open", "Closes; the active option is not toggled."],
           [
             "Backspace",
             "empty text",
             "Removes the last chip and announces it (not on key repeat).",
           ],
           [
-            "Left (Right in RTL)",
+            "ArrowLeft (ArrowRight under `direction: rtl`)",
             "caret at the start",
             "Moves focus to the last chip; the listbox closes, the text stays.",
           ],

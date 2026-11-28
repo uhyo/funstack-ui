@@ -482,10 +482,12 @@ import { setFavorite } from "./actions"; // "use server"
       <h3>What about native handlers?</h3>
       <p>
         DOM event props that a part does not use itself pass through to the element (an{" "}
-        <code>onPointerEnter</code> on a Tab, an <code>onClick</code> on a Tooltip trigger). They
-        are the platform's API, not the library's. Handlers the part does install (for example{" "}
-        <code>onClick</code> on a Toggle) are removed from its props type so they cannot be
-        clobbered by accident.
+        <code>onPointerEnter</code> on a Tab, an <code>onClick</code> on a Tooltip Trigger). They
+        are the platform's API, not the library's. Handlers the part installs itself, in any mode
+        (for example <code>onClick</code> on a Toggle), are removed from its props type: the part's
+        API for that event is its action prop. For the raw event, put a handler on the{" "}
+        <code>render</code> element or use <code>ref</code> (
+        <a href="/concepts/render">Replacing the element</a>).
       </p>
     </DocPage>
   );

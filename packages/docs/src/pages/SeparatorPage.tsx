@@ -16,8 +16,8 @@ export function SeparatorPage() {
         A line between two pieces of content (WAI-ARIA <code>separator</code>). It has no state, no
         action and nothing pending: what it adds over a bare <code>&lt;hr&gt;</code> is the vertical
         case (<code>aria-orientation</code> plus a styling hook), the decorative case (
-        <code>role="none"</code>) and a name for your styled layer. Directive-free, so a Server
-        Component renders it.
+        <code>role="none"</code>) and a name for your styled layer. It has no{" "}
+        <code>"use client"</code>, so a Server Component renders it.
       </p>
 
       <Example file="SeparatorLayout.tsx" css="separator.css">
@@ -79,7 +79,7 @@ export function SeparatorPage() {
           '`SeparatorState` is `{ orientation, decorative }`, the two props (`orientation` defaults to `"horizontal"`).'
         }
         owned={
-          '`role` in both modes (`"separator"`, or `"none"` while `decorative`; either wins over a `render` element\'s own), `aria-orientation`, `data-orientation`, `data-decorative`. `role` and `aria-orientation` are not in the props type.'
+          '`role` in both modes (`"separator"`, or `"none"` while `decorative`; either wins over a `render` element\'s own), `aria-orientation`, `data-orientation`, `data-decorative`.'
         }
         note={
           'Every other `<hr>` prop passes through, `ref` included. `role="separator"` on the default `<hr>` restates its implicit role: assistive technology reads the same thing, and `render={<div />}` stays a separator.'
@@ -88,11 +88,15 @@ export function SeparatorPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
-          ["`data-orientation`", '`"horizontal"` or `"vertical"`, always (decorative too).'],
-          ["`aria-orientation`", "The same value; absent while `decorative`."],
-          ["`data-decorative`", "Present while `decorative` (`state.decorative`)."],
+          [
+            "`data-orientation`",
+            "Separator",
+            '`"horizontal"` or `"vertical"`, always (decorative too).',
+          ],
+          ["`aria-orientation`", "Separator", "The same value; absent while `decorative`."],
+          ["`data-decorative`", "Separator", "Present while `decorative` (`state.decorative`)."],
         ]}
       />
 

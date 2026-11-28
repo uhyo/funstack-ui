@@ -216,7 +216,7 @@ export function ProgressPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`data-indeterminate`", "every part", "`value` is `null`."],
           ["`data-complete`", "every part", "The clamped value reached `max`."],

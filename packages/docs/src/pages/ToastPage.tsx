@@ -402,7 +402,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <PartFacts
         state={"`ToastRootState` is `{ toast, pending, ending, type, priority }`."}
         owned={
-          '`role` (`dialog`, or `alertdialog` for `priority: "high"`), `tabIndex`, `inert` (while ending), `onKeyDown` (none of these four is in the props type), `data-type`, `data-priority`, `data-pending`, `data-ending`. `aria-labelledby` and `aria-describedby` are merged with yours.'
+          '`role` (`dialog`, or `alertdialog` for `priority: "high"`), `tabIndex`, `inert` (while ending), `onKeyDown`, `data-type`, `data-priority`, `data-pending`, `data-ending`. `aria-labelledby` and `aria-describedby` are merged with yours.'
         }
         note={
           "`Toast.Title` (`div`) and `Toast.Description` (`p`) take the same function props against the Root's state (exported as `ToastTitleState` and `ToastDescriptionState`); their `children` default to `toast.title` / `toast.description`, and the Description renders nothing when it has neither."
@@ -450,7 +450,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
           "`ToastActionState` is `{ pending, disabled, toast }`; `disabled` is the prop, never set by pending."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `onClick`, `aria-disabled`, `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `onClick`."
+          "`type` (on a `<button>` only), `disabled`, `onClick`, `aria-disabled`, `data-pending`, `data-disabled`."
         }
         note={
           'By default (`whilePending="ignore"` unless `closeOnActivate={false}`) a second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is then `aria-disabled="true"` while it shows `data-pending`; it is never natively disabled, so it keeps focus.'
@@ -476,7 +476,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <PartFacts
         state={"`ToastCloseState` is `{ disabled, toast }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `onClick`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-disabled`."
         }
         note={
           'Closes the toast with `reason: "dismiss"`, like Escape. Give it a name (text or `aria-label`); development warns otherwise.'
@@ -485,7 +485,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-pending`",
@@ -521,24 +521,24 @@ toast({ title: "Link copied" });`}</CodeBlock>
           [
             "F8 (`hotkey`)",
             "anywhere",
-            "Focus the newest toast; nothing (and no `preventDefault`) without toasts",
+            "Focuses the newest toast; nothing (and no `preventDefault`) without toasts.",
           ],
           [
             "Tab / Shift+Tab",
-            "region",
-            "Through each toast and its buttons in DOM order; nothing is trapped",
+            "Viewport",
+            "Through each toast and its buttons in DOM order; nothing is trapped.",
           ],
           [
             "ArrowDown / ArrowUp",
             "a toast",
-            "Next / previous toast, no wrap. Elements inside that use the arrow keys themselves keep them: text, number, date, range and radio inputs, `textarea`, `select`, contenteditable, and the `textbox`, `combobox`, `spinbutton` and `slider` roles",
+            "Next / previous toast, no wrap. Elements inside that use the arrow keys themselves keep them: text, number, date, range and radio inputs, `textarea`, `select`, contenteditable, and the `textbox`, `combobox`, `spinbutton` and `slider` roles.",
           ],
           [
             "Escape",
             "a toast",
-            "Dismiss it. A `preventDefault()` on the Escape keeps it; `stopPropagation()` does not",
+            "Dismisses it. A `preventDefault()` on the Escape keeps it; `stopPropagation()` does not.",
           ],
-          ["Enter / Space", "Action, Close", "Native button activation"],
+          ["Enter / Space", "Action, Close", "Native button activation."],
         ]}
       />
       <ul>

@@ -139,7 +139,7 @@ export function TabsPage() {
       <PartFacts
         state={"`TabsListState` is `{ orientation, disabled }`."}
         owned={
-          '`role` (`"tablist"`), `aria-orientation`, `tabIndex`, `onKeyDown`, `onFocus`, `focusgroup` (the token list with the flag, removed otherwise), `data-orientation`, `data-disabled`. Not in the props type: `role`, `aria-orientation`, `tabIndex`, `focusgroup` and the handlers.'
+          '`role` (`"tablist"`), `aria-orientation`, `tabIndex`, `onKeyDown`, `onFocus`, `focusgroup` (the token list with the flag, removed otherwise), `data-orientation`, `data-disabled`.'
         }
       />
 
@@ -166,7 +166,7 @@ export function TabsPage() {
       <PartFacts
         state={"`TabsTabState` is `{ value, selected, pending, disabled, orientation }`."}
         owned={
-          '`role` (`"tab"`), `type` (on a `<button>`), `id`, `aria-selected`, `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (on the selected tab with the flag, removed otherwise; not in the props type), `onClick`, `onKeyDown`, `onFocus`, `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, and `anchor-name` in `style` for the Indicator (your `style` wins).'
+          '`role` (`"tab"`), `type` (on a `<button>`), `id`, `aria-selected`, `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (on the selected Tab with the flag, removed otherwise), `onClick`, `onKeyDown`, `onFocus`, `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, and `anchor-name` in `style` for the Indicator (your `style` wins).'
         }
         note={
           "No `transition` prop: everything a Tab renders is optimistic. Animate the selection with a CSS `transition` on `[data-selected]`; to animate a tab's content when the action settles, wrap it in your own `<ViewTransition>` keyed on `fsui-tabs`."
@@ -239,7 +239,7 @@ export function TabsPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-pending`",
@@ -263,25 +263,29 @@ export function TabsPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
             "ArrowRight / ArrowLeft",
-            "Horizontal: next / previous tab (swapped under `direction: rtl`). Wraps when `loop`.",
+            "Tab, horizontal list",
+            "Next / previous Tab (swapped under `direction: rtl`); wraps if `loop`.",
           ],
-          ["ArrowDown / ArrowUp", "Vertical: next / previous tab. Wraps when `loop`."],
-          ["Home / End", "First / last tab, disabled or not."],
+          ["ArrowDown / ArrowUp", "Tab, vertical list", "Next / previous Tab; wraps if `loop`."],
+          ["Home / End", "Tab", "First / last Tab, disabled or not."],
           [
             "Any of these with Alt, Ctrl or Meta, or already default-prevented",
+            "Tab",
             "Not handled: the key is the browser's.",
           ],
           [
             "Enter / Space",
-            "Selects the focused tab (the only way to select by keyboard in manual mode).",
+            "Tab",
+            "Selects the focused Tab (the only way to select by keyboard in manual mode).",
           ],
           [
             "Tab",
-            "Leaves the list: the selected tab is the only tab stop (roving `tabindex`), and the panel is next.",
+            "Tab",
+            "Leaves the list: the selected Tab is the only Tab stop (roving `tabindex`), and the Panel is next.",
           ],
         ]}
       />
@@ -296,7 +300,7 @@ export function TabsPage() {
         </li>
         <li>
           With no selection (<code>null</code>, or a value that matches no tab), the List itself is
-          the tab stop and hands focus to the first enabled tab.
+          the Tab stop and hands focus to the first enabled tab.
         </li>
         <li>
           <code>aria-selected</code> follows the optimistic selection. <code>aria-orientation</code>{" "}

@@ -80,6 +80,32 @@ import { Menubar } from "@funstack/ui/menubar";
         <code>orientation="vertical"</code>, which is not focusable.
       </p>
 
+      <h3 id="how-it-works">How it works</h3>
+      <h4>Switching menus</h4>
+      <p>
+        Every move from one menu of the bar to another runs the same three steps: the target Trigger
+        is focused (with the focus ring from the keyboard, quietly from the pointer); every other
+        menu of the bar closes at once; the target's open is requested. So:
+      </p>
+      <ul>
+        <li>
+          The menu you leave is <strong>dismissed</strong>, a fact:{" "}
+          <code>onOpenChange(false, {'{ reason: "dismiss" }'})</code> on its Root. A menu whose open
+          was still pending is superseded instead:{" "}
+          <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>, and it never appears.
+        </li>
+        <li>
+          The menu you go to is <strong>requested</strong>:{" "}
+          <code>openChangeAction(true, {'{ reason: "activate" }'})</code> in a transition, with{" "}
+          <code>data-open</code> and <code>data-pending</code> on its Trigger until its items have
+          rendered.
+        </li>
+        <li>
+          Because the Trigger is focused before its menu shows, Escape or an item's activation in
+          the new menu returns focus to the new Trigger.
+        </li>
+      </ul>
+
       <h3 id="props">Props</h3>
       <h4>Menubar</h4>
       <PropsTable
@@ -117,8 +143,8 @@ import { Menubar } from "@funstack/ui/menubar";
           <code>data-disabled</code> instead of the native attribute: the Trigger stays focusable
           and announced, and never opens its menu (it renders no <code>popovertarget</code>, and{" "}
           <code>aria-expanded="false"</code> instead). Owned keys add <code>role</code> and{" "}
-          <code>onPointerMove</code> (the hover switch; not in the props type). A{" "}
-          <code>render</code> element&apos;s own <code>onPointerMove</code> still runs, first.
+          <code>onPointerMove</code> (the hover switch). A <code>render</code> element&apos;s own{" "}
+          <code>onPointerMove</code> still runs, first.
         </li>
         <li>
           <code>Menu.Root</code> keeps <code>open</code>, <code>defaultOpen</code>,{" "}
@@ -131,42 +157,17 @@ import { Menubar } from "@funstack/ui/menubar";
         </li>
       </ul>
 
-      <h3 id="how-it-works">How a switch works</h3>
-      <p>
-        Every move from one menu of the bar to another runs the same three steps: the target Trigger
-        is focused (with the focus ring from the keyboard, quietly from the pointer); every other
-        menu of the bar closes at once; the target's open is requested. So:
-      </p>
-      <ul>
-        <li>
-          The menu you leave is <strong>dismissed</strong>, a fact:{" "}
-          <code>onOpenChange(false, {'{ reason: "dismiss" }'})</code> on its Root. A menu whose open
-          was still pending is superseded instead:{" "}
-          <code>openChangeAction(false, {'{ reason: "dismiss" }'})</code>, and it never appears.
-        </li>
-        <li>
-          The menu you go to is <strong>requested</strong>:{" "}
-          <code>openChangeAction(true, {'{ reason: "activate" }'})</code> in a transition, with{" "}
-          <code>data-open</code> and <code>data-pending</code> on its Trigger until its items have
-          rendered.
-        </li>
-        <li>
-          Because the Trigger is focused before its menu shows, Escape or an item's activation in
-          the new menu returns focus to the new Trigger.
-        </li>
-      </ul>
-
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-open`",
-            "Menu.Trigger",
+            "`Menu.Trigger`",
             "Its menu is open or opening (optimistic): set at once when a switch asks for it.",
           ],
-          ["`data-pending`", "Menu.Trigger", "Its menu's open or close action is in flight."],
-          ["`data-disabled`", "Menu.Trigger", "The `disabled` prop."],
+          ["`data-pending`", "`Menu.Trigger`", "Its menu's open or close action is in flight."],
+          ["`data-disabled`", "`Menu.Trigger`", "The `disabled` prop."],
           ["`data-orientation`", "Menubar", 'Always `"horizontal"`.'],
         ]}
       />
@@ -177,7 +178,7 @@ import { Menubar } from "@funstack/ui/menubar";
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Where", "Effect"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
             "Tab / Shift+Tab",
@@ -197,14 +198,19 @@ import { Menubar } from "@funstack/ui/menubar";
           ],
           ["Escape", "that disabled Trigger", "Ends menu mode; focus stays."],
           [
-            "ArrowDown, Enter, Space",
+            "ArrowDown / Enter / Space",
             "Trigger",
-            "Open its menu with the first item focused (unchanged from Menu).",
+            "Opens its menu with the first item focused (as in Menu).",
           ],
-          ["ArrowUp", "Trigger", "Open its menu with the last item focused."],
+          ["ArrowUp", "Trigger", "Opens its menu with the last item focused."],
+          [
+            "Any of these with Alt, Ctrl or Meta, or already default-prevented",
+            "anywhere",
+            "Not handled: the key is the browser's.",
+          ],
           [
             "ArrowRight",
-            "an item that does not open a submenu, at any depth",
+            "an item that opens no submenu, at any depth",
             "The next menu of the bar opens, first item focused. On a SubmenuTrigger it opens the submenu.",
           ],
           [
@@ -212,10 +218,10 @@ import { Menubar } from "@funstack/ui/menubar";
             "an item of a top-level menu",
             "The previous menu of the bar opens, first item focused. In a submenu it closes the submenu.",
           ],
-          ["Escape", "menu", "Closes the innermost menu; focus returns to its Trigger."],
+          ["Escape", "item", "Closes the innermost menu; focus returns to its Trigger."],
           [
             "Tab / Shift+Tab",
-            "menu",
+            "item",
             "Closes the menus; Tab moves past the bar, Shift+Tab lands on the menu's Trigger.",
           ],
           [
@@ -226,11 +232,10 @@ import { Menubar } from "@funstack/ui/menubar";
         ]}
       />
       <p>
-        Keys with Alt, Ctrl or Meta are ignored. There is no typeahead between the Triggers. With
-        every menu closed, the arrow keys only move focus, and hovering a Trigger does nothing: a
-        click or the keyboard opens the first menu. Once one is open, moving the pointer onto
-        another Trigger (mouse or pen, not touch) switches to it, with no delay; a click on the
-        Trigger of the open menu closes it.
+        There is no typeahead between the Triggers. With every menu closed, the arrow keys only move
+        focus, and hovering a Trigger does nothing: a click or the keyboard opens the first menu.
+        Once one is open, moving the pointer onto another Trigger (mouse or pen, not touch) switches
+        to it, with no delay; a click on the Trigger of the open menu closes it.
       </p>
       <Table
         head={["Element", "Attributes"]}
@@ -315,7 +320,7 @@ import { Menubar } from "@funstack/ui/menubar";
         a switch closes leaves by its CSS exit.
       </p>
 
-      <h3 id="not-in-this-version">Not in this version</h3>
+      <h3 id="not-included">Not included</h3>
       <ul>
         <li>
           A vertical menubar (<code>orientation</code>).

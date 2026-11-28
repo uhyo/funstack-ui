@@ -371,7 +371,7 @@ export function NumberFieldPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-pending`",
@@ -415,32 +415,38 @@ export function NumberFieldPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Input", "Effect"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
             "ArrowUp / ArrowDown",
+            "Input",
             "± step from the parsed draft or the shown value (empty counts as 0), snapped and clamped.",
           ],
-          ["Shift+Arrow, PageUp / PageDown", "± largeStep."],
+          ["Shift+ArrowUp / Shift+ArrowDown / PageUp / PageDown", "Input", "± `largeStep`."],
           [
             "Home / End",
+            "Input",
             "`min` / the largest step at or below `max`, only when that bound is set; otherwise the caret moves. Shift+Home / Shift+End always select text.",
           ],
           [
             "Enter",
+            "Input",
             "Commits the draft. Not prevented: inside a form with a submit button the implicit submission follows and posts the committed value.",
           ],
           [
             "Escape",
+            "Input",
             "With an edited draft (its text differs from the value's): the draft is dropped and the value's text shows again. Nothing is dispatched, and the key is consumed, so an enclosing Dialog or Popover stays open; the next Escape closes it. With no edited draft: not handled.",
           ],
-          ["Everything else", "Text editing. Tab leaves the field and the blur commits."],
+          ["Any other key", "Input", "Text editing. Tab leaves the field and the blur commits."],
           [
-            "A button press",
+            "Pointer press",
+            "Increment / Decrement",
             "One step at once, then a repeat after 400 ms and every 60 ms while held; one commit at the release.",
           ],
           [
-            "The wheel (`stepOnWheel`)",
+            "Wheel (`stepOnWheel`)",
+            "Input",
             "One step per wheel event while the input is focused; unfocused, the page scrolls.",
           ],
         ]}

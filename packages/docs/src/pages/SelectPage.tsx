@@ -242,11 +242,7 @@ export function SelectPage() {
             description: "Native: disables every option in the group.",
           },
           ...functionProps("SelectRootState", "The GroupLabel and the group's Options."),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: SelectRootState) => ReactNode)",
-            description: "Replace the default <optgroup>; it must stay an <optgroup>.",
-          },
+          renderProp("optgroup", "SelectRootState", "It must stay an <optgroup>."),
         ]}
       />
       <PartFacts
@@ -284,7 +280,7 @@ export function SelectPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Pseudo-class", "Meaning"]}
+        head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
           [
             "`data-pending`",
@@ -328,32 +324,48 @@ export function SelectPage() {
         committed change, with the optimistic value in the DOM.
       </p>
       <Table
-        head={["Key", "Chromium (customizable select)", "Firefox, Safari (native)", "Dispatches"]}
+        head={[
+          "Key",
+          "Where",
+          "Chromium (customizable select)",
+          "Firefox, Safari (native)",
+          "Dispatches",
+        ]}
         rows={[
           [
             "Tab / Shift+Tab",
+            "anywhere",
             "Focuses the select; while open, closes without committing and focus returns to the select.",
             "Focuses the select.",
             "no",
           ],
           [
-            "Enter, Space, ArrowDown (closed)",
+            "Enter / Space / ArrowDown",
+            "picker closed",
             "Opens the picker; focus moves to the selected option.",
-            "Space / Alt+Down open the native popup; arrows change the value at once.",
+            "Space / Alt+ArrowDown open the native popup; the arrow keys change the value at once.",
             "Chromium: no. Native: once per arrow press",
           ],
           [
-            "Arrows, Home, End (open)",
-            "Move focus between enabled options.",
+            "Any arrow key / Home / End",
+            "picker open",
+            "Moves focus between enabled options.",
             "Inside the native popup.",
             "no",
           ],
-          ["Enter, Space, click (open)", "Commits the focused option and closes.", "Pick.", "once"],
-          ["Escape (open)", "Closes without committing.", "Closes the native popup.", "no"],
           [
-            "Typeahead",
-            "Closed: selects the match at once. Open: moves focus to it.",
-            "Selects the match.",
+            "Enter / Space / Click",
+            "picker open",
+            "Commits the focused option and closes.",
+            "Picks it.",
+            "once",
+          ],
+          ["Escape", "picker open", "Closes without committing.", "Closes the native popup.", "no"],
+          [
+            "A printable character",
+            "anywhere",
+            "Typeahead. Closed: selects the match at once. Open: moves focus to it.",
+            "Typeahead: selects the match.",
             "once per match while closed",
           ],
         ]}
@@ -525,30 +537,6 @@ export function SelectPage() {
         the copy into the button.
       </p>
 
-      <h3 id="several-values">Several values</h3>
-      <p>
-        Select is the browser's control, and no stable engine has a styleable multi-select drop-down
-        yet (<code>{"<select multiple>"}</code> is still a list box). So a select for several values
-        is another component, <a href="/components/multi-select">MultiSelect</a>: the library's own
-        listbox on a popover, with the same action, pending and form conventions. It needs
-        JavaScript and does not open before hydration, which is why it is not a prop here:{" "}
-        <code>{"<Select.Root multiple>"}</code> is a type error and warns in development. When the
-        native multi drop-down ships everywhere, it is the name it will take.
-      </p>
-      <ul>
-        <li>
-          A few choices shown in the page: <a href="/components/checkbox-group">CheckboxGroup</a>.
-        </li>
-        <li>
-          A drop-down of choices, the selection summarised in the button:{" "}
-          <a href="/components/multi-select">MultiSelect</a>.
-        </li>
-        <li>
-          A searchable list with removable chips:{" "}
-          <a href="/components/combobox#multiple">Combobox multiple</a>.
-        </li>
-      </ul>
-
       <h3 id="styling">Styling</h3>
       <p>
         The library ships no CSS. These recipes cover the opt-in, the button, the picker, its
@@ -635,6 +623,31 @@ selectedcontent .icon { inline-size: 1em; }          /* the copy, not the option
         <code>@media (pointer: fine)</code> if you need the wheel). Search, free text and async
         loading on open are <a href="/components/combobox">Combobox</a>'s job.
       </p>
+
+      <h3 id="not-included">Not included</h3>
+      <h4 id="several-values">Several values</h4>
+      <p>
+        Select is the browser's control, and no stable engine has a styleable multi-select drop-down
+        yet (<code>{"<select multiple>"}</code> is still a list box). So a select for several values
+        is another component, <a href="/components/multi-select">MultiSelect</a>: the library's own
+        listbox on a popover, with the same action, pending and form conventions. It needs
+        JavaScript and does not open before hydration, which is why it is not a prop here:{" "}
+        <code>{"<Select.Root multiple>"}</code> is a type error and warns in development. When the
+        native multi drop-down ships everywhere, it is the name it will take.
+      </p>
+      <ul>
+        <li>
+          A few choices shown in the page: <a href="/components/checkbox-group">CheckboxGroup</a>.
+        </li>
+        <li>
+          A drop-down of choices, the selection summarised in the button:{" "}
+          <a href="/components/multi-select">MultiSelect</a>.
+        </li>
+        <li>
+          A searchable list with removable chips:{" "}
+          <a href="/components/combobox#multiple">Combobox multiple</a>.
+        </li>
+      </ul>
     </DocPage>
   );
 }

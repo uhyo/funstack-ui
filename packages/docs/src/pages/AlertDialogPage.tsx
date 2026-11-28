@@ -171,7 +171,7 @@ export function AlertDialogPage() {
         state={
           "`AlertDialogRootState` is `{ open, pending, modal }` (Dialog's; `modal` is always `true`)."
         }
-        owned={"nothing rendered: the Root has no element."}
+        owned={"none: the Root renders no element (no `ref`, `className` or `style`)."}
         note={"There is no `modal` prop: an alert dialog is always modal."}
       />
 
@@ -269,7 +269,7 @@ export function AlertDialogPage() {
           "`AlertDialogCancelState` is `{ pending, disabled }`; `pending` runs from the click until the close it asked for has committed (library mode), for example while the close waits for a confirm that is still running."
         }
         owned={
-          "`Dialog.Close`'s (`type`, `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` in library mode or with `action`, `data-pending`, `data-disabled`; `type`, `aria-disabled` and the invoker attributes are not in the props type), and `autoFocus` in the server and hydration render while it is the focus target in JS-free mode (a Cancel mounted on the client into an open dialog carries the attribute but takes no focus)."
+          "`Dialog.Close`'s (`type`, `disabled`, `aria-disabled`, `commandfor`, `command`, `value`, `onClick` in library mode or with `action`, `data-pending`, `data-disabled`), and `autoFocus` in the server and hydration render while it is the focus target in JS-free mode (a Cancel mounted on the client into an open dialog carries the attribute but takes no focus)."
         }
         note={
           'JS-free mode: `<button command="request-close" autofocus>`, in the server HTML too, so the focus is right before hydration. Library mode: no attribute; the Popup writes `autofocus` on the first enabled Cancel right before `showModal()` and removes it after.'
@@ -328,7 +328,7 @@ export function AlertDialogPage() {
       <PartFacts
         state={"`AlertDialogActionState` is `{ pending, disabled }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor` and `command` (none with `action`), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor` and `command` (none with `action`), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`. Owned and never written: `popoverTarget`, `popoverTargetAction`."
         }
         note={
           '`data-pending` spans the action and the close that follows. `AlertDialog.Action type="submit"` is not supported (`type` is owned): inside an `AlertDialog.Form`, confirm with a plain submit button.'
@@ -351,7 +351,7 @@ export function AlertDialogPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:open`, `:modal`, `::backdrop`", "Popup", "As on a Dialog."],
           ['`[role="alertdialog"]`', "Popup", "Always."],
@@ -361,7 +361,7 @@ export function AlertDialogPage() {
             "Trigger",
             "As on a Dialog: optimistic in library mode; in JS-free mode whether the dialog is open, written from its `toggle` event.",
           ],
-          ["`data-pending`", "Trigger", "Library mode, as on a Dialog."],
+          ["`data-pending`", "Trigger", "Library mode: as on a Dialog."],
           [
             "`data-pending`",
             "Cancel, Action",
@@ -382,24 +382,32 @@ export function AlertDialogPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Behaviour", "Who"]}
+        head={["Key", "Where", "Behaviour", "Who"]}
         rows={[
           [
-            "Enter / Space on the Trigger",
-            "Opens; focus moves to the Cancel",
-            "the browser / Trigger",
+            "Enter / Space",
+            "Trigger",
+            "Opens; focus moves to the Cancel.",
+            "the browser (JS-free) or the Trigger",
           ],
-          ["Tab / Shift+Tab", "Cycles through the dialog; the page is inert", "the browser"],
           [
-            "Escape",
-            'Closes and returns focus to the opener; `onOpenChange(false, { reason: "dismiss" })`',
+            "Tab / Shift+Tab",
+            "Popup",
+            "Cycles through the dialog; the page is inert.",
             "the browser",
           ],
-          ["Enter / Space on Cancel", "Closes", "the browser (JS-free) or the part"],
           [
-            "Enter / Space on Action",
-            "Runs the `action`, then closes; ignored while pending by default",
-            "the part",
+            "Escape",
+            "Popup",
+            'Closes and returns focus to the opener; `onOpenChange(false, { reason: "dismiss" })`.',
+            "the browser",
+          ],
+          ["Enter / Space", "Cancel", "Closes.", "the browser (JS-free) or the Cancel"],
+          [
+            "Enter / Space",
+            "Action",
+            "Runs the `action`, then closes; ignored while pending by default.",
+            "the Action",
           ],
         ]}
       />

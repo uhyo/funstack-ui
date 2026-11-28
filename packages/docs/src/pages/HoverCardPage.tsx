@@ -78,7 +78,7 @@ export function HoverCardPage() {
         </li>
         <li>
           No Close, Title, Description or Arrow part, no Portal. One Trigger per Root; a card shared
-          by many triggers is not offered (unmounted content makes many Roots cheap).
+          by many Triggers is not offered (unmounted content makes many Roots cheap).
         </li>
       </ul>
 
@@ -230,7 +230,7 @@ export function HoverCardPage() {
         state={
           '`HoverCardRootState` is `{ open, pending, disabled }`; `open` is optimistic. `HoverCardOpenChangeDetails` is `{ reason }` plus the virtual `event`; `reason` is `"activate"` for an open, `"dismiss"` for every close, `"platform"` for a card found open at hydration.'
         }
-        owned={"nothing rendered: the Root has no element (no `ref`, `className` or `style`)."}
+        owned={"none: the Root renders no element (no `ref`, `className` or `style`)."}
       />
 
       <h4>
@@ -314,12 +314,11 @@ export function HoverCardPage() {
             "HoverCardPopupState",
             "Content, or a function of the part's state. Rendered from committed state; may suspend.",
           ),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: HoverCardPopupState) => ReactNode)",
-            description:
-              "A `<div>` (default) or a `<span>` for a card inside running text (phrasing content only).",
-          },
+          renderProp(
+            "div",
+            "HoverCardPopupState",
+            "A `<span>` for a card inside running text (phrasing content only).",
+          ),
         ]}
       />
       <PartFacts
@@ -336,7 +335,7 @@ export function HoverCardPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:popover-open`", "Popup", "The card is shown (DOM truth)."],
           [
@@ -352,27 +351,27 @@ export function HoverCardPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
-            "Tab to the link",
-            "The card opens after `delay` (keyboard focus is `:focus-visible`); focus stays on the link",
+            "Tab",
+            "before the Trigger",
+            "Focus reaches the link and the card opens after `delay` (keyboard focus is `:focus-visible`); focus stays on the link.",
           ],
           [
-            "Tab, card open",
-            "Focus moves into the card, to its first focusable element; with none, to what follows",
+            "Tab",
+            "Trigger, card open",
+            "Focus moves into the card, to its first focusable element; with none, to what follows.",
           ],
-          [
-            "Tab from the card's last element",
-            "Focus moves on; the card closes after `closeDelay`",
-          ],
-          ["Shift+Tab from the card's first element", "Back to the link; the card stays open"],
-          ["Tab before `delay` has passed", "The open is cancelled; focus moves on"],
+          ["Tab", "the card's last element", "Focus moves on; the card closes after `closeDelay`."],
+          ["Shift+Tab", "the card's first element", "Back to the link; the card stays open."],
+          ["Tab", "Trigger, before `delay` has passed", "The open is cancelled; focus moves on."],
           [
             "Escape",
-            "Closes the card (or cancels the coming one). With focus inside the card, focus returns to the link and the card does not re-open. Inside a Dialog or a toast only the card closes; a popover or tooltip open inside the card closes first. With a tooltip showing elsewhere too, the one that opened first closes. A `preventDefault()` on the Escape keeps the card open; `stopPropagation()` does not, and inside a modal Dialog it makes the dialog close on the same Escape (the browser closes it before the library can claim the key)",
+            "anywhere",
+            "Closes the card (or cancels the coming one). With focus inside the card, focus returns to the link and the card does not re-open. Inside a Dialog or a toast only the card closes; a popover or tooltip open inside the card closes first. With a tooltip showing elsewhere too, the one that opened first closes. A `preventDefault()` on the Escape keeps the card open; `stopPropagation()` does not, and inside a modal Dialog it makes the dialog close on the same Escape (the browser closes it before the library can claim the key).",
           ],
-          ["Enter on the link", "The link's own activation; the library does nothing"],
+          ["Enter", "Trigger", "The link's own activation; the library does nothing."],
         ]}
       />
       <ul>
@@ -560,7 +559,7 @@ export function HoverCardPage() {
           guidance for interest invokers. A card that must stay is a{" "}
           <a href="/components/popover">Popover</a>.
         </li>
-        <li>One card shared by many triggers, skip-delay between neighbouring cards.</li>
+        <li>One card shared by many Triggers, skip-delay between neighbouring cards.</li>
         <li>A safe-polygon pointer corridor (the bridge recipe above covers the gap).</li>
         <li>
           A long-press for touch on the JS path; anchoring to the hovered line of a wrapped link.

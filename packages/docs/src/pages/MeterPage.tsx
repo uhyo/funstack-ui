@@ -15,8 +15,8 @@ export function MeterPage() {
     >
       <p className="page-intro">
         A scalar measurement within a known range (WAI-ARIA <code>meter</code>): storage used, a
-        password's strength, a battery. Output-only and directive-free like{" "}
-        <a href="/components/progress">Progress</a>, which documents the shared parts, the
+        password's strength, a battery. Output-only, with no <code>"use client"</code> on its Root,
+        like <a href="/components/progress">Progress</a>, which documents the shared parts, the
         formatting and the Server Component story. What Meter adds is the platform's{" "}
         <strong>regions</strong>: <code>low</code>, <code>high</code> and <code>optimum</code>{" "}
         decide whether the value is good, not so good, or bad.
@@ -188,7 +188,7 @@ export function MeterPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`data-region`", "every part", "`optimum`, `suboptimum` or `even-less-good`."],
           ["`--meter-value`", "Root (inherited)", "The percentage."],

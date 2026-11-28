@@ -16,7 +16,7 @@ export function TextFieldPage() {
     >
       <p className="page-intro">
         A text field that <strong>saves itself</strong>. The user types freely; when they are done
-        (they leave the field, or press Enter; Ctrl+Enter or Cmd+Enter in a textarea) the field asks
+        (they leave the field, or press Enter; Ctrl+Enter / Cmd+Enter in a textarea) the field asks
         for the new text through <code>valueCommitAction</code>, shows <code>data-pending</code>{" "}
         while the save runs, and goes back to the saved text if the save is refused. Escape puts the
         saved text back. It is one <code>&lt;input&gt;</code>, or a <code>&lt;textarea&gt;</code>{" "}
@@ -100,7 +100,7 @@ export function TextFieldPage() {
           ],
           [
             "Blur, the commit key",
-            "The commit: the draft is cleared and `valueCommitAction(next, { reason: \"activate\" })` runs in the field's transition, with `data-pending`. The commit key is Enter in an `<input>`: not prevented, so a form's implicit submission follows with the same text. In a `<textarea>` it is Ctrl+Enter or Cmd+Enter (either, on every platform): always prevented, so no line is added, and it submits no form. Enter alone or with Shift is a new line there; Alt+Enter is not the field's key (the browser decides). An Enter that confirms an IME composition commits nothing.",
+            "The commit: the draft is cleared and `valueCommitAction(next, { reason: \"activate\" })` runs in the field's transition, with `data-pending`. The commit key is Enter in an `<input>`: not prevented, so a form's implicit submission follows with the same text. In a `<textarea>` it is Ctrl+Enter / Cmd+Enter (either, on every platform): always prevented, so no line is added, and it submits no form. Enter alone or with Shift is a new line there; Alt+Enter is not the field's key (the browser decides). An Enter that confirms an IME composition commits nothing.",
           ],
           [
             "No change",
@@ -170,7 +170,7 @@ export function TextFieldPage() {
             name: "valueCommitAction",
             type: "ChangeAction<string, TextFieldValueCommitDetails>",
             description:
-              "Once per edit (blur, Enter in an input, Ctrl+Enter or Cmd+Enter in a textarea), and for a form reset or text adopted at mount. Runs in the field's transition and is awaited, with `data-pending`. Uncontrolled state is committed when it resolves. May be a Server Function.",
+              "Once per edit (blur, Enter in an input, Ctrl+Enter / Cmd+Enter in a textarea), and for a form reset or text adopted at mount. Runs in the field's transition and is awaited, with `data-pending`. Uncontrolled state is committed when it resolves. May be a Server Function.",
           },
           {
             name: "name",
@@ -181,7 +181,8 @@ export function TextFieldPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Native `disabled`; also when the enclosing Field is disabled.",
+            description:
+              "Native `disabled`, or the enclosing `Field.Root`'s; never dispatches. A disabled field is not submitted.",
           },
           {
             name: "readOnly",
@@ -217,61 +218,59 @@ export function TextFieldPage() {
           "`TextFieldState` is `{ value, text, pending, disabled, readOnly, required, invalid }`: `value` is the shown value (optimistic), `text` the shown text (the draft while the user is editing, else `value`), `pending` a `valueCommitAction` in flight, `invalid` an error shown by an enclosing `Field.Root` (`data-invalid`; `false` outside one)."
         }
         owned={
-          "`value` (the shown text), `onChange`, `onKeyDown`, `onBlur` (not in the props type; `onInput`, `onFocus`, `onKeyUp` and the rest pass through), `data-pending`, `data-disabled`; inside a Field also `id`, `name`, `disabled`, `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`."
+          "`value` (the shown text), `onChange`, `onKeyDown`, `onBlur` (`onInput`, `onFocus`, `onKeyUp` and the rest pass through), `data-pending`, `data-disabled`; inside a Field also `id`, `name`, `disabled`, `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`."
         }
         note={
           '`TextFieldValueCommitDetails` is `{ reason, event }`: `"activate"` for a commit (`event` is the `focusout` or the `keydown` of the commit key), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`). Serialisable: a Server Function receives `{ reason }`. In development a field with no accessible name (no `<label>`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning.'
         }
       />
 
-      <h3 id="styling">Data attributes and styling</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
-          ["`data-pending`", "A commit is in flight (including the Suspense wait of its render)."],
-          ["`data-disabled`", "The `disabled` prop, or the Field's."],
-          ["`data-invalid`", "Inside a Field that shows an error; never outside one."],
+          [
+            "`data-pending`",
+            "TextField",
+            "A commit is in flight (including the Suspense wait of its render).",
+          ],
+          ["`data-disabled`", "TextField", "The `disabled` prop, or the Field's."],
+          ["`data-invalid`", "TextField", "Inside a Field that shows an error; never outside one."],
           [
             "`:focus`, `:read-only`, `:placeholder-shown`, `:user-invalid`",
+            "TextField",
             "The platform's own states: being edited, read-only, empty, invalid after an edit.",
           ],
         ]}
       />
-      <CodeBlock language="css">{`/* Reads as text until it is used; as wide as its content. */
-.title { field-sizing: content; min-inline-size: 4ch; border: 1px solid transparent; font: inherit; }
-.title:hover, .title:focus-visible { border-color: var(--border); }
-.title:not(:focus) { text-overflow: ellipsis; }
-.title[data-pending] { color: var(--muted); }
-/* A spinner next to it: an input has no pseudo-elements, so the wrapper draws it. */
-.cell:has(.title[data-pending])::after { content: ""; /* spinner */ }`}</CodeBlock>
-      <p>
-        Keep a visible affordance when you remove the border: a hover and focus style at least. A
-        field that looks exactly like text is not discoverable.
-      </p>
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Input", "Effect"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
-          ["Tab", "Reaches the field; leaving it commits."],
+          ["Tab", "an `<input>` or a `<textarea>`", "Reaches the field; leaving it commits."],
           [
-            "Enter (an input)",
+            "Enter",
+            "an `<input>`",
             "Commits. Not prevented: inside a form the implicit submission follows.",
           ],
           [
-            "Ctrl+Enter, Cmd+Enter (a textarea)",
+            "Ctrl+Enter / Cmd+Enter",
+            "a `<textarea>`",
             "Commits, as a blur does. Always prevented, even when there is nothing to commit, so no line is added; focus and the caret stay. Submits no form.",
           ],
-          ["Enter, Shift+Enter (a textarea)", "A new line. Nothing is committed."],
+          ["Enter / Shift+Enter", "a `<textarea>`", "A new line. Nothing is committed."],
           [
-            "Alt+Enter (a textarea)",
+            "Alt+Enter",
+            "a `<textarea>`",
             "Not the field's key: the browser decides (it inserts nothing in current engines). Nothing is committed.",
           ],
           [
             "Escape",
+            "an `<input>` or a `<textarea>`",
             "With an edited draft: reverts it and is consumed. Otherwise not handled (an enclosing dialog closes).",
           ],
-          ["Everything else", "Native text editing."],
+          ["Any other key", "an `<input>` or a `<textarea>`", "Native text editing."],
         ]}
       />
       <ul>
@@ -352,7 +351,7 @@ export function TextFieldPage() {
         <CodeBlock>{`<form action={rename}><input name="title" defaultValue={title} /></form>`}</CodeBlock>
       </BehaviourSection>
 
-      <h3 id="forms">Forms and Field</h3>
+      <h3 id="forms">Forms</h3>
       <ul>
         <li>
           One element: it carries <code>name</code>, the constraints and the text the form posts,
@@ -397,6 +396,19 @@ export function TextFieldPage() {
     if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) event.currentTarget.requestSubmit();
   }}
 >`}</CodeBlock>
+
+      <h3 id="styling">Styling</h3>
+      <CodeBlock language="css">{`/* Reads as text until it is used; as wide as its content. */
+.title { field-sizing: content; min-inline-size: 4ch; border: 1px solid transparent; font: inherit; }
+.title:hover, .title:focus-visible { border-color: var(--border); }
+.title:not(:focus) { text-overflow: ellipsis; }
+.title[data-pending] { color: var(--muted); }
+/* A spinner next to it: an input has no pseudo-elements, so the wrapper draws it. */
+.cell:has(.title[data-pending])::after { content: ""; /* spinner */ }`}</CodeBlock>
+      <p>
+        Keep a visible affordance when you remove the border: a hover and focus style at least. A
+        field that looks exactly like text is not discoverable.
+      </p>
 
       <h3 id="recipes">Recipes</h3>
       <h4 id="roll-back">Roll back and say why</h4>

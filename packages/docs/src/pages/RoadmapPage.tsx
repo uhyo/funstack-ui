@@ -29,7 +29,7 @@ export function RoadmapPage() {
       </p>
       <ul>
         <li>
-          <a href="/components/text-field">TextField</a> in a textarea: Ctrl+Enter or Cmd+Enter
+          <a href="/components/text-field">TextField</a> in a textarea: Ctrl+Enter / Cmd+Enter
           commits, as a blur does, and is always prevented; it submits no form, and Enter is still a
           new line (<a href={issue(196)}>#196</a>). <code>type="search"</code> stays unsupported;
           the development warning now points to <code>type="text"</code> with{" "}
@@ -550,8 +550,8 @@ export function RoadmapPage() {
           <a href={issue(88)}>#88</a>).
         </li>
         <li>
-          Directive-free variants of platform-native parts: considered and not built (
-          <a href={issue(19)}>#19</a>);{" "}
+          Variants of platform-native parts without <code>"use client"</code>: considered and not
+          built (<a href={issue(19)}>#19</a>);{" "}
           <a href="/concepts/server-components#js-free">Server Components</a> defines "JS-free" and
           the form-control pages show the plain HTML alternative.
         </li>
@@ -574,8 +574,8 @@ export function RoadmapPage() {
       <h3>Deferred</h3>
       <ul>
         <li>
-          A directive-free Accordion (<code>@funstack/ui/accordion/native</code>): a ready plan, not
-          scheduled (<a href={issue(19)}>#19</a>).
+          An Accordion without <code>"use client"</code> (<code>@funstack/ui/accordion/native</code>
+          ): a ready plan, not scheduled (<a href={issue(19)}>#19</a>).
         </li>
       </ul>
 

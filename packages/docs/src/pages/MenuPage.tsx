@@ -281,7 +281,7 @@ export function MenuPage() {
         state={
           "`MenuRootState` is `{ open, pending, submenu, context }`; `open` is optimistic; `submenu` is true for a Root rendered inside a `Menu.Popup`; `context` is true while the open came from a [`Menu.ContextTrigger`](/components/context-menu)."
         }
-        owned={"nothing rendered: the Root has no element."}
+        owned={"none: the Root renders no element (no `ref`, `className` or `style`)."}
       />
 
       <h4>
@@ -310,7 +310,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`, in a Menubar or a Toolbar), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `onPointerMove` (the hover switch, in a Menubar), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `type`, `id`, `role` (written in a Menubar), `aria-disabled`, `popoverTarget`, `aria-haspopup`, `aria-expanded` and the four handlers."
+          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`, in a Menubar or a Toolbar), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `role` (in a Menubar), `onClick`, `onKeyDown`, `onMouseDown`, `onPointerMove` (the hover switch, in a Menubar), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`."
         }
         note={
           "Use it in a top-level Root only. A primary-button press on it while the menu is open keeps focus on the current item; the click then closes the menu."
@@ -365,7 +365,7 @@ export function MenuPage() {
           "`MenuPopupState` is `{ open, side, align, submenu, context }`; `open` is committed; `submenu` (`data-submenu`) is true on a submenu's popup; `context` is true and `side` is `null` for an open from a `Menu.ContextTrigger`. While the menu is shown, `side` / `align` are where the browser placed it (a physical side, after any flip: a submenu reads `right` in LTR and `left` in RTL); otherwise your props."
         }
         owned={
-          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged with yours), `tabIndex` (`-1`; not in the props type), `focusgroup` (the token list with the flag, removed otherwise; not in the props type), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
+          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged with yours), `tabIndex` (`-1`), `focusgroup` (the token list with the flag, removed otherwise), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
         }
         note={
           "A menu shown on the physical side you asked for costs no render for the placement; a logical side (every submenu, by default `inline-end`) costs one render on show and one on hide, since `data-side` turns physical while shown. Style it with `:popover-open`; it emits no `data-open`. Render a `<div>`, not a `<dialog>`."
@@ -396,7 +396,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuItemState` is `{ pending, disabled }`."}
         owned={
-          '`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending with `whilePending="ignore"`), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-fsui-typeahead`. Not in the props type: `type`, `role`, `tabIndex`, `aria-disabled` and the three handlers.'
+          '`type` (on a `<button>`), `role`, `tabIndex`, `disabled` (always absent), `aria-disabled` (the `disabled` prop, or while pending with `whilePending="ignore"`), `onClick`, `onKeyDown`, `onPointerMove`, `data-pending`, `data-disabled`, `data-fsui-typeahead`.'
         }
       />
 
@@ -507,10 +507,10 @@ export function MenuPage() {
         <code>Group</code> is a <code>{'<div role="group">'}</code> labelled by its{" "}
         <code>GroupLabel</code> (a <code>&lt;div&gt;</code> with the owned <code>id</code>), which
         also names a <code>RadioGroup</code>. <code>Separator</code> is an{" "}
-        <code>{'<hr role="separator">'}</code>: it owns <code>role</code> (not in its props type),
-        so a <code>render</code> element of another tag is a separator too. All take{" "}
-        <code>className</code>, <code>style</code>, <code>render</code> and (except{" "}
-        <code>Separator</code>) <code>children</code>; they have no state.
+        <code>{'<hr role="separator">'}</code>: it owns <code>role</code>, so a <code>render</code>{" "}
+        element of another tag is a separator too. All take <code>className</code>,{" "}
+        <code>style</code>, <code>render</code> and (except <code>Separator</code>){" "}
+        <code>children</code>; they have no state.
       </p>
 
       <h4>
@@ -540,16 +540,16 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuSubmenuTriggerState` is `{ open, pending, disabled }`, as the Trigger."}
         owned={
-          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`; these, `popoverTarget` and `aria-expanded` are not in the props type) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-fsui-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`). `id`, `type`, `role`, `tabIndex`, `aria-disabled` and these handlers are not in the props type."
+          "the Trigger's (`type`, `id`, `popoverTarget` (only on an invoker: not while disabled), `aria-haspopup`, `aria-expanded` (only when it is no invoker, so also while disabled), `data-open`, `data-pending`; owned and never written: `popoverTargetAction`, `commandfor`, `command`) and the item's (`role`, `tabIndex`, `disabled` (absent), `aria-disabled`, `data-disabled`, `data-fsui-typeahead`, `onClick`, `onKeyDown`, `onPointerMove`, `onPointerEnter`, `onPointerLeave`)."
         }
         note={
-          "Both an item of the parent menu (roving `tabindex`, typeahead) and the trigger of its Root; `data-pending` while items that suspend load. A disabled SubmenuTrigger stays focusable (`aria-disabled`), so it is no invoker while disabled and renders `aria-expanded` from the shown submenu. Use it in a submenu Root only."
+          "Both an item of the parent menu (roving `tabindex`, typeahead) and the Trigger of its Root; `data-pending` while items that suspend load. A disabled SubmenuTrigger stays focusable (`aria-disabled`), so it is no invoker while disabled and renders `aria-expanded` from the shown submenu. Use it in a submenu Root only."
         }
       />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`data-open`", "Trigger, SubmenuTrigger", "Optimistic open state of the Root."],
           [
@@ -612,34 +612,46 @@ export function MenuPage() {
         head={["Key", "Where", "Behaviour"]}
         rows={[
           [
-            "Enter, Space, ArrowDown",
+            "Enter / Space / ArrowDown",
             "Trigger",
-            "Open with the first enabled item focused (ArrowDown on an open menu focuses it)",
+            "Opens with the first enabled item focused (ArrowDown on an open menu focuses it).",
           ],
-          ["ArrowUp", "Trigger", "Open with the last enabled item focused"],
+          ["ArrowUp", "Trigger", "Opens with the last enabled item focused."],
           [
             "ArrowDown / ArrowUp",
             "item",
-            "Next / previous item, disabled ones included; wraps unless `loop={false}`",
+            "Next / previous item, disabled ones included; wraps if `loop`.",
           ],
-          ["Home / End", "item", "First / last item"],
+          ["Home / End", "item", "First / last item."],
           [
             "A printable character",
             "item",
-            "Typeahead: the next item starting with it; repeat to cycle; type a prefix within 500 ms",
+            "Typeahead: the next item starting with it; repeat to cycle; type a prefix within 500 ms.",
           ],
-          ["Enter / Space", "item", "Activate (Space is a character while typeahead is active)"],
-          ["ArrowRight", "SubmenuTrigger", "Open the submenu with its first item focused"],
-          ["ArrowLeft", "item in a submenu", "Close the submenu; focus returns to its trigger"],
+          [
+            "Enter / Space",
+            "item",
+            "Activates it (Space is a character while typeahead is active).",
+          ],
+          [
+            "ArrowRight",
+            "SubmenuTrigger",
+            "Opens the submenu with its first item focused (ArrowLeft under `direction: rtl`).",
+          ],
+          [
+            "ArrowLeft",
+            "item in a submenu",
+            "Closes the submenu; focus returns to its SubmenuTrigger (ArrowRight under `direction: rtl`).",
+          ],
           [
             "Escape",
             "anywhere",
-            "Close the innermost menu; focus returns to its trigger (the library does it for a submenu)",
+            "Closes the innermost menu; focus returns to its Trigger or SubmenuTrigger (the library does it for a submenu).",
           ],
           [
             "Tab / Shift+Tab",
             "item",
-            "Close the whole menu at once and move on (Shift+Tab lands on the Trigger)",
+            "Closes the whole menu at once and moves on (Shift+Tab lands on the Trigger).",
           ],
         ]}
       />
@@ -764,7 +776,7 @@ export function MenuPage() {
       <BehaviourSection
         id="suspense"
         summary={
-          "Items that suspend hold the open: the menu (or submenu) stays closed with `data-pending` on its trigger, then opens once, complete, with the first item focused."
+          "Items that suspend hold the open: the menu (or submenu) stays closed with `data-pending` on its Trigger, then opens once, complete, with the first item focused."
         }
       >
         <p>

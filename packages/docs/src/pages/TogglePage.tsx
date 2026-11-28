@@ -86,13 +86,14 @@ export function TogglePage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
-          ["`data-pressed`", "Optimistically pressed."],
-          ["`aria-pressed`", '`"true"` or `"false"`, optimistic.'],
-          ["`data-pending`", "`pressedChangeAction` is in flight."],
+          ["`data-pressed`", "Toggle", "Optimistically pressed."],
+          ["`aria-pressed`", "Toggle", '`"true"` or `"false"`, optimistic.'],
+          ["`data-pending`", "Toggle", "`pressedChangeAction` is in flight."],
           [
             "`data-disabled`",
+            "Toggle",
             "The `disabled` prop (also matches `:disabled`, except inside a Toolbar, where the button is `aria-disabled`).",
           ],
         ]}
@@ -100,9 +101,9 @@ export function TogglePage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Interaction", "Behaviour"]}
+        head={["Key", "Behaviour"]}
         rows={[
-          ["Space, Enter, click", "Toggles (native button activation)."],
+          ["Enter / Space / Click", "Toggles (native button activation)."],
           [
             "Tab",
             "Focusable unless disabled (inside a Toolbar a disabled Toggle stays focusable).",

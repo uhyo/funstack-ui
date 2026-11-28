@@ -162,15 +162,17 @@ export function ButtonPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-pending`",
+            "Button",
             "The Button's own `action` is in flight (until the commit that ends it, including a Suspense wait), or it submitted the form with its own function `formAction` and the form's submissions have not all finished.",
           ],
-          ["`data-disabled`", "The `disabled` prop. Not set by pending."],
+          ["`data-disabled`", "Button", "The `disabled` prop. Not set by pending."],
           [
             "`aria-disabled`",
+            "Button",
             '`"true"` while pending with `whilePending="ignore"` (unless natively disabled), and while `disabled` with `focusableWhenDisabled`, inside a Toolbar, on a `render` element of another tag (a link), or on a component `render` whose click only the Button acts on. Never set by pending in the default `"run"` mode.',
           ],
         ]}
@@ -186,15 +188,15 @@ export function ButtonPage() {
         rows={[
           [
             "Enter",
-            'Click: runs `action` (unless disabled, or pending with `whilePending="ignore"`)',
-            'Click: `action` and navigation; while pending with `whilePending="ignore"`, neither',
+            'A click: runs `action` (unless disabled, or pending with `whilePending="ignore"`).',
+            'A click: `action` and navigation; while pending with `whilePending="ignore"`, neither.',
           ],
           [
             "Space",
-            "Click on keyup: runs `action`",
-            'Nothing (a link); add `role="button"` and a key handler if a link must act on Space',
+            "A click on keyup: runs `action`.",
+            'Nothing (a link); add `role="button"` and a key handler if a link must act on Space.',
           ],
-          ["Tab", "Sequential, or the Toolbar's single Tab stop inside one", "Same"],
+          ["Tab", "Sequential, or the Toolbar's single Tab stop inside one.", "Same."],
         ]}
       />
       <p>

@@ -52,9 +52,9 @@ export function Settings() {
         (they only compute, then render a context provider created in a client module), so a Server
         Component renders the Root on the server, may pass it function props, and only the small
         context module and the parts reach the browser.{" "}
-        <a href="/components/separator">Separator</a> is directive-free too and reads no context at
-        all: rendered by a Server Component, it runs on the server, function props included, and
-        sends no code to the browser.
+        <a href="/components/separator">Separator</a> has no <code>"use client"</code> either and
+        reads no context at all: rendered by a Server Component, it runs on the server, function
+        props included, and sends no code to the browser.
       </p>
       <p>
         A framework that renders several server payloads into one page must give each its own{" "}
@@ -84,11 +84,11 @@ export function Settings() {
         is never hydrated (<code>react-dom/static</code> <code>prerender</code>,{" "}
         <code>renderToString</code>), <code>"use client"</code> has no effect and the parts' HTML
         works as is, to the extent described under <a href="#before-hydration">Before hydration</a>
-        below. There is no separate directive-free variant of the parts: it was considered in{" "}
-        <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a> and not built, since
-        it would save those few KB but not the runtime. For a single form control, the component
-        page has a <strong>Plain HTML</strong> section where that is an option: the HTML a Server
-        Component can render instead, and what it gives up (for example{" "}
+        below. There is no separate variant of the parts without <code>"use client"</code>: it was
+        considered in <a href="https://github.com/uhyo/funstack-ui/issues/19">issue #19</a> and not
+        built, since it would save those few KB but not the runtime. For a single form control, the
+        component page has a <strong>Plain HTML</strong> section where that is an option: the HTML a
+        Server Component can render instead, and what it gives up (for example{" "}
         <a href="/components/switch">Switch</a>).
       </p>
 

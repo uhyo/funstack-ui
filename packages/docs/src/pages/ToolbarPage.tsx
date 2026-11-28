@@ -109,7 +109,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
       <PartFacts
         state={"`ToolbarRootState` is `{ orientation }`."}
         owned={
-          '`role` (`"toolbar"`), `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`, `focusgroup` (the token list with the flag, removed otherwise), and the `tabindex` of its items. All but the items\' `tabindex` are not in the props type.'
+          '`role` (`"toolbar"`), `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`, `focusgroup` (the token list with the flag, removed otherwise), and the `tabindex` of its items.'
         }
         note={
           "There is no `disabled`: disable items individually, or wrap the toolbar in a `<fieldset disabled>`."
@@ -131,7 +131,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`data-orientation`", "Root", "The toolbar's orientation."],
           ["`data-orientation`", "Separator", "The separator's own (perpendicular) orientation."],
@@ -140,56 +140,57 @@ import { Toolbar } from "@funstack/ui/toolbar";
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Horizontal", "Vertical", "Effect"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
             "ArrowRight / ArrowLeft",
-            "Next / previous item (swapped under `direction: rtl`)",
-            "Ignored",
-            "Moves focus; wraps if `loop`.",
+            "item, horizontal toolbar",
+            "Next / previous item (swapped under `direction: rtl`); wraps if `loop`.",
           ],
-          ["ArrowDown / ArrowUp", "Ignored", "Next / previous item", "Same."],
-          ["Home / End", "First / last item", "Same", "Same."],
           [
-            "Any of the above on a native radio",
-            "",
-            "",
+            "ArrowDown / ArrowUp",
+            "item, vertical toolbar",
+            "Next / previous item; wraps if `loop`.",
+          ],
+          ["Home / End", "item", "First / last item."],
+          [
+            "Any of these with Alt, Ctrl or Meta, or already default-prevented",
+            "item",
+            "Not handled: the key is the browser's.",
+          ],
+          [
+            "Any arrow key / Home / End",
+            "a native radio",
             "The radio group's own: checks the next / previous radio, staying within the group (it wraps, except in Safari).",
           ],
           [
-            "Tab / Shift+Tab on a native radio",
-            "",
-            "",
+            "Tab / Shift+Tab",
+            "a native radio",
             "The checked radio of its group if focus is on another one; else the next / previous toolbar item while one exists.",
           ],
           [
-            "Any of the above on a text-entry item",
-            "",
-            "",
+            "Any arrow key / Home / End",
+            "a text-entry item",
             "Not handled: the item keeps its caret.",
           ],
           [
-            "Tab / Shift+Tab on a text-entry item",
-            "",
-            "",
+            "Tab / Shift+Tab",
+            "a text-entry item",
             "Next / previous toolbar item while one exists; otherwise leaves the toolbar.",
           ],
           [
-            "Tab / Shift+Tab elsewhere",
-            "",
-            "",
+            "Tab / Shift+Tab",
+            "any other item",
             "Leaves the toolbar; re-entry lands on the last focused item.",
           ],
           [
-            "Enter / Space on a `Button`",
-            "",
-            "",
+            "Enter / Space",
+            "`Button`",
             'Runs `action`, unless disabled, or pending with `whilePending="ignore"`.',
           ],
           [
             "A key the item handled itself",
-            "",
-            "",
+            "item",
             "Ignored by the toolbar (a `Menu.Trigger`'s ArrowDown opens its menu).",
           ],
         ]}
@@ -197,9 +198,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
       <p>
         Natively <code>disabled</code> controls are skipped; <code>aria-disabled</code> ones are
         reached, also by Home and End. A popup rendered inside the toolbar (a{" "}
-        <code>Menu.Popup</code>) is not part of the sequence: its items are the menu's. Keys with
-        Alt, Ctrl or Meta, and keys an item's own <code>onKeyDown</code> prevented, are left to the
-        browser.
+        <code>Menu.Popup</code>) is not part of the sequence: its items are the menu's.
       </p>
 
       <h4 id="disabled-items">Disabled controls</h4>

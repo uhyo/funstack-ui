@@ -26,11 +26,17 @@ export function stylingProps(state: string): PropRow[] {
   return functionProps(state).slice(0, 2);
 }
 
-/** The `render` row. */
-export function renderProp(element: string, state: string): PropRow {
+/** The opening sentence of every `render` row. */
+export function renderDescription(element: string): string {
+  return `Replace the default <${element}> (element form) or take over rendering (function form).`;
+}
+
+/** The `render` row, with an optional note on what the replacement must keep. */
+export function renderProp(element: string, state: string, note?: string): PropRow {
   return {
     name: "render",
     type: `ReactElement | ((props, state: ${state}) => ReactNode)`,
-    description: `Replace the default <${element}> (element form) or take over rendering (function form).`,
+    description:
+      note === undefined ? renderDescription(element) : `${renderDescription(element)} ${note}`,
   };
 }

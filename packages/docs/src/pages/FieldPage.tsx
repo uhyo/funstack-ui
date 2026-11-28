@@ -314,14 +314,15 @@ import { Form } from "@funstack/ui/form";
           {
             name: "render",
             type: "ReactElement | ((props, state: FieldState) => ReactNode)",
-            description: "Replace the default <label> (must stay a <label>) or <p>.",
+            description:
+              "Replace the default <label> (Label; it must stay a <label>) or <p> (Description) (element form), or take over rendering (function form).",
           },
         ]}
       />
       <PartFacts
         state={"the Field's."}
         owned={
-          "Label: `id`, `htmlFor` (absent for a group control), `onClick` (for a button control the label activation is cancelled and the button focused; a `render` element's own handler runs first); Description: `id`; both also the Field's four `data-*` attributes. Not in the props type: `id`, `htmlFor` and the Label's `onClick`."
+          "Label: `id`, `htmlFor` (absent for a group control), `onClick` (for a button control the label activation is cancelled and the button focused; a `render` element's own handler runs first); Description: `id`; both also the Field's four `data-*` attributes."
         }
       />
 
@@ -349,12 +350,11 @@ import { Form } from "@funstack/ui/form";
             description: "Native; the Field's value also applies (either one is enough).",
           },
           ...stylingProps("FieldState"),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: FieldState) => ReactNode)",
-            description:
-              "Must render an <input>, <textarea> or <select>: `render={<textarea rows={3} />}`.",
-          },
+          renderProp(
+            "input",
+            "FieldState",
+            "It must render an <input>, <textarea> or <select>: `render={<textarea rows={3} />}`.",
+          ),
           {
             name: "…",
             type: "native",
@@ -459,14 +459,14 @@ import { Form } from "@funstack/ui/form";
           "`FormSubmitState` is `{ pending, disabled }`; `pending` is `useFormStatus().pending` of the enclosing form, so it works in any React form (`Dialog.Form`, a plain `<form action>`)."
         }
         owned={
-          '`type` (`"submit"`, on a `<button>`), `disabled`, `aria-disabled` (a host element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled` and `onClick`; a handler goes on the `render` element, and the submitter\'s `name` / `value` in the `FormData` tell buttons apart.'
+          '`type` (`"submit"`, on a `<button>`), `disabled`, `aria-disabled` (a host element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`, `data-disabled`. To tell submit buttons apart, read the submitter\'s `name` / `value` in the `FormData`.'
         }
         note={"`name`, `value` and `formAction` pass through."}
       />
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`data-invalid`", "every Field part", "An error is shown (`FieldState.invalid`)."],
           [

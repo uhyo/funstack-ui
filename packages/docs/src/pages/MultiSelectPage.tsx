@@ -135,6 +135,17 @@ export function MultiSelectPage() {
         <code>reason: "dismiss"</code>. A pick never closes the listbox.
       </p>
 
+      <h4 id="prior-art">Prior art</h4>
+      <p>
+        Headless UI makes the same split: its <code>Select</code> is a thin wrapper around the
+        native element, and the custom one that takes <code>multiple</code> is <code>Listbox</code>,
+        which stays open while you pick. Mantine, PrimeReact and Carbon name the component{" "}
+        <code>MultiSelect</code> (Mantine's is searchable with pills, PrimeReact's shows a
+        comma-separated list by default, Carbon's shows a count tag). Radix has no multi-select.
+        Chips with remove buttons and a search field are{" "}
+        <a href="/components/combobox#multiple">Combobox multiple</a> here.
+      </p>
+
       <h3 id="props">Props</h3>
       <h4>
         <code>MultiSelect.Root</code>
@@ -227,7 +238,7 @@ export function MultiSelectPage() {
           "`MultiSelectRootState` is `{ value, activeValue, open, pending, disabled, required }`; `value` (pick order) and `open` are optimistic; `pending` covers the value and the open transitions; `required` is the prop or the Field's."
         }
         owned={
-          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden inputs when `name` is given."
+          "none: the Root renders no element (no `ref`, `className` or `style`), only the hidden inputs when `name` is given."
         }
       />
       <p>
@@ -281,7 +292,7 @@ export function MultiSelectPage() {
           "`MultiSelectTriggerState` is `{ value, open, pending, disabled, invalid, required }`; `value` and `open` are optimistic, `pending` is the Root's; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the Root's or the Field's (`data-required`: a button has no `:required`)."
         }
         owned={
-          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget` (written as an attribute after hydration), `form` (from the Root), `onClick`, `onKeyDown`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`, `data-required`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (not in its props type).'
+          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget` (written as an attribute after hydration), `form` (from the Root), `onClick`, `onKeyDown`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`, `data-required`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Owned and never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command`.'
         }
         note={
           "With `required` it renders the validity element right after itself: a visually hidden one-option `<select>` with no name. A `render` element must stay a `<button>` (development warns). `ref` goes to the button."
@@ -427,7 +438,8 @@ export function MultiSelectPage() {
           {
             name: "render",
             type: "ReactElement | ((props, state) => ReactNode)",
-            description: "Replace the default <div>.",
+            description:
+              "Replace the default <div> (element form) or take over rendering (function form).",
           },
         ]}
       />
@@ -443,7 +455,7 @@ export function MultiSelectPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
             "`data-open`",
@@ -470,38 +482,46 @@ export function MultiSelectPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Listbox", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
-            "Enter, Space, ArrowDown, Alt+ArrowDown",
-            "closed",
+            "Enter / Space / ArrowDown / Alt+ArrowDown",
+            "listbox closed",
             "Opens with the first selected option active, else the first enabled one.",
           ],
-          ["ArrowUp", "closed", "Opens with the first selected option active, else the last one."],
-          ["Home / End", "closed", "Opens with the first / last enabled option active."],
-          ["A letter", "closed", "Opens with the first option starting with it active."],
+          [
+            "ArrowUp",
+            "listbox closed",
+            "Opens with the first selected option active, else the last one.",
+          ],
+          ["Home / End", "listbox closed", "Opens with the first / last enabled option active."],
+          [
+            "A printable character",
+            "listbox closed",
+            "Opens with the first option starting with it active.",
+          ],
           [
             "ArrowDown / ArrowUp",
-            "open",
+            "listbox open",
             "Next / previous enabled option; stops at the ends (wraps with `loop`).",
           ],
-          ["Home / End", "open", "First / last enabled option."],
-          ["PageDown / PageUp", "open", "Ten options forward / back."],
-          ["Enter, Space", "open", "Toggles the active option; the listbox stays open."],
+          ["Home / End", "listbox open", "First / last enabled option."],
+          ["PageDown / PageUp", "listbox open", "Ten options forward / back."],
+          ["Enter / Space", "listbox open", "Toggles the active option; the listbox stays open."],
           [
-            "Letters",
-            "open",
+            "A printable character",
+            "listbox open",
             "Typeahead: the active option moves to the next option starting with the typed text (500 ms buffer; a repeated letter cycles). A Space while you are typing is part of the text.",
           ],
-          ["Alt+ArrowUp", "open", "Closes; nothing is toggled."],
+          ["Alt+ArrowUp", "listbox open", "Closes; nothing is toggled."],
           [
             "Escape",
-            "open",
+            "listbox open",
             "The platform closes the listbox; focus stays. A second Escape reaches an enclosing Dialog or Popover.",
           ],
           [
             "Tab / Shift+Tab",
-            "open",
+            "listbox open",
             "Focus moves on and the listbox closes. Tab never toggles the active option.",
           ],
         ]}
@@ -648,17 +668,6 @@ export function MultiSelectPage() {
           the keys work after a click in every engine.
         </li>
       </ul>
-
-      <h3 id="prior-art">Prior art</h3>
-      <p>
-        Headless UI makes the same split: its <code>Select</code> is a thin wrapper around the
-        native element, and the custom one that takes <code>multiple</code> is <code>Listbox</code>,
-        which stays open while you pick. Mantine, PrimeReact and Carbon name the component{" "}
-        <code>MultiSelect</code> (Mantine's is searchable with pills, PrimeReact's shows a
-        comma-separated list by default, Carbon's shows a count tag). Radix has no multi-select.
-        Chips with remove buttons and a search field are{" "}
-        <a href="/components/combobox#multiple">Combobox multiple</a> here.
-      </p>
     </DocPage>
   );
 }

@@ -49,7 +49,7 @@ export function TooltipPage() {
 </div>`}</CodeBlock>
       <ul>
         <li>
-          <code>Root</code> renders no DOM, so the trigger stays a direct child of your toolbar or
+          <code>Root</code> renders no DOM, so the Trigger stays a direct child of your toolbar or
           flex row. There is no Portal and no Positioner: the top layer and anchor positioning do
           those jobs.
         </li>
@@ -58,7 +58,7 @@ export function TooltipPage() {
           that reading order for popovers, and some screen readers attach an adjacent tooltip to the
           wrong control otherwise.
         </li>
-        <li>One trigger per Root.</li>
+        <li>One Trigger per Root.</li>
         <li>
           <code>Arrow</code> is optional and draws nothing itself: it carries the Popup's{" "}
           <code>data-side</code> / <code>data-align</code>, which are where the browser placed the
@@ -94,9 +94,9 @@ export function TooltipPage() {
         </li>
         <li>
           <strong>On the native path</strong> (<code>experimental_interestFor</code> in Chromium)
-          the browser reads the delay from the trigger's computed style, so the Trigger renders{" "}
+          the browser reads the delay from the Trigger's computed style, so the Trigger renders{" "}
           <code>interest-delay-start: calc(250ms * (1 - var(--fsui-tooltip-warm, 0)))</code> and a
-          small stylesheet that sets <code>--fsui-tooltip-warm</code> to 1 on marked triggers while
+          small stylesheet that sets <code>--fsui-tooltip-warm</code> to 1 on marked Triggers while
           a tooltip is showing. React hoists it into <code>&lt;head&gt;</code> (during server
           rendering too); it works before hydration. Nothing visual: it times the interaction only.
           Under a strict <code>style-src</code> it needs its hash or a nonce (
@@ -137,7 +137,7 @@ export function TooltipPage() {
           ],
           [
             "`experimental_interestFor`",
-            "native trigger, no JS interaction listeners",
+            "native Trigger, no JS interaction listeners",
             "attribute ignored, JS path",
             "attribute ignored, JS path",
           ],
@@ -173,7 +173,7 @@ export function TooltipPage() {
             type: "number",
             default: "150",
             description:
-              "Milliseconds from leaving (trigger and popup) or blur to close (Chromium's interest-delay-end).",
+              "Milliseconds from leaving (Trigger and popup) or blur to close (Chromium's interest-delay-end).",
           },
           {
             name: "disabled",
@@ -187,9 +187,9 @@ export function TooltipPage() {
             default: '"description"',
             description: (
               <>
-                Which relation the tooltip provides for the trigger. <code>"description"</code>:{" "}
-                <code>aria-describedby</code>, for triggers with their own name. <code>"name"</code>
-                : <code>aria-labelledby</code>, for icon-only triggers; do not also set{" "}
+                Which relation the tooltip provides for the Trigger. <code>"description"</code>:{" "}
+                <code>aria-describedby</code>, for Triggers with their own name. <code>"name"</code>
+                : <code>aria-labelledby</code>, for icon-only Triggers; do not also set{" "}
                 <code>aria-label</code>.
               </>
             ),
@@ -204,7 +204,7 @@ export function TooltipPage() {
       <PartFacts
         state={"`TooltipRootState` is `{ disabled }`."}
         owned={
-          "nothing rendered: the Root has no element (no `ref`, `className` or `style`), and no `open`, `defaultOpen` or action (see [Browser-owned state](#browser-owned-state))."
+          "none: the Root renders no element (no `ref`, `className` or `style`), and no `open`, `defaultOpen` or action (see [Browser-owned state](#browser-owned-state))."
         }
       />
 
@@ -325,7 +325,7 @@ export function TooltipPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:popover-open`", "Popup", "The tooltip is showing."],
           [
@@ -370,41 +370,46 @@ export function TooltipPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Interaction", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
           [
-            "Hover the trigger",
-            "Opens after `delay`, or at once while another tooltip is showing (which then closes). Stays open while the pointer is over the trigger or the popup.",
+            "Hover",
+            "Trigger",
+            "Opens after `delay`, or at once while another tooltip is showing (which then closes). Stays open while the pointer is over the Trigger or the Popup.",
           ],
-          ["Pointer leaves both", "Closes after `closeDelay`."],
+          ["Pointer leaves", "Trigger and Popup", "Closes after `closeDelay`."],
           [
-            "Keyboard focus on the trigger",
+            "Keyboard focus",
+            "Trigger",
             "Opens after `delay`, or at once while another tooltip is showing (focus from a click does not open).",
           ],
-          ["Blur", "Closes after `closeDelay`."],
+          ["Blur", "Trigger", "Closes after `closeDelay`."],
           [
             "Escape",
-            "Closes, wherever focus is; focus stays on the trigger. Only this tooltip closes: an enclosing Dialog, Menu or toast stays open for the next Escape. A `preventDefault()` on the Escape keeps it open; `stopPropagation()` does not, and inside a modal Dialog it makes the dialog close on the same Escape (the browser closes it before the library can claim the key). Before the tooltip shows, Escape on the trigger cancels the coming open.",
+            "anywhere",
+            "Closes, wherever focus is; focus stays on the Trigger. Only this tooltip closes: an enclosing Dialog, Menu or toast stays open for the next Escape. A `preventDefault()` on the Escape keeps it open; `stopPropagation()` does not, and inside a modal Dialog it makes the dialog close on the same Escape (the browser closes it before the library can claim the key). Before the tooltip shows, Escape on the Trigger cancels the coming open.",
           ],
           [
-            "Any pointerdown",
-            "Closes (outside, on the trigger, on the popup). It reopens only after the pointer leaves and re-enters, or focus leaves and returns.",
+            "Pointer press",
+            "anywhere",
+            "Closes (outside, on the Trigger, on the Popup). It reopens only after the pointer leaves and re-enters, or focus leaves and returns.",
           ],
           [
             "Touch",
+            "Trigger",
             "Never opens on the JS path (no hover). Chromium's native path offers long-press.",
           ],
         ]}
       />
       <ul>
         <li>
-          The popup has <code>role="tooltip"</code>; the trigger gets <code>aria-describedby</code>{" "}
+          The popup has <code>role="tooltip"</code>; the Trigger gets <code>aria-describedby</code>{" "}
           or <code>aria-labelledby</code> per <code>provides</code>, and no{" "}
           <code>aria-expanded</code>. The relation works while the popup is hidden, so screen
           readers announce the text on focus in every engine.
         </li>
         <li>
-          The trigger must be focusable. A natively <code>disabled</code> button never shows a
+          The Trigger must be focusable. A natively <code>disabled</code> button never shows a
           tooltip; use <code>aria-disabled="true"</code> on a control that needs one.
         </li>
         <li>
@@ -419,7 +424,7 @@ export function TooltipPage() {
       </ul>
       <p>
         In development, the library warns when <code>provides="name"</code> is combined with an{" "}
-        <code>aria-label</code>, when the trigger is not focusable, and when the popup contains
+        <code>aria-label</code>, when the Trigger is not focusable, and when the popup contains
         focusable content.
       </p>
 
@@ -453,7 +458,7 @@ export function TooltipPage() {
           and close is the browser's or a timer the user drives, so none of it is a request (an
           action). The popup is a popover in the top layer, opened and closed by the browser (or by
           the library's listeners calling <code>showPopover</code> / <code>hidePopover</code>),
-          never through React state. Style it with <code>:popover-open</code>, and the trigger of an
+          never through React state. Style it with <code>:popover-open</code>, and the Trigger of an
           open tooltip with <code>:has(+ :popover-open)</code>. Tooltip is therefore the one
           component with no transitions, no <code>data-pending</code> and no <code>transition</code>{" "}
           prop; animate it in CSS:
@@ -502,7 +507,7 @@ export function TooltipPage() {
 .tip[data-side="top"]::after { bottom: -4px; inset-inline-start: calc(50% - 4px); }
 .tip[data-side="bottom"]::after { top: -4px; inset-inline-start: calc(50% - 4px); }`}</CodeBlock>
 
-      <h4>A link trigger</h4>
+      <h4>A link Trigger</h4>
       <CodeBlock>{`<Tooltip.Root>
   <Tooltip.Trigger render={<a href="/pricing" />}>Pricing</Tooltip.Trigger>
   <Tooltip.Popup className="tip">Opens the pricing page</Tooltip.Popup>
@@ -528,7 +533,7 @@ export function TooltipPage() {
         <p>
           The popup's content renders when the tooltip mounts, not when it opens. If it must
           suspend, put the <code>&lt;Suspense&gt;</code> boundary inside <code>Tooltip.Popup</code>;
-          a boundary above the Root would hide the trigger too.
+          a boundary above the Root would hide the Trigger too.
         </p>
       </Callout>
 

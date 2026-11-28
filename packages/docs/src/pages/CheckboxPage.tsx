@@ -3,7 +3,7 @@ import { Callout } from "../components/Callout.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { DocPage } from "../components/DocPage.js";
-import { stylingProps } from "./shared-props.js";
+import { renderProp, stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { CheckboxForm } from "../examples/CheckboxForm.js";
 import { CheckboxSelectAll } from "../examples/CheckboxSelectAll.js";
@@ -135,12 +135,11 @@ export function CheckboxPage() {
             description: "Submitted with the form when checked (platform default).",
           },
           ...stylingProps("CheckboxState"),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: CheckboxState) => ReactNode)",
-            description:
-              'Replace the default <input> or take over rendering. Must keep an `<input type="checkbox">`; a custom component must forward `ref` to it (the `indeterminate` property is set through the ref).',
-          },
+          renderProp(
+            "input",
+            "CheckboxState",
+            'It must keep an `<input type="checkbox">`; a custom component must forward `ref` to it (the `indeterminate` property is set through the ref).',
+          ),
         ]}
       />
       <PartFacts
@@ -157,30 +156,34 @@ export function CheckboxPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "Pseudo-class", "Meaning"]}
+        head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
           [
             "`data-checked`",
+            "Checkbox",
             "`:checked`",
             "Optimistic checked state. Identical, with one engine exception (below).",
           ],
           [
             "`data-indeterminate`",
+            "Checkbox",
             "`:indeterminate`",
             "Mixed state, suspended while pending. Only the attribute works before hydration; `:indeterminate` also matches radios in an empty group.",
           ],
-          ["`data-pending`", "–", "`checkedChangeAction` is in flight."],
+          ["`data-pending`", "Checkbox", "–", "`checkedChangeAction` is in flight."],
           [
             "`data-disabled`",
+            "Checkbox",
             "`:disabled`",
             "The `disabled` prop (or the Field's). Only `:disabled` also sees `<fieldset disabled>`.",
           ],
           [
             "`data-invalid`",
+            "Checkbox",
             "`:user-invalid`",
             "Inside a `Field.Root`: the Field shows an error for the checkbox.",
           ],
-          ["–", "`:required`, `:focus-visible`", "Platform only; no attribute."],
+          ["–", "Checkbox", "`:required`, `:focus-visible`", "Platform only; no attribute."],
         ]}
       />
       <Callout kind="warning" title="Chromium and :checked while indeterminate">
@@ -195,10 +198,10 @@ export function CheckboxPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Interaction", "Behaviour"]}
+        head={["Key", "Behaviour"]}
         rows={[
           ["Space", "Toggles; a mixed box becomes checked (native)."],
-          ["Click, label click", "Toggles (native)."],
+          ["Click (the box or its label)", "Toggles (native)."],
           ["Enter", "Does not toggle; may submit the form."],
           ["Tab", "Focusable unless disabled."],
         ]}

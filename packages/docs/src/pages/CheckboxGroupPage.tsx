@@ -239,12 +239,11 @@ export function CheckboxGroupPage() {
           },
 
           ...stylingProps("CheckboxGroupItemState"),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: CheckboxGroupItemState) => ReactNode)",
-            description:
-              'Replace the default <input>. Must keep an `<input>`; the library sets `type="checkbox"`.',
-          },
+          renderProp(
+            "input",
+            "CheckboxGroupItemState",
+            'It must keep an `<input>`; the library sets `type="checkbox"`.',
+          ),
         ]}
       />
       <PartFacts
@@ -278,12 +277,11 @@ export function CheckboxGroupPage() {
           },
 
           ...stylingProps("CheckboxGroupParentState"),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: CheckboxGroupParentState) => ReactNode)",
-            description:
-              'Replace the default <input>. Must keep an `<input>`; the library sets `type="checkbox"`.',
-          },
+          renderProp(
+            "input",
+            "CheckboxGroupParentState",
+            'It must keep an `<input>`; the library sets `type="checkbox"`.',
+          ),
         ]}
       />
       <PartFacts
@@ -331,7 +329,7 @@ export function CheckboxGroupPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Pseudo-class", "Meaning"]}
+        head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
           ["`data-pending`", "Root", "–", "`valueChangeAction` is in flight."],
           [
@@ -379,12 +377,16 @@ export function CheckboxGroupPage() {
         rows={[
           [
             "Tab / Shift+Tab",
-            "Every enabled Item and Parent is a tab stop, in document order.",
+            "Every enabled Item and Parent is a Tab stop, in document order.",
             "no",
           ],
           ["Space", "Toggles the focused box (a Parent follows the click cycle).", "yes"],
           ["Enter", "Submits the form (implicit submission).", "no"],
-          ["Arrows, Home, End", "Nothing (the APG defines no arrow keys for checkboxes).", "–"],
+          [
+            "Any arrow key / Home / End",
+            "Nothing (the APG defines no arrow keys for checkboxes).",
+            "–",
+          ],
         ]}
       />
       <ul>

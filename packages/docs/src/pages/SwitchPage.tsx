@@ -2,7 +2,7 @@ import { CodeBlock } from "../components/CodeBlock.js";
 import { Example } from "../components/Example.js";
 import { BehaviourIndex, BehaviourSection } from "../components/Concept.js";
 import { DocPage } from "../components/DocPage.js";
-import { stylingProps } from "./shared-props.js";
+import { renderProp, stylingProps } from "./shared-props.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { SwitchForm } from "../examples/SwitchForm.js";
 import { SwitchSettings } from "../examples/SwitchSettings.js";
@@ -86,12 +86,11 @@ export function SwitchPage() {
             description: "Submitted with the form when checked (platform default).",
           },
           ...stylingProps("SwitchState"),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: SwitchState) => ReactNode)",
-            description:
-              'Replace the default <input> or take over rendering. Must keep an `<input type="checkbox">` (development warning otherwise); the function form may render siblings next to it.',
-          },
+          renderProp(
+            "input",
+            "SwitchState",
+            'It must keep an `<input type="checkbox">` (development warning otherwise); the function form may render siblings next to it.',
+          ),
         ]}
       />
       <PartFacts
@@ -108,25 +107,28 @@ export function SwitchPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "Pseudo-class", "Meaning"]}
+        head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
           [
             "`data-checked`",
+            "Switch",
             "`:checked`",
             "Optimistic checked state. Identical, because the DOM holds the optimistic value.",
           ],
-          ["`data-pending`", "–", "`checkedChangeAction` is in flight."],
+          ["`data-pending`", "Switch", "–", "`checkedChangeAction` is in flight."],
           [
             "`data-disabled`",
+            "Switch",
             "`:disabled`",
             "The `disabled` prop (or the Field's). Only `:disabled` also sees `<fieldset disabled>`.",
           ],
           [
             "`data-invalid`",
+            "Switch",
             "`:user-invalid`",
             "Inside a `Field.Root`: the Field shows an error for the switch.",
           ],
-          ["–", "`:required`, `:focus-visible`", "Platform only; no attribute."],
+          ["–", "Switch", "`:required`, `:focus-visible`", "Platform only; no attribute."],
         ]}
       />
       <p>
@@ -136,10 +138,10 @@ export function SwitchPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Interaction", "Behaviour"]}
+        head={["Key", "Behaviour"]}
         rows={[
           ["Space", "Toggles (native)."],
-          ["Click, tap, label click", "Toggles (native)."],
+          ["Click (the switch or its label)", "Toggles (native)."],
           ["Enter", "Does not toggle (native); may submit the form."],
           ["Tab", "Focusable unless disabled."],
         ]}

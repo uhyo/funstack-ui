@@ -297,7 +297,7 @@ export function ContextMenuPage() {
         <li>
           Time alone never chooses anything: the menu's corner is under the pointer, so a long,
           still press must not activate the first item, and a menu that flipped away from the
-          pointer stays open after a still release. A submenu trigger opens its submenu while the
+          pointer stays open after a still release. A SubmenuTrigger opens its submenu while the
           pointer rests on it, as with hover.
         </li>
         <li>
@@ -433,12 +433,12 @@ export function ContextMenuPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook or prop", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           [
-            "`data-context`, `state.context`",
+            "`data-context`",
             "`Menu.Popup`",
-            "The current open came from a ContextTrigger and is placed at a point (committed). `data-side` / `data-align` are absent then, and `state.side` is `null`.",
+            "The current open came from a ContextTrigger and is placed at a point (committed; `state.context`). `data-side` / `data-align` are absent then, and `state.side` is `null`.",
           ],
           [
             "`--menu-point-x`, `--menu-point-y`",
@@ -450,23 +450,16 @@ export function ContextMenuPage() {
             "`Menu.Popup`",
             "The vertical gap between the point and the menu: `0px` for a mouse or keyboard open, `16px` for a touch or pen open, which is placed above the point. Inline; your `style` wins (also with `side={null}`).",
           ],
-          [
-            "`side`, `align`",
-            "`Menu.Popup`",
-            "Apply to opens from a `Menu.Trigger`; ignored for a context open. `side={null}` opts out of the inline placement on both paths.",
-          ],
-          [
-            "`onContextMenu` (owned)",
-            "`Menu.Popup`",
-            "Prevents the browser's menu over the custom one.",
-          ],
-          [
-            "`state.context`",
-            "`Menu.Root`",
-            "The current open (optimistic) came from a ContextTrigger.",
-          ],
         ]}
       />
+      <p>
+        On <code>Menu.Popup</code>, <code>side</code> and <code>align</code> apply to opens from a{" "}
+        <code>Menu.Trigger</code> and are ignored for a context open; <code>side={"{null}"}</code>{" "}
+        opts out of the inline placement on both paths. The Popup owns <code>onContextMenu</code>,
+        which prevents the browser&apos;s menu over the custom one. The Root renders no element, so
+        its <code>state.context</code> (the current open, optimistic, came from a ContextTrigger)
+        has no attribute.
+      </p>
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Callout

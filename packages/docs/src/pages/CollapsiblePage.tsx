@@ -45,7 +45,7 @@ export function CollapsiblePage() {
 </Collapsible.Root>`}</CodeBlock>
       <p>
         There is one Trigger and it must be the first child of the Root: that is where the platform
-        puts a <code>&lt;summary&gt;</code>. A trigger placed after the content or outside the Root
+        puts a <code>&lt;summary&gt;</code>. A Trigger placed after the content or outside the Root
         is not possible; drive the Collapsible from elsewhere with controlled <code>open</code>{" "}
         instead (<a href="#recipes">recipe</a>). A heading may go inside the Trigger. If you use{" "}
         <code>render</code>, the Root must still render a <code>&lt;details&gt;</code> and the
@@ -212,11 +212,11 @@ export function CollapsiblePage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:open`", "Root (`details`)", "Committed open state, both modes."],
           ["`data-open`", "Root, Trigger", "Optimistic open state (library mode only)."],
-          ["`data-pending`", "Root, Trigger", "An action is in flight (library mode only)."],
+          ["`data-pending`", "Root, Trigger", "Library mode: an action is in flight."],
           ["`data-disabled`", "Root, Trigger, Panel", "The Root's `disabled` prop."],
           ["`aria-disabled`", "Trigger", '`"true"` when disabled.'],
           ["`::details-content`", "Root", "The native content slot: animate it."],
@@ -243,10 +243,10 @@ export function CollapsiblePage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
-          ["Enter / Space on the trigger", "Toggles (native)."],
-          ["Tab / Shift+Tab", "The trigger is a tab stop; closed content is skipped."],
+          ["Enter / Space", "Trigger", "Toggles (native)."],
+          ["Tab / Shift+Tab", "anywhere", "The Trigger is a Tab stop; closed content is skipped."],
         ]}
       />
       <ul>
@@ -264,7 +264,7 @@ export function CollapsiblePage() {
           The accessible name is the Trigger's content; a label that changes ("Show replies" / "Hide
           replies") is announced through the name, on top of the expanded state.
         </li>
-        <li>A disabled trigger stays focusable. Focus never moves on open or close.</li>
+        <li>A disabled Trigger stays focusable. Focus never moves on open or close.</li>
       </ul>
 
       <BehaviourSection
@@ -286,8 +286,8 @@ export function CollapsiblePage() {
         </Example>
         <ol>
           <li>
-            Click the trigger: the click is intercepted, the chevron flips (<code>data-open</code>),
-            the Root and trigger get <code>data-pending</code>, and{" "}
+            Click the Trigger: the click is intercepted, the chevron flips (<code>data-open</code>),
+            the Root and Trigger get <code>data-pending</code>, and{" "}
             <code>openChangeAction(true, {'{ reason: "activate" }'})</code> runs.
           </li>
           <li>
@@ -316,7 +316,7 @@ export function CollapsiblePage() {
       <BehaviourSection
         id="suspense"
         summary={
-          "The Panel is always mounted; its function child receives the committed `open`, which is how you mount content lazily (library mode: `defaultOpen={false}` is enough). If that content suspends, the `<details>` stays closed with the trigger pending until the content is ready, then opens. Trigger content must not suspend."
+          "The Panel is always mounted; its function child receives the committed `open`, which is how you mount content lazily (library mode: `defaultOpen={false}` is enough). If that content suspends, the `<details>` stays closed with the Trigger pending until the content is ready, then opens. Trigger content must not suspend."
         }
       >
         <Example file="CollapsibleReplies.tsx" css="collapsible.css">

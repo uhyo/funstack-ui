@@ -17,10 +17,10 @@ export function RadioGroupPage() {
       <p className="page-intro">
         A radio group (WAI-ARIA Radio Group pattern, native radio variant): a{" "}
         <code>&lt;fieldset&gt;</code> of real <code>&lt;input type="radio"&gt;</code> elements. The
-        platform supplies the single tab stop, arrow keys (wrapping and RTL-mirrored outside
-        Safari), forms and validation. The library adds one thing: the checked value is changed
-        through <code>valueChangeAction</code> in a transition, with optimistic feedback and{" "}
-        <code>data-pending</code>.
+        platform supplies the single Tab stop, arrow keys (wrapping, and swapped under{" "}
+        <code>direction: rtl</code>, except in Safari), forms and validation. The library adds one
+        thing: the checked value is changed through <code>valueChangeAction</code> in a transition,
+        with optimistic feedback and <code>data-pending</code>.
       </p>
 
       <Example file="RadioGroupTheme.tsx" css="radio-group.css">
@@ -173,12 +173,11 @@ export function RadioGroupPage() {
             description: "Native `disabled`: unfocusable, skipped by the arrow keys.",
           },
           ...stylingProps("RadioGroupItemState"),
-          {
-            name: "render",
-            type: "ReactElement | ((props, state: RadioGroupItemState) => ReactNode)",
-            description:
-              'Replace the default <input>. Must keep an `<input>`; the library sets `type="radio"`.',
-          },
+          renderProp(
+            "input",
+            "RadioGroupItemState",
+            'It must keep an `<input>`; the library sets `type="radio"`.',
+          ),
         ]}
       />
       <PartFacts
@@ -195,7 +194,7 @@ export function RadioGroupPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Pseudo-class", "Meaning"]}
+        head={["Attribute", "On", "Pseudo-class", "Meaning"]}
         rows={[
           ["`data-pending`", "Root", "–", "`valueChangeAction` is in flight."],
           [
@@ -248,12 +247,12 @@ export function RadioGroupPage() {
           ["Space", "Checks the focused radio.", "yes"],
           [
             "ArrowDown / ArrowRight",
-            'Focuses and checks the next enabled radio, wrapping (not in Safari). Mirrored under `dir="rtl"` (not in Safari).',
+            "Focuses and checks the next enabled radio, wrapping (not in Safari). Swapped under `direction: rtl` (not in Safari).",
             "yes, once per press",
           ],
           [
             "ArrowUp / ArrowLeft",
-            "Previous enabled radio, wrapping (not in Safari). Mirrored under RTL (not in Safari).",
+            "Focuses and checks the previous enabled radio, wrapping (not in Safari). Swapped under `direction: rtl` (not in Safari).",
             "yes, once per press",
           ],
           ["Enter", "Submits the form (implicit submission).", "no"],
@@ -278,7 +277,7 @@ export function RadioGroupPage() {
         </li>
         <li>
           The library never moves focus, not even on rollback: focus stays on the radio the user
-          reached, and the checked radio is the group's tab stop again.
+          reached, and the checked radio is the group's Tab stop again.
         </li>
         <li>
           No <code>aria-checked</code> (forbidden on native inputs) and no <code>tabindex</code>{" "}
@@ -362,7 +361,7 @@ export function RadioGroupPage() {
   </label>
 </fieldset>`}</CodeBlock>
         <p>
-          The browser still provides the single tab stop, the arrow keys, <code>required</code> and
+          The browser still provides the single Tab stop, the arrow keys, <code>required</code> and
           submission. For a required group, do what the Root does: put <code>required</code> on
           every radio and <code>aria-required="true"</code> on the fieldset, so the radiogroup
           itself is announced as required. Compared with <code>RadioGroup</code>, every radio needs

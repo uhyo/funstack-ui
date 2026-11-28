@@ -235,7 +235,7 @@ export function DrawerPage() {
       />
       <PartFacts
         state={"`DrawerRootState` is `{ open, pending, modal }` (Dialog's)."}
-        owned={"nothing rendered: the Root has no element."}
+        owned={"none: the Root renders no element (no `ref`, `className` or `style`)."}
       />
 
       <h4>
@@ -344,9 +344,9 @@ export function DrawerPage() {
         <a href="/components/dialog#props">the Dialog props</a>.
       </p>
 
-      <h3 id="data-attributes">Data attributes and custom properties</h3>
+      <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:open`, `:modal`, `::backdrop`", "Popup", "As on a Dialog."],
           [
@@ -375,7 +375,7 @@ export function DrawerPage() {
             "Trigger",
             "As on a Dialog: optimistic in library mode; in JS-free mode whether the dialog is open, written from its `toggle` event.",
           ],
-          ["`data-pending`", "Trigger", "Library mode, as on a Dialog."],
+          ["`data-pending`", "Trigger", "Library mode: as on a Dialog."],
           [
             "`data-pending`",
             "Close",
@@ -459,7 +459,7 @@ export function DrawerPage() {
         </p>
       </BehaviourSection>
 
-      <h3 id="recipes">CSS recipes</h3>
+      <h3 id="recipes">Recipes</h3>
       <h4 id="starter-stylesheet">The starter stylesheet</h4>
       <p>
         One <code>transition</code> on <code>translate</code> is the enter, the exit, the release of
@@ -555,7 +555,6 @@ html:has(.drawer:modal) .app { scale: .96; border-radius: 12px; }
 /* A drawer that steps back while a nested one is open (the inner one is in the top layer). */
 .drawer:has(dialog:open) { scale: .96; }`}</CodeBlock>
 
-      <h3 id="recipes-react">Recipes</h3>
       <h4>Tell a swipe from Escape</h4>
       <CodeBlock>{`<Drawer.Root
   defaultOpen={false}

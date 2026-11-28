@@ -130,14 +130,14 @@ export function AccordionPage() {
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: 'Disables every item: triggers get aria-disabled="true" and never toggle.',
+            description: 'Disables every item: Triggers get aria-disabled="true" and never toggle.',
           },
           {
             name: "loop",
             type: "boolean",
             default: "true",
             description:
-              "ArrowDown on the last trigger moves to the first and ArrowUp on the first to the last. With false the arrows stop at the ends.",
+              "ArrowDown on the last Trigger moves to the first and ArrowUp on the first to the last. With false the arrows stop at the ends.",
           },
           {
             name: "experimental_interpolateSize",
@@ -257,7 +257,7 @@ export function AccordionPage() {
 
       <h3 id="data-attributes">Data attributes</h3>
       <Table
-        head={["Hook", "On", "Meaning"]}
+        head={["Attribute", "On", "Meaning"]}
         rows={[
           ["`:open`", "Item (`details`)", "Committed open state, both modes."],
           ["`data-open`", "Item, Trigger", "Optimistic open state (library mode only)."],
@@ -289,17 +289,19 @@ export function AccordionPage() {
 
       <h3 id="keyboard-and-aria">Keyboard and ARIA</h3>
       <Table
-        head={["Key", "Behaviour"]}
+        head={["Key", "Where", "Behaviour"]}
         rows={[
-          ["Enter / Space on a trigger", "Toggles the item (native)."],
-          ["Tab / Shift+Tab", "Every trigger is a tab stop."],
+          ["Enter / Space", "Trigger", "Toggles the Item (native)."],
+          ["Tab / Shift+Tab", "anywhere", "Every Trigger is a Tab stop."],
           [
             "ArrowDown / ArrowUp",
-            "Next / previous trigger in the same Root, disabled ones included; wraps at the ends unless `loop={false}`.",
+            "Trigger",
+            "Next / previous Trigger in the same Root, disabled ones included; wraps if `loop`.",
           ],
-          ["Home / End", "First / last trigger, disabled or not."],
+          ["Home / End", "Trigger", "First / last Trigger, disabled or not."],
           [
             "Any of these with Alt, Ctrl or Meta, or already default-prevented",
+            "Trigger",
             "Not handled: the key is the browser's (Ctrl+Home scrolls the page).",
           ],
         ]}
@@ -315,7 +317,7 @@ export function AccordionPage() {
           render an <code>aria-live</code> region from the Trigger's state.
         </li>
         <li>
-          Disabled triggers stay focusable and the arrow keys reach them, so they are announced as
+          Disabled Triggers stay focusable and the arrow keys reach them, so they are announced as
           unavailable. Focus never moves on open or close.
         </li>
       </ul>
@@ -339,8 +341,8 @@ export function AccordionPage() {
         </Example>
         <ol>
           <li>
-            Click a trigger: the click is intercepted, the chevron flips (<code>data-open</code>),
-            the item and trigger get <code>data-pending</code>, and{" "}
+            Click a Trigger: the click is intercepted, the chevron flips (<code>data-open</code>),
+            the item and Trigger get <code>data-pending</code>, and{" "}
             <code>
               valueChangeAction(next, {'{ reason: "activate", added: [item], removed: [] }'})
             </code>{" "}
@@ -375,7 +377,7 @@ export function AccordionPage() {
       <BehaviourSection
         id="suspense"
         summary={
-          "The Panel is always mounted; its function child receives the committed `open`, which is how you mount content lazily. If that content suspends, the item stays closed with the trigger pending until the content is ready, then opens. Trigger content must not suspend."
+          "The Panel is always mounted; its function child receives the committed `open`, which is how you mount content lazily. If that content suspends, the item stays closed with the Trigger pending until the content is ready, then opens. Trigger content must not suspend."
         }
       />
 
