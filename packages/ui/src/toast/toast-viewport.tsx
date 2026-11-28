@@ -44,6 +44,8 @@ export interface ToastViewportState {
   readonly queued: number;
   /** A viewport-wide pause holds (pointer over the region, focus inside, hidden document, blurred window). */
   readonly paused: boolean;
+  /** No toast is rendered (`state.toasts` is empty), rendered as `data-empty`. */
+  readonly empty: boolean;
 }
 
 /**
@@ -475,6 +477,7 @@ export function ToastViewport({
     toasts: visible.map((e) => e.item),
     queued: queued.length,
     paused,
+    empty: visible.length === 0,
   };
 
   const regionCallbackRef = useCallback((element: HTMLElement) => {
@@ -506,7 +509,7 @@ export function ToastViewport({
     popover: "manual",
     "aria-label": rest["aria-label"] ?? regionLabel(hotkey),
     "data-paused": dataAttr(paused),
-    "data-empty": dataAttr(state.toasts.length === 0),
+    "data-empty": dataAttr(state.empty),
     onPointerEnter,
     onPointerLeave,
     onFocus,

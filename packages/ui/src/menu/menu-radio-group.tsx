@@ -4,7 +4,13 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  RenderProp,
+  StateValue,
+} from "../internal/types.js";
 import { useControllableAction } from "../internal/action/use-controllable-action.js";
 import { useRender } from "../internal/use-render.js";
 import { MenuGroupContext, MenuRadioGroupContext } from "./menu-context.js";
@@ -19,6 +25,15 @@ export interface MenuRadioGroupState {
   readonly value: string | null;
   /** `valueChangeAction` is in flight. */
   readonly pending: boolean;
+}
+
+/** Details passed as the second argument of `Menu.RadioGroup`'s `valueChangeAction`. */
+export interface MenuRadioGroupValueChangeDetails extends ActionDetails {
+  /**
+   * Always `"activate"`: a `Menu.RadioItem` was chosen (click, Enter or Space); `event` is the
+   * native `click` or `keydown` event.
+   */
+  readonly reason: ChangeReason;
 }
 
 /**
@@ -43,7 +58,7 @@ export interface MenuRadioGroupProps extends Omit<
    * `aria-checked` follow at once and roll back on rejection. Re-activating the selected item
    * dispatches nothing. May be a Server Function.
    */
-  valueChangeAction?: ChangeAction<string>;
+  valueChangeAction?: ChangeAction<string, MenuRadioGroupValueChangeDetails>;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuRadioGroupState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -77,7 +92,10 @@ export function MenuRadioGroup({
   // the dispatch's details object.
   const after = useRef(new WeakMap<object, () => void>());
 
-  const { optimistic, pending, dispatch } = useControllableAction<string | null>({
+  const { optimistic, pending, dispatch } = useControllableAction<
+    string | null,
+    MenuRadioGroupValueChangeDetails
+  >({
     controlled: value,
     defaultValue,
     initialValue: null,
@@ -95,7 +113,7 @@ export function MenuRadioGroup({
       value: optimistic,
       pending,
       select: (next, event, then) => {
-        const details = createActionDetails(event, {});
+        const details = createActionDetails(event, { reason: "activate" as const });
         if (then !== undefined) after.current.set(details, then);
         dispatch(next, details);
       },

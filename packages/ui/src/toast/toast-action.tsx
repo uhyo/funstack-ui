@@ -30,14 +30,14 @@ export interface ToastActionState {
  */
 export interface ToastActionProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "className" | "style" | "children"
+  "onClick" | "type" | "aria-disabled" | "className" | "style" | "children"
 > {
   /**
    * Runs in this part's own transition: `data-pending` on the Action and the Root, the toast's
    * timer paused. When it resolves the toast closes with `reason: "activate"` (unless
-   * `closeOnSettle` is `false`); a rejection keeps the toast and reaches the nearest Error
+   * `closeOnActivate` is `false`); a rejection keeps the toast and reaches the nearest Error
    * Boundary above the Viewport. A caught error counts as success and closes the toast: rethrow
-   * after `toast.update`, or use `closeOnSettle={false}`.
+   * after `toast.update`, or use `closeOnActivate={false}`.
    *
    * @defaultValue the toast's `action.action`
    */
@@ -47,15 +47,15 @@ export interface ToastActionProps extends Omit<
    *
    * @defaultValue `true`
    */
-  closeOnSettle?: boolean;
+  closeOnActivate?: boolean;
   /**
    * What a click does while this part's action is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile): one Undo, one Retry. `"run"`: the action runs
    * again; the Action and the Root stay `data-pending` and the timer paused until every run has
-   * settled. With `closeOnSettle` the toast then closes once, if the latest run resolved; a
+   * settled. With `closeOnActivate` the toast then closes once, if the latest run resolved; a
    * rejected latest run keeps it, as in `"ignore"` mode.
    *
-   * @defaultValue `"ignore"`, or `"run"` with `closeOnSettle={false}`
+   * @defaultValue `"ignore"`, or `"run"` with `closeOnActivate={false}`
    */
   whilePending?: WhilePending;
   /**
@@ -84,16 +84,16 @@ export interface ToastActionProps extends Omit<
  * The toast's action button (Undo, Retry, View): a `button type="button"` whose `action` runs as
  * a transition. Renders nothing when neither the part nor the toast has an action. Never natively
  * disabled while pending: a second click meanwhile is ignored and the Action is `aria-disabled`,
- * unless `whilePending` is `"run"` (the default with `closeOnSettle={false}`).
+ * unless `whilePending` is `"run"` (the default with `closeOnActivate={false}`).
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `onClick`,
- * `aria-disabled`, `data-pending`, `data-disabled`.
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `onClick`, `aria-disabled`. Also owned: `disabled`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/toast
  */
 export function ToastAction({
   action,
-  closeOnSettle = true,
+  closeOnActivate = true,
   whilePending,
   disabled = false,
   children,
@@ -107,7 +107,7 @@ export function ToastAction({
   // action; a toast that stays makes the Action a user-owned trigger.
   const trigger = usePureTrigger({
     whilePending,
-    defaultWhilePending: closeOnSettle ? "ignore" : "run",
+    defaultWhilePending: closeOnActivate ? "ignore" : "run",
   });
   const { pending } = trigger;
   const [token] = useState(() => ({}));
@@ -140,7 +140,7 @@ export function ToastAction({
       () => effective(details),
       () => {
         // Closing is idempotent: a dismissal meanwhile already closed it.
-        if (closeOnSettle) root.close("activate", native);
+        if (closeOnActivate) root.close("activate", native);
       },
     );
   };

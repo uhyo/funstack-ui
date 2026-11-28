@@ -369,7 +369,7 @@ describe("Menu (browser)", () => {
     });
   });
 
-  describe("experimental_focusgroup", () => {
+  describe("experimental_focusGroup", () => {
     it(
       supportsFocusgroup
         ? "native path: the browser moves focus (keydown not prevented), items have no tabindex"
@@ -385,7 +385,7 @@ describe("Menu (browser)", () => {
         onCleanup(() => document.removeEventListener("keydown", listener));
         const action = vi.fn();
         render(
-          <Basic popup={{ experimental_focusgroup: true }}>
+          <Basic popup={{ experimental_focusGroup: true }}>
             <Menu.Item data-testid="rename">Rename</Menu.Item>
             <Menu.Item data-testid="duplicate" action={action}>
               Duplicate

@@ -108,14 +108,16 @@ export interface PopoverPopupProps extends Omit<
    * itself. Animates the opening commit, content changes while open, and every library-driven
    * close (Trigger, Close, controlled `open={false}`), in all engines; dismissals (Escape,
    * click outside) are the browser's and animate with CSS only. Ignored (dev warning) in JS-free
-   * mode. While a view transition runs, the popup's CSS transitions are turned off for the moment
-   * of the library's own show or hide (an inline `transition: none !important`, restored right
-   * after), so that show or hide runs no CSS transition (a `@keyframes` animation is not cut).
+   * mode.
    *
    * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   * A plain open starts none: the children mount under the already-mounted popover element.
+   * mount or `<Activity>` reveal of the Popup inside a transition start a document view
+   * transition (a ~250 ms page cross-fade that the next transition waits for); a plain open
+   * starts none, as the content mounts under the already-mounted popup element. While a view
+   * transition runs, the popup's CSS transitions are cut for the moment of the library's own
+   * show or hide (an inline `transition: none !important`, restored right after), so only the
+   * view transition animates it; a `@keyframes` animation is not cut, and a dismissal, which
+   * runs no view transition, keeps its CSS exit.
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */

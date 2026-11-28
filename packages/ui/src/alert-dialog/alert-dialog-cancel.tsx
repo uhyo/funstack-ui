@@ -2,7 +2,7 @@
 import { use, useCallback } from "react";
 import { useDialogClose } from "../dialog/dialog-close.js";
 import type {
-  DialogCloseDetails,
+  DialogCloseActionDetails,
   DialogCloseProps,
   DialogCloseState,
 } from "../dialog/dialog-close.js";
@@ -15,7 +15,7 @@ import { AlertDialogCancelContext } from "./alert-dialog-context.js";
 export type AlertDialogCancelState = DialogCloseState;
 
 /** Details passed to `AlertDialog.Cancel`'s `action`: Dialog.Close's. */
-export type AlertDialogCancelDetails = DialogCloseDetails;
+export type AlertDialogCancelActionDetails = DialogCloseActionDetails;
 
 /**
  * Props of `AlertDialog.Cancel`: `Dialog.Close`'s (`value` defaults to `""`, what Escape

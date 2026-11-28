@@ -305,7 +305,9 @@ export function NavigationMenuPage() {
         ]}
       />
       <PartFacts
-        state={"`NavigationMenuTriggerState` is `{ open, pending, disabled }` (Popover.Trigger's)."}
+        state={
+          "`NavigationMenuTriggerState` is `{ open, pending, disabled }` (Popover.Trigger's). In JS-free mode `state.open` is `false` (React holds no value) while `data-open` follows the panel, written from its `toggle` event."
+        }
         owned={
           "`type`, `disabled`, `popoverTarget`, `aria-expanded` (never rendered on a button: the browser exposes the panel's state on its invoker), `onClick` in library mode, `data-open`, `data-pending`, `data-disabled`; `commandfor`, `command` and `popoverTargetAction` are not accepted."
         }
@@ -341,7 +343,7 @@ export function NavigationMenuPage() {
             name: "transition",
             type: "ViewTransitionClass",
             description:
-              "Library mode only: a `<ViewTransition>` around the panel animates library-driven opens and closes (the Trigger, a followed Link, a controlled change). Dismissals animate with CSS. Static: changing it remounts the panel.",
+              "Library mode only: a `<ViewTransition>` around the panel animates library-driven opens and closes (the Trigger, a followed Link, a controlled change). Dismissals animate with CSS. Keep it static: changing it remounts the popup. Any value, `\"none\"` included, makes a mount or `<Activity>` reveal of the Popup inside a transition run the page cross-fade; a plain open does not. While a view transition runs, the popup's CSS transitions are cut for the library's own show or hide (a `@keyframes` animation is not, and a dismissal keeps its CSS exit).",
           },
           ...functionProps(
             "NavigationMenuPopupState",

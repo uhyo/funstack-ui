@@ -120,10 +120,11 @@ export interface UsePopoverTriggerOptions<State> {
    */
   readonly submenuItem?: boolean;
   /**
-   * `Menu.Trigger` inside a `Menubar`: an item of the bar, so `disabled` renders
-   * `aria-disabled="true"` and the element stays focusable, as with `submenuItem`; the click
-   * still toggles and the non-button warning is the ordinary one
-   * (design/components/menubar.md 5).
+   * `Menu.Trigger` inside a `Menubar`, or any overlay Trigger inside a `Toolbar.Root`
+   * (conventions 3.6): an item of the bar, so `disabled` renders `aria-disabled="true"` and the
+   * element stays focusable, as with `submenuItem`; the click still toggles and the non-button
+   * warning is the ordinary one (design/components/menubar.md 5). While disabled no
+   * `popovertarget` is rendered, and in JS-free mode the click is cancelled.
    */
   readonly alwaysFocusable?: boolean;
 }

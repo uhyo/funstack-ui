@@ -41,6 +41,10 @@ export interface MenuTriggerProps extends Omit<
   | "onClick"
   | "onKeyDown"
   | "onMouseDown"
+  | "id"
+  | "role"
+  | "type"
+  | "aria-disabled"
   | "aria-expanded"
   | "aria-haspopup"
   | "commandfor"
@@ -53,7 +57,8 @@ export interface MenuTriggerProps extends Omit<
 > {
   /**
    * The menu cannot be opened from this button. Native `disabled` on a `<button>`; with a link or
-   * component `render`, `aria-disabled="true"` instead (the element stays focusable).
+   * component `render`, and inside a `Menubar` or a `Toolbar.Root` (conventions 3.6),
+   * `aria-disabled="true"` instead (the element stays focusable).
    *
    * @defaultValue `false`
    */
@@ -126,11 +131,12 @@ function openFromBar(menu: MenuContextValue, event: Event, focus: MenubarOpenFoc
  * focusable and never opens). Moving the pointer onto it while another menu of the bar is open
  * switches to its menu.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `id`, `disabled`, `aria-disabled`
- * (link or component `render`, and in a Menubar), `popoverTarget`, `aria-haspopup`,
- * `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`,
- * `data-disabled`, and in a Menubar `role`; `commandfor`, `command` and `popoverTargetAction`
- * (never written; omitted from the props type). In a Menubar the hover switch is an
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `aria-disabled` (link or component `render`, and in a Menubar or a Toolbar), `popoverTarget`,
+ * `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown`; `commandfor`,
+ * `command` and `popoverTargetAction` (never written), `id` (the menu's `aria-labelledby`
+ * names it), `role` (written in a Menubar). Also owned: `disabled`, `data-open`,
+ * `data-pending`, `data-disabled`. In a Menubar the hover switch is an
  * `onPointerMove` handler merged with the consumer's (theirs runs first).
  *
  * @see https://ui.funstack.work/components/menu
@@ -211,7 +217,8 @@ export function MenuTrigger({
     part: "Menu.Trigger",
     disabled,
     render,
-    alwaysFocusable: inBar,
+    // An item of a Menubar, or of a Toolbar (conventions 3.6): disabled stays focusable.
+    alwaysFocusable: inBar || toolbar !== null,
     handlers: {
       onKeyDown,
       // Only in a bar: an `undefined` key in the owned layer would remove the consumer's handler.

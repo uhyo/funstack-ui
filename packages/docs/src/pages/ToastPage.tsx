@@ -144,13 +144,13 @@ toast({ title: "Link copied" });`}</CodeBlock>
         <a href="/concepts/pending-and-optimistic#pure-trigger">pure trigger</a>, like{" "}
         <code>Menu.Item</code>. While its action runs the Action and the Root carry{" "}
         <code>data-pending</code> and the toast's timer is paused; when it resolves the toast closes
-        with <code>reason: "activate"</code> (unless <code>closeOnSettle={"{false}"}</code>). A
+        with <code>reason: "activate"</code> (unless <code>closeOnActivate={"{false}"}</code>). A
         second click meanwhile is ignored and the Action is <code>aria-disabled="true"</code>: one
-        Undo, one Retry. With <code>closeOnSettle={"{false}"}</code> the toast stays and the Action
-        is your own trigger, so every click runs (add <code>whilePending="ignore"</code> for a Retry
-        that must not overlap). A rejection keeps the toast and reaches the nearest Error Boundary{" "}
-        <strong>above the Viewport</strong>: put one around the list. Not when the Action is gone or
-        hidden by the time it rejects: the toast was closed while the action ran, or a{" "}
+        Undo, one Retry. With <code>closeOnActivate={"{false}"}</code> the toast stays and the
+        Action is your own trigger, so every click runs (add <code>whilePending="ignore"</code> for
+        a Retry that must not overlap). A rejection keeps the toast and reaches the nearest Error
+        Boundary <strong>above the Viewport</strong>: put one around the list. Not when the Action
+        is gone or hidden by the time it rejects: the toast was closed while the action ran, or a{" "}
         <code>toast.update</code> gave it content that is still suspending. The error then goes to
         the global <code>reportError</code> (a window <code>error</code> event) instead.
       </p>
@@ -159,7 +159,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
           A <code>catch</code> inside the action resolves it, and a resolved action closes the
           toast, so a "Could not undo" written with <code>toast.update</code> in the{" "}
           <code>catch</code> is never seen. Rethrow after the update (the toast stays; the boundary
-          above the Viewport gets the error), or use <code>closeOnSettle={"{false}"}</code>,{" "}
+          above the Viewport gets the error), or use <code>closeOnActivate={"{false}"}</code>,{" "}
           <code>whilePending="ignore"</code> and <code>toast.dismiss(details.id)</code> on success.
         </p>
       </Callout>
@@ -370,7 +370,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
       />
       <PartFacts
         state={
-          "`ToastViewportState` is `{ toasts, queued, paused }`; `toasts` is chronological (oldest first) and includes the ones animating out; `paused` is true while a viewport-wide pause holds."
+          "`ToastViewportState` is `{ toasts, queued, paused, empty }`; `toasts` is chronological (oldest first) and includes the ones animating out; `paused` is true while a viewport-wide pause holds; `empty` is true while no toast is rendered (`data-empty`)."
         }
         owned={
           '`popover` (`"manual"`), `aria-label` (your own wins verbatim), `data-paused`, `data-empty`, and the pointer and focus handlers.'
@@ -402,10 +402,10 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <PartFacts
         state={"`ToastRootState` is `{ toast, pending, ending, type, priority }`."}
         owned={
-          '`role` (`dialog`, or `alertdialog` for `priority: "high"`), `tabIndex`, `aria-labelledby`, `aria-describedby`, `inert` (while ending), `onKeyDown`, `data-type`, `data-pending`, `data-ending`.'
+          '`role` (`dialog`, or `alertdialog` for `priority: "high"`), `tabIndex`, `inert` (while ending), `onKeyDown` (none of these four is in the props type), `data-type`, `data-priority`, `data-pending`, `data-ending`. `aria-labelledby` and `aria-describedby` are merged with yours.'
         }
         note={
-          "`Toast.Title` (`div`) and `Toast.Description` (`p`) take the same function props against the Root's state; their `children` default to `toast.title` / `toast.description`, and the Description renders nothing when it has neither."
+          "`Toast.Title` (`div`) and `Toast.Description` (`p`) take the same function props against the Root's state (exported as `ToastTitleState` and `ToastDescriptionState`); their `children` default to `toast.title` / `toast.description`, and the Description renders nothing when it has neither."
         }
       />
 
@@ -422,7 +422,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
               "Runs in this part's transition. The part renders nothing when neither it nor the toast has an action.",
           },
           {
-            name: "closeOnSettle",
+            name: "closeOnActivate",
             type: "boolean",
             default: "true",
             description: 'Close the toast (`reason: "activate"`) when the action resolves.',
@@ -430,9 +430,9 @@ toast({ title: "Link copied" });`}</CodeBlock>
           {
             name: "whilePending",
             type: '"run" | "ignore"',
-            default: '"ignore", or "run" with closeOnSettle={false}',
+            default: '"ignore", or "run" with closeOnActivate={false}',
             description:
-              'What a click does while this part\'s action is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the Action and the Root stay `data-pending` and the timer paused until every run has settled; with `closeOnSettle` the toast then closes once, if the latest run resolved (a rejection keeps it, in both modes). Set it on the part: `toast({ action })` has no such option. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
+              'What a click does while this part\'s action is pending. `"ignore"`: nothing (the click is cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the Action and the Root stay `data-pending` and the timer paused until every run has settled; with `closeOnActivate` the toast then closes once, if the latest run resolved (a rejection keeps it, in both modes). Set it on the part: `toast({ action })` has no such option. See [A second click while pending](/concepts/pending-and-optimistic#second-click).',
           },
           {
             name: "disabled",
@@ -450,10 +450,10 @@ toast({ title: "Link copied" });`}</CodeBlock>
           "`ToastActionState` is `{ pending, disabled, toast }`; `disabled` is the prop, never set by pending."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `onClick`, `aria-disabled`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `onClick`, `aria-disabled`, `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `onClick`."
         }
         note={
-          'By default (`whilePending="ignore"` unless `closeOnSettle={false}`) a second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is then `aria-disabled="true"` while it shows `data-pending`; it is never natively disabled, so it keeps focus.'
+          'By default (`whilePending="ignore"` unless `closeOnActivate={false}`) a second click while the action is pending is ignored (and cancelled): one Undo, one Retry. The Action is then `aria-disabled="true"` while it shows `data-pending`; it is never natively disabled, so it keeps focus.'
         }
       />
 
@@ -476,7 +476,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <PartFacts
         state={"`ToastCloseState` is `{ disabled, toast }`."}
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (link or component `render`), `onClick`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `onClick`."
         }
         note={
           'Closes the toast with `reason: "dismiss"`, like Escape. Give it a name (text or `aria-label`); development warns otherwise.'
@@ -495,7 +495,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
           [
             "`aria-disabled`",
             "Action, Close",
-            '`"true"` on the Action while `data-pending` with `whilePending="ignore"` (the default unless `closeOnSettle={false}`): a second click is ignored. Also on either part when `disabled` with a link or component `render`',
+            '`"true"` on the Action while `data-pending` with `whilePending="ignore"` (the default unless `closeOnActivate={false}`): a second click is ignored. Also on either part when `disabled` with a link or component `render`',
           ],
           ["`data-disabled`", "Action, Close", "The part's `disabled` prop (never set by pending)"],
           [
@@ -504,6 +504,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
             "Closed, kept (and `inert`) until the animations the ending state started finish",
           ],
           ["`data-type`", "Root", "The toast's `type`"],
+          ["`data-priority`", "Root", '`"normal"` or `"high"`: the toast\'s `priority`, resolved'],
           [
             "`data-paused`",
             "Viewport",

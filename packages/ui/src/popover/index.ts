@@ -40,6 +40,10 @@ export type {
   PopoverSide,
   PopoverAlign,
 } from "./popover-popup.js";
-export type { PopoverCloseProps, PopoverCloseState } from "./popover-close.js";
+export type {
+  PopoverCloseProps,
+  PopoverCloseState,
+  PopoverCloseActionDetails,
+} from "./popover-close.js";
 export type { PopoverTitleProps, PopoverTitleState } from "./popover-title.js";
 export type { PopoverDescriptionProps, PopoverDescriptionState } from "./popover-description.js";

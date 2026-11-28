@@ -15,7 +15,7 @@ export function MenuViewOptions() {
     <div className="demo-stack">
       <Menu.Root>
         <Menu.Trigger className="demo-button">View</Menu.Trigger>
-        <Menu.Popup className="demo-menu" experimental_focusgroup>
+        <Menu.Popup className="demo-menu" experimental_focusGroup>
           <Menu.CheckboxItem
             checked={dense}
             checkedChangeAction={async (next) => {

@@ -27,6 +27,9 @@ export interface PopoverCloseState {
   readonly disabled: boolean;
 }
 
+/** Details passed to `Popover.Close`'s `action`. */
+export interface PopoverCloseActionDetails extends ActionDetails {}
+
 /**
  * Props of `Popover.Close`.
  *
@@ -34,7 +37,16 @@ export interface PopoverCloseState {
  */
 export interface PopoverCloseProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "className" | "style" | "children"
+  | "onClick"
+  | "type"
+  | "commandfor"
+  | "command"
+  | "popoverTarget"
+  | "popoverTargetAction"
+  | "aria-disabled"
+  | "className"
+  | "style"
+  | "children"
 > {
   /**
    * Runs inside this part's own transition (`data-pending` on the button), then closes the
@@ -46,7 +58,7 @@ export interface PopoverCloseProps extends Omit<
    * does nothing instead of hiding the popover without running the action. Without `action` in
    * JS-free mode the button is a native `command="hide-popover"` invoker.
    */
-  action?: Action<[details: ActionDetails]>;
+  action?: Action<[details: PopoverCloseActionDetails]>;
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`
@@ -89,9 +101,10 @@ export interface PopoverCloseProps extends Omit<
  * inside its own popover exposes no state either way, and the `command` event tells the Popup a
  * foreign hide's reason.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `commandfor`,
- * `command` (neither rendered with `action`), `onClick` (library mode, or with `action`), `aria-disabled`, `data-pending`,
- * `data-disabled`.
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `commandfor`, `command` (neither rendered with `action`), `popoverTarget` and
+ * `popoverTargetAction` (never written), `onClick` (library mode, or with `action`),
+ * `aria-disabled`. Also owned: `disabled`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/popover
  */

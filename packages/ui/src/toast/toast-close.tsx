@@ -28,7 +28,7 @@ export interface ToastCloseState {
  */
 export interface ToastCloseProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "className" | "style" | "children"
+  "onClick" | "type" | "aria-disabled" | "className" | "style" | "children"
 > {
   /**
    * Never closes. Native `disabled` on a `<button>` (owned; a `render` element cannot re-enable
@@ -52,8 +52,8 @@ export interface ToastCloseProps extends Omit<
  * Dismisses the toast (`reason: "dismiss"`, the same as Escape). Label it yourself (`aria-label`
  * or text). No Invoker Command: `hide-popover` would hide the whole region.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>` only), `disabled`, `aria-disabled`,
- * `onClick`, `data-disabled`.
+ * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * `aria-disabled`, `onClick`. Also owned: `disabled`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/toast
  */

@@ -232,7 +232,7 @@ export function DialogPage() {
             type: "boolean",
             default: "false",
             description:
-              'Native `disabled`: a disabled button is not an invoker and never opens. With a link or component `render` where the Trigger handles the click (library mode, or a non-modal dialog), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode (it cannot be natively disabled), and its click is cancelled.',
+              'Native `disabled`: a disabled button is not an invoker and never opens. With a link or component `render` where the Trigger handles the click (library mode, or a non-modal dialog), `aria-disabled="true"` instead (the element stays focusable). A host link is `aria-disabled` in every mode (it cannot be natively disabled), and its click is cancelled. Inside a [`Toolbar.Root`](/components/toolbar), in every mode, a disabled Trigger is `aria-disabled="true"` instead: it stays focusable and in the arrow-key sequence, renders no invoker attribute, and its click is cancelled.',
           },
           ...functionProps(
             "DialogTriggerState",
@@ -243,10 +243,10 @@ export function DialogPage() {
       />
       <PartFacts
         state={
-          "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends, but a request still running when a dismissal superseded it keeps `pending` until that request settles."
+          "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends, but a request still running when a dismissal superseded it keeps `pending` until that request settles. In JS-free mode `state.open` is `false` (React holds no value) while `data-open` follows the dialog, written from its `toggle` event."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a host link, or a component `render` with the click handler installed), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a host link, a component `render` with the click handler installed, or inside a Toolbar), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode; runs after yours, so it stays in the props type), `data-open`, `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
         }
       />
 
@@ -306,7 +306,7 @@ export function DialogPage() {
             name: "transition",
             type: "ViewTransitionClass",
             description:
-              "Library mode only. Forwarded to the `<ViewTransition>` around the dialog; without it no boundary is rendered. Animates the opening commit, content swaps while open, and every library-driven close (a Close part, a Form submit or settled action, a foreign close command, a controlled `open={false}`) in all engines. Dismissals (Escape, a click outside) are the browser's and animate with CSS only. Keep it static; any value makes a Root inserted by a transition run the page cross-fade.",
+              "Library mode only. Forwarded to the `<ViewTransition>` around the dialog; without it no boundary is rendered. Animates the opening commit, content swaps while open, and every library-driven close (a Close part, a Form submit or settled action, a foreign close command, a controlled `open={false}`) in all engines. Dismissals (Escape, a click outside) are the browser's and animate with CSS only. Keep it static: changing it remounts the popup. Any value, `\"none\"` included, makes a mount or `<Activity>` reveal of the Popup inside a transition run the page cross-fade; a plain open does not. While a view transition runs, the popup's CSS transitions are cut for the library's own show or hide (a `@keyframes` animation is not, and a dismissal keeps its CSS exit).",
           },
           ...functionProps("DialogPopupState"),
           renderProp("dialog", "DialogPopupState"),
@@ -317,7 +317,7 @@ export function DialogPage() {
           "`DialogPopupState` is `{ open, modal }`; `open` is committed (`false` in JS-free mode; `:open` is the DOM truth)."
         }
         owned={
-          "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` are merged with yours. `onToggle` and `onBeforeToggle` are not accepted: use a `ref` for the platform events."
+          "`id`, `open` (never rendered: opening goes through `showModal()` only), `closedby`, `data-modal`, `suppressHydrationWarning`; `aria-labelledby` and `aria-describedby` are merged with yours. `onToggle` and `onBeforeToggle` are not accepted: use a `ref` for the platform events. `popover` is not accepted either: a `<dialog popover>` cannot be opened with `showModal()`."
         }
         note={
           'Other props, such as `role` or `onCancel`, pass through. For a confirmation, use [AlertDialog](/components/alert-dialog): `role="alertdialog"`, no light dismiss and focus on Cancel are its defaults.'
@@ -331,7 +331,7 @@ export function DialogPage() {
         rows={[
           {
             name: "action",
-            type: "Action<[details: DialogCloseDetails]>",
+            type: "Action<[details: DialogCloseActionDetails]>",
             description: (
               <>
                 Runs in this button's own transition (<code>data-pending</code> on it), then closes
@@ -382,7 +382,7 @@ export function DialogPage() {
           "`DialogCloseState` is `{ pending, disabled }`; `pending` runs from the click until the close this part asked for has committed, with or without `action` (library mode)."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled`, `commandfor`, `command` (not with `action`, and not on a link or other non-button host element), `value`, `onClick` (library mode, or with `action`), `data-pending`, `data-disabled`; a `render` element cannot re-enable a disabled Close. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
         }
         note={
           'By default (`whilePending="ignore"`) a second click, Enter or Space while the action is pending is ignored (and cancelled), and the button is `aria-disabled="true"` for as long as it shows `data-pending`, which spans the action and the close; it is never natively disabled, so it keeps focus. To close at once and finish the work in the background, do not return the promise: `action={() => { void save(); }}`.'
@@ -494,7 +494,11 @@ export function DialogPage() {
           ["`:modal`", "Popup", "Opened with `showModal()`."],
           ["`::backdrop`", "Popup", "The modal backdrop."],
           ["`data-modal`", "Popup", "The `modal` prop (also before the dialog opens)."],
-          ["`data-open`", "Trigger", "Optimistic open state (library mode only)."],
+          [
+            "`data-open`",
+            "Trigger",
+            "Library mode: optimistic open state. JS-free mode: whether the dialog is open, written from its `toggle` event.",
+          ],
           [
             "`data-pending`",
             "Trigger",

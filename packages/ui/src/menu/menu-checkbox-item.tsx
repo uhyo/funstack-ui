@@ -4,7 +4,13 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
-import type { ChangeAction, RenderProp, StateValue } from "../internal/types.js";
+import type {
+  ActionDetails,
+  ChangeAction,
+  ChangeReason,
+  RenderProp,
+  StateValue,
+} from "../internal/types.js";
 import { useControllableAction } from "../internal/action/use-controllable-action.js";
 import { rendersButton, useRender } from "../internal/use-render.js";
 import { closeStackLater, useMenuContext } from "./menu-context.js";
@@ -22,6 +28,15 @@ export interface MenuCheckboxItemState {
   readonly pending: boolean;
   /** The `disabled` prop. */
   readonly disabled: boolean;
+}
+
+/** Details passed as the second argument of `Menu.CheckboxItem`'s `checkedChangeAction`. */
+export interface MenuCheckboxItemCheckedChangeDetails extends ActionDetails {
+  /**
+   * Always `"activate"`: the user toggled the item (click, Enter or Space); `event` is the native
+   * `click` or `keydown` event.
+   */
+  readonly reason: ChangeReason;
 }
 
 /**
@@ -46,7 +61,7 @@ export interface MenuCheckboxItemProps extends Omit<
    * rejection (which reaches the nearest Error Boundary above the item). May be a Server
    * Function.
    */
-  checkedChangeAction?: ChangeAction<boolean>;
+  checkedChangeAction?: ChangeAction<boolean, MenuCheckboxItemCheckedChangeDetails>;
   /**
    * Close the whole menu once the change settles. When `false` the menu stays open.
    *
@@ -88,7 +103,10 @@ export function MenuCheckboxItem({
   const menu = useMenuContext("Menu.CheckboxItem");
   // The close to run after a dispatch's action resolved, keyed by the dispatch's details.
   const after = useRef(new WeakMap<object, () => void>());
-  const { optimistic, pending, dispatch } = useControllableAction<boolean>({
+  const { optimistic, pending, dispatch } = useControllableAction<
+    boolean,
+    MenuCheckboxItemCheckedChangeDetails
+  >({
     controlled: checked,
     defaultValue: defaultChecked,
     initialValue: false,
@@ -106,7 +124,7 @@ export function MenuCheckboxItem({
     disabled,
     label,
     activate: (event) => {
-      const details = createActionDetails(event, {});
+      const details = createActionDetails(event, { reason: "activate" as const });
       if (closeOnActivate) after.current.set(details, closeStackLater(menu, event));
       dispatch(!optimistic, details);
     },

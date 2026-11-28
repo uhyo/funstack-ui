@@ -150,6 +150,25 @@ function Plain({
   );
 }
 
+/** The shared suite's JS-free harness (its "JS-free data-open" rows). */
+function StaticHarness({ withTrigger = true }: { withTrigger?: boolean }) {
+  return (
+    <Popover.Root>
+      {withTrigger && (
+        <Popover.Trigger
+          data-testid="trigger"
+          className={({ open }) => (open ? "state-open" : "state-closed")}
+        >
+          Filters
+        </Popover.Trigger>
+      )}
+      <Popover.Popup data-testid="popup" aria-label="Filters" style={box(200, 100)}>
+        <Popover.Close data-testid="close">Done</Popover.Close>
+      </Popover.Popup>
+    </Popover.Root>
+  );
+}
+
 /** The shared suite's harness: the content, then `inside`, then a Close part. */
 function SuiteHarness({
   action,
@@ -217,6 +236,7 @@ describe("Popover (browser)", () => {
       partCloses: [{ name: "a Trigger click", close: () => trigger().click() }],
       dismiss: () => popup().hidePopover(),
     },
+    jsFree: { Harness: StaticHarness },
   });
 
   describe("JS-free mode", () => {

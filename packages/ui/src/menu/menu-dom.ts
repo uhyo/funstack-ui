@@ -39,7 +39,7 @@ export function focusItem(item: HTMLElement): void {
 
 /** The text typeahead matches: the item's `label` prop, else its text content. */
 export function typeaheadText(item: Element): string {
-  return (item.getAttribute("data-typeahead") ?? item.textContent ?? "").trim().toLowerCase();
+  return (item.getAttribute("data-fsui-typeahead") ?? item.textContent ?? "").trim().toLowerCase();
 }
 
 export function isRtl(element: Element): boolean {
