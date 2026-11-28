@@ -31,11 +31,13 @@ import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Tabs } from "./index.js";
 import type {
   TabsIndicatorState,
+  TabsListProps,
   TabsListState,
   TabsPanelProps,
   TabsPanelState,
   TabsRootProps,
   TabsRootState,
+  TabsTabProps,
   TabsTabState,
   TabsValueChangeDetails,
 } from "./index.js";
@@ -211,14 +213,77 @@ describe("Tabs", () => {
       expect(a).not.toHaveAttribute("data-pending");
     });
 
-    it("reflects vertical orientation on Root, List and Tab", () => {
+    it("reflects vertical orientation on every part (conventions 4.1 rule 2)", () => {
       render(<Harness mode="uncontrolled" rootProps={{ orientation: "vertical" }} />);
       expect(root()).toHaveAttribute("data-orientation", "vertical");
       expect(list()).toHaveAttribute("aria-orientation", "vertical");
       expect(list()).toHaveAttribute("data-orientation", "vertical");
       for (const t of allTabs()) expect(t).toHaveAttribute("data-orientation", "vertical");
-      // Design 7: data-orientation is not emitted on Panel.
-      expect(screen.getByRole("tabpanel")).not.toHaveAttribute("data-orientation");
+      expect(screen.getByRole("tabpanel")).toHaveAttribute("data-orientation", "vertical");
+      expect(indicator()).toHaveAttribute("data-orientation", "vertical");
+    });
+
+    it("Panel and Indicator: every attribute has its state field (conventions 4.1)", () => {
+      const panelStates: TabsPanelState[] = [];
+      const indicatorStates: TabsIndicatorState[] = [];
+      render(
+        <Tabs.Root defaultValue="a" disabled>
+          <Tabs.List aria-label="x">
+            <Tabs.Tab value="a">A</Tabs.Tab>
+            <Tabs.Indicator
+              data-testid="indicator"
+              className={(s) => {
+                indicatorStates.push(s);
+                return undefined;
+              }}
+            />
+          </Tabs.List>
+          <Tabs.Panel
+            value="a"
+            className={(s) => {
+              panelStates.push(s);
+              return undefined;
+            }}
+          >
+            A
+          </Tabs.Panel>
+        </Tabs.Root>,
+      );
+      const panel = screen.getByRole("tabpanel");
+      expect(panel).toHaveAttribute("data-disabled", "");
+      expect(panel).toHaveAttribute("data-orientation", "horizontal");
+      expect(panelStates.at(-1)).toMatchObject({
+        selected: true,
+        disabled: true,
+        orientation: "horizontal",
+      });
+      expect(indicator()).toHaveAttribute("data-selected", "");
+      expect(indicatorStates.at(-1)).toMatchObject({ selected: true, value: "a" });
+    });
+
+    it("an enabled Root renders no data-disabled on the Panel", () => {
+      render(<Harness mode="uncontrolled" />);
+      expect(screen.getByRole("tabpanel")).not.toHaveAttribute("data-disabled");
+    });
+
+    it("Indicator: selected is false and data-selected absent with no selection", () => {
+      const states: TabsIndicatorState[] = [];
+      render(
+        <Tabs.Root defaultValue={null}>
+          <Tabs.List aria-label="x">
+            <Tabs.Tab value="a">A</Tabs.Tab>
+            <Tabs.Indicator
+              data-testid="indicator"
+              className={(s) => {
+                states.push(s);
+                return undefined;
+              }}
+            />
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      expect(indicator()).not.toHaveAttribute("data-selected");
+      expect(states.at(-1)).toMatchObject({ selected: false, value: null });
     });
 
     it("Root disabled disables every Tab (focusable, aria-disabled)", () => {
@@ -282,6 +347,8 @@ describe("Tabs", () => {
         error.mock.calls.filter((call) => String(call[0]).includes("matches no Tabs.Tab"));
       expect(warnings()).toHaveLength(1);
       expect(String(warnings()[0]?.[0])).toContain('"zzz"');
+      // The warning names the part (conventions 9.5).
+      expect(String(warnings()[0]?.[0]).startsWith("Tabs.List: ")).toBe(true);
       rerender(<Harness mode="controlled" initial="zzz" action={action} />);
       expect(warnings()).toHaveLength(1);
 
@@ -1063,6 +1130,7 @@ describe("Tabs", () => {
       expect(indicator()).toHaveClass("ind-b");
       expect(className).toHaveBeenLastCalledWith({
         value: "b",
+        selected: true,
         pending: true,
         orientation: "horizontal",
       });
@@ -1148,6 +1216,7 @@ describe("Tabs", () => {
         value: "a",
         selected: true,
         orientation: "horizontal",
+        disabled: false,
       });
 
       await act(async () => {
@@ -1311,6 +1380,20 @@ describe("Tabs", () => {
   });
 
   describe("transition prop", () => {
+    it("Tab has no transition prop (conventions 5.1: all optimistic)", () => {
+      render(
+        <Tabs.Root defaultValue="a">
+          <Tabs.List aria-label="x">
+            {/* @ts-expect-error Everything a Tab renders is optimistic: no `transition`. */}
+            <Tabs.Tab value="a" transition="fade">
+              A
+            </Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      expect(tab("A")).toBeInTheDocument();
+    });
+
     it("Indicator has no transition prop (type-level)", () => {
       render(
         <Tabs.Root defaultValue="a">
@@ -1325,7 +1408,53 @@ describe("Tabs", () => {
     });
   });
 
-  describe("experimental_focusgroup", () => {
+  describe("owned keys are not in the props types (conventions 1.5)", () => {
+    it("List, Tab and Panel reject the keys they own; token-merged lists stay", () => {
+      // Type-level rows: the function is never rendered. TypeScript accepts any hyphenated JSX
+      // attribute that a type does not declare, so the `aria-*` keys are checked on props
+      // objects (a spread, a wrapper's props) instead.
+      const types = () => (
+        <Tabs.Root defaultValue="a">
+          {/* @ts-expect-error `role` is the List's. */}
+          <Tabs.List role="group" />
+          {/* @ts-expect-error `tabIndex` is the List's. */}
+          <Tabs.List tabIndex={0} />
+          {/* @ts-expect-error `role` is the Tab's. */}
+          <Tabs.Tab value="a" role="button" />
+          {/* @ts-expect-error `type` is the Tab's. */}
+          <Tabs.Tab value="a" type="submit" />
+          {/* @ts-expect-error `tabIndex` is the Tab's (roving). */}
+          <Tabs.Tab value="a" tabIndex={-1} />
+          {/* @ts-expect-error `role` is the Panel's. */}
+          <Tabs.Panel value="a" role="region" />
+          <Tabs.Tab value="a" aria-controls="x" aria-describedby="y" />
+          <Tabs.Panel value="a" aria-labelledby="x" tabIndex={-1} />
+        </Tabs.Root>
+      );
+      // @ts-expect-error `aria-orientation` is the List's.
+      const listProps: TabsListProps = { "aria-orientation": "vertical" };
+      // @ts-expect-error `aria-selected` is the Tab's.
+      const selectedProps: TabsTabProps = { value: "a", "aria-selected": true };
+      // @ts-expect-error `aria-disabled` is the Tab's: use `disabled`.
+      const disabledProps: TabsTabProps = { value: "a", "aria-disabled": true };
+      const merged: TabsTabProps = { value: "a", "aria-controls": "x" };
+      expect([types, listProps, selectedProps, disabledProps, merged]).toHaveLength(5);
+    });
+  });
+
+  describe("experimental_focusGroup", () => {
+    it("the lower-case spelling is not a prop (conventions 8)", () => {
+      render(
+        <Tabs.Root defaultValue="a">
+          {/* @ts-expect-error Renamed to `experimental_focusGroup`. */}
+          <Tabs.List aria-label="x" experimental_focusgroup>
+            <Tabs.Tab value="a">A</Tabs.Tab>
+          </Tabs.List>
+        </Tabs.Root>,
+      );
+      expect(tab("A")).toBeInTheDocument();
+    });
+
     it.each([
       ["horizontal", true, "tablist inline wrap nomemory"],
       ["horizontal", false, "tablist inline nowrap nomemory"],
@@ -1334,7 +1463,7 @@ describe("Tabs", () => {
     ] as const)("%s loop=%s renders focusgroup=%s", (orientation, loop, expected) => {
       render(
         <Tabs.Root defaultValue="a" orientation={orientation} loop={loop}>
-          <Tabs.List aria-label="x" experimental_focusgroup>
+          <Tabs.List aria-label="x" experimental_focusGroup>
             <Tabs.Tab value="a">A</Tabs.Tab>
           </Tabs.List>
         </Tabs.Root>,
@@ -1350,7 +1479,7 @@ describe("Tabs", () => {
 
       render(
         <Tabs.Root defaultValue="a">
-          <Tabs.List aria-label="x" experimental_focusgroup>
+          <Tabs.List aria-label="x" experimental_focusGroup>
             <Tabs.Tab value="a">A</Tabs.Tab>
             <Tabs.Tab value="b">B</Tabs.Tab>
           </Tabs.List>

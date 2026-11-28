@@ -7,9 +7,7 @@ import type {
   KeyboardEvent,
   MouseEvent,
   ReactNode,
-  ViewTransitionClass,
 } from "react";
-import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { rendersButton, resolveStateValue, useRender } from "../internal/use-render.js";
@@ -41,7 +39,19 @@ export interface TabsTabState {
  */
 export interface TabsTabProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "onKeyDown" | "onFocus" | "id" | "value" | "className" | "style" | "children"
+  | "onClick"
+  | "onKeyDown"
+  | "onFocus"
+  | "id"
+  | "value"
+  | "role"
+  | "type"
+  | "tabIndex"
+  | "aria-selected"
+  | "aria-disabled"
+  | "className"
+  | "style"
+  | "children"
 > {
   /** The value this tab selects. Must be unique within the Root. */
   value: string;
@@ -51,16 +61,6 @@ export interface TabsTabProps extends Omit<
    * @defaultValue `false`
    */
   disabled?: boolean;
-  /**
-   * Forwarded to the Tab's `<ViewTransition default>`. Default: no boundary. Fires only on the commit
-   * that settles the action (or rolls it back), never on the optimistic selection; animate the
-   * selection itself with a CSS `transition` on `[data-selected]`.
-   *
-   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
-   * mount or `<Activity>` reveal inside a transition start a document view transition (a ~250 ms
-   * page cross-fade that the next transition waits for).
-   */
-  transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, TabsTabState>;
   /** Inline style, or a function of the part's state that returns one. */
@@ -89,10 +89,13 @@ function movedWithinList(event: FocusEvent<HTMLElement>): boolean {
 
 /**
  * A `button[role=tab]`. Renders the optimistic selection (`aria-selected`, `data-selected`,
- * roving `tabindex`) and carries `anchor-name` for the Indicator.
+ * roving `tabindex`) and carries `anchor-name` for the Indicator. No `transition` prop: everything
+ * it renders is optimistic (conventions 5.1); animate the selection with a CSS `transition` on
+ * `[data-selected]`, or wrap the content in your own `<ViewTransition>` keyed on `fsui-tabs`.
  *
- * Owned keys (conventions 1.2): `role`, `id`, `aria-selected`, `aria-controls` (token-merged),
- * `aria-disabled`, `tabIndex`, `focusgroupstart` (with `experimental_focusgroup`), `data-selected`, `data-pending`, `data-disabled`,
+ * Owned keys (conventions 1.5): `role`, `type` (on a `<button>`), `id`, `aria-selected`,
+ * `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (with
+ * `experimental_focusGroup`), `data-selected`, `data-pending`, `data-disabled`,
  * `data-orientation`, `onClick`, `onKeyDown`, `onFocus`.
  *
  * @see https://ui.funstack.work/components/tabs
@@ -100,7 +103,6 @@ function movedWithinList(event: FocusEvent<HTMLElement>): boolean {
 export function TabsTab({
   value,
   disabled: disabledProp = false,
-  transition,
   className,
   style,
   children,
@@ -172,7 +174,7 @@ export function TabsTab({
     },
   });
 
-  return useTransitionBoundary("Tabs.Tab", transition, element);
+  return element;
 }
 
 TabsTab.displayName = "TabsTab";

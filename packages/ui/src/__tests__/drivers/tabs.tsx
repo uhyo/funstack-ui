@@ -23,7 +23,7 @@ export const tabsDriver: ValueActionDriver<string, TabsValueChangeDetails> = {
     >
       <Tabs.List aria-label="Sections">
         {VALUES.map((v) => (
-          <Tabs.Tab key={v} value={v} {...definedProps({ transition })}>
+          <Tabs.Tab key={v} value={v}>
             {v.toUpperCase()}
           </Tabs.Tab>
         ))}

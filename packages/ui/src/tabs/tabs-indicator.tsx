@@ -14,9 +14,11 @@ import { anchorName } from "./tabs-ids.js";
 export interface TabsIndicatorState {
   /** Optimistic selected value, or `null` (the indicator is then `hidden`). */
   readonly value: string | null;
+  /** A tab is selected (`value !== null`): `data-selected`. */
+  readonly selected: boolean;
   /** The Root is pending. */
   readonly pending: boolean;
-  /** The Root's `orientation`. */
+  /** The Root's `orientation` (`data-orientation`). */
   readonly orientation: TabsOrientation;
 }
 
@@ -47,7 +49,8 @@ export interface TabsIndicatorProps extends Omit<
  * positioned element in tree order). No `<ViewTransition>`: it changes only in optimistic (sync)
  * commits, which never start a view transition (design 10.1).
  *
- * Owned keys (conventions 1.2): `aria-hidden`, `hidden`, `data-selected`, `data-pending`.
+ * Owned keys (conventions 1.5): `aria-hidden`, `hidden`, `data-selected`, `data-pending`,
+ * `data-orientation`.
  *
  * @see https://ui.funstack.work/components/tabs
  */
@@ -56,6 +59,7 @@ export function TabsIndicator({ className, style, children, render, ...rest }: T
   const value = ctx.optimistic;
   const state: TabsIndicatorState = {
     value,
+    selected: value !== null,
     pending: ctx.pending,
     orientation: ctx.orientation,
   };
@@ -75,6 +79,7 @@ export function TabsIndicator({ className, style, children, render, ...rest }: T
       hidden: value === null,
       "data-selected": dataAttr(value !== null),
       "data-pending": dataAttr(ctx.pending),
+      "data-orientation": ctx.orientation,
     },
   });
 }
