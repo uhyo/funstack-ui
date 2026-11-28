@@ -475,6 +475,49 @@ describe("Menubar", () => {
       expect(isOpen("file-popup")).toBe(true);
       expect(el("new")).toHaveFocus();
     });
+
+    // Conventions 3.10 rule 2: on the bar too, a modified or prevented key is the browser's.
+    it.each(["Alt", "Control", "Meta"])(
+      "%s+arrow on a Trigger neither moves focus nor switches menus",
+      async (modifier) => {
+        render(<Bar />);
+        const user = setupUser();
+        act(() => el("file").focus());
+        await user.keyboard(`{${modifier}>}{ArrowRight}{/${modifier}}`);
+        expect(el("file")).toHaveFocus();
+
+        // Menu mode on the bar: a hover switch leaves focus on the Trigger of an open menu.
+        await openFile(user);
+        fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
+        await flushTasks(2);
+        expect(isOpen("edit-popup")).toBe(true);
+        expect(el("edit")).toHaveFocus();
+        await user.keyboard(`{${modifier}>}{ArrowRight}{/${modifier}}`);
+        await flushTasks(2);
+        expect(el("edit")).toHaveFocus();
+        expect(isOpen("edit-popup")).toBe(true);
+        expect(isOpen("view-popup")).toBe(false);
+      },
+    );
+
+    it("an arrow a consumer prevented neither moves focus nor switches menus", async () => {
+      render(<Bar />);
+      const user = setupUser();
+      const prevent = (event: KeyboardEvent) => {
+        if (event.key === "ArrowRight") event.preventDefault();
+      };
+      el("edit").addEventListener("keydown", prevent);
+      await openFile(user);
+      fireEvent.pointerMove(el("edit"), { pointerType: "mouse" });
+      await flushTasks(2);
+      expect(el("edit")).toHaveFocus();
+      await user.keyboard("{ArrowRight}");
+      await flushTasks(2);
+      expect(el("edit")).toHaveFocus();
+      expect(isOpen("edit-popup")).toBe(true);
+      expect(isOpen("view-popup")).toBe(false);
+      el("edit").removeEventListener("keydown", prevent);
+    });
   });
 
   describe("menu mode on the bar", () => {

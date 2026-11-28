@@ -43,7 +43,7 @@ export interface TogglePressedChangeDetails extends ActionDetails {
  */
 export interface ToggleProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "onClick" | "type" | "aria-pressed" | "className" | "style" | "children"
+  "onClick" | "type" | "aria-pressed" | "aria-disabled" | "className" | "style" | "children"
 > {
   /** Controlled pressed state. `undefined` means uncontrolled. */
   pressed?: boolean;

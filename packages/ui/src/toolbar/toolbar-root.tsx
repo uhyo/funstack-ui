@@ -82,7 +82,7 @@ function firstItem(items: readonly HTMLElement[]): HTMLElement | undefined {
  * between them (design/components/toggle-group.md section 6). Name it with `aria-label` or
  * `aria-labelledby`.
  *
- * Owned keys (conventions 1.2): `role`, `aria-orientation`, `data-orientation`, `onKeyDown`,
+ * Owned keys (conventions 1.5): `role`, `aria-orientation`, `data-orientation`, `onKeyDown`,
  * `onFocus`, `onBlur`, `onPointerDown`, and `focusgroup` while the flag is on.
  *
  * @see https://ui.funstack.work/components/toolbar

@@ -737,6 +737,41 @@ describe("ToggleGroup", () => {
       );
     }
 
+    // Conventions 3.10 rule 2: a modified or prevented key is the browser's.
+    it.each(["altKey", "ctrlKey", "metaKey"] as const)(
+      "a key with %s neither moves focus nor is prevented",
+      (modifier) => {
+        render(<Group />);
+        act(() => item("A").focus());
+        for (const key of ["ArrowRight", "End"]) {
+          // `fireEvent` returns false when the event was default-prevented.
+          expect(fireEvent.keyDown(item("A"), { key, [modifier]: true })).toBe(true);
+          expect(item("A")).toHaveFocus();
+        }
+      },
+    );
+
+    it("an arrow a consumer's onKeyDown prevented does not move focus", () => {
+      render(
+        <ToggleGroup.Root aria-label="x">
+          <ToggleGroup.Item
+            value="a"
+            onKeyDown={(event) => {
+              if (event.key === "ArrowRight") event.preventDefault();
+            }}
+          >
+            A
+          </ToggleGroup.Item>
+          <ToggleGroup.Item value="b">B</ToggleGroup.Item>
+        </ToggleGroup.Root>,
+      );
+      act(() => item("A").focus());
+      fireEvent.keyDown(item("A"), { key: "ArrowRight" });
+      expect(item("A")).toHaveFocus();
+      fireEvent.keyDown(item("A"), { key: "End" });
+      expect(item("B")).toHaveFocus();
+    });
+
     const matrix = [
       // orientation, loop, start, key, expected
       ["horizontal", true, "A", "ArrowRight", "B"],

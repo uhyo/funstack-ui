@@ -230,7 +230,7 @@ const NO_LAYOUT: ToggleGroupLayout = { order: [], disabled: [] };
  * focus over its Items (design/components/toggle-group.md 16.2). Inside a `Toolbar.Root` it runs
  * no engine of its own: its Items are members of the Toolbar's sequence.
  *
- * Owned keys (conventions 1.2): `role`, `data-orientation`, `data-pending`, `data-disabled`;
+ * Owned keys (conventions 1.5): `role`, `data-orientation`, `data-pending`, `data-disabled`;
  * standalone also `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` and, with the flag,
  * `focusgroup`.
  *

@@ -161,7 +161,18 @@ export interface AccordionRootExclusiveProps extends AccordionRootBaseProps {
   value?: string | null;
   /** Initial open item in uncontrolled library mode. */
   defaultValue?: string | null;
-  /** See {@link AccordionRootMultipleProps.valueChangeAction}. */
+  /**
+   * Called with the next open item (or `null`) on every change, inside the Root's transition; may
+   * be sync or async (also a Server Function). Rejections reach the nearest Error Boundary. Also
+   * called with `details.reason === "platform"` when the browser opened an item itself.
+   *
+   * Persist `next`: the value is single-valued, so the latest dispatch wins and `next` is the
+   * whole intended value. `details.added` / `details.removed` say what changed (a switch from A
+   * to B is `added: ["b"]`, `removed: ["a"]`).
+   *
+   * A `setState` placed after your own `await` is not a Transition update; wrap it in
+   * `startTransition` (React limitation).
+   */
   valueChangeAction?: ChangeAction<string | null, AccordionValueChangeDetails>;
 }
 
