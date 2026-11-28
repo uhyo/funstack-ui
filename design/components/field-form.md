@@ -1397,6 +1397,21 @@ were in question:
 The same comparison row exists for every control: after the dispatch has committed, with no
 server error shown, `details.valid` equals `validityElement.validity.valid`.
 
+**What an invalid dispatch does to uncontrolled state** (conventions 3.3.1):
+
+| Control | A resolved dispatch with `valid: false` | The control shows | A later rejected request returns to |
+| --- | --- | --- | --- |
+| `TextField` | not written; the typed text stays a draft | the draft, untouched, with its error | the saved text |
+| `NumberField`, typed text | not written; the typed text stays a draft, and the hidden input keeps the draft's number | the draft, with its error | the saved number |
+| `NumberField`, a step (invalid only through `validate`) | written, as before | the stepped value | that value |
+| `Checkbox`, `Switch`, `RadioGroup`, `Select`, `Combobox`, `Slider` | written, as before | what the user chose, with its error | that state |
+| `CheckboxGroup`, `MultiSelect`, `Combobox` with `multiple` | the change is kept, as before | the set the user made, with its error | the set without the rejected change |
+| `OTPField` | nothing is written by `completeAction` in any case | the code | not applicable |
+
+Inside a Field nothing else changes: the kept draft is the control's DOM value, so `validate`,
+`:user-invalid`, `Field.Error`, the first-invalid focus and a submission all see it. The
+comparison row above reads, for a kept draft, "after the dispatch has settled".
+
 ## 8. Server rendering, progressive enhancement, before hydration
 
 Every part is a client module and every part may be rendered from a Server Component with
