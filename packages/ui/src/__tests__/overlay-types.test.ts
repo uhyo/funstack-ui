@@ -39,6 +39,19 @@ describe("overlay owned keys are not in the props types (conventions 1.5)", () =
     }
   });
 
+  it("Menu.Trigger: id and role; Toast.Root: tabIndex and inert (overwritten, so omitted)", () => {
+    expectTypeOf<UI.MenuTriggerProps>().not.toHaveProperty("id");
+    expectTypeOf<UI.MenuTriggerProps>().not.toHaveProperty("role");
+    expectTypeOf<UI.ToastRootProps>().not.toHaveProperty("tabIndex");
+    expectTypeOf<UI.ToastRootProps>().not.toHaveProperty("inert");
+  });
+
+  it("keys the library chains or token-merges stay in the type", () => {
+    expectTypeOf<UI.DialogTriggerProps>().toHaveProperty("onPointerDown");
+    expectTypeOf<UI.ToastRootProps>().toHaveProperty("aria-labelledby");
+    expectTypeOf<UI.ToastRootProps>().toHaveProperty("aria-describedby");
+  });
+
   it("a dialog Popup: popover", () => {
     expectTypeOf<UI.DialogPopupProps>().not.toHaveProperty("popover");
     expectTypeOf<UI.AlertDialogPopupProps>().not.toHaveProperty("popover");

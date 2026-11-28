@@ -246,7 +246,7 @@ export function DialogPage() {
           "`DialogTriggerState` is `{ open, pending, disabled }`; `pending` is true while the Root is pending: an open in flight, or a part's close waiting for `openChangeAction(false)`. A dismissal never pends, but a request still running when a dismissal superseded it keeps `pending` until that request settles. In JS-free mode `state.open` is `false` (React holds no value) while `data-open` follows the dialog, written from its `toggle` event."
         }
         owned={
-          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a host link, a component `render` with the click handler installed, or inside a Toolbar), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode), `data-open`, `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
+          "`type` (on a `<button>` only), `disabled`, `aria-disabled` (a host link, a component `render` with the click handler installed, or inside a Toolbar), `commandfor`, `command` (not on a link or other non-button host element), `onClick` (when it installs one), `onPointerDown` (non-modal JS-free mode; runs after yours, so it stays in the props type), `data-open`, `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled`, `commandfor`, `command`, `popoverTarget`, `popoverTargetAction`."
         }
       />
 

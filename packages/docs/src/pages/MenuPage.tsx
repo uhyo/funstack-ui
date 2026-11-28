@@ -310,7 +310,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`, in a Menubar or a Toolbar), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `type`, `aria-disabled`, `popoverTarget`, `aria-haspopup` and `aria-expanded`."
+          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`, in a Menubar or a Toolbar), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `type`, `id`, `role` (written in a Menubar), `aria-disabled`, `popoverTarget`, `aria-haspopup` and `aria-expanded`."
         }
         note={
           "Use it in a top-level Root only. A primary-button press on it while the menu is open keeps focus on the current item; the click then closes the menu."

@@ -82,8 +82,9 @@ const isDev = process.env.NODE_ENV !== "production";
  * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
  * `aria-disabled` (a link or component `render` with the click handler installed, or inside a
  * Toolbar), `commandfor`, `command`, `popoverTarget` and `popoverTargetAction` (never written),
- * `onClick`. Also owned: `disabled`, `onPointerDown` (non-modal JS-free mode), `data-open`,
- * `data-pending`, `data-disabled`.
+ * `onClick`. Also owned: `disabled`, `data-open`, `data-pending`, `data-disabled`.
+ * `onPointerDown` (non-modal JS-free mode) stays in the type: the library's handler is chained
+ * after yours, never in its place.
  *
  * @see https://ui.funstack.work/components/dialog
  */

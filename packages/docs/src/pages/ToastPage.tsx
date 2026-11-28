@@ -402,7 +402,7 @@ toast({ title: "Link copied" });`}</CodeBlock>
       <PartFacts
         state={"`ToastRootState` is `{ toast, pending, ending, type, priority }`."}
         owned={
-          '`role` (`dialog`, or `alertdialog` for `priority: "high"`), `tabIndex`, `aria-labelledby`, `aria-describedby`, `inert` (while ending), `onKeyDown`, `data-type`, `data-priority`, `data-pending`, `data-ending`.'
+          '`role` (`dialog`, or `alertdialog` for `priority: "high"`), `tabIndex`, `inert` (while ending), `onKeyDown` (none of these four is in the props type), `data-type`, `data-priority`, `data-pending`, `data-ending`. `aria-labelledby` and `aria-describedby` are merged with yours.'
         }
         note={
           "`Toast.Title` (`div`) and `Toast.Description` (`p`) take the same function props against the Root's state (exported as `ToastTitleState` and `ToastDescriptionState`); their `children` default to `toast.title` / `toast.description`, and the Description renders nothing when it has neither."

@@ -41,6 +41,8 @@ export interface MenuTriggerProps extends Omit<
   | "onClick"
   | "onKeyDown"
   | "onMouseDown"
+  | "id"
+  | "role"
   | "type"
   | "aria-disabled"
   | "aria-expanded"
@@ -132,8 +134,9 @@ function openFromBar(menu: MenuContextValue, event: Event, focus: MenubarOpenFoc
  * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
  * `aria-disabled` (link or component `render`, and in a Menubar or a Toolbar), `popoverTarget`,
  * `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown`; `commandfor`,
- * `command` and `popoverTargetAction` (never written). Also owned: `id`, `disabled`,
- * `data-open`, `data-pending`, `data-disabled`, and in a Menubar `role`. In a Menubar the hover switch is an
+ * `command` and `popoverTargetAction` (never written), `id` (the menu's `aria-labelledby`
+ * names it), `role` (written in a Menubar). Also owned: `disabled`, `data-open`,
+ * `data-pending`, `data-disabled`. In a Menubar the hover switch is an
  * `onPointerMove` handler merged with the consumer's (theirs runs first).
  *
  * @see https://ui.funstack.work/components/menu

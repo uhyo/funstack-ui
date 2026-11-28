@@ -29,6 +29,14 @@ HoverCard, NavigationMenu).
   picked up; no library composition does that.
 - `Popover.Popup` renders a `<dialog popover>`: `instanceof HTMLDialogElement` does not tell a
   Popover from a Dialog in the shared browser suite; check `hasAttribute("popover")`.
-- Owned keys still in the types, not on the checklist (left alone, reported): `onPointerDown`
-  on the Dialog Trigger (non-modal JS-free; chained, not clobbered), `id` / `role` on
-  `Menu.Trigger`, `tabIndex` / `inert` / `aria-labelledby` / `aria-describedby` on `Toast.Root`.
+- Owned keys (follow-up, coordinator decision): `Menu.Trigger` `id` / `role` and `Toast.Root`
+  `tabIndex` / `inert` are now omitted (the library overwrites them). Kept in the types, said in
+  the "Owned keys" JSDoc: the Dialog Trigger's `onPointerDown` (chained after the consumer's) and
+  `Toast.Root`'s `aria-labelledby` / `aria-describedby` (token-merged).
+
+## For the alpha.28 release notes (not in the CHANGELOG table; the entry is not edited)
+
+| Component | Change | Migration |
+| --- | --- | --- |
+| Menu | `id` and `role` on `Menu.Trigger` are type errors (they were overwritten) | remove them; the Trigger's id is generated |
+| Toast | `tabIndex` and `inert` on `Toast.Root` are type errors (they were overwritten) | remove them |

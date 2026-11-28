@@ -38,7 +38,7 @@ export interface ToastRootState {
  */
 export interface ToastRootProps extends Omit<
   ComponentPropsWithRef<"div">,
-  "role" | "className" | "style" | "children" | "onKeyDown"
+  "role" | "tabIndex" | "inert" | "className" | "style" | "children" | "onKeyDown"
 > {
   /** The toast to render: an item of the Viewport's `state.toasts`. */
   toast: ToastItem;
@@ -81,8 +81,9 @@ function SuspenseGuard({ children }: { children: ReactNode }) {
  * `fallback` prop (invisible by default), so a toast whose content suspends does not pull the whole Viewport into a boundary above it.
  * When the toast closes it stays with `data-ending` (and `inert`) until its exit animations end.
  *
- * Owned keys (conventions 1.2): `role`, `tabIndex`, `aria-labelledby`, `aria-describedby`,
- * `inert`, `data-type`, `data-priority`, `data-pending`, `data-ending`, `onKeyDown`.
+ * Owned keys (conventions 1.2), omitted from the props type: `role`, `tabIndex`, `inert`,
+ * `onKeyDown`. Also owned: `data-type`, `data-priority`, `data-pending`, `data-ending`;
+ * `aria-labelledby` and `aria-describedby` are token-merged with yours (they stay in the type).
  *
  * @see https://ui.funstack.work/components/toast
  */
