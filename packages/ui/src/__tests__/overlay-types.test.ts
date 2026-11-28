@@ -46,8 +46,14 @@ describe("overlay owned keys are not in the props types (conventions 1.5)", () =
     expectTypeOf<UI.ToastRootProps>().not.toHaveProperty("inert");
   });
 
-  it("keys the library chains or token-merges stay in the type", () => {
-    expectTypeOf<UI.DialogTriggerProps>().toHaveProperty("onPointerDown");
+  it("handlers the part passes to its element in any mode are omitted (conventions 1.5)", () => {
+    expectTypeOf<UI.DialogTriggerProps>().not.toHaveProperty("onPointerDown");
+    expectTypeOf<UI.AlertDialogTriggerProps>().not.toHaveProperty("onPointerDown");
+    expectTypeOf<UI.DrawerTriggerProps>().not.toHaveProperty("onPointerDown");
+    expectTypeOf<UI.MenuTriggerProps>().not.toHaveProperty("onPointerMove");
+  });
+
+  it("keys the library token-merges stay in the type", () => {
     expectTypeOf<UI.ToastRootProps>().toHaveProperty("aria-labelledby");
     expectTypeOf<UI.ToastRootProps>().toHaveProperty("aria-describedby");
   });
@@ -108,6 +114,10 @@ describe("overlay owned keys are not in the props types (conventions 1.5)", () =
       { commandfor: "x" } satisfies UI.AlertDialogActionProps,
       // @ts-expect-error -- owned: the Trigger writes `type="button"`
       { type: "submit" } satisfies UI.MenuTriggerProps,
+      // @ts-expect-error -- owned: the non-modal JS-free press handler
+      { onPointerDown: () => {} } satisfies UI.DialogTriggerProps,
+      // @ts-expect-error -- owned: the Menubar hover switch
+      { onPointerMove: () => {} } satisfies UI.MenuTriggerProps,
       // @ts-expect-error -- a `<dialog popover>` breaks `showModal()`
       { popover: "auto" } satisfies UI.DialogPopupProps,
     ];

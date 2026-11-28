@@ -116,8 +116,9 @@ import { Menubar } from "@funstack/ui/menubar";
           <code>disabled</code> renders <code>aria-disabled="true"</code> and{" "}
           <code>data-disabled</code> instead of the native attribute: the Trigger stays focusable
           and announced, and never opens its menu (it renders no <code>popovertarget</code>, and{" "}
-          <code>aria-expanded="false"</code> instead). Owned keys add <code>role</code>. The hover
-          switch is an <code>onPointerMove</code> handler merged with yours, which runs first.
+          <code>aria-expanded="false"</code> instead). Owned keys add <code>role</code> and{" "}
+          <code>onPointerMove</code> (the hover switch; not in the props type). A{" "}
+          <code>render</code> element&apos;s own <code>onPointerMove</code> still runs, first.
         </li>
         <li>
           <code>Menu.Root</code> keeps <code>open</code>, <code>defaultOpen</code>,{" "}

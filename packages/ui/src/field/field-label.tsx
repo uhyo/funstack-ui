@@ -15,7 +15,7 @@ const isDev = process.env.NODE_ENV !== "production";
  */
 export interface FieldLabelProps extends Omit<
   ComponentPropsWithRef<"label">,
-  "htmlFor" | "id" | "className" | "style" | "children"
+  "htmlFor" | "id" | "onClick" | "className" | "style" | "children"
 > {
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, FieldState>;
@@ -36,8 +36,9 @@ export interface FieldLabelProps extends Omit<
  * Trigger, multi-select.md B.10) the click is cancelled and the button is focused instead, as a
  * label focuses a `<select>` without opening it.
  *
- * Owned keys (conventions 1.2): `id`, `htmlFor`, `onClick` (composed), `data-invalid`,
- * `data-disabled`, `data-required`, `data-pending`.
+ * Owned keys (conventions 1.5), omitted from the props type: `id`, `htmlFor`, `onClick` (a
+ * `render` element's own handler runs first; the label checks `defaultPrevented`). Also owned:
+ * `data-invalid`, `data-disabled`, `data-required`, `data-pending`.
  *
  * @see https://ui.funstack.work/components/field
  */

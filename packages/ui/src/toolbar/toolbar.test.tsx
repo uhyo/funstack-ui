@@ -636,6 +636,28 @@ describe("Toolbar", () => {
       );
       expect(toolbar()).toHaveAttribute("focusgroup", "toolbar block nowrap");
     });
+
+    it("focusgroup is owned in both modes: not a prop, removed from a render element without the flag", () => {
+      const { unmount } = render(
+        <Toolbar.Root aria-label="T" render={<div focusgroup="toolbar" />}>
+          <Button>A</Button>
+          {/* @ts-expect-error `focusgroup` is the Root's: use `experimental_focusGroup` (conventions 1.5). */}
+          <Toolbar.Root aria-label="U" focusgroup="toolbar" />
+        </Toolbar.Root>,
+      );
+      for (const element of screen.getAllByRole("toolbar")) {
+        expect(element).not.toHaveAttribute("focusgroup");
+      }
+      unmount();
+      render(
+        <Toolbar.Root
+          aria-label="T"
+          experimental_focusGroup
+          render={<div focusgroup="toolbar nowrap" />}
+        />,
+      );
+      expect(toolbar()).toHaveAttribute("focusgroup", "toolbar inline wrap");
+    });
   });
 
   describe("Menu.Trigger outside a Toolbar is unchanged", () => {

@@ -118,18 +118,23 @@ MenuGroupLabel.displayName = "MenuGroupLabel";
  */
 export interface MenuSeparatorProps extends Omit<
   ComponentPropsWithRef<"hr">,
-  "className" | "style" | "children"
+  "role" | "className" | "style" | "children"
 > {
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MenuSeparatorState>;
   /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, MenuSeparatorState>;
-  /** Another element must carry `role="separator"` itself. */
+  /**
+   * Replace the default `<hr>` (element form) or take over rendering (function form). The part
+   * writes the role, so any element is a separator.
+   */
   render?: RenderProp<ComponentPropsWithRef<"hr">, MenuSeparatorState>;
 }
 
 /**
- * A divider between items: `<hr>` (implicit `role="separator"`). Owns no keys.
+ * A divider between items: `<hr role="separator">`. The role is rendered, not left to the
+ * `<hr>`, so a `render` element of another tag is a separator too
+ * (design/components/separator.md 3). Owned keys: `role`.
  *
  * @see https://ui.funstack.work/components/menu
  */
@@ -142,6 +147,7 @@ export function MenuSeparator({ className, style, render, ...rest }: MenuSeparat
     style,
     children: undefined,
     props: rest,
+    libraryProps: { role: "separator" },
   });
 }
 

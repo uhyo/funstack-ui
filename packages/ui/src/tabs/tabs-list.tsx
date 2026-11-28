@@ -41,6 +41,7 @@ export interface TabsListProps extends Omit<
   | "role"
   | "aria-orientation"
   | "tabIndex"
+  | "focusgroup"
   | "className"
   | "style"
   | "children"
@@ -73,9 +74,9 @@ function tabsOf(list: Element): HTMLElement[] {
  * The `role="tablist"` container. Owns arrow-key / Home / End navigation between Tabs: it only
  * moves focus; automatic activation happens in the Tab's focus handler.
  *
- * Owned keys (a `render` element cannot override them, conventions 1.2): `role`,
+ * Owned keys (a `render` element cannot override them, conventions 1.5): `role`,
  * `aria-orientation`, `data-orientation`, `data-disabled`, `tabIndex`, `onKeyDown`, `onFocus`,
- * and `focusgroup` when `experimental_focusGroup` is on.
+ * and `focusgroup` (the token list when `experimental_focusGroup` is on, removed otherwise).
  *
  * @see https://ui.funstack.work/components/tabs
  */
@@ -194,9 +195,9 @@ export function TabsList({
       "data-orientation": orientation,
       "data-disabled": dataAttr(disabled),
       tabIndex: listIsTabStop ? 0 : undefined,
-      // Owned only while the flag is on; otherwise the key is omitted, not `undefined`, so it is not
-      // owned (conventions 1.2).
-      ...(focusgroup !== undefined && { focusgroup }),
+      // Owned in both modes (conventions 1.5): without the flag a `render` element's own
+      // `focusgroup` would put a native arrow-key handler beside the JS one.
+      focusgroup,
       onKeyDown,
       onFocus,
     },

@@ -26,7 +26,7 @@ export interface FormSubmitState {
  */
 export interface FormSubmitProps extends Omit<
   ComponentPropsWithRef<"button">,
-  "type" | "className" | "style" | "children"
+  "type" | "onClick" | "aria-disabled" | "className" | "style" | "children"
 > {
   /**
    * Native `disabled` (owned; a `render` element cannot re-enable it) and `data-disabled`. Never
@@ -54,9 +54,9 @@ export interface FormSubmitProps extends Omit<
  * (`Form.Root`, `Dialog.Form`, a plain `<form action>`). Never disabled while pending: block
  * repeat clicks with CSS on `[data-pending]` if you need to.
  *
- * Owned keys (conventions 1.2): `type` (on a `<button>`), `disabled`, `aria-disabled` (a host
- * element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`,
- * `data-disabled`.
+ * Owned keys (conventions 1.5), omitted from the props type: `type` (on a `<button>`),
+ * `aria-disabled` (a host element other than `<button>` / `<input>`), `onClick` (while
+ * disabled). Also owned: `disabled`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/field
  */

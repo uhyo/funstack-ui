@@ -63,7 +63,7 @@ export function MenuPage() {
   <Menu.Trigger>Actions</Menu.Trigger>                     {/* button[popovertarget][aria-haspopup=menu] */}
   <Menu.Popup>                                             {/* div[popover=auto][role=menu] */}
     <Menu.Item action={rename}>Rename</Menu.Item>          {/* button[role=menuitem] */}
-    <Menu.Separator />                                     {/* hr */}
+    <Menu.Separator />                                     {/* hr role="separator" */}
     <Menu.Group>                                           {/* div[role=group] */}
       <Menu.GroupLabel>View</Menu.GroupLabel>
       <Menu.CheckboxItem checked={dense} checkedChangeAction={saveDense}>Dense</Menu.CheckboxItem>
@@ -310,7 +310,7 @@ export function MenuPage() {
       <PartFacts
         state={"`MenuTriggerState` is `{ open, pending, disabled }`."}
         owned={
-          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`, in a Menubar or a Toolbar), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `type`, `id`, `role` (written in a Menubar), `aria-disabled`, `popoverTarget`, `aria-haspopup` and `aria-expanded`."
+          "`type` (only on a `<button>`), `id`, `disabled`, `aria-disabled` (link or component `render`, in a Menubar or a Toolbar), `popoverTarget` (only on an invoker), `aria-haspopup`, `aria-expanded` (only on a Trigger that is no invoker), `onClick`, `onKeyDown`, `onMouseDown`, `onPointerMove` (the hover switch, in a Menubar), `data-open`, `data-pending`, `data-disabled`. Owned and never written: `popoverTargetAction`, `commandfor`, `command`. Not in the props type: these three, `type`, `id`, `role` (written in a Menubar), `aria-disabled`, `popoverTarget`, `aria-haspopup`, `aria-expanded` and the four handlers."
         }
         note={
           "Use it in a top-level Root only. A primary-button press on it while the menu is open keeps focus on the current item; the click then closes the menu."
@@ -365,7 +365,7 @@ export function MenuPage() {
           "`MenuPopupState` is `{ open, side, align, submenu, context }`; `open` is committed; `submenu` (`data-submenu`) is true on a submenu's popup; `context` is true and `side` is `null` for an open from a `Menu.ContextTrigger`. While the menu is shown, `side` / `align` are where the browser placed it (a physical side, after any flip: a submenu reads `right` in LTR and `left` in RTL); otherwise your props."
         }
         owned={
-          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged with yours), `tabIndex` (`-1`; not in the props type), `focusgroup` (with the flag), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
+          '`id`, `popover`, `role` (`"menu"`), `aria-labelledby` (token-merged with yours), `tabIndex` (`-1`; not in the props type), `focusgroup` (the token list with the flag, removed otherwise; not in the props type), `onKeyDown`, `onBlur`, `onMouseDown` (a press outside the items keeps focus on the current item), `onContextMenu` (no browser menu over this one), `onPointerEnter`, `onPointerLeave`, `data-side` / `data-align` (unless `side` is `null`), `data-context`, `data-submenu`, and for a context open the inline `--menu-point-x` / `--menu-point-y` / `--menu-point-gap`, the inline `top` and `left` (`right` in RTL) and the hoisted `@position-try` stylesheet.'
         }
         note={
           "A menu shown on the physical side you asked for costs no render for the placement; a logical side (every submenu, by default `inline-end`) costs one render on show and one on hide, since `data-side` turns physical while shown. Style it with `:popover-open`; it emits no `data-open`. Render a `<div>`, not a `<dialog>`."
@@ -506,11 +506,11 @@ export function MenuPage() {
       <p>
         <code>Group</code> is a <code>{'<div role="group">'}</code> labelled by its{" "}
         <code>GroupLabel</code> (a <code>&lt;div&gt;</code> with the owned <code>id</code>), which
-        also names a <code>RadioGroup</code>. <code>Separator</code> is an <code>&lt;hr&gt;</code>{" "}
-        (implicit <code>role="separator"</code>); give a <code>render</code> element{" "}
-        <code>role="separator"</code> yourself. All take <code>className</code>, <code>style</code>,{" "}
-        <code>render</code> and (except <code>Separator</code>) <code>children</code>; they have no
-        state.
+        also names a <code>RadioGroup</code>. <code>Separator</code> is an{" "}
+        <code>{'<hr role="separator">'}</code>: it owns <code>role</code> (not in its props type),
+        so a <code>render</code> element of another tag is a separator too. All take{" "}
+        <code>className</code>, <code>style</code>, <code>render</code> and (except{" "}
+        <code>Separator</code>) <code>children</code>; they have no state.
       </p>
 
       <h4>

@@ -321,7 +321,7 @@ import { Form } from "@funstack/ui/form";
       <PartFacts
         state={"the Field's."}
         owned={
-          "Label: `id`, `htmlFor` (absent for a group control); Description: `id`; both also the Field's four `data-*` attributes."
+          "Label: `id`, `htmlFor` (absent for a group control), `onClick` (for a button control the label activation is cancelled and the button focused; a `render` element's own handler runs first); Description: `id`; both also the Field's four `data-*` attributes. Not in the props type: `id`, `htmlFor` and the Label's `onClick`."
         }
       />
 
@@ -459,7 +459,7 @@ import { Form } from "@funstack/ui/form";
           "`FormSubmitState` is `{ pending, disabled }`; `pending` is `useFormStatus().pending` of the enclosing form, so it works in any React form (`Dialog.Form`, a plain `<form action>`)."
         }
         owned={
-          '`type` (`"submit"`, on a `<button>`), `disabled`, `aria-disabled` (a host element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`, `data-disabled`.'
+          '`type` (`"submit"`, on a `<button>`), `disabled`, `aria-disabled` (a host element other than `<button>` / `<input>`), `onClick` (while disabled), `data-pending`, `data-disabled`. Not in the props type: `type`, `aria-disabled` and `onClick`; a handler goes on the `render` element, and the submitter\'s `name` / `value` in the `FormData` tell buttons apart.'
         }
         note={"`name`, `value` and `formAction` pass through."}
       />

@@ -45,20 +45,20 @@ export interface SeparatorProps extends Omit<
   /** Inline style, or a function of the part's state that returns one. */
   style?: StateValue<CSSProperties | undefined, SeparatorState>;
   /**
-   * Replace the `<hr>` (element form) or take over rendering (function form). Another element
-   * must carry `role="separator"` itself unless `decorative`.
+   * Replace the `<hr>` (element form) or take over rendering (function form). The part writes
+   * the role, so any element is a separator (or, with `decorative`, none).
    */
   render?: RenderProp<ComponentPropsWithRef<"hr">, SeparatorState>;
 }
 
 /**
- * A line between two pieces of content: an `<hr>` with `aria-orientation` and
+ * A line between two pieces of content: an `<hr role="separator">` with `aria-orientation` and
  * `data-orientation`, or with `decorative` a `role="none"` line with no `aria-orientation`. Not
  * focusable. Directive-free, so a Server Component may render it.
  *
- * Owned keys (conventions 1.5): `aria-orientation`, `data-orientation`, `data-decorative`, and
- * `role` while `decorative` (`"none"`, which wins over a `render` element's own). While not
- * decorative no `role` is rendered, so a `render` element keeps the one it carries.
+ * Owned keys (conventions 1.5): `role` in both modes (`"separator"`, or `"none"` while
+ * `decorative`; either wins over a `render` element's own), `aria-orientation`,
+ * `data-orientation`, `data-decorative`.
  *
  * @see https://ui.funstack.work/components/separator
  */
@@ -73,9 +73,10 @@ export function Separator({
 }: SeparatorProps) {
   const state: SeparatorState = { orientation, decorative };
   const libraryProps: Partial<ComponentPropsWithRef<"hr">> & DataAttributes = {
-    ...(decorative
-      ? { role: "none", "aria-orientation": undefined }
-      : { "aria-orientation": orientation }),
+    // Rendered, not left to the `<hr>`: a `render` element of another tag is a separator too
+    // (design/components/separator.md 3).
+    role: decorative ? "none" : "separator",
+    "aria-orientation": decorative ? undefined : orientation,
     "data-orientation": orientation,
     // Every boolean of the state is also an attribute (conventions 4.1 rule 2).
     "data-decorative": dataAttr(decorative),

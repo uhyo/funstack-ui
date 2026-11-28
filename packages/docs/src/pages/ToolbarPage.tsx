@@ -109,7 +109,7 @@ import { Toolbar } from "@funstack/ui/toolbar";
       <PartFacts
         state={"`ToolbarRootState` is `{ orientation }`."}
         owned={
-          '`role` (`"toolbar"`), `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`, `focusgroup` (with the flag), and the `tabindex` of its items.'
+          '`role` (`"toolbar"`), `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`, `focusgroup` (the token list with the flag, removed otherwise), and the `tabindex` of its items. All but the items\' `tabindex` are not in the props type.'
         }
         note={
           "There is no `disabled`: disable items individually, or wrap the toolbar in a `<fieldset disabled>`."

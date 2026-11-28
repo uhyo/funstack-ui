@@ -41,6 +41,7 @@ export interface MenuTriggerProps extends Omit<
   | "onClick"
   | "onKeyDown"
   | "onMouseDown"
+  | "onPointerMove"
   | "id"
   | "role"
   | "type"
@@ -131,13 +132,12 @@ function openFromBar(menu: MenuContextValue, event: Event, focus: MenubarOpenFoc
  * focusable and never opens). Moving the pointer onto it while another menu of the bar is open
  * switches to its menu.
  *
- * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * Owned keys (conventions 1.5), omitted from the props type: `type` (on a `<button>` only),
  * `aria-disabled` (link or component `render`, and in a Menubar or a Toolbar), `popoverTarget`,
- * `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown`; `commandfor`,
- * `command` and `popoverTargetAction` (never written), `id` (the menu's `aria-labelledby`
- * names it), `role` (written in a Menubar). Also owned: `disabled`, `data-open`,
- * `data-pending`, `data-disabled`. In a Menubar the hover switch is an
- * `onPointerMove` handler merged with the consumer's (theirs runs first).
+ * `aria-haspopup`, `aria-expanded`, `onClick`, `onKeyDown`, `onMouseDown`, `onPointerMove`
+ * (the hover switch, installed in a Menubar); `commandfor`, `command` and
+ * `popoverTargetAction` (never written), `id` (the menu's `aria-labelledby` names it), `role`
+ * (written in a Menubar). Also owned: `disabled`, `data-open`, `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/menu
  */
@@ -221,7 +221,8 @@ export function MenuTrigger({
     alwaysFocusable: inBar || toolbar !== null,
     handlers: {
       onKeyDown,
-      // Only in a bar: an `undefined` key in the owned layer would remove the consumer's handler.
+      // Only in a bar: an `undefined` key in the owned layer would remove a `render` element's own
+      // `onPointerMove` outside one.
       ...(onPointerMove !== undefined && { onPointerMove }),
       onMouseDown: (event: ReactMouseEvent<HTMLButtonElement>) => {
         // A press on the Trigger of an open menu must not move focus out of the popup: the Popup's

@@ -39,6 +39,7 @@ export interface DialogTriggerState {
 export interface DialogTriggerProps extends Omit<
   ComponentPropsWithRef<"button">,
   | "onClick"
+  | "onPointerDown"
   | "type"
   | "commandfor"
   | "command"
@@ -79,12 +80,11 @@ const isDev = process.env.NODE_ENV !== "production";
  * so `[data-open]` styles the Trigger in both modes. Inside a `Toolbar.Root` a disabled Trigger
  * is `aria-disabled` and stays focusable (conventions 3.6).
  *
- * Owned keys (conventions 1.2), omitted from the props type: `type` (on a `<button>` only),
+ * Owned keys (conventions 1.5), omitted from the props type: `type` (on a `<button>` only),
  * `aria-disabled` (a link or component `render` with the click handler installed, or inside a
  * Toolbar), `commandfor`, `command`, `popoverTarget` and `popoverTargetAction` (never written),
- * `onClick`. Also owned: `disabled`, `data-open`, `data-pending`, `data-disabled`.
- * `onPointerDown` (non-modal JS-free mode) stays in the type: the library's handler is chained
- * after yours, never in its place.
+ * `onClick`, `onPointerDown` (non-modal JS-free mode). Also owned: `disabled`, `data-open`,
+ * `data-pending`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/dialog
  */

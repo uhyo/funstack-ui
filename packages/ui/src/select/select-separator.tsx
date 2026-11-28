@@ -24,7 +24,9 @@ export interface SelectSeparatorProps extends Omit<
 
 /**
  * A decorative `<hr>` between options or groups (exposed as `separator` by Chromium's
- * customizable select; a line in native pickers). Owned keys: `data-pending`, `data-disabled`,
+ * customizable select; a line in native pickers). Writes no `role`: inside a `<select>` the
+ * parser keeps only an `<hr>`, so the implicit role cannot be lost
+ * (design/components/separator.md 5). Owned keys: `data-pending`, `data-disabled`,
  * `data-invalid` (the Root's).
  *
  * @see https://ui.funstack.work/components/select

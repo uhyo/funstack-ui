@@ -798,6 +798,20 @@ describe("Dialog", () => {
       );
       expect(error).toHaveBeenCalledWith(expect.stringContaining("Only a <button>"));
     });
+
+    it("onPointerDown is the Trigger's (conventions 1.5); a render element's own still runs", () => {
+      const onPointerDown = vi.fn();
+      render(
+        <Dialog.Root modal={false}>
+          <Dialog.Trigger render={<button onPointerDown={onPointerDown} />}>Open</Dialog.Trigger>
+          {/* @ts-expect-error owned: the non-modal JS-free press handler */}
+          <Dialog.Trigger onPointerDown={() => {}}>Other</Dialog.Trigger>
+          <Dialog.Popup aria-label="x" />
+        </Dialog.Root>,
+      );
+      fireEvent.pointerDown(screen.getByRole("button", { name: "Open" }));
+      expect(onPointerDown).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("post-await rule", () => {

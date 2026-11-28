@@ -22,6 +22,8 @@ describe("Separator props", () => {
     // `aria-orientation` is omitted from the type too, but TSX never checks a hyphenated name.
     // @ts-expect-error `decorative` is the spelling of role="none"
     void (<Separator role="none" />);
+    // @ts-expect-error owned in both modes: the part writes role="separator"
+    void (<Separator role="separator" />);
     // @ts-expect-error an <hr> is void
     void (<Separator>or</Separator>);
   });
