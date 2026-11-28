@@ -116,7 +116,7 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Cancel` | The safe answer of an AlertDialog: a close button that is the default initial focus target (`Dialog.Close` under another name). | `button` |
 | `Action` | The confirm button of an AlertDialog: a close button whose `action` runs first in its own transition and that, with `action`, is no native close invoker. Not Toast's `Action`, which is a toast's own button. | `button` |
 | `Control` | The native form control a Field labels and describes (`input`, or `textarea` / `select` through `render`), inside a Field or alone (outside a `Field.Root` it is the plain control, nothing added). Any FUNSTACK form control inside a `Field.Root` plays the same role through `useFieldControl` (3.8). | `input` |
-| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the control (Field) or the `<dialog>` (Dialog, AlertDialog) always references, mounted or not. | `p` |
+| `Description` | Describes the owner through `aria-describedby`: a `p[id]` the `<dialog>` (Dialog, AlertDialog) always references, mounted or not; the control (Field) references it only while it is mounted (field-form.md 4.2). | `p` |
 | `Error` | The message for a Field's current constraint violation: `div[id]`, rendered only while an error is shown and referenced through `aria-describedby` while it is; no live region, no `role`. | `div` |
 | `Submit` | A form's submit button with the form channel's `data-pending` (`useFormStatus`). | `button[type=submit]` |
 | `GroupLabel` | Names a `Group` (or a `RadioGroup` in Menu) through `aria-labelledby`. Not `Label`, which names the component's owner. | `div` |

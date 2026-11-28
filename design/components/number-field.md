@@ -1061,7 +1061,7 @@ words, and the name follows a label that changes.
 | `id="plus"` | the self-reference uses `plus` | unchanged |
 
 - **The label** is `NumberField.Label` while one is mounted, and inside a Field the Field's
-  label id; with both, both tokens, the part's first (the order the Root's name had). With
+  label id while a `Field.Label` is mounted (field-form.md 4.2, #217); with both, both tokens, the part's first (the order the Root's name had). With
   neither (the Input named by the consumer's `aria-label`) no `aria-labelledby` is rendered
   and the name is the short one: the library has no label to refer to, and it does not compose
   a sentence from an attribute. Such a field passes full names to the buttons
@@ -1069,8 +1069,9 @@ words, and the name follows a label that changes.
   ("Increase Qty Quantity").
 - **Server HTML.** `NumberField.Label` registers from a layout effect, which does not run on
   the server, so the server HTML carries the buttons' ids and, inside a Field, the Field
-  label's token; the `NumberField.Label` token is added right after hydration (no mismatch, no
-  warning). Before hydration a standalone field's buttons are named "Increase" / "Decrease".
+  label's token (whether or not a `Field.Label` is rendered: the Field counts its parts as
+  mounted until its first commit, and hydration drops the token when there is none); the
+  `NumberField.Label` token is added right after hydration (no mismatch, no warning). Before hydration a standalone field's buttons are named "Increase" / "Decrease".
 - **Word order is "verb, label"**, which is all a list of id references can express. A consumer's
   `aria-labelledby` replaces the library's whole, so a language that needs another order
   passes an `aria-label` with the full text and `aria-labelledby` pointing at the button's own

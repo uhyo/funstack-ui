@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { fieldDataAttributes, useFieldContext } from "../internal/form/field-context.js";
 import type { FieldState } from "../internal/form/field-context.js";
@@ -25,9 +26,9 @@ export interface FieldDescriptionProps extends Omit<
 }
 
 /**
- * Help text for the field: a `<p>` whose id the control always lists in `aria-describedby`
- * (a dangling reference when no Description is rendered is skipped by assistive technology, so
- * nothing registers and the server HTML is exact).
+ * Help text for the field: a `<p>` whose id the control lists in `aria-describedby` while it is
+ * mounted. It registers with the Field from a layout effect; until the Field's first commit the
+ * id counts as mounted, so the server HTML references it (design 4.2, #217).
  *
  * Owned keys (conventions 1.2): `id`, `data-invalid`, `data-disabled`, `data-required`,
  * `data-pending`.
@@ -42,6 +43,8 @@ export function FieldDescription({
   ...rest
 }: FieldDescriptionProps) {
   const ctx = useFieldContext("Field.Description");
+  const { registerDescription } = ctx;
+  useLayoutEffect(registerDescription, [registerDescription]);
   return useRender<ComponentPropsWithRef<"p">, FieldState>({
     defaultElement: "p",
     render,

@@ -39,7 +39,8 @@ function defaultChildren(state: FieldState): ReactNode {
  * The field's error message: a `div` rendered only while an error is shown, whose id the control
  * then lists in `aria-describedby`. No role and no live region: the library focuses the first
  * invalid control after a submission attempt, and focus reads the description (design 4.2).
- * Its presence lets the Field cancel the platform's validation bubble.
+ * Its presence (registered from a layout effect) lets the Field cancel the platform's validation
+ * bubble, and the control lists its id only while one is mounted (#217).
  *
  * Owned keys (conventions 1.2): `id`, `data-invalid`, `data-disabled`, `data-required`,
  * `data-pending`.

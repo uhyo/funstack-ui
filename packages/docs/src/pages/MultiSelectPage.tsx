@@ -391,7 +391,7 @@ export function MultiSelectPage() {
       <PartFacts
         state={"`MultiSelectListState` is `{ empty }`."}
         owned={
-          '`id`, `role` (`"listbox"`), `aria-multiselectable` (`"true"`), `aria-labelledby` (token-merged; the Label, else the enclosing `Field.Label`), `aria-busy` (while a `Status` is mounted inside it), `data-empty`.'
+          '`id`, `role` (`"listbox"`), `aria-multiselectable` (`"true"`), `aria-labelledby` (token-merged; the Label, else the enclosing `Field.Label` while one is mounted; absent with neither), `aria-busy` (while a `Status` is mounted inside it), `data-empty`.'
         }
         note={"Without a Label give the List an `aria-label` (development warns otherwise)."}
       />

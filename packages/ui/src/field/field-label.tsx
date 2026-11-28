@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { fieldDataAttributes, useFieldContext } from "../internal/form/field-context.js";
 import type { FieldState } from "../internal/form/field-context.js";
@@ -30,7 +31,8 @@ export interface FieldLabelProps extends Omit<
 /**
  * The field's visible name: `<label for>` pointing at the control. For a group control (a
  * RadioGroup or CheckboxGroup `<fieldset>`) it renders no `for` once the group registered, and
- * the group names itself with `aria-labelledby` → this id (design 4.2).
+ * the group names itself with `aria-labelledby` → this id (design 4.2). It registers with the
+ * Field from a layout effect, so a control references its id only while it is mounted (#217).
  *
  * A `<label for>` on a `<button>` forwards a click to it. For a button control (MultiSelect's
  * Trigger, multi-select.md B.10) the click is cancelled and the button is focused instead, as a
@@ -44,6 +46,8 @@ export interface FieldLabelProps extends Omit<
  */
 export function FieldLabel({ className, style, children, render, ...rest }: FieldLabelProps) {
   const ctx = useFieldContext("Field.Label");
+  const { registerLabel } = ctx;
+  useLayoutEffect(registerLabel, [registerLabel]);
   const ref = useElementCheck(
     isDev &&
       ((el) =>

@@ -17393,3 +17393,93 @@ where an Error Boundary goes in a Toast and an AlertDialog" is in the code. Bran
   `overlay-close-part-suite` and Menu, Toast, Button, OTPField and TextField `valid` rows, and the
   two Toast boundary placements. All jsdom: the native `checked` rollback is visible there.
   Tooltip and Select have no `openChangeAction`, so no row.
+
+## 2026-11-29, #217: a Field references its Label, Description and Error only while mounted
+
+From the #216 review (finding 3), filed as #217 and assigned to the developer. The Field always
+put `${id}-label` into a group control's `aria-labelledby` (and into the NumberField step
+buttons' and the Combobox / MultiSelect List's) and `${id}-description` into every control's
+`aria-describedby`, and `${id}-error` while invalid, whether or not the part was mounted. The
+names still resolved (accname skips an IDREF that names nothing), but a dangling IDREF is
+invalid ARIA and validators flag it. This reverses developer choice 5 (accepted by the review as
+L5), which kept the description and error tokens unconditional to save a render.
+
+### What changed in the rules
+
+- field-form.md Decisions row 5, the part table (Label, Description, Error rows), 4.2
+  ("Referenced only while mounted" replaces the paragraph on `Field.Error`'s ref-counted
+  presence), 5.1 (the control and group rows), 7.1 (the `attributes` comment), 7.2 (Combobox and
+  MultiSelect rows), 8 (the server-HTML row), and the HTML example of section 1 (a comment on
+  the Newsletter field without a Description).
+- number-field.md 8.4: the Field label token follows the same rule; the server-HTML bullet
+  says it is in the server HTML whether or not a `Field.Label` is rendered.
+- conventions.md 1 (the `Description` row): the Field half no longer "always references".
+- progress.md 2 row 8 and 8: the precedent named for Progress's dangling label token is
+  `Dialog.Description` alone.
+- internal-hooks.md, the file index: `use-part-presence.ts`.
+
+### The SSR trade-off, and why
+
+`usePartPresence` (one per kind in `Field.Root`) counts a part as mounted until the owner's
+first commit; the parts register from a layout effect, and the owner's own layout effect (which
+runs after its children's) settles the real presence before the first paint. So the server
+HTML and the hydration render reference every part (no mismatch, no warning: the drop is a
+post-hydration render), a `Field.Label` keeps its token in the server HTML as before, and a
+page without a Description, Error or group Label references missing ids until hydration (a
+no-JS page keeps them). Rejected:
+
+- **Register during render** through a mutable object in context: it reaches only the
+  controls rendered after the part, never a Description below the control (the usual layout),
+  and is a render-phase side effect a discarded concurrent render would leave behind.
+- **Start from "not mounted"** (`useRegisterCount`, as `NumberField.Label`, `Combobox.Label`
+  and `Slider.Label` do): exact after hydration, but every server page would lose the Field
+  label and description tokens, a regression for no-JS pages.
+
+A part inside a Suspense boundary that is still dehydrated has not registered, so its token is
+missing until the boundary hydrates (the element is in the HTML but unreferenced for that
+time).
+
+### Audit of the other always-present idrefs (not changed here)
+
+Found while auditing `aria-labelledby` / `aria-describedby` / `aria-controls` /
+`aria-errormessage` across `packages/ui/src`. Each is a deliberate rule of its own design, so
+it is left for a decision:
+
+- Dialog, AlertDialog, Drawer Popup → Title / Description, Popover Popup → Title / Description
+  (dialog.md 1, popover.md 1: "always emitted"), Toast Root → Title / Description (toast.md
+  1). Dangling while closed (the content is not rendered) and with no Title / Description.
+  `usePartPresence` fits them as it fits the Field.
+- `Menu.Group`, `Menu.RadioGroup`, `Combobox.Group`, `MultiSelect.Group` → their GroupLabel
+  (menu.md: "dangling is harmless"). Same fit.
+- Context menu Popup → Trigger id (context-menu.md 10: dangling without a Trigger).
+- Progress and Meter Root → `${id}-label` (progress.md 8): Server Components, so no
+  registration is possible without making them client modules.
+- `aria-controls`: Combobox Input / Trigger and MultiSelect Trigger → the List (not rendered
+  while closed; ARIA 1.2 requires the attribute on `combobox`), Tabs Tab → its Panel
+  (tabs.md: a dangling `aria-controls` is ignored). NumberField buttons → the Input, always
+  rendered.
+
+### Test plan
+
+`field/field-references.test.tsx`, for every Field control (Field.Control, TextField,
+Checkbox, Switch, Select, RadioGroup, CheckboxGroup, Slider with one and two thumbs,
+NumberField, OTPField, Combobox, MultiSelect):
+
+| Row | Assert |
+| --- | --- |
+| No parts | no `aria-labelledby` / `aria-describedby` / `aria-errormessage` token names a missing element, valid and invalid (a server error); no Field tokens at all |
+| Parts mounted later, then unmounted | the label token on every element that references the Field label (groups, step buttons, the List), the description and error tokens on the described element; removed again on unmount; nothing dangles |
+| SSR with every part | the server HTML and the hydrated DOM reference all three; no recoverable error, no `console.error` |
+| SSR with no parts | the server HTML references them (the trade-off); hydration removes them; no recoverable error, no `console.error` |
+
+## 2026-11-29, #217: review follow-up
+
+From the review of `dev/217` (`memo/reviewer/review-217.md`): no code defect; test gaps and
+one docs line. field-form.md 4.2 now says a part hidden by `<Activity>` or by a boundary that
+suspends again loses its token while hidden (its layout effects disconnect) and gets it back
+when shown. Rows added to `field/field-references.test.tsx`: consumer tokens kept exactly with
+no parts mounted (`Field.Control aria-describedby`, `RadioGroup.Root aria-labelledby` and
+`aria-describedby`: the omitted-key path); StrictMode (no false two-errors warning); keyed
+remount of the parts and of the whole Field; `<Activity>` hide and show; parts revealed by a
+Suspense boundary; Combobox `multiple` with Chips (the Chips and the List follow the Field
+label).

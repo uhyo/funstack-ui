@@ -1284,7 +1284,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     empty,
     loading,
     hasLabel: labelCount > 0,
-    fieldLabelId: field?.ids.label,
+    fieldLabelId: field?.referencedIds.label,
     disabled,
     readOnly,
     inputRef,
