@@ -119,7 +119,10 @@ function useShownNameWarningDev(
     queueMicrotask(() => {
       if (cancelled || warned.current) return;
       const target = element !== null && "current" in element ? element.current : element;
-      if (target === null || hasName(target, { resolveIds: true })) return;
+      // Gone by now (unmounted before the microtask): nothing to name. Independent of whether
+      // React ran the cleanup above first.
+      if (target === null || !target.isConnected) return;
+      if (hasName(target, { resolveIds: true })) return;
       if (applies !== undefined && !applies(target)) return;
       warned.current = true;
       console.error(message);

@@ -250,32 +250,141 @@ describe.each(TITLE_CASES)("$name Popup → Title and Description (#218)", (c) =
   });
 });
 
-describe("Dialog in library mode: the content is not rendered while closed (#218)", () => {
-  function Controlled({ open }: { open: boolean }) {
-    return (
+interface LibraryCase {
+  readonly name: string;
+  /**
+   * The owner in library mode (controlled), named by its Title only: no `aria-label`, so a
+   * missing-name false positive of the shown-name warning would be caught.
+   */
+  readonly ui: (open: boolean) => ReactNode;
+  readonly isShown: (el: HTMLElement) => boolean;
+}
+
+const dialogShown = (el: HTMLElement) => (el as HTMLDialogElement).open;
+const popoverShown = (el: HTMLElement) => el.matches(":popover-open");
+
+const LIBRARY_CASES: readonly LibraryCase[] = [
+  {
+    name: "Dialog",
+    isShown: dialogShown,
+    ui: (open) => (
       <Dialog.Root open={open} onOpenChange={() => {}}>
         <Dialog.Popup data-testid="owner">
           <Dialog.Title>Title</Dialog.Title>
           <Dialog.Description>Description</Dialog.Description>
         </Dialog.Popup>
       </Dialog.Root>
+    ),
+  },
+  {
+    name: "AlertDialog",
+    isShown: dialogShown,
+    ui: (open) => (
+      <AlertDialog.Root open={open} onOpenChange={() => {}}>
+        <AlertDialog.Popup data-testid="owner">
+          <AlertDialog.Title>Title</AlertDialog.Title>
+          <AlertDialog.Description>Description</AlertDialog.Description>
+          <AlertDialog.Cancel>Keep</AlertDialog.Cancel>
+        </AlertDialog.Popup>
+      </AlertDialog.Root>
+    ),
+  },
+  {
+    name: "Drawer",
+    isShown: dialogShown,
+    ui: (open) => (
+      <Drawer.Root open={open} onOpenChange={() => {}}>
+        <Drawer.Popup data-testid="owner">
+          <Drawer.Title>Title</Drawer.Title>
+          <Drawer.Description>Description</Drawer.Description>
+          <Drawer.Close>Done</Drawer.Close>
+        </Drawer.Popup>
+      </Drawer.Root>
+    ),
+  },
+  {
+    name: "Popover",
+    isShown: popoverShown,
+    ui: (open) => (
+      <Popover.Root open={open} onOpenChange={() => {}}>
+        <Popover.Trigger>Filters</Popover.Trigger>
+        <Popover.Popup data-testid="owner">
+          <Popover.Title>Title</Popover.Title>
+          <Popover.Description>Description</Popover.Description>
+        </Popover.Popup>
+      </Popover.Root>
+    ),
+  },
+];
+
+describe.each(LIBRARY_CASES)(
+  "$name in library mode: the content is not rendered while closed (#218)",
+  (c) => {
+    it("closed: no reference; opened: both, named by the Title with no missing-name warning; closed again: none", async () => {
+      const error = vi.spyOn(console, "error");
+      const { rerender } = render(c.ui(false));
+      await flushMicrotasks();
+      expectNone(owner());
+      await act(async () => rerender(c.ui(true)));
+      await flushTasks(2);
+      expect(c.isShown(owner())).toBe(true);
+      expectAll(owner());
+      await act(async () => rerender(c.ui(false)));
+      // The content is held for the exit (an animation check after the close), then unmounts.
+      await flushTasks(2);
+      expectNone(owner());
+      expect(error).not.toHaveBeenCalled();
+    });
+  },
+);
+
+describe("Popover: a Title outside the Popup counts (popover.md 1, #218)", () => {
+  function App({ title }: { title: boolean }) {
+    return (
+      <Popover.Root>
+        {title && <Popover.Title data-testid="title">Filters</Popover.Title>}
+        <Popover.Trigger>Open</Popover.Trigger>
+        <Popover.Popup data-testid="owner">Content</Popover.Popup>
+      </Popover.Root>
     );
   }
 
-  it("closed: no reference; opened: both, with no missing-name warning; closed again: none", async () => {
+  it("names the Popup while the outside Title is mounted, and drops it when it unmounts", async () => {
+    const { rerender } = render(<App title />);
+    await flushMicrotasks();
+    expect(owner()).toHaveAttribute("aria-labelledby", screen.getByTestId("title").id);
+    expect(owner()).not.toHaveAttribute("aria-describedby");
+    expect(danglingRefs(document.body)).toEqual([]);
+    rerender(<App title={false} />);
+    await flushMicrotasks();
+    expect(owner()).not.toHaveAttribute("aria-labelledby");
+    expect(danglingRefs(document.body)).toEqual([]);
+  });
+});
+
+describe("The shown-name warning's microtask (#218)", () => {
+  it("an owner unmounted before the microtask does not warn", async () => {
     const error = vi.spyOn(console, "error");
-    const { rerender } = render(<Controlled open={false} />);
+    // Shown (JS-free mode) and nameless: it would warn a microtask after the effect.
+    const { unmount } = render(
+      <Dialog.Root>
+        <Dialog.Popup />
+      </Dialog.Root>,
+    );
+    unmount();
     await flushMicrotasks();
-    expectNone(owner());
-    await act(async () => rerender(<Controlled open />));
-    await flushMicrotasks();
-    expect((owner() as HTMLDialogElement).open).toBe(true);
-    expectAll(owner());
-    await act(async () => rerender(<Controlled open={false} />));
-    // The content is held for the exit (an animation check after the close), then unmounts.
-    await flushTasks(2);
-    expectNone(owner());
     expect(error).not.toHaveBeenCalled();
+  });
+
+  it("a nameless owner still warns once the microtask runs", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <Dialog.Root>
+        <Dialog.Popup />
+      </Dialog.Root>,
+    );
+    await flushMicrotasks();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("no accessible name"));
   });
 });
 
