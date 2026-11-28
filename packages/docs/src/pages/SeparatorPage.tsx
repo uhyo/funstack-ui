@@ -34,7 +34,7 @@ export function SeparatorPage() {
       <CodeBlock>{`import { Separator } from "@funstack/ui/separator";
 
 <article>…</article>
-<Separator />                                     {/* hr aria-orientation="horizontal" */}
+<Separator />                                     {/* hr role="separator" aria-orientation="horizontal" */}
 <article>…</article>
 
 <nav aria-label="Breadcrumb">
@@ -44,7 +44,9 @@ export function SeparatorPage() {
 </nav>`}</CodeBlock>
       <p>
         One plain component, no parts. It renders <code>&lt;hr&gt;</code>, which is void: there is
-        no <code>children</code> prop.
+        no <code>children</code> prop. The part writes the role itself (<code>separator</code>, or{" "}
+        <code>none</code> while <code>decorative</code>), so a <code>render</code> element of
+        another tag is a separator too.
       </p>
 
       <h3 id="props">Props</h3>
@@ -68,7 +70,7 @@ export function SeparatorPage() {
           {
             ...renderProp("hr", "SeparatorState"),
             description:
-              'Replace the `<hr>` (element form) or take over rendering (function form). Another element must carry `role="separator"` itself unless `decorative`.',
+              "Replace the `<hr>` (element form) or take over rendering (function form). The part writes the role, so any element is a separator (or, with `decorative`, none).",
           },
         ]}
       />
@@ -77,10 +79,10 @@ export function SeparatorPage() {
           '`SeparatorState` is `{ orientation, decorative }`, the two props (`orientation` defaults to `"horizontal"`).'
         }
         owned={
-          '`aria-orientation`, `data-orientation`, `data-decorative`, and `role` while `decorative` (`"none"`, which wins over a `render` element\'s own).'
+          '`role` in both modes (`"separator"`, or `"none"` while `decorative`; either wins over a `render` element\'s own), `aria-orientation`, `data-orientation`, `data-decorative`. `role` and `aria-orientation` are not in the props type.'
         }
         note={
-          'Every other `<hr>` prop passes through, `ref` included. While not decorative no `role` is rendered, so `render={<div role="separator" />}` keeps the one it carries.'
+          'Every other `<hr>` prop passes through, `ref` included. `role="separator"` on the default `<hr>` restates its implicit role: assistive technology reads the same thing, and `render={<div />}` stays a separator.'
         }
       />
 
@@ -98,10 +100,10 @@ export function SeparatorPage() {
       <Table
         head={["Case", "Rendered", "Announced"]}
         rows={[
-          ["default", "`hr[aria-orientation=horizontal]`", "separator"],
+          ["default", "`hr[role=separator][aria-orientation=horizontal]`", "separator"],
           [
             '`orientation="vertical"`',
-            "`hr[aria-orientation=vertical]`",
+            "`hr[role=separator][aria-orientation=vertical]`",
             "separator, vertical where the screen reader says so",
           ],
           ["`decorative`", "`hr[role=none][data-decorative]`", "nothing"],
@@ -123,10 +125,9 @@ export function SeparatorPage() {
           one is not.
         </li>
         <li>
-          A line with a word in it ("or") is{" "}
-          <code>render={'{<div role="separator">or</div>}'}</code>. The children of a separator are
-          presentational, so the word is not announced: right for "or", wrong for anything that
-          matters.
+          A line with a word in it ("or") is <code>render={"{<div>or</div>}"}</code>. The children
+          of a separator are presentational, so the word is not announced: right for "or", wrong for
+          anything that matters.
         </li>
       </ul>
 

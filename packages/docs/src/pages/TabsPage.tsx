@@ -139,7 +139,7 @@ export function TabsPage() {
       <PartFacts
         state={"`TabsListState` is `{ orientation, disabled }`."}
         owned={
-          '`role` (`"tablist"`), `aria-orientation`, `tabIndex`, `onKeyDown`, `onFocus`, `focusgroup` (with the flag), `data-orientation`, `data-disabled`.'
+          '`role` (`"tablist"`), `aria-orientation`, `tabIndex`, `onKeyDown`, `onFocus`, `focusgroup` (the token list with the flag, removed otherwise), `data-orientation`, `data-disabled`. Not in the props type: `role`, `aria-orientation`, `tabIndex`, `focusgroup` and the handlers.'
         }
       />
 
@@ -166,7 +166,7 @@ export function TabsPage() {
       <PartFacts
         state={"`TabsTabState` is `{ value, selected, pending, disabled, orientation }`."}
         owned={
-          '`role` (`"tab"`), `type` (on a `<button>`), `id`, `aria-selected`, `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (with the flag), `onClick`, `onKeyDown`, `onFocus`, `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, and `anchor-name` in `style` for the Indicator (your `style` wins).'
+          '`role` (`"tab"`), `type` (on a `<button>`), `id`, `aria-selected`, `aria-controls` (token-merged), `aria-disabled`, `tabIndex`, `focusgroupstart` (on the selected tab with the flag, removed otherwise; not in the props type), `onClick`, `onKeyDown`, `onFocus`, `data-selected`, `data-pending`, `data-disabled`, `data-orientation`, and `anchor-name` in `style` for the Indicator (your `style` wins).'
         }
         note={
           "No `transition` prop: everything a Tab renders is optimistic. Animate the selection with a CSS `transition` on `[data-selected]`; to animate a tab's content when the action settles, wrap it in your own `<ViewTransition>` keyed on `fsui-tabs`."

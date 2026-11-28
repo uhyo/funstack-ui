@@ -165,7 +165,7 @@ export function ToggleGroupPage() {
           "`ToggleGroupRootState` is `{ value, pending, disabled, orientation }`; `value` is the optimistic set as an array in document order (exclusive mode: `[value]` or `[]`)."
         }
         owned={
-          '`role` (`"group"`), `data-orientation`, `data-pending`, `data-disabled`; standalone (outside a Toolbar) also the roving-focus handlers `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` and, with the flag, `focusgroup`.'
+          '`role` (`"group"`), `data-orientation`, `data-pending`, `data-disabled`, `focusgroup` (the token list standalone with the flag, removed otherwise); standalone (outside a Toolbar) also the roving-focus handlers `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown`. `role`, `focusgroup` and the handlers are not in the props type.'
         }
         note={"Every other `<div>` prop passes through."}
       />
@@ -197,7 +197,7 @@ export function ToggleGroupPage() {
           "`ToggleGroupItemState` is `{ value, pressed, pending, disabled, orientation }`; `value` is the Item's own `value` prop."
         }
         owned={
-          '`aria-pressed`, `disabled`, `aria-disabled` (inside a Toolbar, or a link or component `render`), `onClick`, `tabIndex` (the roving focus writes it), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, and `focusgroupstart` while the Root renders `focusgroup`. `type` defaults to `"button"`; a `render` element\'s own wins.'
+          '`aria-pressed`, `disabled`, `aria-disabled` (inside a Toolbar, or a link or component `render`), `onClick`, `tabIndex` (the roving focus writes it), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`, and `focusgroupstart` (on the first pressed Item while the Root renders `focusgroup`, removed otherwise; not in the props type). `type` defaults to `"button"`; a `render` element\'s own wins.'
         }
         note={
           "No `transition` prop: everything an Item renders is optimistic. Animate the flip with CSS on `[data-pressed]`; to animate the commit that ends the action, wrap the content in your own `<ViewTransition>` keyed on the `fsui-toggle-group` types."
