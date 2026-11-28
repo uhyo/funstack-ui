@@ -219,7 +219,7 @@ Rendered HTML (closed, the value is `["ham", "olive"]`; ids come from one `useId
 | `Root` | none; one `input[type=hidden]` per value when `name` is given | | optimistic value | Owns `useId`, the value (set-valued `useControllableAction`), the open state (`usePopoverRoot`, library mode), the active option, the Option and Status registries, the label cache, the form-reset listener. No `ref`, `className`, `style`. Hidden inputs as combobox.md 15.8. |
 | `Label` | `label` | | Root disabled and pending | `for` → the Trigger's id; `id` → the List's `aria-labelledby`. `data-disabled`, `data-pending` (the owner's, conventions 4.1 rule 4). Its click focuses the Trigger and does **not** open the listbox (B.8). |
 | `Trigger` | `button` | `combobox` | optimistic value and open; shown open for `aria-expanded` | The one Tab stop and the owner surface. `type="button"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `aria-required`, `popovertarget` after hydration, `data-open`, `data-pending`, `data-disabled`. Content must not be interactive. With `required` it renders the validity element right after itself (B.10). |
-| `Value` | `span` | none | optimistic value, label cache | Inside `Trigger`. Shows the selection, or `placeholder` while it is empty; `data-empty` (`state.empty`) while the selection is empty, with or without `children`; `data-disabled`. Optional: any Trigger content rendered from state works. |
+| `Value` | `span` | none | optimistic value, label cache | Inside `Trigger`. Shows the selection, or `placeholder` while it is empty (with or without `children`, B.7); `data-empty` (`state.empty`) while the selection is empty, with or without `children`; `data-disabled`. Optional: any Trigger content rendered from state works. |
 | `Popup` | `div` | none | committed open | `popover="auto"`, inline placement; the content region; `keepMounted`, `transition`. As `Combobox.Popup`. |
 | `List` | `div` | `listbox` | registries | `aria-multiselectable="true"`, `aria-labelledby`, `aria-busy="true"` while loading, `data-empty`. Owns only `Option`s and `Group`s. |
 | `Option` | `div` | `option` | optimistic and committed value, urgent active | `value` required; `label` optional (typeahead text and the label cache; default the trimmed `textContent`); `disabled` → `aria-disabled`. `aria-selected` on every option, `data-selected`, `data-active`, `data-pending`, `data-disabled`. Never focused. |
@@ -271,6 +271,8 @@ Shared types come from `packages/ui/src/internal/types.ts`.
 
 ```ts
 export interface MultiSelectValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * "activate": the user toggled an option (Enter, Space, click; `details.event` is the
    * `keydown` or `click`).
@@ -369,11 +371,11 @@ export interface MultiSelectValueState {
 }
 export interface MultiSelectValueProps
   extends Omit<ComponentPropsWithRef<"span">, "className" | "style" | "children"> {
-  /** Rendered by the default content while the selection is empty. */
+  /** Rendered while the selection is empty, instead of `children` (B.7). */
   placeholder?: ReactNode;
   className?: StateValue<string | undefined, MultiSelectValueState>;
   style?: StateValue<CSSProperties | undefined, MultiSelectValueState>;
-  /** Default: `placeholder` while empty, else each `labels[i] ?? value[i]` joined with ", ". */
+  /** The summary. Not used while the selection is empty and `placeholder` is given. Default: each `labels[i] ?? value[i]` joined with ", ". */
   children?: StateValue<ReactNode, MultiSelectValueState>;
   render?: RenderProp<ComponentPropsWithRef<"span">, MultiSelectValueState>;
 }
@@ -487,8 +489,14 @@ function, where it has its own list. Every comparison the library makes is set e
 <MultiSelect.Value placeholder="Choose toppings" />
 ```
 
-- **Default content**: `placeholder` while the selection is empty, else each value's label
-  joined with `", "`. The span carries `data-empty` whenever the selection is empty, also
+- **`placeholder` wins while the selection is empty.** When `placeholder` is given (not
+  `undefined` or `null`) and nothing is selected, the span renders it, whatever `children` is:
+  a function is not called, static children are not rendered. So the first example above needs
+  no empty branch. `children` describes the selection; `placeholder` describes its absence.
+  Without `placeholder`, `children` is used for the empty selection too (the "count" example),
+  and without either the span is empty. The function form of `render` receives the resolved
+  content as `props.children`, as everywhere (conventions 1.2).
+- **Default content** (no `children`): each value's label joined with `", "`. The span carries `data-empty` whenever the selection is empty, also
   with function `children`: the library's one word for "the value is empty" (conventions 4.1),
   the attribute `Combobox.Input` and `Combobox.Chips` carry for the same condition. There is no
   `data-placeholder`. The separator is

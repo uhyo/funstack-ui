@@ -313,6 +313,8 @@ export type SliderValue = number | readonly number[];
 export type SliderOrientation = "horizontal" | "vertical";
 
 export interface SliderValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * "activate": the user moved a thumb (`details.event` is the native `input` event for a key
    * press, the `pointerdown` / `pointermove` / `pointerup` for a drag, the `keydown` for a
@@ -328,6 +330,8 @@ export interface SliderValueChangeDetails extends ActionDetails {
 }
 
 export interface SliderValueCommitDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * "activate": a gesture ended (`details.event` is the native `change` event for a key press,
    * the `pointerup` / `pointercancel` / `lostpointercapture` for a drag, the `keydown` for a

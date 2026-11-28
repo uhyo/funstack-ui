@@ -34,7 +34,7 @@ hydration.
 | --- | --- | --- |
 | 1 | Anatomy | `CheckboxGroup.Root` (`<fieldset>`, native role `group`), `CheckboxGroup.Label` (`<legend>`, optional, first child), `CheckboxGroup.Item` (`<input type="checkbox">`, one per value), `CheckboxGroup.Parent` (`<input type="checkbox">` whose checked/mixed state is **derived** from the group and whose click sets a whole subset). No `Indicator` (conventions resolved question 16). A plain `Checkbox` rendered inside a `Root` is **not** a member; membership is explicit through `Item`. |
 | 2 | State | One library-owned state, `value: string[]`, as `value` / `defaultValue` (default `[]`) / `valueChangeAction(next, details)`. Internally a `ReadonlySet<string>`; duplicates are dropped; `next` is a fresh array in **document order of the Items**. Equality everywhere (no-op rule, reconciliation) is set equality. |
-| 3 | Details | `CheckboxGroupValueChangeDetails = { reason, added: string[], removed: string[] }`. An Item click has one entry in one of them; a Parent click has its whole subset; a platform path has the diff against what the user intends. The optimistic reducer applies `added` / `removed` as a **patch**, so stacked dispatches re-base (conventions 3.4). |
+| 3 | Details | `CheckboxGroupValueChangeDetails = { reason, added: string[], removed: string[], valid }` (`valid`: conventions 2.2). An Item click has one entry in one of them; a Parent click has its whole subset; a platform path has the diff against what the user intends. The optimistic reducer applies `added` / `removed` as a **patch**, so stacked dispatches re-base (conventions 3.4). |
 | 4 | Rendered DOM state | Every Item renders `checked={optimistic.has(value)}`; the Parent renders `checked={all}` and `el.indeterminate = some && !all` through `useNativeChecked`. Both are correctness requirements (`form-controls.md` §2). |
 | 5 | Parent | Takes `values: string[]` (the subset it controls). `checked` = every value in the optimistic set; `indeterminate` = some but not all, **not suspended while pending** (it is derived from optimistic state, unlike Checkbox's consumer-owned prop). Click follows the APG mixed-state example: mixed → check all; checked → uncheck all; unchecked → restore the last partial combination of its values the group *committed* (the mount-time one counts), else check all. Renders no `name`, so it never posts. |
 | 6 | Group `required` | `required` on Root means "at least one". No native group constraint exists, so the Root renders native `required` on every Item **only while the optimistic set is empty**. Validation, `:user-invalid` and the (localised) browser message stay native; after one box is checked nothing is required. No `aria-required` on the fieldset: ARIA does not allow it on role `group`. Before hydration the attribute is static (every box required while empty), the safe direction. |
@@ -290,6 +290,8 @@ Shared types come from `packages/ui/src/internal/types.ts` (conventions 2.2, 9.4
 
 ```ts
 export interface CheckboxGroupValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * Library-wide vocabulary (conventions 2.2). "activate": the user toggled an Item or a Parent
    * (click, Space, label click; `event` is the native `click`). "platform": the browser changed

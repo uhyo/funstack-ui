@@ -179,6 +179,8 @@ dispatch. The gesture here is one edit, from the first keystroke to the blur or 
 ```ts
 /** The details of `valueCommitAction`: `<Component><State>CommitDetails` (conventions 9.4). There is no `TextFieldValueChangeDetails`: the component has no change action. */
 export interface TextFieldValueCommitDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /** `"activate"`: the user committed an edit (blur, the commit key). `"platform"`: a form reset, or text adopted at mount. */
   readonly reason: ChangeReason;
 }
@@ -302,8 +304,21 @@ What a commit does:
 
 The commit does not look at validity: text that fails `required` or `pattern` is committed like
 any other, as NumberField commits a number outside `min` / `max` (number-field.md 5.6). The
-constraint is reported by the platform and by a Field; an action that must not save such text
-checks it (section 13 lists the alternative).
+constraint is reported by the platform and by a Field, and **the action is told**:
+`details.valid` is `false` (conventions 2.2: the native constraints of the text being committed
+and, inside a Field, `validate`). An action that must not save such text returns early:
+
+```tsx
+valueCommitAction={async (next, details) => {
+  if (!details.valid) return;   // nothing saved
+  await saveName(next);
+}}
+```
+
+Uncontrolled, the early return commits the text to the field: it stays on screen with the
+Field's error, `state.value` is that text, and the next valid commit saves. Controlled, a parent
+that does not adopt it shows the saved text again. Section 13 lists the alternative (a commit
+that waits for validity).
 
 Nothing commits at unmount: a draft that is open when the field is removed (a popover that
 closes, a navigation) is dropped. A commit needs a mounted owner for its transition.

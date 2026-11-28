@@ -278,6 +278,8 @@ export interface SwitchState {
 
 /** Details passed as the second argument of `checkedChangeAction`. */
 export interface SwitchCheckedChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * `"activate"`: the user toggled the switch (click, Space, label click); `event` is the native
    * `click` event. `"platform"`: the browser changed the value itself: a form reset (`event` is

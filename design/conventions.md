@@ -537,6 +537,43 @@ the diff in that mode too, and there it names the item the change **implicitly**
 released: a switch from A to B is `added: ["b"]`, `removed: ["a"]`. A platform dispatch that
 carries several changes at once (mount reconciliation, a form reset) lists them all.
 
+**`details.valid`: every value action of a form control says whether the requested value passes
+constraint validation.** A *form control* is a component that registers with a Field
+(field-form.md 7.2) and has a value action: Checkbox and Switch (`checkedChangeAction`),
+RadioGroup, CheckboxGroup, Select, MultiSelect and Combobox (`valueChangeAction`), TextField
+(`valueCommitAction`), NumberField and Slider (`valueChangeAction` and `valueCommitAction`),
+OTPField (`completeAction`). Their details types all carry
+
+```ts
+/** The control would be valid holding this value: its native constraints and, inside a Field, `validate`. */
+readonly valid: boolean;
+```
+
+- **What it covers**: the control's native constraints (`required`, `pattern`, `minLength`,
+  `min` / `max` / `step`, a group's "at least one") evaluated for the value the action is
+  called with, and inside a Field the Field's `validate` for that value. Outside a Field it is
+  the native constraints alone. It is `true` for a control with no constraint.
+- **What it does not cover**: a server error (`Form.Root errors`). That is a statement about a
+  value already submitted, and the change that is being dispatched is the edit that dismisses
+  it.
+- **It is information, not a gate.** The library dispatches an invalid value like any other
+  (the control holds what the user entered; validity is a separate fact that a Field shows and
+  a form submission enforces). An action that saves checks it:
+  `if (!details.valid) return;`. In uncontrolled mode that early return keeps the invalid value
+  in the control, with the Field's error next to it, and saves nothing; a controlled parent
+  that does not adopt rolls back instead.
+- **Every reason**: `"activate"`, `"platform"` (a form reset, a value adopted at mount) and
+  NumberField's `"dismiss"` notice all carry it, computed the same way.
+- **Serialisable** (a boolean own property), so a Server Function passed directly receives it.
+- **Not on handlers and not on other actions**: `onValueChange` (OTPField),
+  `onInputValueChange` (Combobox), `onOpenChange` / `openChangeAction`, and the actions of
+  components that are not form controls (Toggle, ToggleGroup, Tabs, Menu's checkable items)
+  have no `valid`.
+- A read-only or disabled control dispatches nothing (3.6, 3.6.1), so the field has no value to
+  define there.
+
+How each control computes it, and the one internal helper they share, is field-form.md 7.5.
+
 Adding a value is a change to this document, not to one component. The first argument is always the next value, so the
 common case stays short:
 

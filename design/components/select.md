@@ -172,6 +172,8 @@ Shared types come from `packages/ui/src/internal/types.ts` (conventions 2.2, 9.4
 
 ```ts
 export interface SelectValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * Library-wide vocabulary (conventions 2.2):
    * "activate": the user picked an option (pointer, keyboard, typeahead, or browser autofill,

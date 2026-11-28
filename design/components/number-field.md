@@ -305,6 +305,8 @@ export type NumberFieldSource = "input" | "increment" | "decrement" | "keyboard"
 
 /** The details of `valueChangeAction` (a step). */
 export interface NumberFieldValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   readonly reason: ChangeReason;                       // "activate" | "platform" | "dismiss" (a rollback notice)
   /** Typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
   readonly source: NumberFieldSource | null;
@@ -312,6 +314,8 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
 
 /** The details of `valueCommitAction`: a type of its own, as Slider's (conventions 9.4). Never `"dismiss"`. */
 export interface NumberFieldValueCommitDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   readonly reason: ChangeReason;                       // "activate" | "platform"
   readonly source: NumberFieldSource | null;
 }
@@ -727,7 +731,9 @@ A native `<input type="number" min="1" step="1">` accepts a typed `0` or `1.5` a
 `rangeUnderflow` / `stepMismatch`; it does not rewrite the user's number. The library does the
 same: the hidden input holds the typed value, the browser's message says what is wrong
 ("Value must be greater than or equal to 1."), the form does not submit until it is fixed, and
-inside a Field the message shows (section 7). Base UI (`allowOutOfRange: false`) and React Aria
+inside a Field the message shows (section 7). The actions are told: `details.valid` is `false`
+for such a value (conventions 2.2; the hidden input is written before the dispatch so that it
+can be read, field-form.md 7.5). Base UI (`allowOutOfRange: false`) and React Aria
 clamp on commit and Base UI snaps with `snapOnStep`; both hide the constraint from the user by
 changing their number. Platform first; a consumer who wants clamping does it in
 `valueChangeAction` with controlled mode. Product-owner item 3.

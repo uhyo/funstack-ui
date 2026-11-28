@@ -223,6 +223,8 @@ export interface CheckboxState {
 
 /** Details passed as the second argument of `checkedChangeAction`. */
 export interface CheckboxCheckedChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /** `"activate"`: user click/Space/label; `"platform"`: form reset (`event` is the `reset` event) or a pre-hydration click found on mount (`event` undefined). */
   readonly reason: ChangeReason;
 }

@@ -124,6 +124,8 @@ Shared types come from `packages/ui/src/internal/types.ts` (conventions 2.2 and 
 
 ```ts
 export interface RadioGroupValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * Library-wide vocabulary (conventions 2.2):
    * "activate": the user checked a radio (click, Space, or an arrow key, all of which arrive

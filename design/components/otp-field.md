@@ -135,6 +135,8 @@ export interface OTPFieldValueChangeDetails extends ActionDetails {
   readonly reason: ChangeReason;
 }
 export interface OTPFieldCompleteDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /** `"activate"`: an edit (typing, paste, keyboard autofill). `"platform"`: a WebOTP fill (`event` is `undefined`). */
   readonly reason: ChangeReason;
 }

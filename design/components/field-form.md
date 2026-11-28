@@ -39,7 +39,7 @@ reported no errors**, so a failed submission never wipes what the user typed.
 
 | # | Topic | Decision |
 | --- | --- | --- |
-| 1 | Anatomy | `Field.Root` (`div`), `Field.Label` (`label[for]`), `Field.Control` (a native `input`, or `textarea` / `select` through `render`), `Field.Description` (`p[id]`), `Field.Error` (`div[id]`, rendered only while an error is shown). `Form.Root` (`form`), `Form.Submit` (`button[type=submit]` with `data-pending`). Any FUNSTACK form control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, Slider) placed inside a `Field.Root` is the field's control (section 7), no wrapper part needed. |
+| 1 | Anatomy | `Field.Root` (`div`), `Field.Label` (`label[for]`), `Field.Control` (a native `input`, or `textarea` / `select` through `render`), `Field.Description` (`p[id]`), `Field.Error` (`div[id]`, rendered only while an error is shown). `Form.Root` (`form`), `Form.Submit` (`button[type=submit]` with `data-pending`), `Form.Error` (`div`, rendered only while the form has a form-level error, 3.7). Any FUNSTACK form control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox, Slider) placed inside a `Field.Root` is the field's control (section 7), no wrapper part needed. |
 | 2 | Validity source | Native constraints (`required`, `type`, `pattern`, `min`/`max`, `minLength`, …) plus **one custom-validity slot** the Field owns: `validate(value, formData)` (sync, re-run on every `input` / `change` in the form and after a FUNSTACK control's value change that fired no event, 7.1) and the server error for the field, both written with `setCustomValidity`. Cleared on the control's next edit. No JS schema, no `validationMode`. |
 | 3 | When an error is shown | `invalid = userInvalid \|\| serverShown`. `userInvalid` is read from the DOM (`control.matches(":user-invalid")`) on `input`, `change`, `focusout`, `invalid` and after `reset`: the platform's heuristic (changed-then-blurred, or a submission attempt; live afterwards; cleared by a reset). `serverShown` is the field's entry in `Form.Root errors` until the user edits the control, re-armed by the next settled submission (each Field re-arms itself on its own `useFormStatus` edge, in the settle commit, 3.4). |
 | 4 | The display state is urgent | `invalid`, `messages` and `validity` are a **mirror of a browser-owned fact**, written with plain `useState` from the DOM event (the urgent lane of conventions 2.6, like virtual focus): the DOM already holds the truth, and the error must be in the DOM when focus moves to the field. No `transition` prop on any Field or Form part; `Field.Error` animates with CSS. |
@@ -47,7 +47,7 @@ reported no errors**, so a failed submission never wipes what the user typed.
 | 6 | The bubble | After hydration a Field cancels the control's `invalid` event **when a `Field.Error` is mounted and the control matches `:user-invalid`** (a submission attempt), renders the message instead, and focuses the first such control in document order (module-level collector, works in any form). A `checkValidity()` or `reportValidity()` call, and a Field without `Field.Error`, keep the platform's behaviour. Before hydration the bubble is the fallback. |
 | 7 | Submission | `Form.Root` renders `<form action={action}>` **unwrapped** (progressive enhancement: the server HTML posts to the Server Function) and, after hydration, intercepts `submit`: `preventDefault()` and `await action(formData)` inside the Form's own `useTransition`. react-dom then skips its own action run (and its automatic reset) and still starts the form's pending status, so `useFormStatus` and `Form.Submit` work unchanged. A submitter with its own `formaction` and a string `action` are left to React / the browser. |
 | 8 | Reset policy | `autoReset` (default `true`): the form is reset when a submission the Form ran **settles with no errors** (`errors` has no non-empty entry at the settle commit, hidden stale ones included). A submission that returns field errors leaves every value, `:user-invalid` and custom validity in place. `false`: never; the consumer resets. |
-| 9 | Server errors | `Form.Root errors` (keyed by field `name`, from `useActionState`'s result or anything else) reach each Field through context. Shown at once, `setCustomValidity`'d, cleared by the field's next edit; the Form focuses the first errored field after the settle. An error for a field whose value changed while the submission was in flight is not shown (it was about a value the user already replaced), and stays hidden until the next settle, also while the next submission is in flight (3.4). |
+| 9 | Server errors | `Form.Root errors` (keyed by field `name`, from `useActionState`'s result or anything else) reach each Field through context. Shown at once, `setCustomValidity`'d, cleared by the field's next edit; the Form focuses the first errored field after the settle. An error for a field whose value changed while the submission was in flight is not shown (it was about a value the user already replaced), and stays hidden until the next settle, also while the next submission is in flight (3.4). A **form-level** error (not about one field: "the server is unavailable") is a second prop, `Form.Root error`, shown by `Form.Error`: it keeps the form from resetting and a dialog from closing, as a field error does, but it is never written into a control's validity, so the same values can be submitted again (3.7). |
 | 10 | Pending | `Form.Root` and `Form.Submit`: `data-pending` while the submission's transition is pending (`useFormStatus`). `Field.Root`: `data-pending` from `useFormStatus().pending` of the enclosing form, the one deliberate exception to "a part never folds the form channel into its own `pending`", because a Field has no action of its own. Controls inside keep their own `data-pending` for their own actions. |
 | 11 | Repeat submits | Not dropped while pending: a `useActionState` dispatch queues them in order (React's own semantics; conventions 2.5 names forms as the ordered-actions case); a plain action runs concurrently. Consumers block with CSS on `Form.Submit[data-pending]`. |
 | 12 | Directives | Every part file is `"use client"` (context, `useId`, `useFormStatus`). Server Components may render all parts with serialisable props: `Form.Root action={serverFn} errors={…}`, `Field.Root name required`; `validate` is a function and needs a client component. |
@@ -60,7 +60,8 @@ reported no errors**, so a failed submission never wipes what the user typed.
 import { Field } from "@funstack/ui/field";
 import { Form } from "@funstack/ui/form";
 
-<Form.Root action={formAction} errors={state.errors}>              {/* form */}
+<Form.Root action={formAction} errors={state.errors} error={state.error}>  {/* form */}
+  <Form.Error />                                                   {/* div, only while `error` is not empty */}
   <Field.Root name="email">                                        {/* div */}
     <Field.Label>Email</Field.Label>                               {/* label[for] */}
     <Field.Control type="email" required autoComplete="email" />  {/* input */}
@@ -413,12 +414,14 @@ seen twice, on purpose:
    1. if any registered Field **shows** a server error at this commit (`serverShown`, which
       already excludes dismissed and hidden stale ones): **focus** the first such Field's target
       in document order (3.5), or announce when focus is already there;
-   2. otherwise, if `autoReset`, the submission was intercepted, and `errors` (the prop at this
-      commit, read through `latest`) has **no non-empty entry at all**, hidden stale entries
-      included: `form.reset()`. A result that flags only a value the user replaced during the
+   2. otherwise, if `autoReset`, the submission was intercepted, and the form **has no error**
+      (`errors`, the prop at this commit, read through `latest`, has no non-empty entry at all,
+      hidden stale entries included, and `error` is empty, 3.7): `form.reset()`. A result that flags only a value the user replaced during the
       flight (walkthrough 5) therefore resets nothing: the user's new value stays and is
       submitted next (developer choice 3; the first draft's "no non-empty, non-suppressed entry"
       would have wiped it).
+   3. in both cases, when `error` is not empty and a `Form.Error` is mounted, the form-level
+      messages are announced (3.7).
 
 `form.reset()` from the effect, not `requestFormReset`: the latter must run inside a transition
 and resets at that transition's commit, which here would be a second commit for the same result;
@@ -438,7 +441,17 @@ export type FormErrors = Readonly<Record<string, FieldErrorValue>>;
 Keyed by field **`name`**; `""`, `[]`, `null` and `undefined` mean no error. The object usually
 is the action state's own (`state.errors`), but it can be anything: a loader result, a prop from a
 Server Component (serialisable), or a constant for a story. A form-level message (not about one
-field) is the consumer's own markup; the library reserves no key for it.
+field) does not go here: it is the `error` prop (3.7). The library reserves no key in `errors`.
+
+**A field error is a statement about that value.** While it is shown it is the control's custom
+validity, so the browser blocks a submission of the unchanged value (3.4): right for "this title
+is taken", wrong for "the request failed". A transient failure, or anything else the user cannot
+fix by editing that field, belongs in `error`.
+
+An entry whose key matches no Field keeps its behaviour: nothing shows it, nothing is focused or
+announced, and it still counts as an error for `autoReset` and for a dialog's close. That is what
+the error-summary pattern (11.6) relies on; it is not the form-level channel, and a misspelt
+field name ends up there silently.
 
 The Form never interprets a return value, so a result reaches the Fields only through this prop:
 "use `useActionState` and pass `state.errors`" is the documented pattern, and it is the one React
@@ -516,8 +529,8 @@ product-owner decision). Nothing is announced when focus moved: the description 
 No focus on mount, even with initial errors: focusing on page load is the kind of focus move
 assistive-technology users complain about, and a progressive-enhancement post-back lands on a
 fresh page where the consumer decides (an error summary with `tabIndex={-1}` and `autoFocus`, or
-nothing). No focus when the errors have no matching Field (a form-level message): the consumer
-renders that message and decides.
+nothing). No focus when the errors have no matching Field, and none for a form-level `error`: it
+is announced instead (3.7).
 
 ### 3.6 Repeat submissions, resets in flight, errors thrown
 
@@ -549,6 +562,66 @@ renders that message and decides.
   order, as Dialog 8.1).
 
 ---
+
+### 3.7 Form-level errors: `error` and `Form.Error`
+
+```tsx
+const [state, formAction] = useActionState(createTask, {});
+// state: { errors?: { title?: string }, error?: string }
+
+<Form.Root action={formAction} errors={state.errors} error={state.error}>
+  <Form.Error className="form-error" />
+  <Field.Root name="title" required>…</Field.Root>
+  <Form.Submit>Create</Form.Submit>
+</Form.Root>
+```
+
+`error` has the type of one entry of `errors` (`FieldErrorValue`: a string, several strings, or
+nothing), normalised the same way. The two props are the two kinds of failure:
+
+| | `errors[name]` | `error` |
+| --- | --- | --- |
+| Says | this field's value is wrong | the submission failed |
+| Shown by | the `Field.Error` of the Field with that name | `Form.Error` |
+| Custom validity | written on the control while shown | never |
+| Submitting the same values again | blocked until the field is edited | allowed: that is the retry |
+| Dismissed by | the field's next edit | nothing; replaced by the next result |
+| At the settle | the first such field is focused | announced, no focus move |
+| `autoReset`, `Dialog.Form` close | prevented | prevented |
+
+Rules:
+
+1. **`Form.Error` is a mirror of the prop.** It renders its `<div>` exactly while `error` has a
+   message, and `null` otherwise: at mount (a post-back, a loader result), after a settle, and
+   while the next submission is in flight (the action state still holds the previous result;
+   `data-pending` is on the part for a consumer who wants to dim it). There is no dismissed or
+   suppressed state as a Field has (3.4): the message is not about a value the user can edit.
+2. **"The form has an error"** is one predicate, used by `autoReset` (3.2) and by `Dialog.Form`'s
+   settle close (dialog.md 8.1): `errors` has a non-empty entry, or `error` is not empty. A
+   submission that reports a form-level error therefore keeps every value and keeps the dialog
+   open.
+3. **The announcement.** After a settle at which `error` is not empty, the Form speaks the
+   messages (joined with a space) through `ariaNotify()` on the form element, once per settle,
+   also when the text is the same as last time (a second failed retry is news). Only while a
+   `Form.Error` is mounted (it registers its presence with the Form, as `Field.Error` does with
+   its Field): a consumer who renders the message in their own markup owns its announcement.
+   When the same settle also announces a Field's server messages because focus was already on
+   that field (3.5), the two are one announcement, form-level messages first. Nothing is
+   announced at mount.
+4. **No focus move.** Focus goes to the first errored Field if there is one (3.5), else it stays
+   where it was (usually the submit button, which is where the retry is).
+5. **No `role="alert"` and no `aria-live`** on `Form.Error`, for the reason `Field.Error` has
+   none (4.2): the announcement is rule 3's, and a live region would read it twice.
+6. Several `Form.Error` parts may be mounted (top and bottom of a long form); the announcement
+   is still one. A `Form.Error` outside a `Form.Root` throws (conventions 9.5).
+7. Before hydration and without JS the part is plain markup in the server HTML for whatever
+   `error` the page was rendered with. `error` is serialisable, so a Server Component may pass
+   it.
+8. No `transition` prop (section 9). The part appears in the settle's commit and animates with
+   CSS `@starting-style`.
+
+An action that **throws** is still the Error Boundary's (3.6). `error` is for a failure the
+action caught and returned.
 
 ## 4. Props and types
 
@@ -809,9 +882,16 @@ export interface FormRootProps
    */
   errors?: FormErrors;
   /**
-   * Reset the form (`form.reset()`) when a submission the Form ran settles with no non-empty
-   * entry in `errors` at all (an error hidden because the user replaced the value during the
-   * flight still counts). Default `true`. A submission that reports errors never resets, so the
+   * A form-level error: a failure that is not about one field (usually `state.error` from
+   * `useActionState`). Shown by `Form.Error` and announced when a submission settles. Never
+   * written into a control's validity, so the same values can be submitted again. While it is
+   * not empty the form is not reset and a `Dialog.Form` stays open.
+   */
+  error?: FieldErrorValue;
+  /**
+   * Reset the form (`form.reset()`) when a submission the Form ran settles with no error: no
+   * non-empty entry in `errors` at all (an error hidden because the user replaced the value
+   * during the flight still counts) and an empty `error`. Default `true`. A submission that reports errors never resets, so the
    * user's input, `:user-invalid` and custom validity stay. `false`: never reset.
    */
   autoReset?: boolean;
@@ -874,11 +954,38 @@ export const Field = { Root: FieldRoot, Label: FieldLabel, Control: FieldControl
 export type { FieldRootProps, FieldState, FieldValidity, FieldValidate, FieldLabelProps, FieldControlProps, FieldDescriptionProps, FieldErrorProps } from …;
 
 // src/form/index.ts
-export const Form = { Root: FormRoot, Submit: FormSubmit } as const;
-export type { FormRootProps, FormRootState, FormErrors, FieldErrorValue, FormSubmitProps, FormSubmitState } from …;
+export const Form = { Root: FormRoot, Submit: FormSubmit, Error: FormError } as const;
+export type { FormRootProps, FormRootState, FormErrors, FieldErrorValue, FormSubmitProps, FormSubmitState, FormErrorProps, FormErrorState } from …;
 ```
 
 Subpaths `@funstack/ui/field` and `@funstack/ui/form`; both re-exported from the root entry.
+
+### 4.7 `Form.Error`
+
+```ts
+export interface FormErrorState {
+  /** The form-level messages: `Form.Root error`, normalised. Never empty while the part renders. */
+  readonly messages: readonly string[];
+  /** The enclosing form's submission is in flight. */
+  readonly pending: boolean;
+}
+
+export interface FormErrorProps
+  extends Omit<ComponentPropsWithRef<"div">, "className" | "style" | "children"> {
+  className?: StateValue<string | undefined, FormErrorState>;
+  style?: StateValue<CSSProperties | undefined, FormErrorState>;
+  /**
+   * Rendered only while the form has a form-level error. Default: `state.messages` joined by a
+   * space. A function gets the state. Must not suspend.
+   */
+  children?: StateValue<ReactNode, FormErrorState>;
+  render?: RenderProp<ComponentPropsWithRef<"div">, FormErrorState>;
+}
+```
+
+The shape of `Field.Error` (4.2), without the Field's validity. Owned key: `data-pending`. `id`
+is the consumer's (nothing references the part). Must be rendered inside a `Form.Root`; the
+rules are section 3.7.
 
 ---
 
@@ -936,6 +1043,9 @@ focuses (or activates) the labelable control. The library installs no key handle
    empty and the attempt fails on it: focus is already there, so the message is spoken through
    `ariaNotify()` ("This email is already registered" / "Please fill out this field."), once; the
    description is unchanged for the next focus.
+5. The server could not be reached and the action returned a form-level `error`: `Form.Error`
+   appears, focus stays on the submit button, and the message is spoken through `ariaNotify()`
+   on the form (3.7). Pressing the button again retries; a second failure is spoken again.
 
 ---
 
@@ -949,7 +1059,7 @@ focuses (or activates) the labelable control. The library installs no key handle
 | `data-disabled` | every Field part, `Form.Submit` | disabled by prop (Field or control) |
 | `data-required` | every Field part | `Field.Root required` or the control's own `required` (the control reports its own through the registration) |
 | `data-readonly` | every Field part | `Field.Root readOnly` or the control's own `readOnly` (through the registration; conventions 3.6.1) |
-| `data-pending` | every Field part, `Form.Root`, `Form.Submit` | the form's submission is in flight |
+| `data-pending` | every Field part, `Form.Root`, `Form.Submit`, `Form.Error` | the form's submission is in flight |
 
 Platform pseudo-classes next to them (conventions 4.2): `:user-invalid` / `:user-valid` on the
 control and `:has(:user-invalid)` on the Root cover the native half of `data-invalid` with no JS
@@ -1192,6 +1302,76 @@ Rules that follow:
   natively disabled `<button>` (only `click` is withheld).
 
 ---
+
+### 7.5 `details.valid`
+
+Conventions 2.2: every value action of a form control carries `details.valid`, "the control
+would be valid holding this value". It has two halves, and each control supplies the first:
+
+```
+valid = native(next) && custom(next)
+```
+
+- **`native(next)`**: the control's native constraints for the requested value. A control whose
+  DOM already holds that value when it dispatches reads it from the validity element: every
+  `ValidityState` flag except `customError` is false. (Not `validity.valid`: the custom slot
+  may still hold the previous value's `validate` message or a server error, and a click-driven
+  `onChange` runs before the `input` / `change` the Field listens to.) A control whose value
+  reaches the DOM only in the commit after the dispatch computes it from its own props.
+- **`custom(next)`**: inside a Field with a `validate`, `validate(value, formData)` returns no
+  message, where `formData` is `new FormData(form)` (empty with no form owner) **as it would be
+  with the requested value**, and `value` is `formData.get(name)` as in 2.1. A control whose DOM
+  already holds the value needs nothing; the others patch their own entries into the
+  `FormData`. `true` outside a Field, without `validate`, and while read-only (`validate` is not
+  run then, 4.1).
+
+One internal hook does the second half and the conjunction, next to `useFieldControl`:
+
+```ts
+/**
+ * Returns a function for event handlers: `(native, patch) => native && custom`. `patch` writes
+ * the control's own entries for the requested value into the FormData `validate` will see;
+ * `null` when the form's DOM already holds them. Reads the latest `validate`; writes no state
+ * and no custom-validity slot (the Field's own refresh does that after the dispatch, 2.4).
+ */
+export function useNextValidity(): (native: boolean, patch: ((formData: FormData) => void) | null) => boolean;
+```
+
+`validate` is therefore called once more per dispatch. It is already required to be a sync,
+pure function of its arguments (2.1).
+
+| Control | `native(next)` | `patch` | Notes |
+| --- | --- | --- | --- |
+| `Checkbox`, `Switch` | read from the `<input>` | `null` | The dispatch is in the click; the browser has already toggled `checked`, also for a controlled input (React restores it after the handler). |
+| `RadioGroup` | read from the validity element (the first enabled radio) | `null` | A checked radio clears `valueMissing` on every radio of the group. |
+| `Select` | read from the `<select>` | `null` | The dispatch is in `change`. |
+| `TextField` | read from the `<input>` / `<textarea>`, which holds the draft being committed | `null` | `tooShort` / `tooLong` are flagged by the platform only for text the user edited: `valid` follows the platform. |
+| `OTPField` (`completeAction`) | `true`: a complete code satisfies `required` and the derived `pattern` by construction | set `name` to the code | The patch is needed because the Field's `input` listener saw the browser's text before the filter's write-back (otp-field.md 3.1). Only `validate` can make it `false`. |
+| `NumberField` (both actions) | write the hidden `input[type=number]` first (`syncHidden(next)`, which a step already calls in the same task; the typed-text commit does the same before it dispatches), then read the hidden input | `null` (the hidden input is the form control and now holds the value) | `rangeUnderflow`, `rangeOverflow`, `stepMismatch` and `valueMissing` apply to a script-set value. The Input's layout effect re-syncs the hidden input to the shown value after every commit, so a rollback restores it. A `"dismiss"` notice is computed for the value it reports. |
+| `Slider` (both actions) | `true` (a range is never invalid, slider.md 9) | set each thumb's name to its next value | Only `validate` can make it `false` (the "narrow the range" rule of slider.md 9.4). |
+| `CheckboxGroup` | `!(required && next.length === 0)` | set the group's `name` to the next values | Computed, never read: a Parent click changes the Items only in the next commit. `required` is the Root's or the Field's (the derived "at least one"). |
+| `MultiSelect` | `!(required && next.length === 0)` | set `name` to the next values | The hidden inputs and the hidden validity `<select>` change in the next commit. |
+| `Combobox` | `!(required && next === null)` | set `name` to `next ?? ""` | `required` is on the Input and means "empty text"; a committed value always has text and a cleared one has none, so the selection decides. Other constraints a consumer passes to `Combobox.Input` (`pattern`, `minLength`) describe the typed text, not the value, and are not part of `valid`. |
+| `Combobox` with `multiple` | `!(required && next.length === 0)` | set `name` to the next values | The computed `required` of combobox.md 15.8. |
+
+A patch "sets a name" with `formData.delete(name)` and one `append` per value; a control with no
+`name`, or a disabled one, patches nothing (it is not in the form's data).
+
+**Feasibility.** No control depends on the order of the Field's listener and React's: the read
+controls ignore the custom slot, and the computed controls do not touch the DOM. The three that
+were in question:
+
+- **NumberField**: feasible because the hidden input is uncontrolled and written only by the
+  library; the step path already writes it before dispatching. The one change of order is in
+  the typed-text commit.
+- **MultiSelect** and **Combobox**: feasible without the DOM, since their only native constraint
+  is `required` on a value the Root already has. The cost is that the predicate is written
+  twice (the attribute the part renders, and this function), so each has a test row that
+  compares `details.valid` with the validity element's `validity.valid` after the commit
+  (conventions 10).
+
+The same comparison row exists for every control: after the dispatch has committed, with no
+server error shown, `details.valid` equals `validityElement.validity.valid`.
 
 ## 8. Server rendering, progressive enhancement, before hydration
 
@@ -1509,6 +1689,49 @@ const deferredQuery = useDeferredValue(query);
 ```
 
 ---
+
+### 11.9 A form-level error, and a dialog that forgets it
+
+```tsx
+"use client";
+async function createTask(_: State, formData: FormData): Promise<State> {
+  try {
+    const result = await api.createTask(formData);
+    return result.ok ? {} : { errors: result.fieldErrors };  // "title": "Already exists"
+  } catch {
+    return { error: "Could not reach the server. Try again." };  // nothing to fix in a field
+  }
+}
+
+function NewTaskForm() {
+  const [state, formAction] = useActionState(createTask, {});
+  return (
+    <Dialog.Form action={formAction} render={<Form.Root errors={state.errors} error={state.error} />}>
+      <Form.Error className="form-error" />
+      <Field.Root name="title" required>
+        <Field.Label>Title</Field.Label>
+        <Field.Control />
+        <Field.Error />
+      </Field.Root>
+      <Form.Submit>Create</Form.Submit>
+    </Dialog.Form>
+  );
+}
+
+<Dialog.Root>
+  <Dialog.Trigger>New task</Dialog.Trigger>
+  <Dialog.Popup><NewTaskForm /></Dialog.Popup>
+</Dialog.Root>
+```
+
+Both kinds of error keep the dialog open and the values in place. The field error blocks the
+same title until it is edited; the form-level one does not, so "Create" retries.
+
+**`useActionState` lives inside the Popup.** The Popup's content is unmounted while the dialog
+is closed (without `keepMounted`), so the action state, and with it the errors, starts fresh at
+the next open. With the hook in the component that renders `Dialog.Root`, the state outlives
+the close, and the next open shows the last submission's errors on an empty form (errors
+present at mount are shown, 3.4). The docs write the recipe this way.
 
 ## 12. Not in v1
 

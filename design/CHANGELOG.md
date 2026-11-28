@@ -16902,3 +16902,170 @@ browser rows (P1 to P8 as component rows, all three engines in CI); the docs pag
 state, owned keys, data attributes, keyboard rows; "Disabled or read-only" on the Field page;
 Toggle's "no `readOnly`" note); the skill; a playground demo (Field and Form, "Read-only").
 Not done: the screen-reader pass (NVDA, JAWS, VoiceOver), which is a human task.
+
+## 2026-11-28, dogfood run 1: `Form.Root error` and `Form.Error` (#208), `MultiSelect.Value placeholder` (#209), `details.valid` (#210)
+
+Three amendments from the first dogfood run (`memo/product-owner/dogfood-1-friction.md` F4, F7,
+F9, F17; analysis and the options put to the user in `memo/architect/dogfood-1-api.md`). The
+user chose: #208 option B, #209 option A, #210 option B for every form control at once, with
+the rule written library-wide. #207 (a failed save without an Error Boundary) is still open and
+is not part of this entry. Design only at this point: nothing below is implemented.
+
+### #208: what changed in the rules
+
+- New prop `Form.Root error?: FieldErrorValue` and new part `Form.Error` (field-form.md 3.7,
+  4.4, 4.7; decisions rows 1 and 9; the anatomy; 5.3 item 5; 6.1).
+- "The form has an error" is now `errors` has a non-empty entry **or** `error` is not empty,
+  for `autoReset` (3.2) and for `Dialog.Form`'s settle close (dialog.md 8.1 and the
+  `closeOnSettle` doc comment).
+- The settle effect gains a third step: announce the form-level messages (3.2 item 2.3, 3.7
+  rule 3).
+- 3.3 replaces "a form-level message is the consumer's own markup; the library reserves no key"
+  with: use `error`; a field error is a statement about that value and blocks it; an unmatched
+  key keeps its behaviour and is not the form-level channel.
+- New example 11.9, which also moves `useActionState` inside the Popup (F9: stale errors at the
+  next open).
+- Considered and not taken: a reserved key in `errors` (`""` or `_form`: a library key inside
+  the user's field names, and server code would have to know it); docs only (the channel would
+  stay a side effect, with no announcement and no protection against a misspelt field name); a
+  dev warning for an unmatched key (the error-summary pattern of 11.6 uses them on purpose).
+- Not breaking. An `errors._form` workaround keeps working.
+
+### #209: what changed in the rules
+
+- `MultiSelect.Value`: `placeholder`, when given, is rendered while the selection is empty
+  whatever `children` is (multi-select.md B.7, the props comment, the part row). Before, it was
+  read only by the default content, and the design's own first example was the broken
+  combination.
+- Checked: `Select.Value` is `<selectedcontent>` with neither `children` nor `placeholder`; no
+  other part has a `placeholder` of this kind.
+- Behaviour change for one call site only: `placeholder` together with `children` that render
+  something else for the empty selection now shows the placeholder.
+
+### #210: what changed in the rules
+
+- Conventions 2.2: every value action of a form control carries `details.valid`. The list of
+  actions, what it covers (native constraints and a Field's `validate`, for the requested
+  value), what it does not (server errors), and "information, not a gate".
+- field-form.md 7.5: `valid = native(next) && custom(next)`, the internal hook
+  `useNextValidity`, and the per-control table.
+- The details type of each control gains `readonly valid: boolean` (checkbox.md, switch.md,
+  radio-group.md, checkbox-group.md, select.md, multi-select.md, combobox.md twice,
+  text-field.md, number-field.md twice, slider.md twice, otp-field.md `OTPFieldCompleteDetails`).
+- text-field.md 5 and number-field.md 5.6 say the action is told.
+- Considered and not taken: not dispatching while invalid (blur would either lose the user's
+  text or need an unfocused-draft state, and the rule could not extend to Checkbox or Select);
+  `valid` on the commit-style controls only (a one-off).
+- Not breaking: a new field on details objects.
+
+### Feasibility of `details.valid` per control
+
+| Control | How | Risk |
+| --- | --- | --- |
+| Checkbox, Switch, RadioGroup, Select, TextField | Read the native flags (all but `customError`) from the validity element in the handler that dispatches; the DOM holds the value | Low. Checkbox, Switch and RadioGroup dispatch from the click, before `input` / `change`: confirm in a browser row that `validity.valueMissing` already reflects the toggled state in all three engines, also for a controlled input. |
+| OTPField | `native` is `true` by construction; `validate` sees the code through the patch | Low. |
+| NumberField | Write the hidden input (`syncHidden(next)`) before dispatching, then read it. Steps already do; the typed-text commit must be reordered | Medium: the reorder touches `commitDraft`. The visible input's mirrored validity then changes at the dispatch, not at the commit after it; that is already the case for steps. Check the rollback row (the hidden input returns to the shown value in the Input's layout effect). |
+| MultiSelect | Computed from `required` and the next set; no DOM | Low. The predicate duplicates the hidden validity `<select>`; the comparison row guards drift. |
+| Combobox | Single: `!(required && next === null)`. Multiple: `!(required && next.length === 0)`. No DOM | Medium for single: it assumes "a committed value has non-empty text". Check `allowCustomValue` (a custom value is its own text, never empty) and an Option whose `label` is `""` (if reachable, document it as out of scope). Constraints passed through to the Input other than `required` are not covered, by rule. |
+| CheckboxGroup | Computed from `required` and the next set (a Parent click is not in the DOM yet) | Low. |
+| Slider | `native` is `true`; `validate` through the patch with per-thumb names | Low. Check the two-thumb `getAll(name)` order matches the form's. |
+
+If a control turns out not to be feasible as written, stop and report: the user decided "all
+controls at once", so a partial landing is a decision, not an implementation detail.
+
+### Checklist, #208
+
+Implementation:
+
+- `internal/form/validity.ts`: `hasFormError(errors, error)`; `hasAnyError` stays for the
+  Fields.
+- `internal/form/field-context.ts`: `FormContextValue` gains the normalised `error` messages
+  and `registerFormError(): () => void` (presence count, a ref).
+- `form/form-root.tsx`: the `error` prop; the predicate in the settle; the announcement
+  (`announce(form, messages.join(" "))`, merged with the Field announcement of 3.5 when both
+  happen); `latest` carries `error`.
+- `form/form-error.tsx` (new, `"use client"`): the part; `displayName` `FormError`; throws
+  outside a `Form.Root`.
+- `form/index.ts`: `Form.Error`, `FormErrorProps`, `FormErrorState`; the root entry and
+  `@funstack/ui/types`.
+- `dialog/dialog-form.tsx`: the close predicate reads the form's error through the context.
+- Docs: Field page (props table of `Form.Root`, a `Form.Error` section, "a field error blocks
+  the same value", the unmatched-key note, the Dialog recipe rewritten as 11.9 with the trap
+  named); Dialog page (`closeOnSettle`); a live example with a failing server; the skill (one
+  rule: field errors for a wrong value, `error` for a failed submission; and the Popup recipe).
+
+Tests (jsdom unless marked):
+
+| Row | Assert |
+| --- | --- |
+| Mirror | `error="x"` at mount: `Form.Error` renders "x", nothing announced, no focus move; `""`, `[]`, `null`, `undefined`: no element; an array renders joined by a space; function `children` get `{ messages, pending }` |
+| Settle with `error` only | no reset (values kept), no focus move, announced once on the form element (`ariaNotify` stubbed); the same text at the next settle is announced again |
+| Retry | after a settle with `error`, a second submit with unchanged values runs the action (no custom validity anywhere: `form.checkValidity()` is true) |
+| Both kinds | `errors.title` and `error`: the title field is focused, `Form.Error` renders; with focus already on the field, one announcement, form-level text first |
+| No part mounted | `error` given, no `Form.Error`: nothing announced; still no reset |
+| Clean settle after an error | `error` becomes empty: the part unmounts, the form resets |
+| Pending | `data-pending` on `Form.Error` during the next flight; the previous message still rendered |
+| Outside a Form | `Form.Error` alone throws the conventions 9.5 message |
+| Dialog | `Dialog.Form render={<Form.Root error=… />}`: a settle with `error` keeps the dialog open and the values; a clean settle closes; both orientations of the composition |
+| 11.9 | form component inside the Popup: submit an error, cancel, reopen: no error shown |
+| Server render | `renderToString` with `error`: the div is in the HTML; hydrates without a warning |
+| Types | `error` accepts `FieldErrorValue`; `Form.Error` state type |
+| Browser | a real settle in the three engines: the message is in the accessibility tree after the settle, focus stays on the submit button |
+
+### Checklist, #209
+
+- `multi-select/multi-select-value.tsx`: `empty && placeholder != null ? placeholder : children ?? default`; the doc comments on `placeholder` and `children`.
+- Docs: the MultiSelect page's Anatomy and props table; remove the repeated placeholder text
+  from the live examples' functions; the skill's MultiSelect line.
+
+| Row | Assert |
+| --- | --- |
+| Function children, empty | `placeholder` rendered, the function not called |
+| Function children, not empty | the function's result |
+| Static children, empty | `placeholder` rendered |
+| No `placeholder`, function children, empty | the function is called (`state.empty` true) |
+| `placeholder={null}` | treated as not given |
+| No children | unchanged: `placeholder`, else the labels |
+| `data-empty` | present in every empty row |
+| Rollback | a rejected first pick returns to the placeholder |
+| `render` function | receives the placeholder as `props.children` while empty |
+
+### Checklist, #210
+
+Implementation:
+
+- `internal/form/` (new file for `useNextValidity`, `"use client"`; a directive-free
+  `nativeValid(element)` next to `snapshotValidity` in `validity.ts`): the hook reads
+  `FieldContext`; the Field exposes what it needs (the latest `validate`, `name`, the form
+  owner, `readOnly`) through the context.
+- `internal/action/action-details.ts`: no change expected (`valid` is an ordinary own field).
+- One details type and one dispatch site per control, as the table of field-form.md 7.5. The
+  shared checkable machinery (`internal/form/use-checkable-input.ts`) covers Checkbox, Switch
+  and the group items in one place.
+- NumberField: `syncHidden(next)` before the typed-text dispatch.
+- Every `"platform"` dispatch (form reset, mount reconciliation) and NumberField's `"dismiss"`
+  notice carry it too.
+- Docs: the Action props page (the rule, with the inline-save example); each control page's
+  details table; TextField and NumberField pages (replace the "an action that must not save
+  checks it" bullet with `details.valid`); the Field page (what `valid` includes); the skill
+  (one sentence, and an entry in "Things agents get wrong": a `required` inline-save field
+  commits empty text unless the action checks `details.valid`).
+
+Tests, per control (jsdom unless marked):
+
+| Control | Rows |
+| --- | --- |
+| All | no constraint: `valid` is `true`; outside a Field with a native constraint; inside a Field with `validate` failing and passing for the requested value; a shown server error does not make it `false`; the comparison row (after the commit, `details.valid === validityElement.validity.valid`); the field is an own enumerable property (reaches a Server Function: `JSON.stringify(details)`); the type row |
+| Checkbox, Switch | `required`: uncheck gives `false`, check gives `true`; controlled parent that refuses; reset (`"platform"`). Browser: the three engines agree at click time |
+| RadioGroup | `required` with nothing checked, then a pick: `true`; reset to empty: `false` |
+| CheckboxGroup | `required`: last Item unchecked gives `false`; Parent click that clears all gives `false`, that checks all `true`; `validate` sees `getAll(name)` for the next set |
+| Select | `required`: the `""` option gives `false`; reset |
+| MultiSelect | `required`: removing the last value gives `false`; `validate` over `getAll(name)` sees the next set, not the committed one |
+| Combobox | single: clear gives `false` with `required`, a pick `true`, a custom value `true`; multiple: last chip removed gives `false`; `validate` sees the next selection |
+| TextField | the dogfood case: `required`, clear, Enter: `false`, and with `if (!details.valid) return` nothing is saved, the empty text stays, `Field.Error` shows; `pattern`; `validate`; blur commit; textarea; reset. Browser: real keys |
+| NumberField | typed `0` with `min={1}`: `false` on `valueCommitAction`; a step never produces `false` for range (it clamps) but does for `validate`; empty with `required`: `false`; unparsable text dispatches nothing (unchanged); rollback restores the hidden input; `"dismiss"` notice. Browser: the hidden input's flags for a script-set value in the three engines |
+| Slider | `true` without `validate`; the two-thumb "narrow the range" rule gives `false` on both actions for the offending value |
+| OTPField | `completeAction`: `true`; with `validate` rejecting the code: `false`, and `validate` received the filtered code |
+
+Not done here: the screen-reader pass for the `Form.Error` announcement (NVDA, JAWS,
+VoiceOver), which is a human task.

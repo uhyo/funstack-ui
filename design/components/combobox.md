@@ -263,6 +263,8 @@ export type UrgentChangeHandler<T, Details extends ActionDetails = ActionDetails
 
 ```ts
 export interface ComboboxValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * "activate": the user accepted an option (Enter, click; `details.event` is the `keydown` or
    * `click`), committed free text with `allowCustomValue` (Enter: the `keydown`; focus leaving:
@@ -1492,6 +1494,8 @@ or without a reducer; a later change warns in development and is ignored).
 ```ts
 /** Details of `valueChangeAction` with `multiple`. */
 export interface ComboboxMultipleValueChangeDetails extends ActionDetails {
+  /** The control would be valid holding this value (conventions 2.2, field-form.md 7.5). */
+  readonly valid: boolean;
   /**
    * "activate": the user toggled an option (Enter, click), added free text (`allowCustomValue`),
    * removed a chip (Backspace or Delete: the `keydown`; `ChipRemove`: the `click`) or pressed Clear.

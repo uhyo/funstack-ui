@@ -916,9 +916,11 @@ export interface DialogFormProps
   /**
    * With a function `action`: close the dialog once the action's transition settles without
    * throwing and, when this form is rendered as a `Form.Root`
-   * (`render={<Form.Root errors={state.errors} />}`), with no field error: a settle whose
-   * `errors` has a non-empty entry (hidden stale ones included, the `autoReset` rule) keeps
-   * the dialog open and the Form focuses the first errored field. Default `true`.
+   * (`render={<Form.Root errors={state.errors} error={state.error} />}`), with no error: a
+   * settle whose `errors` has a non-empty entry (hidden stale ones included) or whose
+   * form-level `error` is not empty (the `autoReset` rule, field-form.md 3.7) keeps the dialog
+   * open; the Form focuses the first errored field or announces the form-level error.
+   * Default `true`.
    *
    * Without a `Form.Root` the library never sees a result, so any settle that does not throw
    * counts, including a `useActionState` result that reports errors: render the form as a
@@ -1369,8 +1371,9 @@ then runs the action, routes the errors to the Fields and resets only on a clean
 (field-form.md 3), and `Dialog.Form`'s settle close becomes **error-aware**: a child rendered
 among the form's children reads the `FormContext` (present exactly when the form is a
 `Form.Root`, in either orientation of the composition) and the close is requested only when
-`hasAnyError(errors)` is false at the settle commit, the same predicate as `autoReset`, hidden
-stale entries included, so "reset" and "close" never disagree; a settle with errors keeps the
+the form has no error at the settle commit (no non-empty entry in `errors`, hidden stale entries
+included, and an empty form-level `error`: the one predicate of field-form.md 3.7, which
+`autoReset` uses too), so "reset" and "close" never disagree; a settle with errors keeps the
 dialog open while `Form.Root` focuses the first errored field. Three outcomes: the action throws
 (the dialog stays open, the Error Boundary shows the error), returns errors (open, values kept,
 first errored field focused, nothing reset), or settles clean (`Form.Root` resets, then the
