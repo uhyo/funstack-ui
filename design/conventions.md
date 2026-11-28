@@ -31,7 +31,7 @@ Ark UI, Headless UI), and a handful of React 19.3.1 behaviour probes recorded in
 | # | Topic | Decision |
 | --- | --- | --- |
 | 1 | Composition | Compound parts under a namespace (`Tabs.Root`, `Tabs.Tab`); single-element components are plain (`Toggle`). Element polymorphism via a `render` prop (element or `(props, state) => node`), never `asChild` or `as`. `ref` is a normal prop. `className`, `style`, `children` accept a value or a function of the part's state. |
-| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary. What a pure trigger does with an activation that arrives while its own action is pending is the prop `whilePending` (`"run"` | `"ignore"`); the default follows who owns the action: `"run"` for a user-owned trigger (`Button`), `"ignore"` for a part whose activation the library owns (a Close part); an ignoring part renders `aria-disabled="true"` while pending (2.5.1). **`fooAction` always means a handler the component runs in a transition**, and a **request**: a change the library can still roll back. A change the library cannot hold is reported to an `on*` handler instead (row 11): `on<State>Change` or `on<Event>`, never an action. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), not an event prop. |
+| 2 | Action props | `<state>ChangeAction` for state changes (`pressedChangeAction`, `valueChangeAction`), bare `action` for pure triggers. Signature `(next, details)`; sync or async; the library `await`s it inside the state owner's `useTransition`. Errors go to the nearest Error Boundary; an action that handled its own failure calls `details.reject()` instead, which has every effect of a rejection except the boundary (2.4.1). What a pure trigger does with an activation that arrives while its own action is pending is the prop `whilePending` (`"run"` | `"ignore"`); the default follows who owns the action: `"run"` for a user-owned trigger (`Button`), `"ignore"` for a part whose activation the library owns (a Close part); an ignoring part renders `aria-disabled="true"` while pending (2.5.1). **`fooAction` always means a handler the component runs in a transition**, and a **request**: a change the library can still roll back. A change the library cannot hold is reported to an `on*` handler instead (row 11): `on<State>Change` or `on<Event>`, never an action. A continuous control adds `<state>CommitAction` once per gesture (Slider). A component whose input is a command rather than an interaction (Toast) exports a function next to its namespace (`toast`), not an event prop. |
 | 3 | State model | `x` / `defaultX` / `xChangeAction`. The state owner holds committed state, optimistic state (`useOptimistic`, reducer form) and the transition. **Trigger parts render optimistic state; content regions render committed state.** Uncontrolled state is committed after the action resolves; the latest dispatched action wins, and set-valued state without `exclusive` commits the changes whose actions resolved (3.3). "Transition by default" applies to library-owned state; browser-owned state (top layer, `<details open>`) is observed, not driven. An overlay's `open` has both: requests through `openChangeAction`, and facts (a dismissal) adopted urgently and reported to `onOpenChange`, which supersede every request in flight (3.4 `adoptFact`, 3.9). |
 | 4 | Exposure | One vocabulary in three forms: `data-pending` / `state.pending` / docs. Every data attribute a part emits has a same-named member in that part's state (4.1). Booleans by attribute presence. Hover/focus/active come from CSS pseudo-classes, not attributes. |
 | 5 | ViewTransition | An animatable part renders `<ViewTransition default={transition}>` as its outermost node **only when `transition` is given**; with the prop absent it renders no boundary, because react-dom starts a document view transition for any boundary that mounts or is revealed in a transition commit, whatever `"none"` says. `transition` forwards React's own `default` shape and is static. For a top-layer part the boundary wraps **the top-layer element itself**, so a library-driven `showPopover()` / `hidePopover()` in a layout effect animates enter and exit in every engine. Library adds `fsui-<component>[-<change>]` transition types. Reduced motion handled in CSS. |
@@ -481,7 +481,13 @@ export interface ActionDetails {
   readonly event: Event | undefined;
 }
 
-export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Action<[next: T, details: Details]>;
+/** What an action's `details` has and a handler's does not: the action may refuse the request (2.4.1). */
+export interface Rejectable {
+  /** Call before the action returns or resolves: the request counts as rejected, and no error is thrown. */
+  readonly reject: () => void;
+}
+
+export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Action<[next: T, details: Details & Rejectable]>;
 
 /** Why a change action was dispatched; the full vocabulary (section 2.2, "reason" table). */
 export type ChangeReason = "activate" | "platform" | "dismiss" | "timeout";
@@ -585,7 +591,8 @@ common case stays short:
 The return type is `unknown`, not `void | Promise<void>`: TypeScript's void-return leniency does
 not apply to unions, so `(next) => save(next)` with `save` returning `Promise<Response>` would be
 a type error, and Server Functions usually return data. The library `await`s whatever comes back
-(a thenable is awaited; anything else is ignored). v0 has no `cancel()` on `details`.
+(a thenable is awaited; anything else is ignored). The one thing an action can tell the library
+besides settling is `details.reject()` (2.4.1).
 
 **`details` is serialisable; `event` is virtual**
 (`docs/research/server-function-action-props.md`): React's reply serialiser rejects a DOM `Event`
@@ -601,10 +608,13 @@ cannot be detected on the client. So:
    the only way the library builds `details`.
    `details.event` and `"event" in details` work; `Object.keys(details)`, `{ ...details }`,
    `JSON.stringify(details)` and React's serialiser see only the real fields. The
-   `ActionDetails` type and the `(next, details)` signature are unchanged.
+   `ActionDetails` type and the `(next, details)` signature are unchanged. `reject` (2.4.1) is
+   the second virtual property, served the same way and only to actions.
 3. Therefore **a Server Function may be passed directly to any action prop**, from a Server
    Component or a Client Component, in every RSC framework surveyed, with no dev warning. It
    receives `(next, details)` with `details.event === undefined` and every other field intact.
+   It has no `details.reject` either (a function does not cross the wire): a Server Function
+   refuses by throwing, or through a client wrapper that calls `reject()` (2.4.1).
    A thin client wrapper is optional, useful only to drop or reshape arguments.
 
 ```tsx
@@ -793,8 +803,9 @@ Optimistic state reverts automatically. Uncontrolled committed state is written 
 action resolves, so a rejected action leaves it untouched (section 3.3). A controlled parent gets
 the same by updating its state on success only.
 
-A consumer who wants inline error UI instead of a boundary catches inside the action. Note that a
-caught error makes the action *resolve*, which the library treats as success:
+A consumer who wants inline error UI instead of a boundary catches inside the action **and calls
+`details.reject()`** (2.4.1). Without that call a caught error makes the action *resolve*, which
+the library treats as success:
 
 ```tsx
 <Toggle
@@ -810,8 +821,122 @@ caught error makes the action *resolve*, which the library treats as success:
 />
 ```
 
-In uncontrolled mode a swallowed error therefore commits the new value. Use controlled mode when
-the parent needs to veto.
+In uncontrolled mode a swallowed error therefore commits the new value. `details.reject()` is
+how an action refuses in either mode.
+
+#### 2.4.1 `details.reject()`: a rejection the action handled
+
+```tsx
+<Checkbox
+  defaultChecked={task.done}
+  checkedChangeAction={async (next, details) => {
+    try {
+      await setTaskDone(task.id, next);
+    } catch (e) {
+      toast({ title: "Could not update the task", type: "error" });
+      details.reject();          // roll back; no Error Boundary
+    }
+  }}
+/>
+
+<AlertDialog.Action
+  action={async (details) => {
+    const result = await deleteProject(id);
+    if (!result.ok) {
+      setMessage(result.message);  // shown in the dialog
+      details.reject();            // the dialog stays open
+    }
+  }}
+>
+  Delete
+</AlertDialog.Action>
+```
+
+**One rule: an action that called `details.reject()` before it settled is treated as if it had
+rejected, except that nothing is thrown and nothing is reported.** Everything this document and
+the component documents say about "a rejection" applies, minus the Error Boundary and
+`reportError`:
+
+- the optimistic state reverts when the transition ends;
+- uncontrolled state is not written (3.3); in a set-valued component the dispatch leaves no
+  trace in the replay (2.5);
+- a pure trigger's continuation does not run: `Menu.Item` and `Toast.Action` do not close their
+  container (`closeOnActivate`), a Close part and `AlertDialog.Action` do not close the dialog;
+- an overlay's `openChangeAction` leaves `open` as it was;
+- the view-transition, Field-notification and focus consequences of a rollback are those of a
+  rejection.
+
+It exists on **every action's `details`** and nowhere else: state owners
+(`<state>ChangeAction`, `<state>CommitAction`), pure triggers (`action`), event actions
+(`completeAction`), and each action of a two-action part (Slider, NumberField) separately.
+Where a rejection has nothing to undo (OTPField's `completeAction`: the code stays typed), the
+call changes nothing.
+
+The contract:
+
+1. **When it is read.** Once, when the action settles: at its synchronous return, or when the
+   thenable it returned resolves. A synchronous action calls it before returning; an async one
+   at any point before its promise resolves. The request stays pending until then: `reject()`
+   does not end `data-pending` early and does not interrupt the action.
+2. **Called twice**: the same as once. There is no way to take it back.
+3. **Called after the action settled** (from a promise the action did not await, a timer, a
+   later event): no effect, and a development warning naming the mistake. The usual cause is
+   `void save().catch(() => details.reject())`: return or await the promise.
+4. **Called, and then the action throws or rejects anyway**: the throw wins. It is a real
+   rejection and takes the route of 2.4.
+5. **Overlaps and superseded dispatches.** `reject()` belongs to its own dispatch and has
+   exactly the standing a rejection of that dispatch would have (2.5). Single-valued state: on
+   the latest dispatch it rolls back; on a superseded one it changes nothing on screen (that
+   dispatch's outcome was already irrelevant). Set-valued state: that one change is dropped,
+   the others are kept. A pure trigger with `whilePending="run"`: the continuation runs once,
+   when the last run settles, and only if the **latest** run resolved without `reject()`; an
+   older run's `reject()` does not stop it (2.5.1).
+6. **Owner gone** (unmounted or hidden when the action settles): no effect. Unlike a thrown
+   rejection (2.4) nothing goes to `reportError`: the action handled its failure.
+7. **Controlled mode.** The parent's prop is the truth, as always. `reject()` there equals
+   "resolve without adopting" for the state, and it is still what keeps a trigger's container
+   open. A parent that adopts the value and also calls `reject()` gets the value it adopted.
+8. **Not on handlers.** An `on*` handler reports a fact (2.1) and its `details` has no
+   `reject`: the type is `Details`, not `Details & Rejectable`, and the property is `undefined`
+   at run time.
+9. **Not on form actions.** `Form.Root action` and `Dialog.Form action` are React form actions:
+   they receive `FormData` and no `details` (2.7). Their counterpart is the returned result:
+   `Form.Root error` for a failed submission and `errors` for a wrong value keep the values
+   and keep a dialog open (field-form.md 3.7), which is what `reject()` does for an action
+   prop. The `openChangeAction(false)` that a settled `Dialog.Form` requests is an ordinary
+   action and has `reject()`.
+10. **Server Functions.** `reject` is a virtual, non-own property of `details`, like `event`
+    (2.2): it is not serialised, so a Server Function passed directly receives no `reject`.
+    It refuses by throwing (the boundary), or the consumer wraps it on the client:
+
+    ```tsx
+    checkedChangeAction={async (next, details) => {
+      const result = await setTaskDoneOnServer(id, next);   // returns { ok, message }
+      if (!result.ok) { toast({ title: result.message }); details.reject(); }
+    }}
+    ```
+
+    A copy of `details` (`{ ...details }`) has no `reject`, as it has no `event`. The function
+    does not depend on `this`: `({ reject }) => …` works.
+11. **With `details.valid`** (2.2). The two compose into the two things an inline-save action
+    can do with an invalid value: `if (!details.valid) return;` keeps the value in the control
+    and saves nothing (the Field shows why); `if (!details.valid) return details.reject();`
+    puts the saved value back.
+12. **No state for it.** There is no `data-rejected`, no `state.error` and no error object held
+    by the library: the action that calls `reject()` is the one that shows the message.
+
+Typing: every action prop's `details` parameter is `<Details> & Rejectable`. `ChangeAction`
+adds it; the props of pure triggers and event actions are typed the same way. The named details
+types (9.4) do not contain `reject`, because handlers share them. A consumer who writes the
+function apart from the JSX annotates `details: SwitchCheckedChangeDetails & Rejectable`
+(`Rejectable` is exported from `@funstack/ui/types` and the root entry).
+
+Why a method on `details` and not the alternatives: a return value is never interpreted (2.2:
+Server Functions return data); a thrown sentinel would look like an error to everything between
+the action and the library; an `onActionError` prop would put the handling away from the
+`await` that failed and add a prop to every part. Why `reject` and not `cancel` or `fail`: the
+effect is defined as "a rejection", the word this document already uses for it everywhere, and
+`cancel` suggests stopping work that has in fact already run.
 
 ### 2.5 Overlapping actions
 

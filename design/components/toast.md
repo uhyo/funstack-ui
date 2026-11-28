@@ -38,7 +38,7 @@ hiding the stack.
 | 2 | Imperative input, declarative output | The queue is fed imperatively (`toast(options)` returns an id; `toast.promise`, `toast.update`, `toast.dismiss`) and rendered declaratively: the consumer's Viewport `children(state)` maps `state.toasts` to parts. Section 2 justifies this against the vision: toasts are produced in action bodies and outlive the component that produced them, and no `on*` handler exists anywhere in the API. |
 | 3 | Urgent queue | Every queue mutation (add, update, dismiss, drop after exit) is a normal (urgent) update, dispatched from a microtask so a `toast()` call inside a `startTransition` scope escapes it (research §7). The third documented urgent state after a controlled text input and virtual focus (conventions 2.6). Order is preserved, dismissals included: a `toast.dismiss()` closes the toasts open at that point of the batch and never one added later in the same tick. |
 | 4 | Promise toasts | `toast.promise(promise, { pending, success, error })` shows `pending` at once with `data-pending`, swaps to `success` / `error` when the promise settles (urgent `update`), announces on settle, and starts the timer only then. It returns a promise that mirrors `promise`, **except** that a rejection is resolved (with `undefined`) when `error` was given: the error toast is the handler the consumer asked for. Returning the promise lets one call feed both the toast and the awaited action prop of the part that started the work (section 3.1). |
-| 5 | Undo | `Toast.Action` is a pure-trigger action prop (`useActionTrigger`, like `Menu.Item`): `data-pending` on the Action and the Root while it runs, the toast's timer paused, the toast closed with `reason: "activate"` when it resolves (`closeOnActivate`, default `true`); a rejection keeps the toast and reaches the nearest Error Boundary above the Viewport. |
+| 5 | Undo | `Toast.Action` is a pure-trigger action prop (`useActionTrigger`, like `Menu.Item`): `data-pending` on the Action and the Root while it runs, the toast's timer paused, the toast closed with `reason: "activate"` when it resolves (`closeOnActivate`, default `true`); a rejection keeps the toast and reaches the nearest Error Boundary above the Action part (3.2 says where to put one); an action that handled its failure calls `details.reject()`, which keeps the toast with no boundary (conventions 2.4.1). |
 | 6 | `onClose` | A per-toast **handler** called when the toast leaves, with `details.reason`: `"activate"` (the Action part settled), `"dismiss"` (Close part, Escape, `toast.dismiss()`, a promise toast with no message for its outcome), or `"timeout"` (the timer elapsed; a `ChangeReason` value, conventions feedback 1). Called synchronously where the close is applied, outside any transition, not awaited; it may return a promise, whose rejection goes to `reportError` (the handler rule, conventions 2.1): the "commit the deletion when the Undo window elapses" pattern (section 9.3). |
 | 7 | Top layer | One `popover="manual"` region, shown while it has toasts (exiting ones included), hidden when empty. Re-raised (`hidePopover(); showPopover()`) when a toast is added while it is already open, so a later-opened menu or popover does not cover new toasts. While a library `Dialog` is modal, the region is inside the topmost open modal `<dialog>` and back inline when it closes, because a top-layer region outside a modal dialog is inert and absent from the accessibility tree (research finding 1). Mechanism: the region always portals into a library-owned `display: contents` host element that the library itself moves with a DOM `append` (React never sees the move, so the toasts keep their React state: an Undo in flight stays pending) between an inline anchor and the topmost modal (a module-level registry Dialog writes to). |
 | 8 | Announcements | `document.ariaNotify(text, { priority })` after the toast's content has committed un-suspended, coalesced per microtask, `priority: "high"` for `priority: "high"` toasts. No live region anywhere. The text defaults to the Title and Description text (`textContent` of the parts), overridable per toast or per Viewport through `announce(toast)` (built-in strings rule, conventions 11). |
@@ -230,7 +230,7 @@ disabled: native `disabled` wins, conventions 1.2). Under `"run"`:
 `data-pending` on the Action and the Root and the paused timer last until every run has
 settled, no `aria-disabled` from pending; with `closeOnActivate` the toast closes once, when the
 last run in flight settles, and only if the latest run resolved; an older run's rejection goes
-to `reportError` and the latest one's to the boundary above the Viewport, or to `reportError`
+to `reportError` and the latest one's to the boundary above the Action, or to `reportError`
 once the toast has left (conventions 2.4). A rejection keeps the toast in both modes. The prop
 is on the part only: `ToastActionOptions` (`toast({ action: { label, action } })`) has no
 `whilePending` field, since the part is where the consumer renders the button and the options
@@ -242,29 +242,42 @@ has on `Menu.Item`, because it is the same contract (conventions 2.5.1): activat
 closes its container, after the part's `action` and only if the latest run resolved.
 `closeOnSettle` is `Dialog.Form`'s prop and means something else (a form submission settled
 without an error). When it rejects, the toast
-stays and the error reaches the nearest Error Boundary above the Viewport; a consumer who wants
-the failure *in the toast* catches inside the action and updates it:
+stays and the error reaches the **nearest Error Boundary above the `Toast.Action` part**, the
+part that owns the transition (conventions 2.4). A consumer who wants
+the failure *in the toast* catches inside the action, updates the toast and calls
+`details.reject()`:
 
 ```tsx
-// The trap: a caught error RESOLVES the action, so the toast closes on settle and the
-// "Could not undo" message is never seen (conventions 2.4: swallowed errors count as success).
 action: {
   label: "Undo",
   action: async (details) => {
     try {
       await unarchive(id);
     } catch (e) {
-      toast.update(details.id, { title: "Could not undo", description: String(e), priority: "high", action: undefined });
+      toast.update(details.id, { title: "Could not undo", description: String(e), priority: "high" });
+      details.reject();   // without this the action resolves and the toast closes, message unseen
     }
   },
 }
 ```
 
-The rule is therefore explicit in the Action's docs: to keep the toast open after a handled
-failure, either rethrow after the `update` (the error then reaches the boundary above the
-Viewport, which must render the list with the failure visible, section 15.3), or set
-`closeOnActivate={false}` on the Action part and dismiss from the action yourself on success
-(`toast.dismiss(details.id)`).
+`details.reject()` is the rejection without the boundary (conventions 2.4.1): the toast stays,
+`data-pending` leaves, the timer resumes, and the Action can be pressed again (a Retry). A
+caught error without it **resolves** the action, so the toast closes on settle and the "Could
+not undo" is never seen; that trap is named in the Action's docs.
+
+**Where an Error Boundary goes, for an action that lets its error through.** A boundary replaces
+everything inside it, so its place decides what the user loses:
+
+| Boundary | A failed Undo shows |
+| --- | --- |
+| around `Toast.Action`, inside the Root | the fallback instead of the button; the toast, its Title and its Close stay. **The recommended place.** |
+| around one `Toast.Root` (one per toast, in the Viewport's `children` function) | the fallback instead of that toast; the others stay |
+| around the list inside the Viewport | one fallback instead of every toast |
+| around `Toast.Viewport`, or none nearer than the app's | the region is gone, or the page is |
+
+Rethrowing after a `toast.update` is not a way to keep an updated toast: with any boundary that
+contains the toast, the fallback replaces the toast that was just updated.
 
 `details` for the Action's action is `ToastActionDetails`: `{ id }` plus the virtual `event`
 (conventions 2.2). `id` is there so an action declared inline in `toast({ … })` can update or
@@ -938,9 +951,10 @@ It is not set while content is merely suspended (that is the guard's job, and no
    from the settled options (`pending` toasts rarely carry one; if they do, the Action is a normal
    dispatch and the toast's `pending` stays true until both settle).
 4. **Undo rejects.** The Action's transition rejects, `data-pending` leaves, the toast stays, the
-   error reaches the boundary above the Viewport. With the boundary around the Viewport's list
-   (section 15.3), the list re-renders in error state and the toast is still in the queue; the
-   boundary's reset re-renders it.
+   error reaches the nearest boundary above the Action. With one around the Action inside the
+   Root (3.2), the fallback replaces the button and the toast is otherwise unchanged; it is
+   still in the queue, so a boundary further out that is reset renders it again. An action that
+   calls `details.reject()` instead reaches no boundary: the toast stays as it is.
 5. **Undo clicked twice.** One dispatch (the default, `whilePending="ignore"`): the second click
    arrives while the first run is in flight, `run` returns `false`, the click is
    `preventDefault()`ed, the Action is `aria-disabled`; the resolve closes the toast once.
@@ -949,7 +963,7 @@ It is not set while content is merely suspended (that is the guard's job, and no
    rejection is passed to `reportError` (#152, conventions 2.4): React drops the rejection of a
    transition whose component has unmounted (probed 2026-11-23 on 19.3.1: no boundary, no
    `reportError`, no `unhandledrejection`), so `useActionTrigger` reports a latest rejection
-   itself once the part's effects are disconnected. The boundary above the Viewport is not
+   itself once the part's effects are disconnected. No boundary is
    involved. Until #152 the rejection went nowhere. The same holds while the Action is hidden by
    the Root's Suspense guard (an urgent `toast.update` whose new content suspends): an Undo that
    rejects then is reported, not thrown.
@@ -1069,31 +1083,33 @@ toast({
   title: "Archived",
   action: {
     label: "Undo",
-    action: async ({ id }) => {
+    action: async (details) => {
       try {
         await unarchive(itemId);
       } catch (e) {
-        toast.update(id, { title: "Could not undo", description: String(e), priority: "high", action: undefined });
-        throw e; // keep the toast: a resolved action would close it on settle
+        toast.update(details.id, { title: "Could not undo", description: String(e), priority: "high" });
+        details.reject(); // keep the toast: a resolved action would close it on settle
       }
     },
   },
 });
 ```
 
-The rethrow routes to the Error Boundary above the Viewport, so put one around the list and let
-it render the queue with the failure visible:
+The
+toast stays with its new text and the Undo button, which is now a retry. No Error Boundary is
+involved.
+
+For an action that does not catch, the boundary goes around the Action part (3.2):
 
 ```tsx
-<Toast.Viewport>
-  {({ toasts }) => (
-    <ErrorBoundary fallback={<ToastListFallback />}>{toasts.map(renderToast)}</ErrorBoundary>
-  )}
-</Toast.Viewport>
+<Toast.Root toast={t}>
+  <Toast.Title />
+  <ErrorBoundary fallback={<span>Could not undo</span>}>
+    <Toast.Action />
+  </ErrorBoundary>
+  <Toast.Close aria-label="Close">×</Toast.Close>
+</Toast.Root>
 ```
-
-Alternatively `closeOnActivate={false}` on the Action part and `toast.dismiss(id)` on success,
-without throwing. Either way the trap in section 3.2 (catch, resolve, toast closes) is avoided.
 
 ### 15.4 A Server Function result in a form
 
