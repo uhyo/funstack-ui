@@ -2,6 +2,7 @@
 import { addTransitionType, useCallback, useMemo, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { createActionDetails } from "./action-details.js";
+import { callAction } from "./call-action.js";
 import type { ActionDetails, ChangeAction, ChangeReason } from "../types.js";
 import { useActionTrigger } from "./use-action-trigger.js";
 import { useControllableAction } from "./use-controllable-action.js";
@@ -137,7 +138,11 @@ export function useStepCommit<T, V, S, F extends object>(
   const runCommit = async (next: T, details: F & ActionDetails): Promise<void> => {
     const seq = ++commitSeq.current;
     try {
-      await commitAction?.(next, details);
+      // Through `callAction` here, not only in `useControllableAction`: a `details.reject()`
+      // (conventions 2.4.1) must take the revert below too.
+      await (commitAction === undefined
+        ? undefined
+        : callAction(warn.component, details, (d) => commitAction(next, d)));
     } catch (error) {
       // In uncontrolled mode, tell the preview channel about the rollback, for the latest commit
       // only. Yield once to leave the commit's transition (conventions 2.6).
@@ -184,6 +189,7 @@ export function useStepCommit<T, V, S, F extends object>(
     onStep: options.onStep,
     onCommit: options.onCommit,
     runStep,
+    warnName: warn.component,
   });
 
   const step = useCallback(
@@ -202,7 +208,14 @@ export function useStepCommit<T, V, S, F extends object>(
       onStep?.(next);
       // A revert has no commit after it: the optimistic value already shows the committed one.
       if (reason !== "dismiss") setStepHeld(true);
-      const { stepAction: action, stepTypes, fromShown, details, runStep: run } = latest.current;
+      const {
+        stepAction: action,
+        stepTypes,
+        fromShown,
+        details,
+        runStep: run,
+        warnName,
+      } = latest.current;
       // Without a step action there is nothing to run and no consumer update to keep
       // interruptible: no transition, so `data-pending` does not blink on every pointer move.
       if (action === undefined) return true;
@@ -210,7 +223,9 @@ export function useStepCommit<T, V, S, F extends object>(
       const fields = details(reason, source, next);
       run(() => {
         for (const type of stepTypes) addTransitionType(type);
-        return action(fromShown(next), createActionDetails(event, fields));
+        return callAction(warnName, createActionDetails(event, fields), (d) =>
+          action(fromShown(next), d),
+        );
       });
       return true;
     },

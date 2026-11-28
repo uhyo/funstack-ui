@@ -2,7 +2,13 @@
 // so a Server Component may import `toast` (for its type, or to pass nothing) without a client
 // reference (design/components/toast.md 13). The parts are client modules.
 import type { ReactNode } from "react";
-import type { Action, ActionDetails, ChangeReason, UrgentHandler } from "../internal/types.js";
+import type {
+  Action,
+  Rejectable,
+  ActionDetails,
+  ChangeReason,
+  UrgentHandler,
+} from "../internal/types.js";
 
 /** Announcement priority and role of a toast. */
 export type ToastPriority = "normal" | "high";
@@ -14,10 +20,11 @@ export interface ToastActionOptions {
   /**
    * Runs in the Action part's own transition (`data-pending` on the Action and the Root, the
    * timer paused). The toast closes with `reason: "activate"` when it resolves; a rejection
-   * keeps the toast and reaches the nearest Error Boundary above the Viewport. A caught error
-   * resolves the action and therefore closes the toast: rethrow after `toast.update` to keep it.
+   * keeps the toast and reaches the nearest Error Boundary above the Action part (put one around
+   * `Toast.Action`). A caught error resolves the action and therefore closes the toast: to keep
+   * it, call `details.reject()` after `toast.update` (conventions 2.4.1).
    */
-  readonly action: Action<[details: ToastActionDetails]>;
+  readonly action: Action<[details: ToastActionDetails & Rejectable]>;
 }
 
 /**

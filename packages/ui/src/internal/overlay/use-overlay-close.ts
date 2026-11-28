@@ -1,9 +1,17 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { dataAttr } from "../data-attr.js";
-import type { Action, ActionDetails, RenderProp, StateValue, WhilePending } from "../types.js";
+import type {
+  Action,
+  Rejectable,
+  ActionDetails,
+  RenderProp,
+  StateValue,
+  WhilePending,
+} from "../types.js";
 import { useElementCheck } from "../use-element-check.js";
 import { usePureTrigger } from "../action/use-pure-trigger.js";
+import { callAction } from "../action/call-action.js";
 import { cancelClick, disabledButton, rendersButton, useRender } from "../use-render.js";
 import type { DataAttributes } from "../use-render.js";
 
@@ -30,7 +38,7 @@ export interface OverlayCloseOptions<Details extends ActionDetails> {
   readonly popupId: string;
   readonly command: "hide-popover" | "request-close";
   readonly openGeneration: () => number;
-  readonly action: Action<[details: Details]> | undefined;
+  readonly action: Action<[details: Details & Rejectable]> | undefined;
   /**
    * The part's `whilePending` prop; `"ignore"` when omitted, and `"run"` whatever it says
    * without `action` (conventions 2.5.1).
@@ -110,7 +118,7 @@ export function useOverlayClose<Details extends ActionDetails>(
     const details = options.details(native);
     // An ignored run needs no extra cancel: the click is already cancelled above.
     trigger.run(
-      () => action(details),
+      () => callAction(part, details, action),
       () => options.close(native),
     );
   };

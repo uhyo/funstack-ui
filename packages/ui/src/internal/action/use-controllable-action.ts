@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { ActionDetails, ChangeAction } from "../types.js";
 import { useLatest } from "../use-latest.js";
+import { callAction, isHandledRejection } from "./call-action.js";
 import { reportDropped } from "./report-dropped.js";
 import { useConnected } from "./use-connected.js";
 import { useModeWarnings } from "../use-dev-warning.js";
@@ -177,7 +178,14 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   // only with `committed`, `optimistic` and `pending`, and the components' memoised context values
   // are reused across renders that change none of them. They read the props of the last
   // committed render through `props`; they run from handlers, actions and effects, never render.
-  const props = useLatest({ committed, isControlled, action, transitionTypes, reducer });
+  const props = useLatest({
+    committed,
+    isControlled,
+    action,
+    transitionTypes,
+    reducer,
+    component: warn.component,
+  });
 
   /**
    * Marks a dispatch settled. When it was the last one in flight, the uncontrolled reducer-mode
@@ -206,7 +214,14 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
       const whole = options?.whole ?? false;
       // Read once, at the call, as the per-render closure did: the action, the mode and the
       // previous value belong to the UI the user acted on, even after the `await`.
-      const { committed: prev, isControlled, action, transitionTypes, reducer } = props.current;
+      const {
+        committed: prev,
+        isControlled,
+        action,
+        transitionTypes,
+        reducer,
+        component,
+      } = props.current;
       const id = ++latest.current;
       const dispatchEpoch = epochRef.current;
       inFlight.current.count += 1;
@@ -219,9 +234,14 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
         for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
         setOptimistic({ next, details, epoch: dispatchEpoch, whole });
         try {
-          await action?.(next, details);
+          await (action === undefined
+            ? undefined
+            : callAction(component, details, (d) => action(next, d)));
         } catch (error) {
           settle();
+          // The action called `details.reject()` (2.4.1): the rejection path above and below,
+          // minus the boundary and `reportError`, whether latest, superseded or owner gone.
+          if (isHandledRejection(error)) return;
           // The latest dispatch's rejection takes React's own route to the boundary while the
           // owner is there to render it. React drops a superseded one (it keeps only the newest
           // thenable) and one whose owner unmounted or is hidden: reported instead (2.4, #152).

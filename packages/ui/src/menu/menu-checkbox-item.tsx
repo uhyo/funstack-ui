@@ -2,6 +2,7 @@
 import { useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
+import { callAction } from "../internal/action/call-action.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
@@ -111,7 +112,10 @@ export function MenuCheckboxItem({
     defaultValue: defaultChecked,
     initialValue: false,
     action: async (next, details) => {
-      await checkedChangeAction?.(next, details);
+      // Through `callAction`: a `details.reject()` must skip the close too (conventions 2.4.1).
+      await (checkedChangeAction === undefined
+        ? undefined
+        : callAction("Menu.CheckboxItem", details, (d) => checkedChangeAction(next, d)));
       after.current.get(details)?.();
     },
     transitionTypes: (next) => transitionTypes("menu", next ? "check" : "uncheck"),

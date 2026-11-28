@@ -19,9 +19,27 @@ export interface ActionDetails {
   readonly event: Event | undefined;
 }
 
+/**
+ * What an action's `details` has and a handler's does not: the action may refuse the request
+ * (conventions 2.4.1). Every action prop's `details` parameter is `<Details> & Rejectable`; the
+ * named details types do not contain it, because handlers share them.
+ */
+export interface Rejectable {
+  /**
+   * Call before the action returns or its promise resolves: the request counts as rejected
+   * (optimistic state reverts, uncontrolled state is not written, a trigger's container stays
+   * open), and **nothing is thrown or reported**, so no Error Boundary shows. Use it after
+   * catching an error and showing your own message. It does not throw, does not end pending
+   * early and cannot be taken back; a call after the action settled has no effect (a
+   * development warning). A virtual property, like `event`: not serialised, so a Server
+   * Function passed directly has none.
+   */
+  readonly reject: () => void;
+}
+
 /** An action called with the next value of a controllable state. */
 export type ChangeAction<T, Details extends ActionDetails = ActionDetails> = Action<
-  [next: T, details: Details]
+  [next: T, details: Details & Rejectable]
 >;
 
 /**

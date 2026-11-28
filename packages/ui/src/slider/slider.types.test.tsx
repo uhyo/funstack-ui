@@ -1,5 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 import { Slider } from "./index.js";
+import type { Rejectable } from "../internal/types.js";
 import type {
   SliderRootProps,
   SliderRootState,
@@ -20,11 +21,11 @@ describe("SliderRootProps", () => {
         defaultValue={[20, 80]}
         valueChangeAction={(next, details) => {
           expectTypeOf(next).toEqualTypeOf<readonly number[]>();
-          expectTypeOf(details).toEqualTypeOf<SliderValueChangeDetails>();
+          expectTypeOf(details).toEqualTypeOf<SliderValueChangeDetails & Rejectable>();
         }}
         valueCommitAction={(next, details) => {
           expectTypeOf(next).toEqualTypeOf<readonly number[]>();
-          expectTypeOf(details).toEqualTypeOf<SliderValueCommitDetails>();
+          expectTypeOf(details).toEqualTypeOf<SliderValueCommitDetails & Rejectable>();
         }}
       >
         {(state) => {

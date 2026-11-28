@@ -696,6 +696,36 @@ renderBoth("completeAction", (mode) => {
     expect(screen.getByTestId("error-catcher")).toHaveTextContent("check failed");
   });
 
+  // #207 (conventions 2.4.1): a rejection here has nothing to undo, so neither has reject().
+  it("details.reject(): the code stays, pending ends, no boundary and no reportError", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const caught = vi.fn();
+    const d = deferred();
+    const user = setupUser();
+    render(
+      <ErrorCatcher onError={caught}>
+        <Harness
+          mode={mode}
+          length={2}
+          completeAction={async (_value, details) => {
+            await d.promise;
+            details.reject();
+          }}
+        />
+      </ErrorCatcher>,
+    );
+    await user.click(input());
+    await user.keyboard("12");
+    expectPending(root());
+    await act(async () => d.resolve());
+    await flushMicrotasks(2);
+    expectNotPending(root());
+    expect(input().value).toBe("12");
+    expect(caught).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
   it("not at mount with a complete default, and not on a reset", async () => {
     const completeAction = vi.fn<Complete>();
     render(

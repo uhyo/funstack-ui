@@ -1,5 +1,5 @@
 import { describe, expectTypeOf, it } from "vitest";
-import type { Action, ChangeReason, UrgentChangeHandler } from "../internal/types.js";
+import type { Action, ChangeReason, Rejectable, UrgentChangeHandler } from "../internal/types.js";
 import { OTPField } from "./index.js";
 import type {
   OTPFieldCharset,
@@ -31,7 +31,7 @@ describe("OTPField props", () => {
       UrgentChangeHandler<string, OTPFieldValueChangeDetails> | undefined
     >();
     expectTypeOf<OTPFieldRootProps["completeAction"]>().toEqualTypeOf<
-      Action<[value: string, details: OTPFieldCompleteDetails]> | undefined
+      Action<[value: string, details: OTPFieldCompleteDetails & Rejectable]> | undefined
     >();
     expectTypeOf<OTPFieldCompleteDetails["reason"]>().toEqualTypeOf<ChangeReason>();
     expectTypeOf<OTPFieldRootProps["charset"]>().toEqualTypeOf<OTPFieldCharset | undefined>();

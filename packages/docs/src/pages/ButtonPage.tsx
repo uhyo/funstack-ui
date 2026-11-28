@@ -68,7 +68,7 @@ export function ButtonPage() {
         rows={[
           {
             name: "action",
-            type: "Action<[details: ButtonActionDetails]>",
+            type: "Action<[details: ButtonActionDetails & Rejectable]>",
             description: (
               <>
                 Runs inside the Button's own transition on click, Enter or Space. Sync or async; may

@@ -2,7 +2,13 @@
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { useDialogClose } from "../dialog/dialog-close.js";
 import type { DialogCloseActionDetails, DialogCloseState } from "../dialog/dialog-close.js";
-import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
+import type {
+  Action,
+  Rejectable,
+  RenderProp,
+  StateValue,
+  WhilePending,
+} from "../internal/types.js";
 
 /** State of `AlertDialog.Action`, passed to the function forms of `className`, `style`, `children` and `render`. */
 export type AlertDialogActionState = DialogCloseState;
@@ -33,8 +39,10 @@ export interface AlertDialogActionProps extends Omit<
    * The confirmed work. Runs inside this part's own transition (`data-pending` on the button),
    * then closes the dialog with `value` as `returnValue`: in library mode through the Root
    * (`openChangeAction(false)` awaited, view transition if set), in JS-free mode with
-   * `close(value)`. A rejection reaches the nearest Error Boundary above this part and leaves
-   * the dialog open. If the dialog was dismissed and opened again while the action ran, the
+   * `close(value)`. A rejection reaches the nearest Error Boundary above this part (put one
+   * around the Action only, so the Cancel stays) and leaves the dialog open; an action that
+   * shows its own message calls `details.reject()` instead, which keeps the dialog open with no
+   * boundary (conventions 2.4.1). If the dialog was dismissed and opened again while the action ran, the
    * close is dropped. Escape or a Cancel while it runs closes the dialog; the action keeps
    * running (it is hidden, not aborted).
    *
@@ -43,7 +51,7 @@ export interface AlertDialogActionProps extends Omit<
    * The confirm that works before hydration is `AlertDialog.Form`. Without `action` the button
    * only closes the dialog (read `returnValue` in `openChangeAction`).
    */
-  action?: Action<[details: AlertDialogActionDetails]>;
+  action?: Action<[details: AlertDialogActionDetails & Rejectable]>;
   /**
    * What a click does while the `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again; the dialog

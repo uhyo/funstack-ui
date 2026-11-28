@@ -187,7 +187,7 @@ import { Separator } from "@funstack/ui/separator";
           },
           {
             name: "completeAction",
-            type: "Action<[value: string, details: OTPFieldCompleteDetails]>",
+            type: "Action<[value: string, details: OTPFieldCompleteDetails & Rejectable]>",
             description:
               "An edit left the code complete. Runs in the Root's transition and is awaited, with `data-pending`. May be a Server Function.",
           },

@@ -2,6 +2,7 @@
 import { useId, useMemo, useRef } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
+import { callAction } from "../internal/action/call-action.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { transitionTypes } from "../internal/transition-types.js";
 import type {
@@ -100,7 +101,12 @@ export function MenuRadioGroup({
     defaultValue,
     initialValue: null,
     action: async (next, details) => {
-      if (next !== null) await valueChangeAction?.(next, details);
+      // Through `callAction`: a `details.reject()` must skip the close too (conventions 2.4.1).
+      if (next !== null) {
+        await (valueChangeAction === undefined
+          ? undefined
+          : callAction("Menu.RadioGroup", details, (d) => valueChangeAction(next, d)));
+      }
       after.current.get(details)?.();
     },
     transitionTypes: () => transitionTypes("menu", "select"),
