@@ -237,6 +237,43 @@ export function BrowserOwnedStatePage() {
         </p>
       </ConceptExample>
 
+      <h3 id="one-escape">One Escape closes one layer</h3>
+      <p>
+        A <strong>layer</strong> here is anything an Escape can close: a popup, a dialog, a toast,
+        or the unsaved text of an input that reverts on Escape. Layers nest (a tooltip inside a
+        dialog, a listbox inside a drawer), and one Escape closes only one of them. The browser does
+        this for the layers it owns (a modal dialog, an <code>auto</code> popover) through its{" "}
+        <a href="https://html.spec.whatwg.org/multipage/interaction.html#close-watchers">
+          close watchers
+        </a>
+        . Where the library handles Escape in JavaScript, it follows the same order:
+      </p>
+      <ul>
+        <li>
+          An input with an edited draft takes the Escape first: it reverts the text, and nothing
+          else closes.
+        </li>
+        <li>
+          Then a tooltip or a hover card that is showing, wherever focus is; with two, the one that
+          opened first.
+        </li>
+        <li>
+          Then the innermost layer around the focus. The next Escape reaches the layer outside it.
+        </li>
+      </ul>
+      <p>
+        To keep a layer open on Escape, call <code>preventDefault()</code> on the{" "}
+        <code>keydown</code>. <code>stopPropagation()</code> keeps none open: the browser skips the
+        close request only for a cancelled <code>keydown</code>, and the library reads the same
+        signal. An Escape pressed during an IME composition only ends the composition.
+      </p>
+      <ConceptExample component="Tooltip" href="/components/tooltip">
+        <p>
+          A Tooltip shown inside an open Dialog: the first Escape hides the tooltip and the dialog
+          stays open; the second Escape closes the dialog.
+        </p>
+      </ConceptExample>
+
       <h3 id="popup-triggers">Triggers of a popup</h3>
       <p>
         A component whose popup is a popover has a <strong>Trigger</strong>: the part that opens and
