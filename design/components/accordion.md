@@ -17,7 +17,7 @@ find-in-page, `interpolate-size`, `@starting-style`), probes in `memo/architect/
 | 3 | Value type | Discriminated on `exclusive`: `exclusive` → `string \| null`; otherwise `string[]` (the flag names the non-default mode, conventions 3.1). `details` is the set diff `{ reason, added, removed }` in both modes (conventions 2.2); in exclusive mode `removed` names the item the change closed implicitly. |
 | 4 | Pending UI | Trigger and Item: `data-open` (optimistic) and `data-pending`. The `<details open>` attribute, `:open`, `::details-content` and the native marker follow committed state. Consumers draw their own chevron from `data-open`. |
 | 5 | Platform-initiated opens | Find-in-page and text fragments open a closed `<details>` natively in all engines. Library mode listens to `toggle`, dispatches `valueChangeAction` with `reason: "platform"`, and re-applies committed state to the DOM once the action settles. No `hidden="until-found"` needed. |
-| 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item, Trigger and Panel in library mode (types `fsui-accordion-open` / `-close`), animating only the settling commit (layout/cross-fade of the whole list); the optimistic `data-open` flip is a CSS transition; not both on the same change. No `keepMounted`: `<details>` keeps content mounted and auto-opens on find-in-page natively. `experimental_interpolateSize` on Root. |
+| 6 | Animation | CSS on `::details-content` (`@starting-style`, `transition-behavior: allow-discrete`, grid-rows or `interpolate-size`) in both modes. `transition` prop (`<ViewTransition>`) on Item and Panel in library mode, not on Trigger (all optimistic, conventions 5.1) (types `fsui-accordion-open` / `-close`), animating only the settling commit (layout/cross-fade of the whole list); the optimistic `data-open` flip is a CSS transition; not both on the same change. No `keepMounted`: `<details>` keeps content mounted and auto-opens on find-in-page natively. `experimental_interpolateSize` on Root. |
 | 7 | Keyboard | Enter/Space native on `<summary>`. Up/Down/Home/End between triggers is implemented by Root in both modes (APG: optional; we ship it), under the rules of conventions 3.10: disabled (`aria-disabled`) triggers are in the sequence, keys with Alt / Ctrl / Meta are the browser's, `loop` (default `true`). No `focusgroup` flag (it would collapse the Tab stops). |
 | 8 | RSC | All four parts are `"use client"` files (Flight cannot read context in a Server Component). A Server Component renders them freely; JS-free mode needs no interaction JS, works before hydration and with JS off, but the parts' code is in the client bundle. One anatomy: "JS-free" means no behaviour JS and works without hydration; a directive-free `@funstack/ui/accordion/native` is a recorded, unscheduled plan (conventions 7.3). |
 
@@ -442,7 +442,6 @@ because `open` would read as controlled to a React developer.
 ```ts
 export interface AccordionTriggerProps
   extends Omit<ComponentPropsWithRef<"summary">, "onClick" | "aria-disabled" | "className" | "style" | "children"> {
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, AccordionTriggerState>;
   style?: StateValue<CSSProperties | undefined, AccordionTriggerState>;
   children?: StateValue<ReactNode, AccordionTriggerState>;
@@ -751,10 +750,10 @@ inherited declaration on the Root covers every item.
 
 ### 8.3 `transition` (ViewTransition, library mode only)
 
-Item, Trigger and Panel each render `<ViewTransition default={transition}>` as the outermost
+Item and Panel each render `<ViewTransition default={transition}>` as the outermost
 node of their output **only when `transition` is given** (conventions 5.1, #35; the Item's
-boundary wraps the `<details>`, the Trigger's wraps the `<summary>`, the Panel's wraps its
-`<div>`; none of them adds DOM, so the summary stays the first child of the details). Static mode
+boundary wraps the `<details>`, the Panel's wraps its `<div>`; neither adds DOM). The Trigger
+has no `transition` prop and no boundary: everything it renders is optimistic. Static mode
 renders no boundary at all. Without the prop a Panel mounting in a transition, or an Item inserted
 by an action, starts no document view transition; with it, every such mount runs the page
 cross-fade (see the conventions for the consumer-side CSS). Transition types per the conventions
@@ -773,11 +772,8 @@ rollback; it is a CSS job:
 
 What `<ViewTransition>` sees is the transition-lane commit that ends the action: the `open`
 attribute flip on the Item (Item boundary: `update`, the box grows or shrinks), the Panel content
-that mounts or changes in that commit (Panel boundary), and `pending` leaving on the Trigger.
-So `transition` on the Trigger animates only the end of the action (a spinner rendered from
-`pending` disappearing). The Trigger keeps the prop as the trigger of a content region, next
-to the Panel whose swap the same commit animates (conventions 5.1); it is documented as such,
-not as the chevron animation.
+that mounts or changes in that commit (Panel boundary). `pending` leaving on the Trigger is
+inside the Item's boundary and updates with it.
 
 ```tsx
 <Accordion.Item value="a" transition="fsui-grow">

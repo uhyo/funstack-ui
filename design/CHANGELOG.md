@@ -15921,7 +15921,9 @@ entry records them and the rules they became. Design documents only: the code fo
 4. `transition` is removed from the checkables (`Toggle`, `Checkbox`, `Switch`,
    `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent`, `ToggleGroup.Item`): a value control
    whose attributes are all optimistic takes no `transition` (V-M2; conventions 5.1). This
-   replaces the earlier product-owner decision that Toggle keeps the prop.
+   replaces the earlier product-owner decision that Toggle keeps the prop. Extended the same
+   day to the triggers `Tabs.Tab`, `Accordion.Trigger` and `Collapsible.Trigger`: the rule is
+   "a part whose rendered state is all optimistic takes no `transition`". `Button` keeps it.
 5. Disabled is not submitted: the hidden inputs of Combobox and MultiSelect are `disabled`
    with their owner, `Field.Root disabled` included (V-H1; conventions 3.6).
 6. `readOnly` leaves the props types of the controls that do not honour it. A real
@@ -15984,7 +15986,7 @@ entry records them and the rules they became. Design documents only: the code fo
   `state.invalid` / `state.required` wherever the fact exists. New rows: `readOnly`,
   `decorative`, `submenu`, `priority`. 4.3: `NavigationMenu.Item` is an owner with attributes
   (C-M4).
-- **5.1**: the value-control rule replaces "Toggle keeps the prop". **5.3**: the kinds table
+- **5.1**: the all-optimistic rule replaces "Toggle keeps the prop". **5.3**: the kinds table
   (one name per meaning) and a row for every component: Dialog, Tooltip, TextField, Menubar
   and Separator were missing (X-M7, O-L6).
 - **7.3 / 7.4**: `Drawer.Close` in the closing-part list; the JS-free `data-open` write is
@@ -16004,8 +16006,7 @@ entry records them and the rules they became. Design documents only: the code fo
 
 ### Decisions the architect made to state a rule completely
 
-Each follows from a decision above; each is listed under "Open questions" where the plan did
-not name it.
+Each follows from a decision above.
 
 - `readOnly` is also omitted from `RadioGroup.Item`, `CheckboxGroup.Item` and
   `CheckboxGroup.Parent`: the same native inputs with the same no-op as Checkbox and Switch.
@@ -16020,7 +16021,8 @@ not name it.
 - `Separator` renders `data-decorative`; `Menu.Popup` `data-submenu`; `Toast.Root`
   `data-priority`; the Slider Track and Indicator `data-dragging`; the Tabs Panel and
   Indicator `data-orientation` (4.1 rule 2).
-- Combobox's Escape revert applies with the listbox closed and to a single selection only.
+- Combobox's Escape revert applies with the listbox closed; while it is open, Escape is the
+  listbox's.
 - The Toolbar rule covers the Triggers of Menu, Popover, Dialog, AlertDialog and Drawer, not
   only Toggle and `ToggleGroup.Item`.
 - The transition types of the checkables stay; only the prop and the boundary go.
@@ -16039,10 +16041,11 @@ No alias exists for any of these.
 | Collapsible | transition types `fsui-collapsible-expand` / `-collapse` are `-open` / `-close` | rename |
 | Collapsible | `state.open` is `false`, not `undefined`, in JS-free mode | as Accordion |
 | Toggle, Checkbox, Switch, `RadioGroup.Item`, `CheckboxGroup.Item` / `Parent`, `ToggleGroup.Item` | the `transition` prop is removed | wrap the content in your own `<ViewTransition>` keyed on the component's `fsui-*` types |
+| `Tabs.Tab`, `Accordion.Trigger`, `Collapsible.Trigger` | the `transition` prop is removed (`Tabs.Panel`, `Accordion.Item` / `Panel`, `Collapsible.Root` / `Panel` keep it) | the Item's or Root's boundary already covers the trigger; for a Tab, wrap its content in your own `<ViewTransition>` keyed on `fsui-tabs` |
 | Switch | transition types `fsui-switch-on` / `-off` are `fsui-switch-check` / `-uncheck` | rename |
 | Checkbox, Switch, `RadioGroup.Item`, `CheckboxGroup.Item` / `Parent`, `Combobox.Input` | `readOnly` is a type error (it never had an effect) | remove it; `disabled`, or keep the value in controlled state |
 | Combobox, MultiSelect | a disabled control (own `disabled` or `Field.Root disabled`) is no longer submitted | a server that read the value of a disabled field must not expect it |
-| Combobox | Escape with the listbox closed and edited text reverts the text and is consumed | one more Escape closes an enclosing dialog |
+| Combobox | Escape with the listbox closed and edited text reverts the text (with `multiple`: clears the search text) and is consumed | one more Escape closes an enclosing dialog |
 | Combobox | `Combobox.Input` renders `data-empty` while nothing is selected; `data-selected` is gone | `[data-selected]` becomes `:not([data-empty])` |
 | Combobox | types `ComboboxSingleProps` / `ComboboxMultipleProps` are `ComboboxRootSingleProps` / `ComboboxRootMultipleProps` | rename imports |
 | MultiSelect | `MultiSelect.Value` renders `data-empty`; `data-placeholder` is gone | rename the selector |
@@ -16067,27 +16070,25 @@ the Tabs Panel and Indicator and on the Menubar (with `aria-orientation`); `loop
 `state.value` on `Accordion.Root`; the per-part state aliases; `readonly string[]` props; the
 newly exported types; the development warnings.
 
-### Open questions (for the product owner)
+### Questions answered on 2026-11-28
 
-1. **Triggers that keep `transition`.** `Tabs.Tab`, `Accordion.Trigger` and
-   `Collapsible.Trigger` render only optimistic state, as the checkables do, and keep the
-   prop: decision 4 names value controls. 5.1 records them as triggers of a content region.
-   Extending the rule to them is one more breaking change.
-2. **Escape in a Combobox with `multiple`.** Written as "not handled": the text is a search,
-   not an edit of a value. The alternative is to clear it (what a blur does there).
-3. **`PopoverCloseActionDetails`** against the `PopoverCloseDetails` named in O-L2 and in
-   #201's text: the plan's `<C>ActionDetails` rule was followed.
-4. **Combobox's variant type names** (`ComboboxRootSingleProps` / `ComboboxRootMultipleProps`)
-   follow from C-L1's rule but are in no issue's list. `ComboboxMultipleRootState` and
-   `ComboboxMultipleValueChangeDetails` were left as they are; 9.4 has no rule for a variant
-   of a state or details type.
-5. **`value` and `values` in one state** (X-L6: Combobox Input and Clear, Slider) is not
-   decided and not changed.
-6. **Files two issues touch.** The checklists below give each file to one issue, which moves
-   items between issues relative to their texts: Toggle and ToggleGroup (V-M2, V-L1) go to
-   #202 with the rest of those two folders; Switch's kinds (X-M7) go to #200; the Toolbar rule
-   for the overlay Triggers (C-H1) and `Menu.Popup`'s flag rename (X-L9) go to #201; the
-   MultiSelect test row and the Combobox and MultiSelect Popup JSDoc (O-L1, O-L4) go to #200.
+1. **Triggers (user decision).** `transition` is removed from `Tabs.Tab`, `Accordion.Trigger`
+   and `Collapsible.Trigger` too. The rule of 5.1 is "a part whose rendered state is all
+   optimistic takes no `transition`", not only value controls. `Button` keeps it.
+2. **Escape in a Combobox with `multiple`**: the same rule as single, stated once: the text
+   reverts to what a blur would leave, which there is `""`, and the key is consumed.
+3. `PopoverCloseActionDetails` is the name (the plan's rule, not O-L2's).
+4. Combobox's variant props types are renamed in #200. `ComboboxMultipleRootState` and
+   `ComboboxMultipleValueChangeDetails` stay; 9.4 gets no rule for a variant of a state or
+   details type.
+5. `value` and `values` in one state (X-L6) is not decided and not changed.
+6. File ownership as in the checklists below is confirmed. It moves items between issues
+   relative to their texts: Toggle and ToggleGroup (V-M2, V-L1) go to #202 with the rest of
+   those two folders; Switch's kinds (X-M7) go to #200; the Toolbar rule for the overlay
+   Triggers (C-H1) and `Menu.Popup`'s flag rename (X-L9) go to #201; the MultiSelect test row
+   and the Combobox and MultiSelect Popup JSDoc (O-L1, O-L4) go to #200.
+7. The missing platform-typings imports (X-L2) are assigned: field, form, otp-field and
+   text-field to #200, toast to #201.
 
 ### Implementation checklists
 
@@ -16130,8 +16131,8 @@ edit, each in its own components' blocks.
   `data-required`.
 - **Combobox Escape (V-M4).** `combobox/combobox-keyboard.ts` (and `combobox-root.tsx` where
   the text is written): Escape request (`isEscapeRequest`), listbox not `:popover-open`,
-  single selection, text different from the revert target of `use-combobox-text.ts`'s blur
-  path: write the target with `reason: "dismiss"` and the `keydown`, `consumeEscape`. Tests:
+  text different from the revert target of `use-combobox-text.ts`'s blur path (single: the
+  selection's label or the committed custom value; `multiple`: `""`): write the target with `reason: "dismiss"` and the `keydown`, `consumeEscape`. Tests:
   the "Draft revert" row of `testing.md`, the Dialog rows in the browser file.
 - **`readOnly` out of the types (V-M5).** Add `"readOnly"` to the `Omit` of
   `ComboboxInputProps`, `CheckboxProps`, `SwitchProps`, `RadioGroupItemProps`,
@@ -16162,6 +16163,8 @@ edit, each in its own components' blocks.
   `popovertarget` close of a MultiSelect (`"activate"`), in `multi-select.browser.test.tsx`.
   The shared `transition` JSDoc paragraph (#201 writes it) on `combobox-popup.tsx` and
   `multi-select-popup.tsx`.
+- **Platform typings (X-L2).** Add `import "../internal/platform-attributes.js";` to
+  `field/index.ts`, `form/index.ts`, `otp-field/index.ts`, `text-field/index.ts`.
 - **Type names (9.4).** `combobox/combobox-root.tsx`: `ComboboxRootSingleProps`,
   `ComboboxRootMultipleProps`, export `ComboboxRootBaseProps`. State aliases:
   `SelectTriggerState`, `SelectValueState`, `SelectGroupState`, `SelectGroupLabelState`,
@@ -16201,6 +16204,8 @@ edit, each in its own components' blocks.
 - **`data-fsui-typeahead` (X-L7).** `menu/use-menu-item.ts` writes it, `menu/menu-dom.ts`
   reads it; the "Owned" lines of `packages/docs/src/pages/MenuPage.tsx`.
 - **`experimental_focusGroup` on `Menu.Popup` (X-L9).** `menu/menu-popup.tsx`.
+- **Platform typings (X-L2).** Add `import "../internal/platform-attributes.js";` to
+  `toast/index.ts`.
 - **Disabled in a Toolbar, the Triggers (C-H1).** `menu/menu-trigger.tsx`:
   `alwaysFocusable: inBar || toolbar !== null`. `popover/popover-trigger.tsx` (through
   `usePopoverTrigger`'s option) and `dialog/dialog-trigger.tsx` (`disabledButton` directly):
@@ -16225,6 +16230,10 @@ edit, each in its own components' blocks.
 - **Kinds (X-M7).** `accordion/accordion-root.tsx`, `accordion-trigger.tsx`: `open` /
   `close` per non-empty side of the diff. `collapsible/collapsible-root.tsx`,
   `collapsible-trigger.tsx`: `open` / `close`. The two `*-transition-types.test.tsx` files.
+- **No `transition` on the triggers (user decision, question 1).** Remove the prop, the
+  boundary and the JSDoc from `tabs/tabs-tab.tsx`, `accordion/accordion-trigger.tsx`,
+  `collapsible/collapsible-trigger.tsx`, with the test rows and docs examples that pass it.
+  `Tabs.Panel`, `Accordion.Item` / `Panel` and `Collapsible.Root` / `Panel` keep theirs.
 - **`state.open` (C-M3).** `accordion/accordion-item.tsx`, `accordion-panel.tsx`,
   `collapsible/collapsible-root.tsx`, `collapsible-panel.tsx`: `boolean`, `false` in JS-free
   mode.

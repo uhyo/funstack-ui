@@ -207,7 +207,7 @@ reason given) in exactly these cases, and nowhere else:
 | An option is accepted (Enter, click) | the option's `label` prop, else its `textContent` trimmed, read **at that moment** from the DOM | `"activate"` | the `keydown` / `click` |
 | The accepted option's action rejects, or a controlled parent does not adopt the value | the text of the previous committed value (the label cache, 2.3) | `"dismiss"` | `undefined` |
 | Focus leaves with unmatched text and `allowCustomValue` is off | the committed value's label (cache), or `""` when `value` is `null` | `"dismiss"` | the `focusout` |
-| Escape while the listbox is closed and the text differs from the selection's (single selection, section 8) | the optimistic selection's label (cache), the committed custom value with `allowCustomValue`, or `""` when `value` is `null` | `"dismiss"` | the `keydown` |
+| Escape while the listbox is closed and the text differs from what a blur would leave (section 8) | single: the optimistic selection's label (cache), the committed custom value with `allowCustomValue`, or `""` when `value` is `null`; `multiple`: `""` | `"dismiss"` | the `keydown` |
 | `Clear` | `""` | `"activate"` | the `click` |
 | Form reset | the Input's `defaultValue` (the mirror of `defaultInputValue` / the mount-time `inputValue`, written into the attribute in the `reset` event itself, 11.1) | `"platform"` | the `reset` event |
 | Mount reconciliation (typed before hydration; Firefox restoration) | the DOM value | `"platform"` | `undefined` |
@@ -1054,8 +1054,8 @@ and is accepted: Enter during an open that has not committed yet submits a form 
 | Enter | open, no active option | `allowCustomValue`: commit the text (5.3) and close; else nothing | yes |
 | Enter | closed | `allowCustomValue`: commit the text if it changed (in `flushSync`, 5.3); the form may submit | no |
 | Escape | open | **platform**: the auto popover's close watcher closes it; focus stays in the input; a `"dismiss"` fact. The active option is forgotten; the text is kept | no (the platform cancels the close request itself) |
-| Escape | closed, the text differs from the text of the selection (single selection) | **revert** (conventions 15): the text is written back to what a blur would leave (the optimistic selection's label, the committed custom value with `allowCustomValue`, `""` with no selection), urgently, through `onInputValueChange` with `reason: "dismiss"`; no value is dispatched and the selection stays. The key is consumed (`consumeEscape`), so an enclosing Dialog or Popover stays open and the next Escape closes it | yes |
-| Escape | closed, the text is the selection's (or `multiple`, whose text is a search and not an edit of a value) | nothing; reaches an enclosing Dialog / Popover | no |
+| Escape | closed, the text differs from what a blur would leave | **revert** (conventions 15), one rule for both modes: the text is written back to what a blur would leave (single: the optimistic selection's label, the committed custom value with `allowCustomValue`, `""` with no selection; `multiple`: `""`, the search text is cleared and the chips stay), urgently, through `onInputValueChange` with `reason: "dismiss"`; no value is dispatched and the selection stays. The key is consumed (`consumeEscape`), so an enclosing Dialog or Popover stays open and the next Escape closes it | yes |
+| Escape | closed, the text is already what a blur would leave | nothing; reaches an enclosing Dialog / Popover | no |
 | Tab / Shift+Tab | open | focus moves on; `focusout` closes the listbox (5.4); the text reverts or, with `allowCustomValue`, commits. **Tab does not accept the active option** (question 5) | no |
 | Space | any | a character (the input's own) | no |
 

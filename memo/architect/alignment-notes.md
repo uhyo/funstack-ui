@@ -18,3 +18,7 @@ Things to remember when the code comes back for review:
   `ComboboxMultipleValueChangeDetails`), and `value` / `values` in one state (X-L6).
 - The docs site and the skill still say the old things; they are the technical writer's half
   of #199 and each code issue's own pages.
+
+Answered the same day (in the CHANGELOG entry, "Questions answered"): the triggers lose
+`transition` too (rule: all rendered state optimistic); Combobox `multiple` Escape clears the
+search text; file ownership per the checklists confirmed; X-L2 assigned.

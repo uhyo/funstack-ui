@@ -1772,9 +1772,12 @@ have none and animate in CSS instead:
 1. **Browser-owned visibility** (3.5: Tooltip's `Popup`, the Accordion's `<details>` in static
    mode, which ignores the prop with a dev warning): the open/close happens outside any React
    transition; `@starting-style` and `transition-behavior: allow-discrete`.
-2. **A value control whose attributes are all optimistic.** Nothing in it mounts from library
+2. **A part whose rendered state is all optimistic.** Nothing in it mounts from library
    state, and the flip lands in a sync render, so the settle commit shows nothing a boundary
-   could animate. This is one rule for every value control: the checkables (`Toggle`,
+   could animate. This is one rule, for value controls and triggers alike: the triggers of a
+   content region (`Tabs.Tab`, `Accordion.Trigger`, `Collapsible.Trigger`; the Panel next to
+   them, and the `<details>` of `Accordion.Item` and `Collapsible.Root`, render committed
+   state and have the prop); the checkables (`Toggle`,
    `Checkbox`, `Switch`, `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent`,
    `ToggleGroup.Item`); Menu's items (their `aria-checked` lands in a sync render); every Select
    part (the picker is a UA pseudo-element, `<selectedcontent>` is written by the browser);
@@ -1794,11 +1797,10 @@ have none and animate in CSS instead:
    arrive in the consumer's lane (usually urgent, 2.6) and animate through a CSS transition on
    a registered custom property.
 
-The parts that render optimistic state and **keep** `transition` are not value controls: the
-pure trigger `Button`, whose only state is `pending` and whose content is keyed on it, and the
-triggers of a content region (`Tabs.Tab`, `Accordion.Trigger`, `Collapsible.Trigger`), next to
-the Panel whose swap the same commit animates. A part without the prop renders no boundary, so
-the prop costs nothing for consumers who do not set it.
+`Button` keeps `transition`: it renders no optimistic state at all. Its only state is
+`pending`, which is the transition's own, and content keyed on it changes in the commit that
+ends the action. A part without the prop renders no boundary, so the prop costs nothing for
+consumers who do not set it.
 
 **Top-layer parts: the boundary wraps the top-layer element itself, never only its children**
 (the `vt-popover` probe in `docs/research/popover-menu.md`). A boundary inside a `[popover]` or
@@ -1845,7 +1847,7 @@ Per kind of part:
 
 | Part renders | Animate with | Why |
 | --- | --- | --- |
-| Optimistic state (a checkable, `Tabs.Tab`, `Accordion.Trigger`, `Tabs.Indicator`) | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
+| Optimistic state (a checkable, `Tabs.Tab`, `Accordion.Trigger`, `Collapsible.Trigger`, `Tabs.Indicator`): no `transition` prop | CSS `transition` on the data attribute or on the anchored insets (`[data-pressed]`, `[data-selected]`, `position-anchor` following the optimistic tab) | The flip lands in a sync-lane commit; `<ViewTransition>` never fires for it, on click or on rollback. |
 | Committed state (`Tabs.Panel`, `Accordion.Panel`, `Popup` content driven by library state) | `transition` prop | The swap lands in the transition-lane commit that settles the action. Mount-prone parts (a Panel with `keepMounted={false}` or `true`) pay the page cross-fade on every mount or reveal once `transition` is set; with `"until-found"` only updates happen. A boundary that mounts *under a new DOM element* is shielded: Dialog's children mount under the `<dialog>` element on a plain open, so a plain open starts no view transition even with `transition` set; only a nested Popup mounting together with outer content, or a Root inserted by a transition, pays. |
 | `pending` leaving, a controlled snap-back, content the parent changes in the same transition | `transition` prop | Same commit as above (snap-backs carry no `fsui-*` types, section 5.3). |
 | Any part with `transition` absent | nothing (no boundary rendered) | Baseline timing; a switch or open calls no `startViewTransition`. |
@@ -1944,8 +1946,8 @@ Every component has a row:
 | Progress, Meter | none (a consumer-owned value in the consumer's lane, section 5.1) |
 | Avatar | none (the status is an urgent mirror, 2.6; a consumer `<ViewTransition>` around it gets react-dom's commit wait for the image, `design/components/avatar.md` 5) |
 
-A component that emits types and has no `transition` prop on any part (the value controls of
-5.1) emits them for consumers' own boundaries.
+A component that emits types and has no `transition` prop on any part (the all-optimistic
+parts of 5.1) emits them for consumers' own boundaries.
 
 Hyphens only: types are also exposed as `:active-view-transition-type(fsui-tabs-next)` and a
 colon would need escaping there. Consumers' own `addTransitionType` calls in the action's sync
@@ -2675,15 +2677,16 @@ enclosing layer closes. The revert cancels nothing in flight.
 
 - **TextField, NumberField**: the text is a library draft. The revert drops the draft and
   dispatches nothing.
-- **Combobox** (single selection): the text is the urgent `inputValue`, and "the text of the
-  shown value" is what a blur would leave: the label of the optimistic selection, the committed
-  custom value with `allowCustomValue`, or `""` with no selection. The rule applies **while the
+- **Combobox**: the text is the urgent `inputValue`, and "the text of the shown value" is
+  what a blur would leave, in both modes. Single selection: the label of the optimistic
+  selection, the committed custom value with `allowCustomValue`, or `""` with no selection.
+  With `multiple`: `""`, since the values are the chips and the text is a search, so Escape
+  clears leftover search text. The rule applies **while the
   listbox is closed**; while it is open, Escape is the listbox's (its close watcher closes it
   and the text stays), so the first Escape closes the listbox and the second reverts the text.
   The revert is an urgent write reported to `onInputValueChange` with `reason: "dismiss"`, the
-  reason the blur revert uses, and no value is dispatched. It is not a clear: the selection
-  stays. With `multiple` the text is a search, not an edit of a value, and Escape does not
-  touch it (`design/components/combobox.md` 8).
+  reason the blur revert uses, and no value is dispatched. It never clears the selection
+  (`design/components/combobox.md` 8).
 
 `internal/escape-key.ts` holds all of it: `isEscapeRequest` (rules 1 and 2),
 `consumeEscape` (rule 3), `decideEscapeLast` and `createEscapeRecord` (rule 4), and

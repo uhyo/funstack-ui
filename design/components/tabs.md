@@ -76,8 +76,8 @@ Rendered DOM for the example (ids come from `useId` on the Root; see section 8):
 | `Indicator` | `span` | none (`aria-hidden`) | **optimistic** value | Optional. Must come after the Tabs inside `List`. |
 
 Every part renders exactly one element (or nothing), with `<ViewTransition>` as the outermost node
-on `Panel` and `Tab`. `Indicator` has none: it changes only in optimistic (sync) commits, which do
-not start view transitions (section 10.1), so it animates with CSS transitions instead.
+on `Panel` only. `Tab` and `Indicator` have none: they change only in optimistic (sync) commits, which do
+not start view transitions (section 10.1), so they animate with CSS transitions instead.
 
 ## 2. States
 
@@ -198,11 +198,6 @@ export interface TabsTabProps
   value: string;
   /** Focusable but inert: `aria-disabled="true"`, never dispatches. */
   disabled?: boolean;
-  /**
-   * Forwarded to the Tab's `<ViewTransition default>`. Default "none". Fires only on the commit
-   * that settles the action (or rolls it back), never on the optimistic click (section 10.1).
-   */
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, TabsTabState>;
   style?: StateValue<CSSProperties | undefined, TabsTabState>;
   children?: StateValue<ReactNode, TabsTabState>;
@@ -633,9 +628,11 @@ Consequences, stated so nobody is surprised:
 - **The Indicator animates through CSS transitions, not `<ViewTransition>`.** Its move happens in
   the optimistic commit. A view transition would run only on snap-back, which would double-animate
   against the CSS transition, so `Indicator` takes no `transition` prop and renders no boundary.
-- **`Tab` keeps a `<ViewTransition>` and a `transition` prop** as the trigger of a content region, next to the Panel whose swap the same commit animates (conventions 5.1), but it fires
-  only on the settle commit (a spinner in `children` disappearing) and on snap-back. Styling that
-  must react to the click uses CSS transitions on `[data-selected]` / `[data-pending]`.
+- **`Tab` has no `transition` prop and renders no boundary**: everything it renders is
+  optimistic (conventions 5.1, the rule for every such part). Styling that reacts to the click
+  uses CSS transitions on `[data-selected]` / `[data-pending]`; a consumer who wants the settle
+  commit to animate a tab's content (a spinner in `children` leaving) wraps it in their own
+  `<ViewTransition>` keyed on `fsui-tabs`.
 - `useDeferredValue(optimistic)` does not rescue the Indicator: probed, the deferred render also
   commits without a view transition while an action is pending.
 - **No `transition`, no boundary** (conventions 5.1, #35). A `<ViewTransition>` that mounts or is
@@ -663,8 +660,7 @@ Consequences, stated so nobody is surprised:
   `anchor-size()` values (WPT `anchor-transition-default.html`); Gecko does not yet
   (`docs/research/popover-anchor-tooltip.md`), so in Firefox the indicator jumps. That is a
   missing animation, not a broken feature, and the library ships no JS measurement fallback.
-- `Tab`: `<button …/>`, wrapped in `<ViewTransition default={transition}>` only when `transition`
-  is given; see 10.1 for when it fires.
+- `Tab`: `<button …/>`, never wrapped.
 
 Types added per dispatch: `fsui-tabs`, and `fsui-tabs-next` or `fsui-tabs-prev` when both the
 committed tab and the target tab are in the DOM. Root's `transitionTypes(next, prev)` looks both

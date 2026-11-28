@@ -24,7 +24,7 @@ Collapsible's own surface and names the Accordion section for the rest.
 | 3 | Two modes, one anatomy | **JS-free mode** (Root has none of `open`, `defaultOpen`, `openChangeAction`): the browser owns `open`, nothing runs on toggle. **Library mode** (any of the three): the summary click is intercepted, `open` follows committed state inside a transition, `data-open` is optimistic, the action is awaited. Same selection rule as Popover and Dialog (conventions 3.9.11), without `onOpenChange`. |
 | 4 | No `onOpenChange` | Every way a `<details>` changes is one the library can roll back, so every change is a request (conventions 2.1). The browser's own changes (find-in-page, a click before hydration) go to `openChangeAction` with `reason: "platform"`. |
 | 5 | Pending UI | Root and Trigger: `data-open` (optimistic) and `data-pending`. The `open` attribute, `:open`, `::details-content` and the Panel follow committed state. |
-| 6 | Animation | CSS on `::details-content` in both modes; `transition` (`<ViewTransition>`) on Root, Trigger and Panel in library mode; `experimental_interpolateSize` on Root. No `keepMounted`. All as Accordion 8. |
+| 6 | Animation | CSS on `::details-content` in both modes; `transition` (`<ViewTransition>`) on Root and Panel in library mode, not on Trigger (all optimistic, conventions 5.1); `experimental_interpolateSize` on Root. No `keepMounted`. All as Accordion 8. |
 | 7 | Keyboard | Native: Enter and Space on the summary. Nothing added. |
 | 8 | RSC | All three parts are `"use client"` files. JS-free mode runs no behaviour JS and works before and without hydration (conventions 7.3). |
 
@@ -258,7 +258,6 @@ writer of `open`. An exclusive group of disclosures is an `Accordion.Root exclus
 ```ts
 export interface CollapsibleTriggerProps
   extends Omit<ComponentPropsWithRef<"summary">, "onClick" | "aria-disabled" | "className" | "style" | "children"> {
-  transition?: ViewTransitionClass;
   className?: StateValue<string | undefined, CollapsibleTriggerState>;
   style?: StateValue<CSSProperties | undefined, CollapsibleTriggerState>;
   /** Rendered from optimistic state; must not suspend. */
@@ -441,8 +440,9 @@ Chromium only; elsewhere the height jumps. Same flag, same name and same meaning
 
 ### 8.3 `transition` (ViewTransition, library mode only)
 
-Root, Trigger and Panel each render `<ViewTransition default={transition}>` as the outermost
+Root and Panel each render `<ViewTransition default={transition}>` as the outermost
 node **only when `transition` is given** (conventions 5.1, `internal/transition-boundary.tsx`).
+The Trigger has no `transition` prop: everything it renders is optimistic.
 Transition types: `fsui-collapsible`, plus `fsui-collapsible-open` or
 `fsui-collapsible-close`: the kinds of every `open` state in the library (conventions 5.3),
 the overlays' and Accordion's included.
