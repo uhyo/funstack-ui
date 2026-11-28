@@ -180,6 +180,52 @@ describe("Form: editing while the submission is in flight", () => {
   });
 });
 
+describe("Form: a form-level error (field-form.md 3.7, #208)", () => {
+  function ErrorForm({ run }: { run: () => Promise<{ error?: string }> }) {
+    const [state, formAction] = useActionState(run, {});
+    return (
+      <Form.Root action={formAction} error={state.error} data-testid="form">
+        <Form.Error data-testid="form-error" />
+        <Field.Root name="title">
+          <Field.Label>Title</Field.Label>
+          <Field.Control data-testid="title" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>
+    );
+  }
+
+  it("a real settle: the message is rendered and announced on the form, focus stays, a retry runs", async () => {
+    const run = vi.fn(async () => ({ error: "Could not reach the server." }));
+    render(<ErrorForm run={run} />);
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    const notifying = form as unknown as { ariaNotify: (message: string) => void };
+    // Every supported engine has `ariaNotify` (announce.ts), a test build may lag; the spy keeps
+    // the real call.
+    const notify =
+      typeof notifying.ariaNotify === "function" ? vi.spyOn(notifying, "ariaNotify") : null;
+    await user.type(screen.getByTestId("title"), "Groceries");
+    await user.click(submit());
+    await flushTasks();
+    const part = screen.getByTestId("form-error");
+    expect(part).toBeVisible();
+    expect(part).toHaveTextContent("Could not reach the server.");
+    expect(document.activeElement).toBe(submit());
+    expect((screen.getByTestId("title") as HTMLInputElement).value).toBe("Groceries");
+    expect(form.checkValidity()).toBe(true);
+    if (notify !== null) {
+      expect(notify).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledWith("Could not reach the server.");
+    }
+
+    await user.click(submit());
+    await flushTasks();
+    expect(run).toHaveBeenCalledTimes(2);
+    if (notify !== null) expect(notify).toHaveBeenCalledTimes(2);
+    expect(document.activeElement).toBe(submit());
+  });
+});
+
 describe("Form: invalid submission", () => {
   it("an invalid form never reaches the action; the Field shows the error and focuses", async () => {
     const action = vi.fn();

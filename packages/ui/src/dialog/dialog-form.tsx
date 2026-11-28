@@ -6,7 +6,7 @@ import { FormStatusWatcher } from "../internal/form/form-status-watcher.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
-import { hasAnyError } from "../internal/form/validity.js";
+import { hasFormError } from "../internal/form/validity.js";
 import { useDialogContext } from "./dialog-context.js";
 import type { DialogNamespace } from "./dialog-context.js";
 
@@ -46,9 +46,10 @@ export interface DialogFormProps extends Omit<
   /**
    * With a function `action`: close the dialog once the action's transition settles without
    * throwing and, when this form is rendered as a `Form.Root`
-   * (`render={<Form.Root errors={state.errors} />}`), with no field error: a settle whose
-   * `errors` has a non-empty entry (hidden stale ones included, the `autoReset` rule) keeps
-   * the dialog open and the Form focuses the first errored field.
+   * (`render={<Form.Root errors={state.errors} error={state.error} />}`), with no error: a
+   * settle whose `errors` has a non-empty entry (hidden stale ones included) or whose
+   * form-level `error` is not empty (the `autoReset` rule) keeps the dialog open; the Form
+   * focuses the first errored field or announces the form-level error.
    *
    * Without a `Form.Root` the library never sees a result, so any settle that does not throw
    * counts, including a `useActionState` result that reports errors: render the form as a
@@ -86,8 +87,9 @@ export interface DialogFormProps extends Omit<
  * function `action`: `<form action={action}>` (React overrides the method) and a status watcher
  * that closes the dialog once the action has settled, with the submitter's `value`, unless
  * `closeOnSettle` is `false`, the dialog was closed while the action ran, or the form is rendered
- * as a `Form.Root` and the result has a field error (`render={<Form.Root errors={...} />}`, the
- * recommended composition for validation).
+ * as a `Form.Root` and the result has an error, a field one or a form-level one
+ * (`render={<Form.Root errors={...} error={...} />}`, the recommended composition for
+ * validation).
  *
  * `DialogFormState.pending` is this form's own status; it is not emitted as `data-pending` and
  * is not folded into any control's `pending` (conventions 2.7). Submit buttons read
@@ -209,8 +211,8 @@ export function useDialogForm(
 /**
  * Rendered among the form's children, so it reads the `FormContext` exactly when the form is a
  * `Form.Root` (either orientation of the `render` composition): the settle close then waits for
- * a result with no field error (`hasAnyError`, the `autoReset` predicate, hidden stale entries
- * included).
+ * a result with no error (`hasFormError`, the `autoReset` predicate: hidden stale entries
+ * included, and the form-level `error`).
  */
 function DialogFormSettle({
   namespace,
@@ -235,9 +237,10 @@ function DialogFormSettle({
   );
   const isForm = form !== null;
   const errors = form?.errors;
+  const error = form?.error;
   const settled = useCallback(
-    () => onSettled(!isForm || !hasAnyError(errors)),
-    [isForm, errors, onSettled],
+    () => onSettled(!isForm || !hasFormError(errors, error)),
+    [isForm, errors, error, onSettled],
   );
   if (!watches) return null;
   return <FormStatusWatcher onPendingChange={onPendingChange} onSettled={settled} />;

@@ -13,8 +13,8 @@ import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useLatest } from "../internal/use-latest.js";
 import { resolveStateValue, useRender } from "../internal/use-render.js";
-import { hasAnyError } from "../internal/form/validity.js";
-import type { FormErrors } from "../internal/form/validity.js";
+import { hasFormError, normaliseErrorValue } from "../internal/form/validity.js";
+import type { FieldErrorValue, FormErrors } from "../internal/form/validity.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -54,9 +54,17 @@ export interface FormRootProps extends Omit<
    */
   errors?: FormErrors;
   /**
-   * Reset the form (`form.reset()`) when a submission the Form ran settles with no non-empty
-   * entry in `errors`. A submission that reports errors never resets, so the
-   * user's input, `:user-invalid` and custom validity stay. `false`: never reset.
+   * A form-level error: a failure that is not about one field (usually `state.error` from
+   * `useActionState`). Shown by `Form.Error` and announced when a submission settles. Never
+   * written into a control's validity, so the same values can be submitted again. While it is
+   * not empty the form is not reset and a `Dialog.Form` stays open.
+   */
+  error?: FieldErrorValue;
+  /**
+   * Reset the form (`form.reset()`) when a submission the Form ran settles with no error: no
+   * non-empty entry in `errors` at all (an error hidden because the user replaced the value
+   * during the flight still counts) and an empty `error`. A submission that reports errors never
+   * resets, so the user's input, `:user-invalid` and custom validity stay. `false`: never reset.
    *
    * @defaultValue `true`
    */
@@ -87,7 +95,9 @@ interface Submission {
  * element, so a Server Function posts before hydration.
  *
  * When a submission settles, the Form focuses the first Field that shows a server error (from
- * `errors`), or, when `errors` has no entry and `autoReset` is on, resets the form.
+ * `errors`), or, when the form has no error (`errors` has no entry and `error` is empty) and
+ * `autoReset` is on, resets the form. A form-level `error` is announced at the settle while a
+ * `Form.Error` is mounted (design 3.7).
  *
  * Owned keys (conventions 1.2): `action`, `method` (except with a string `action`), `onSubmit`,
  * `data-pending`.
@@ -97,6 +107,7 @@ interface Submission {
 export function FormRoot({
   action,
   errors,
+  error,
   autoReset = true,
   method,
   className,
@@ -115,7 +126,9 @@ export function FormRoot({
   const formRef = useRef<HTMLFormElement | null>(null);
   const submission = useRef<Submission | null>(null);
   const fields = useRef(new Set<FormFieldRegistration>());
-  const latest = useLatest({ errors, autoReset });
+  const latest = useLatest({ errors, error, autoReset });
+  // `Form.Error` parts mounted (design 3.7 rule 3): the form-level announcement is theirs.
+  const formErrorCount = useRef(0);
   const isFunction = typeof action === "function";
 
   // A native capture listener sees every submission, React's path included (a submitter with its
@@ -188,6 +201,9 @@ export function FormRoot({
     submission.current = null;
     const form = formRef.current;
     if (form === null) return;
+    const { errors, error, autoReset } = latest.current;
+    // The form-level messages, spoken once per settle while a `Form.Error` is mounted (3.7).
+    const formMessages = formErrorCount.current > 0 ? normaliseErrorValue(error).join(" ") : "";
     const shown = [...fields.current]
       .filter((field) => field.showsServerError())
       .map((field) => ({ field, target: field.getFocusTarget() }))
@@ -199,15 +215,19 @@ export function FormRoot({
       const first = sortByDocumentOrder(shown, (entry) => entry.target)[0]!;
       // Focus already there (the user pressed Enter in that field): `focus()` does nothing and
       // nothing reads the new description, so the message is announced instead (design 5.3).
+      // The form-level messages come first, in the same announcement (3.7 rule 3).
       if (first.target.ownerDocument.activeElement === first.target) {
-        announce(first.target, first.field.serverMessages().join(" "));
+        const fieldMessages = first.field.serverMessages().join(" ");
+        announce(first.target, [formMessages, fieldMessages].filter((m) => m !== "").join(" "));
       } else {
+        announce(form, formMessages);
         first.target.focus();
       }
       return;
     }
-    const { errors, autoReset } = latest.current;
-    if (autoReset && settled?.intercepted === true && !hasAnyError(errors)) form.reset();
+    // No focus move for a form-level error (3.7 rule 4): it is announced on the form.
+    announce(form, formMessages);
+    if (autoReset && settled?.intercepted === true && !hasFormError(errors, error)) form.reset();
   }, [latest]);
 
   const submittedData = useCallback(() => {
@@ -219,9 +239,25 @@ export function FormRoot({
     for (const field of fields.current) if (field !== source) field.refresh();
   }, []);
 
+  const registerFormError = useCallback(() => {
+    formErrorCount.current += 1;
+    return () => {
+      formErrorCount.current -= 1;
+    };
+  }, []);
+
+  const formMessages = useMemo(() => normaliseErrorValue(error), [error]);
+
   const context = useMemo<FormContextValue>(
-    () => ({ errors, registerField, submittedData, refreshFields }),
-    [errors, registerField, submittedData, refreshFields],
+    () => ({
+      errors,
+      error: formMessages,
+      registerFormError,
+      registerField,
+      submittedData,
+      refreshFields,
+    }),
+    [errors, formMessages, registerFormError, registerField, submittedData, refreshFields],
   );
 
   const state: FormRootState = { pending };

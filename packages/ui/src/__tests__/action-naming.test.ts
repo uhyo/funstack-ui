@@ -150,6 +150,7 @@ type PublicProps = {
   FieldErrorProps: UI.FieldErrorProps;
   FieldLabelProps: UI.FieldLabelProps;
   FieldRootProps: UI.FieldRootProps;
+  FormErrorProps: UI.FormErrorProps;
   FormRootProps: UI.FormRootProps;
   FormSubmitProps: UI.FormSubmitProps;
   HoverCardPopupProps: UI.HoverCardPopupProps;
@@ -319,6 +320,7 @@ const listedKeys = {
   FieldErrorProps: true,
   FieldLabelProps: true,
   FieldRootProps: true,
+  FormErrorProps: true,
   FormRootProps: true,
   FormSubmitProps: true,
   HoverCardPopupProps: true,

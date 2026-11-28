@@ -475,6 +475,8 @@ export type {
   FieldErrorValue,
   FormSubmitProps,
   FormSubmitState,
+  FormErrorProps,
+  FormErrorState,
 } from "./form/index.js";
 
 export { Progress } from "./progress/index.js";
