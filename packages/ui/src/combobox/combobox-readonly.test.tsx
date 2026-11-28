@@ -4,7 +4,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { flushTasks, setupUser } from "../__tests__/helpers.js";
+import { deferred, flushTasks, setupUser } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
 import { Combobox } from "./index.js";
 import type { ComboboxRootMultipleProps, ComboboxRootSingleProps } from "./index.js";
@@ -211,6 +211,125 @@ describe("Combobox readOnly (conventions 3.6.1)", () => {
     expect(input()).toHaveAttribute("data-readonly", "");
   });
 
+  it("text edited before readOnly turns on goes back to the selection's label (dismiss)", async () => {
+    const onText = vi.fn<Fn>();
+    const { rerender } = render(<Single onInputValueChange={onText} />);
+    const user = setupUser();
+    await user.click(input());
+    await user.clear(input());
+    await user.keyboard("Fra");
+    await flushTasks(2);
+    expect(input().value).toBe("Fra");
+    onText.mockClear();
+    expect(isOpen()).toBe(true);
+    // Async: the close request's transition renders the List, which suspends on its deferred
+    // query; a sync `act` would never retry it in jsdom.
+    await act(async () => rerender(<Single readOnly onInputValueChange={onText} />));
+    await flushTasks(2);
+    expect(input().value).toBe("Japan");
+    expect(onText.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["Japan", "dismiss"]]);
+    expect(isOpen()).toBe(false);
+  });
+
+  it("allowCustomValue: the committed custom value is the text readOnly goes back to", async () => {
+    const { rerender } = render(
+      <Single allowCustomValue defaultValue={null} defaultInputValue="" />,
+    );
+    const user = setupUser();
+    await user.click(input());
+    await user.keyboard("Atlantis{Enter}");
+    await flushTasks(2);
+    await user.keyboard("{Backspace}{Backspace}");
+    await flushTasks(2);
+    expect(input().value).toBe("Atlanti".slice(0, 6));
+    await act(async () =>
+      rerender(<Single allowCustomValue readOnly defaultValue={null} defaultInputValue="" />),
+    );
+    await flushTasks(2);
+    expect(input().value).toBe("Atlantis");
+  });
+
+  it("on leave while read-only, text a controlled parent kept is reverted again", async () => {
+    const onText = vi.fn<Fn>();
+    function App({ readOnly }: { readOnly: boolean }) {
+      const [text, setText] = useState("Japan");
+      return (
+        <Single
+          readOnly={readOnly}
+          inputValue={text}
+          onInputValueChange={(next, details) => {
+            onText(next, details);
+            // The parent adopts typing only: the lock's revert is refused.
+            if (details.reason === "activate") setText(next);
+          }}
+        />
+      );
+    }
+    const { rerender } = render(<App readOnly={false} />);
+    const user = setupUser();
+    await user.click(input());
+    await user.clear(input());
+    await user.keyboard("Fr");
+    await flushTasks(2);
+    await act(async () => rerender(<App readOnly />));
+    await flushTasks(2);
+    expect(input().value).toBe("Fr");
+    onText.mockClear();
+    await user.click(screen.getByRole("button", { name: "before" }));
+    await flushTasks(2);
+    expect(onText.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["Japan", "dismiss"]]);
+  });
+
+  // Escape on the shown listbox is the platform's close watcher, which jsdom does not run: the
+  // browser row in combobox.browser.test.tsx covers it.
+  it("a popup a controlled parent keeps open: Alt+ArrowUp requests the close again; Escape is not consumed", async () => {
+    const openAction = vi.fn<Fn>();
+    const onOpenChange = vi.fn<Fn>();
+    await act(async () => {
+      render(<Single readOnly open openChangeAction={openAction} onOpenChange={onOpenChange} />);
+    });
+    await flushTasks(2);
+    // Mounted read-only and open: one close request already, which the parent refused.
+    expect(openAction.mock.calls.map(([n]) => n)).toEqual([false]);
+    expect(isOpen()).toBe(true);
+    openAction.mockClear();
+    input().focus();
+    expect(fireEvent.keyDown(input(), { key: "ArrowUp", altKey: true })).toBe(false);
+    await flushTasks(2);
+    expect(openAction.mock.calls.map(([n]) => n)).toEqual([false]);
+    // The parent refuses: still shown. Escape reaches the platform (not prevented).
+    expect(isOpen()).toBe(true);
+    expect(fireEvent.keyDown(input(), { key: "Escape" })).toBe(true);
+    // Other keys stay inert and unprevented.
+    expect(fireEvent.keyDown(input(), { key: "ArrowDown" })).toBe(true);
+    await flushTasks(2);
+    expect(openAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("readOnly turned on while a value action is pending cancels nothing (rule 12)", async () => {
+    const d = deferred();
+    const action = vi.fn<Fn>(() => d.promise);
+    const { rerender } = render(<Single valueChangeAction={action} />);
+    const user = setupUser();
+    await user.click(input());
+    fireEvent.keyDown(input(), { key: "ArrowDown" });
+    await flushTasks(2);
+    await user.click(screen.getByRole("option", { name: "France" }));
+    await flushTasks(2);
+    expect(input()).toHaveAttribute("data-pending", "");
+    await act(async () => rerender(<Single readOnly valueChangeAction={action} />));
+    await flushTasks(2);
+    expect(input()).toHaveAttribute("data-pending", "");
+    expect(input().value).toBe("France");
+    await act(async () => d.resolve());
+    await flushTasks(2);
+    expect(input()).not.toHaveAttribute("data-pending");
+    expect(input().value).toBe("France");
+    const hidden = document.querySelector<HTMLInputElement>('input[type="hidden"]')!;
+    expect(hidden.value).toBe("fr");
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
   describe("multiple", () => {
     it("ChipRemove is disabled; Backspace on the Input and on a chip removes nothing", async () => {
       const valueAction = vi.fn<Fn>();
@@ -240,6 +359,37 @@ describe("Combobox readOnly (conventions 3.6.1)", () => {
       expect(screen.getByTestId("chip-ts")).toHaveFocus();
       await user.keyboard("{ArrowRight}{ArrowRight}");
       expect(input()).toHaveFocus();
+    });
+
+    it("a search typed before readOnly turns on is cleared (dismiss)", async () => {
+      const onText = vi.fn<Fn>();
+      const { rerender } = render(<Multiple onInputValueChange={onText} />);
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("Go");
+      await flushTasks(2);
+      onText.mockClear();
+      await act(async () => rerender(<Multiple readOnly onInputValueChange={onText} />));
+      await flushTasks(2);
+      expect(input().value).toBe("");
+      expect(onText.mock.calls.map(([n, d]) => [n, d.reason])).toEqual([["", "dismiss"]]);
+    });
+
+    it("readOnly turned on while a removal is pending cancels nothing (rule 12)", async () => {
+      const d = deferred();
+      const action = vi.fn<Fn>(() => d.promise);
+      const { rerender } = render(<Multiple valueChangeAction={action} />);
+      await setupUser().click(screen.getByTestId("remove-ts"));
+      await flushTasks(2);
+      expect(screen.queryByTestId("chip-ts")).toBeNull();
+      expect(screen.getByTestId("chips")).toHaveAttribute("data-pending", "");
+      await act(async () => rerender(<Multiple readOnly valueChangeAction={action} />));
+      expect(screen.getByTestId("chips")).toHaveAttribute("data-pending", "");
+      await act(async () => d.resolve());
+      await flushTasks(2);
+      expect(screen.getByTestId("chips")).not.toHaveAttribute("data-pending");
+      expect(screen.queryByTestId("chip-ts")).toBeNull();
+      expect(action).toHaveBeenCalledTimes(1);
     });
 
     it("every value is submitted", () => {

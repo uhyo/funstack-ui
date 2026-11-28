@@ -5,10 +5,19 @@
 // `input` / `change` is not an edit, and a server error is still shown. The text controls render
 // `data-readonly` and take the Field's `readOnly`.
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { useActionState } from "react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { flushMicrotasks, hydrateFromServer, silenceErrors } from "../__tests__/helpers.js";
+import {
+  flushMicrotasks,
+  hydrateFromServer,
+  setupUser,
+  silenceErrors,
+} from "../__tests__/helpers.js";
 import { Checkbox } from "../checkbox/index.js";
 import { Form } from "../form/index.js";
+import type { FormErrors } from "../form/index.js";
+import { Select } from "../select/index.js";
 import { NumberField } from "../number-field/index.js";
 import { OTPField } from "../otp-field/index.js";
 import { TextField } from "../text-field/index.js";
@@ -266,5 +275,155 @@ describe("the text controls: data-readonly, and the Field's readOnly", () => {
     );
     expect(control().value).toBe("12");
     expect(onValueChange).not.toHaveBeenCalled();
+  });
+});
+
+// Rule 5's library-side bar, on controls the platform does not bar (a checkbox, a `<select>`):
+// the four branches of field-root.tsx that keep a read-only control from blocking or being
+// focused for an error (`validate` and the server message out of the slot, the first-invalid
+// collector and the Form's server-error focus skip it).
+describe("a read-only non-text control inside a Field is barred from validation", () => {
+  const controls: [string, () => ReactNode][] = [
+    ["Checkbox", () => <Checkbox data-testid="c" />],
+    [
+      "Select",
+      () => (
+        <Select.Root data-testid="c" defaultValue="a">
+          <Select.Option value="a">A</Select.Option>
+          <Select.Option value="b">B</Select.Option>
+        </Select.Root>
+      ),
+    ],
+  ];
+  const slotOf = () => screen.getByTestId("c") as HTMLInputElement | HTMLSelectElement;
+
+  it.each(controls)(
+    "%s: a validate message stays out of the slot; the form submits",
+    async (_n, el) => {
+      const action = vi.fn();
+      render(
+        <Form.Root action={action} data-testid="form">
+          <Field.Root name="x" readOnly validate={() => "Not allowed."}>
+            <Field.Label>X</Field.Label>
+            {el()}
+            <Field.Error data-testid="error" />
+          </Field.Root>
+          <Form.Submit>Save</Form.Submit>
+        </Form.Root>,
+      );
+      await flushMicrotasks();
+      expect(slotOf().validity.customError).toBe(false);
+      expect((screen.getByTestId("form") as HTMLFormElement).checkValidity()).toBe(true);
+      await setupUser().click(screen.getByRole("button", { name: "Save" }));
+      await flushMicrotasks();
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("error")).toBeNull();
+    },
+  );
+
+  it.each(controls)(
+    "%s: a server error is shown but stays out of the slot; the form submits",
+    async (_n, el) => {
+      const action = vi.fn();
+      render(
+        <Form.Root action={action} errors={{ x: "Rejected." }} data-testid="form">
+          <Field.Root name="x" readOnly data-testid="root">
+            <Field.Label>X</Field.Label>
+            {el()}
+            <Field.Error data-testid="error" />
+          </Field.Root>
+          <Form.Submit>Save</Form.Submit>
+        </Form.Root>,
+      );
+      await flushMicrotasks();
+      expect(screen.getByTestId("error")).toHaveTextContent("Rejected.");
+      expect(screen.getByTestId("root")).toHaveAttribute("data-invalid", "");
+      expect(slotOf().validationMessage).toBe("");
+      expect((screen.getByTestId("form") as HTMLFormElement).checkValidity()).toBe(true);
+      await setupUser().click(screen.getByRole("button", { name: "Save" }));
+      await flushMicrotasks();
+      expect(action).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(controls)(
+    "%s: the server-error focus after a settle skips it for the next errored field",
+    async (_n, el) => {
+      let result: { errors?: FormErrors } = {};
+      function App() {
+        const [state, formAction] = useActionState(async () => result, {});
+        return (
+          <Form.Root action={formAction} errors={state.errors}>
+            <Field.Root name="x" readOnly>
+              <Field.Label>X</Field.Label>
+              {el()}
+              <Field.Error />
+            </Field.Root>
+            <Field.Root name="name">
+              <Field.Label>Name</Field.Label>
+              <Field.Control data-testid="name" />
+              <Field.Error />
+            </Field.Root>
+            <Form.Submit>Save</Form.Submit>
+          </Form.Root>
+        );
+      }
+      render(<App />);
+      result = { errors: { x: "Rejected.", name: "Bad name." } };
+      await setupUser().click(screen.getByRole("button", { name: "Save" }));
+      await flushMicrotasks();
+      expect(screen.getByText("Rejected.")).toBeInTheDocument();
+      expect(document.activeElement).toBe(screen.getByTestId("name"));
+    },
+  );
+
+  it("the first-invalid focus skips a read-only control that is still invalid", async () => {
+    // `Field.Control type="checkbox" required readOnly`: `readonly` does not bar a checkbox, so
+    // it is still `valueMissing` (and the development warning says so). The Field must not focus
+    // it. (A checkbox, not a `<select>`: jsdom bars a readonly select, unlike the browsers.)
+    silenceErrors();
+    const action = vi.fn();
+    render(
+      <Form.Root action={action}>
+        <Field.Root name="pick" readOnly required>
+          <Field.Label>Pick</Field.Label>
+          <Field.Control data-testid="pick" type="checkbox" />
+          <Field.Error />
+        </Field.Root>
+        <Field.Root name="name" required>
+          <Field.Label>Name</Field.Label>
+          <Field.Control data-testid="name" />
+          <Field.Error data-testid="name-error" />
+        </Field.Root>
+        <Form.Submit>Save</Form.Submit>
+      </Form.Root>,
+    );
+    await flushMicrotasks();
+    await setupUser().click(screen.getByRole("button", { name: "Save" }));
+    await flushMicrotasks();
+    expect((screen.getByTestId("pick") as HTMLInputElement).validity.valueMissing).toBe(true);
+    expect(action).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(screen.getByTestId("name"));
+  });
+
+  it("validate is not run while the control is read-only", async () => {
+    const validate = vi.fn(() => "Not allowed.");
+    render(
+      <Form.Root action={() => {}}>
+        <Field.Root name="x" readOnly validate={validate}>
+          <Field.Label>X</Field.Label>
+          <Checkbox data-testid="c" />
+        </Field.Root>
+        <Field.Root name="y">
+          <Field.Label>Y</Field.Label>
+          <Field.Control data-testid="y" />
+        </Field.Root>
+      </Form.Root>,
+    );
+    await flushMicrotasks();
+    // Another field's edit refreshes every Field (cross-field rules).
+    fireEvent.input(screen.getByTestId("y"), { target: { value: "z" } });
+    await flushMicrotasks();
+    expect(validate).not.toHaveBeenCalled();
   });
 });

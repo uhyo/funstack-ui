@@ -912,11 +912,14 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     pendingEdgeRef.current = null;
   };
 
-  // A popup that is open, or on its way, when `readOnly` turns on closes (conventions 3.6.1
-  // rule 8): a close request, so a controlled `open` parent decides as for any other.
+  // When `readOnly` turns on (conventions 3.6.1 rule 8): a popup that is open, or on its way,
+  // gets a close request, so a controlled `open` parent decides as for any other; edited text
+  // goes back to the committed value's text (a search is cleared) with `"dismiss"`, as TextField
+  // and NumberField drop their draft: the native `readonly` would leave it unfixable.
   const closeForReadOnly = useEffectEvent(() => {
     pendingEdgeRef.current = null;
     if (popover.intended()) popover.requestClose(undefined, "dismiss");
+    revertText(undefined);
   });
   useLayoutEffect(() => {
     if (readOnly) closeForReadOnly();
@@ -1061,7 +1064,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
    * custom value is its own label), `""` with no selection; `multiple`: `""`, the search is
    * cleared and the chips stay. Urgent, `"dismiss"`, no value dispatched.
    */
-  const revertText = (event: Event): boolean => {
+  const revertText = (event: Event | undefined): boolean => {
     const target = multiple ? "" : labelFor(selection.optimistic);
     if (textRef.current === target) return false;
     writeText(target, "dismiss", event);
@@ -1090,8 +1093,11 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     // `disabled`: nothing dispatches (disabling a focused input blurs it).
     if (disabled) return;
     hideListbox(event);
-    // Read-only: the text cannot differ from the selection's; nothing to commit or revert.
-    if (readOnly) return;
+    // Read-only: nothing commits; text that differs (edited before the lock) is reverted.
+    if (readOnly) {
+      revertText(event);
+      return;
+    }
     if (multiple) {
       // The text was a search: added as a value with `allowCustomValue`, else dropped (15.9).
       if (textRef.current === "") return;

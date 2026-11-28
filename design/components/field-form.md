@@ -110,7 +110,7 @@ message, and focused the control):
 | --- | --- | --- | --- | --- |
 | `Field.Root` | `div` | | `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending` (form channel) | Owns `useId`, `name`, `disabled`, `required`, `readOnly`, `validate`, the validity mirror, the control registration and the listeners. `children(state)` receives `FieldState`. |
 | `Field.Label` | `label` | | same five attributes | `id`; `for` → the control id while the registered control is labelable (default); a group control (a `<fieldset>` Root) removes it and names itself with `aria-labelledby` → this id. |
-| `Field.Control` | `input` (`textarea` / `select` through `render`) | the element's | `data-invalid`, `data-disabled`, `data-required`, `data-pending` | `id`, `name` (the Field's unless given), `disabled` / `required` (own or the Field's), `aria-describedby` (token-merged), `aria-invalid`. The native constraint attributes are ordinary pass-through. Must stay a native form control. |
+| `Field.Control` | `input` (`textarea` / `select` through `render`) | the element's | `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending` | `id`, `name` (the Field's unless given), `disabled` / `required` / `readOnly` (own or the Field's), `aria-describedby` (token-merged), `aria-invalid`. The native constraint attributes are ordinary pass-through. Must stay a native form control. |
 | `Field.Description` | `p` | | same five attributes | `id` = `${id}-description`; always referenced by the control's `aria-describedby` (a dangling reference is skipped, the Dialog rule), so no registration. |
 | `Field.Error` | `div` | | same five attributes | `id` = `${id}-error`; renders **nothing** while `invalid` is false. Default content: the messages (`validationMessage` for a native or custom constraint, the server's text for a server error). Its mount registers "an error element exists" so the Field knows it may cancel the bubble. |
 | `Form.Root` | `form` | form | `data-pending` | Owns the submission intercept, `errors`, the submitted `FormData` (for the stale-value rule), the first-error focus, the cross-field refresh and the reset policy. `children(state)` receives `{ pending }`. |
@@ -630,8 +630,9 @@ Owned keys: `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `
 "own or the Field's", and the registration carries it, so every Field part shows
 `data-readonly` whichever of the two set it. While the control is read-only the Field treats
 it as HTML treats a read-only text input, **barred from constraint validation**: the
-custom-validity slot is kept empty (a `validate` result and a server error do not block the
-submission, and the control is skipped by the first-invalid focus), an `input` / `change` from
+custom-validity slot is kept empty (`validate` is not run, a server error does not block the
+submission, and the control is skipped by the first-invalid focus and the Form's server-error
+focus), an `input` / `change` from
 it is not an edit, and a server error for the field is still shown, with nothing to dismiss
 it until the next submission. There is no inherited `readOnly`: a native `<fieldset>` has none
 (7.4), so a read-only group of Fields is the prop on each. A `Field.Control` renders the

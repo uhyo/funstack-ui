@@ -1246,13 +1246,24 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
   `readonly` (no `aria-readonly` next to it), so it stays in the Tab order with its text
   selectable, and the platform bars it from constraint validation. **The popup never opens**:
   ArrowDown / ArrowUp, Alt+ArrowDown, a click on the Input and the Trigger request nothing,
-  and `aria-expanded` stays `"false"`; a popup that is open when the prop turns on closes as
-  it does when `disabled` turns on. `Trigger`, `Clear` and every `ChipRemove` are natively
-  disabled (`data-disabled`); with `multiple`, the chip keys still move focus between chips
-  and Backspace / Delete remove nothing. Neither `valueChangeAction` nor
-  `onInputValueChange` is called, `allowCustomValue` commits nothing, and Escape has nothing
-  to revert. The hidden inputs are **not** disabled: the selection is submitted. `readOnly`
-  is in the state of the Root and of every part that has `disabled`, as `data-readonly`.
+  and `aria-expanded` stays `"false"`. **When the prop turns on** (or the Root mounts
+  read-only and open) the Root makes a close request with `"dismiss"`: an uncontrolled popup
+  closes, a controlled `open` parent decides; and text the user edited goes back to the
+  committed value's text (single: the selection's label, with `allowCustomValue` a committed
+  custom value's own text; `multiple`: the search is cleared) through `onInputValueChange`
+  with `"dismiss"`, as TextField and NumberField drop their draft. Focus leaving while
+  read-only reverts it again (a controlled parent may have refused). `Trigger`, `Clear` and
+  every `ChipRemove` are natively disabled (`data-disabled`). **Keys while read-only**: the
+  Input handles only ArrowLeft, ArrowRight, Home and End (the caret, and with `multiple` the
+  move into the chips) and the closing keys: Escape takes its usual path (a shown listbox is
+  the platform's close watcher, an open on its way is cancelled, conventions 15), and
+  Alt+ArrowUp with the listbox shown makes a close request and accepts nothing. Every other
+  key is the platform's, unhandled and not prevented: Enter submits a form, a printable key
+  does nothing (native `readonly`). On a chip the arrows, Home and End still move focus;
+  Backspace and Delete do nothing at all. Neither `valueChangeAction` nor
+  `onInputValueChange` is called for user interaction, and `allowCustomValue` commits
+  nothing. The hidden inputs are **not** disabled: the selection is submitted. `readOnly` is
+  in the state of the Root and of every part that has `disabled`, as `data-readonly`.
 
 ### 11.2 Server rendering and before hydration
 

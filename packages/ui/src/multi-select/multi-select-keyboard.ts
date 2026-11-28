@@ -13,8 +13,9 @@ import type { OptionRegistry, OrderedOption } from "../internal/use-option-regis
 const PAGE = 10;
 
 export interface MultiSelectKeyboardOptions {
-  /** The Root's `disabled` and `loop`. */
+  /** The Root's `disabled`, `readOnly` and `loop`. */
   readonly disabled: boolean;
+  readonly readOnly: boolean;
   readonly loop: boolean;
   readonly popover: Pick<PopoverRootValue, "popupRef" | "requestOpen" | "requestClose">;
   readonly options: Pick<OptionRegistry, "registry" | "orderedOptions">;
@@ -45,6 +46,7 @@ function typeaheadTexts(enabled: readonly OrderedOption[]): string[] {
  */
 export function createMultiSelectKeyDown({
   disabled,
+  readOnly,
   loop,
   popover,
   options,
@@ -103,6 +105,16 @@ export function createMultiSelectKeyDown({
     if (isComposingKey(event)) return;
     const isOpen = isPopoverOpen(popover.popupRef.current);
     const key = event.key;
+    // Read-only (conventions 3.6.1 rule 8): nothing opens, moves or toggles. A popup a controlled
+    // parent keeps open can still be closed: Alt+ArrowUp here, Escape by the platform (the auto
+    // popover's close watcher, as always). Every other key is left alone, not prevented.
+    if (readOnly) {
+      if (key === "ArrowUp" && event.altKey && isOpen) {
+        event.preventDefault();
+        popover.requestClose(event, "activate");
+      }
+      return;
+    }
     const buffer = typeahead.current;
     // Space belongs to a live typeahead buffer; otherwise it opens or toggles (B.8).
     const typeaheadKey =

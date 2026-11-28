@@ -231,7 +231,7 @@ export function MultiSelectPage() {
             type: "boolean",
             default: "false",
             description:
-              'The selection is shown, focusable and submitted, and cannot be changed, or the enclosing `Field.Root`\'s: the Trigger stays an enabled button with `aria-readonly="true"` and `data-readonly`, the popup never opens (a press, Enter, Space, the arrows and typeahead request nothing; `aria-expanded` stays `"false"`), and nothing dispatches. The hidden inputs are not disabled, and the validity element\'s `required` is not rendered: a read-only MultiSelect never blocks a submission. A listbox open when it turns on closes.',
+              'The selection is shown, focusable and submitted, and cannot be changed, or the enclosing `Field.Root`\'s: the Trigger stays an enabled button with `aria-readonly="true"` and `data-readonly`, the popup never opens (a press, Enter, Space, the arrows and typeahead request nothing; `aria-expanded` stays `"false"`), and nothing dispatches. The hidden inputs are not disabled, and the validity element\'s `required` is not rendered: a read-only MultiSelect never blocks a submission. When it turns on, an open listbox gets a close request (a controlled `open` parent decides); Escape and Alt+ArrowUp still close a listbox a parent keeps open.',
           },
           {
             name: "children",
@@ -532,7 +532,11 @@ export function MultiSelectPage() {
             "listbox open",
             "Focus moves on and the listbox closes. Tab never toggles the active option.",
           ],
-          ["Every key but Tab", "read-only", "Nothing: the listbox does not open."],
+          [
+            "Every key but Tab, Escape and Alt+ArrowUp",
+            "read-only",
+            "Nothing: the listbox does not open. Escape and Alt+ArrowUp close one a controlled parent keeps open.",
+          ],
         ]}
       />
       <p>

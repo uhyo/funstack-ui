@@ -293,7 +293,7 @@ import { Form } from "@funstack/ui/form";
             type: "boolean",
             default: "false",
             description:
-              "Makes the control read-only and marks every part `data-readonly`: the value is focusable and submitted, the user cannot change it, and it never blocks a submission (`validate` and a server error stay out of the control's validity; a server error is still shown). Every FUNSTACK form control takes it; `Field.Control` renders native `readonly`. See [Disabled or read-only](#disabled-or-read-only).",
+              "Makes the control read-only and marks every part `data-readonly`: the value is focusable and submitted, the user cannot change it, and it never blocks a submission (`validate` is not run and a server error stays out of the control's validity, though it is still shown). Every FUNSTACK form control takes it; `Field.Control` renders native `readonly`. See [Disabled or read-only](#disabled-or-read-only).",
           },
           {
             name: "validate",

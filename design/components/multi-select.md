@@ -645,8 +645,12 @@ No announcement is built in. Toggling changes `aria-selected` on the element
 - **`readOnly`** on the Root (its own prop or the Field's) (conventions 3.6.1): the Trigger stays an enabled,
   focusable button with `aria-readonly="true"` (owned; `combobox` has the state) and
   `data-readonly`, and **the popup never opens**: a press, Enter, Space, the arrows and
-  typeahead request nothing, `aria-expanded` stays `"false"`, and a popup open when the prop
-  turns on closes as it does for `disabled`. Nothing dispatches. The hidden inputs are not
+  typeahead request nothing, `aria-expanded` stays `"false"`. When the prop turns on (or the
+  Root mounts read-only and open) the Root makes a close request with `"dismiss"`: an
+  uncontrolled popup closes, a controlled `open` parent decides. A popup a parent keeps open
+  can still be closed: Escape is the platform's close watcher, and Alt+ArrowUp with the
+  listbox shown makes a close request; every other key is left alone, not prevented.
+  Nothing dispatches. The hidden inputs are not
   disabled, so the selection is submitted, and the validity element's `required` is not
   rendered (a read-only control is barred from validation). `readOnly` is in the state of
   the Root and of every part that has `disabled`.

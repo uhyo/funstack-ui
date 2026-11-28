@@ -365,7 +365,8 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
   // oxlint-disable-next-line react/refs
   // Read-only (conventions 3.6.1 rule 8): no key opens, toggles or types ahead.
   const keyDown = createMultiSelectKeyDown({
-    disabled: disabled || readOnly,
+    disabled,
+    readOnly,
     loop,
     popover,
     options: { registry, orderedOptions },

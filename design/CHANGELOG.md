@@ -16840,21 +16840,52 @@ CheckboxGroup, Select, Slider).
 - conventions 3.8's pointer to internal-hooks now says "rule 1 to rule 10"; field-form.md's
   "four attributes" of the Field parts are five (`data-readonly`).
 
-### Choices the design left open
+### Choices the design left open (accepted by the product owner as rules after review)
 
-- **The popup of a Combobox or MultiSelect when `readOnly` turns on** (rule 8: "closes as it
-  does when `disabled` turns on"). Turning `disabled` on does not close the listbox actively
-  (the input loses focus, and the leave handler returns early while disabled), so there was no
-  behaviour to copy. The Root makes a close request (`requestClose(undefined, "dismiss")`) in a
-  layout effect when `readOnly` turns on: an uncontrolled popup closes, a controlled `open`
-  parent decides through `openChangeAction(false)`. The architect may want the rule to say so.
+- **The popup of a Combobox or MultiSelect when `readOnly` turns on** (rule 8 said "closes as it
+  does when `disabled` turns on", which is no behaviour: turning `disabled` on does not close
+  the listbox actively). The Root makes a close request (`requestClose(undefined, "dismiss")`)
+  in a layout effect when `readOnly` turns on, or at mount read-only and open: an uncontrolled
+  popup closes, a controlled `open` parent decides through `openChangeAction(false)`. Now the
+  text of conventions 3.6.1 rule 8, combobox.md 11.1 and multi-select.md B.10.
 - **Combobox keys while read-only**: the Input handles only the caret / focus keys (ArrowLeft,
-  ArrowRight, Home, End: the move into the chips included); every other key returns unhandled
-  and unprevented, so Enter still submits a form. On a chip, Backspace and Delete do nothing at
-  all (no focus move either).
+  ArrowRight, Home, End: the move into the chips included) and the closing keys (below); every
+  other key returns unhandled and unprevented, so Enter still submits a form. On a chip,
+  Backspace and Delete do nothing at all (no focus move either). Now the text of combobox.md
+  11.1.
 - **Slider**: `readOnly` turned on during a pointer gesture stops the steps (`moveTo` returns)
   and the release commits where it stopped (rule 12); a native `change` with no gesture commits
   nothing.
+
+### Review fixes (reviewer's notes `memo/reviewer/readonly-203.md`)
+
+- **Combobox text revert.** Text the user edited before `readOnly` turned on stayed shown and,
+  under native `readonly`, could not be fixed. When `readOnly` turns on, and on leave while
+  read-only, the Root now writes back the committed value's text (single: the selection's
+  label; with `allowCustomValue` a committed custom value's own text) or clears the search
+  (`multiple`), with `"dismiss"`, as TextField and NumberField drop their draft. Rule 8 and
+  combobox.md 11.1 say so.
+- **The closing keys pass the read-only filter** (conventions 15): in Combobox, Escape takes its
+  usual path (a shown listbox is the platform's close watcher, an open on its way is cancelled)
+  and Alt+ArrowUp with the listbox shown makes a close request without accepting; in
+  MultiSelect, Alt+ArrowUp the same (Escape was already the platform's). A popup a controlled
+  parent keeps open can therefore still be closed from the keyboard.
+- **`validate` is not run while read-only** (it never reached the slot anyway): field-form.md
+  4.1 and the `Field.Root` docs say so.
+- **Rule 5's library-side bar is pinned** with a read-only Checkbox and Select inside a Field:
+  `validate` and a server error do not block `checkValidity()` or a submission, the server
+  error is still shown, the Form's server-error focus skips the field, and the first-invalid
+  focus skips a read-only control that is still invalid (a `Field.Control type="checkbox"
+  required readOnly`; jsdom bars a readonly `<select>`, unlike the browsers). Each of the four
+  `field-root.tsx` branches (no `validate`, no server message in the slot, the two focus
+  skips) was mutated and each mutation fails a row.
+- **Rows for rule 12** on Combobox and MultiSelect (`readOnly` turned on while a value action is
+  pending), and browser rows for Escape on a listbox a controlled parent keeps open.
+- **Design text**: conventions 3.6.1 rule 14 says `Field.Control`'s `readOnly` is owned inside a
+  Field (own or the Field's); field-form.md's `Field.Control` part row gains `readOnly` and
+  `data-readonly`.
+- jsdom note: a render that suspends inside a synchronous `act` never retries, so the rows that
+  turn `readOnly` on (whose close request renders the List) rerender inside an async `act`.
 
 ### jsdom and the cancelled click
 

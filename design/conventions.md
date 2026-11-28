@@ -1594,9 +1594,16 @@ The rules:
 8. **A popup the library opens does not open while read-only** (Combobox, MultiSelect): the
    control already shows the value, and a list in which nothing can be picked is noise. The
    requests are not made: the Input's and the Trigger's keys and presses do nothing, and
-   `aria-expanded` stays `"false"`. A popup that is open when `readOnly` turns on closes as it
-   does when `disabled` turns on. Select's picker is the browser's and has no open event
-   (4.1): it opens, and rule 6 makes it inert.
+   `aria-expanded` stays `"false"`. When `readOnly` turns on (or the control mounts read-only
+   with its popup open), the owner makes a close request (`"dismiss"`), so an uncontrolled popup
+   closes and a controlled `open` parent decides through `openChangeAction(false)` as for any
+   other request; and a Combobox's edited text goes back to the committed value's text (the
+   selection's label, a committed custom value's own text; with `multiple` the search is
+   cleared), reported with `"dismiss"`, as TextField and NumberField drop their draft, and again
+   when focus leaves while read-only. The closing keys stay live so that a popup a parent keeps
+   open can still be closed: Escape is the platform's close watcher (15), and Alt+ArrowUp makes
+   a close request without accepting anything. Select's picker is the browser's and has no
+   open event (4.1): it opens, and rule 6 makes it inert.
 9. **The mark for assistive technology** is the platform's where there is one, else
    `aria-readonly="true"` on the element whose role has the state (ARIA 1.2: `checkbox` and
    `switch`, `combobox`, `listbox`, `radiogroup`, `slider`, `spinbutton`, `textbox`; not
@@ -1631,9 +1638,11 @@ The rules:
 14. **Not form controls, so no `readOnly`**: Toggle, ToggleGroup, Tabs, Accordion, the menu
     items. They submit nothing, and the `button` role has no read-only state: "shown,
     reachable, not changeable" is `disabled` there, which a composite keeps focusable (3.6,
-    3.10). A `Field.Control` passes the native attribute through and renders the Field's; the
-    platform honours it on text-like inputs and a textarea only, and the part warns in
-    development on any other element (a `<select>`, a checkbox: use the library's component).
+    3.10). `Field.Control` renders native `readonly`: inside a Field the attribute is owned and
+    is its own `readOnly` or the Field's (an explicit `false` does not override the Field, as for
+    `disabled` and `required`); outside a Field it is ordinary pass-through. The platform
+    honours it on text-like inputs and a textarea only, and the part warns in development on any
+    other element (a `<select>`, a checkbox: use the library's component).
 
 ### 3.7 `keepMounted` on content regions
 

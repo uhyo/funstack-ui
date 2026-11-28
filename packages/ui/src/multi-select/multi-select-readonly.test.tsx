@@ -4,7 +4,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { flushTasks, setupUser } from "../__tests__/helpers.js";
+import { deferred, flushTasks, setupUser } from "../__tests__/helpers.js";
 import { Field } from "../field/index.js";
 import { MultiSelect } from "./index.js";
 import type { MultiSelectRootProps } from "./index.js";
@@ -134,6 +134,51 @@ describe("MultiSelect readOnly (conventions 3.6.1)", () => {
     );
     expect(trigger()).toHaveAttribute("aria-readonly", "true");
     expect(screen.getByTestId("field")).toHaveAttribute("data-readonly", "");
+  });
+
+  it("a popup a controlled parent keeps open: Alt+ArrowUp requests the close again; Escape is not consumed", async () => {
+    const openAction = vi.fn<Fn>();
+    await act(async () => {
+      render(<Box readOnly open openChangeAction={openAction} onOpenChange={() => {}} />);
+    });
+    await flushTasks(2);
+    // Mounted read-only and open: one close request already, which the parent refused.
+    expect(openAction.mock.calls.map(([n]) => n)).toEqual([false]);
+    expect(isOpen()).toBe(true);
+    openAction.mockClear();
+    trigger().focus();
+    expect(fireEvent.keyDown(trigger(), { key: "ArrowUp", altKey: true })).toBe(false);
+    await flushTasks(2);
+    expect(openAction.mock.calls.map(([n]) => n)).toEqual([false]);
+    // Escape is the platform's close watcher (multi-select.browser.test.tsx): not prevented.
+    expect(fireEvent.keyDown(trigger(), { key: "Escape" })).toBe(true);
+    // Moving and toggling keys stay inert.
+    expect(fireEvent.keyDown(trigger(), { key: "ArrowDown" })).toBe(true);
+    expect(fireEvent.keyDown(trigger(), { key: "Enter" })).toBe(true);
+    await flushTasks(2);
+    expect(openAction).toHaveBeenCalledTimes(1);
+  });
+
+  it("readOnly turned on while a toggle is pending cancels nothing (rule 12)", async () => {
+    const d = deferred();
+    const action = vi.fn<Fn>(() => d.promise);
+    const { rerender } = render(<Box valueChangeAction={action} />);
+    const user = setupUser();
+    await user.click(trigger());
+    await flushTasks(2);
+    await user.click(screen.getByRole("option", { name: "Olive" }));
+    await flushTasks(2);
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    await act(async () => rerender(<Box readOnly valueChangeAction={action} />));
+    await flushTasks(2);
+    expect(trigger()).toHaveAttribute("data-pending", "");
+    expect(formValues()).toEqual(["ham", "olive"]);
+    await act(async () => d.resolve());
+    await flushTasks(2);
+    expect(trigger()).not.toHaveAttribute("data-pending");
+    expect(formValues()).toEqual(["ham", "olive"]);
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(isOpen()).toBe(false);
   });
 
   it("disabled wins: the Trigger is disabled; state.readOnly stays the prop", () => {

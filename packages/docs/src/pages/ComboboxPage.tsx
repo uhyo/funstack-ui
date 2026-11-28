@@ -381,7 +381,7 @@ export function ComboboxPage() {
             type: "boolean",
             default: "false",
             description:
-              'The selection is shown, focusable and submitted, and cannot be changed, or the enclosing `Field.Root`\'s: the Input renders native `readonly` (its text stays selectable; no `aria-readonly` next to it), the popup never opens (the arrows, Alt+ArrowDown, a click on the Input and the Trigger request nothing; `aria-expanded` stays `"false"`), the Trigger, Clear and every `ChipRemove` are disabled, and nothing dispatches (`allowCustomValue` commits nothing). With `multiple` the chip keys still move focus and Backspace / Delete remove nothing. The hidden inputs are not disabled. A listbox open when it turns on closes.',
+              'The selection is shown, focusable and submitted, and cannot be changed, or the enclosing `Field.Root`\'s: the Input renders native `readonly` (its text stays selectable; no `aria-readonly` next to it), the popup never opens (the arrows, Alt+ArrowDown, a click on the Input and the Trigger request nothing; `aria-expanded` stays `"false"`), the Trigger, Clear and every `ChipRemove` are disabled, and nothing dispatches (`allowCustomValue` commits nothing). With `multiple` the chip keys still move focus and Backspace / Delete remove nothing. The hidden inputs are not disabled. When it turns on, an open listbox gets a close request (a controlled `open` parent decides) and edited text goes back to the text of the committed value (with `multiple` the search is cleared), reported to `onInputValueChange` with `"dismiss"`. Escape and Alt+ArrowUp still close a listbox a parent keeps open.',
           },
           {
             name: "children",
@@ -827,7 +827,7 @@ export function ComboboxPage() {
           [
             "Read-only",
             "anywhere",
-            "Only Tab, the caret keys and (with `multiple`) the move into the chips work: nothing opens, commits, reverts or removes.",
+            "Only Tab, the caret keys, (with `multiple`) the move into the chips, Escape and Alt+ArrowUp (which close a listbox a parent keeps open) work: nothing opens, commits or removes. Every other key is left to the browser (Enter submits a form).",
           ],
         ]}
       />

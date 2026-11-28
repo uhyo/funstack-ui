@@ -81,8 +81,8 @@ export interface FieldRootProps extends Omit<
   /**
    * Makes the control read-only (conventions 3.6.1) and marks every part `data-readonly`: the
    * value is focusable and submitted, the user cannot change it, and it never blocks a
-   * submission (the control is barred from validation: `validate` and a server error do not
-   * block, a server error is still shown).
+   * submission (the control is barred from validation: `validate` is not run and a server error
+   * does not block, though it is still shown).
    *
    * @defaultValue `false`
    */

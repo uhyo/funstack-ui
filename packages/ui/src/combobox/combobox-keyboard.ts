@@ -111,16 +111,23 @@ export function createComboboxKeyDown({
 
   return (event: KeyboardEvent): boolean => {
     if (disabled || event.ctrlKey || event.metaKey) return false;
-    // Read-only (conventions 3.6.1 rules 3, 8): no open, no pick, no commit, no chip removal;
-    // the keys that only move focus or the caret keep working (the inline-start arrow into the
-    // chips, Home / End). Not prevented: the input's own default (caret, submission) runs.
-    if (readOnly && !CARET_KEYS.has(event.key)) return false;
     // IME: the key belongs to the composition (Enter commits it, arrows pick a candidate).
     if (isComposingKey(event)) return false;
     // What the user sees, not what is intended: right after Escape the platform has hidden the
     // popup but its `toggle` (and the fact it reports) is still queued, and an open that
     // is still committing shows nothing yet. Enter must submit and arrows must open in both.
     const isOpen = isPopoverOpen(popover.popupRef.current);
+    // Read-only (conventions 3.6.1 rules 3, 8; combobox.md 11.1): no open, no pick, no commit,
+    // no chip removal. The keys that only move focus or the caret keep working (the inline-start
+    // arrow into the chips, Home / End); the closing keys too, so a popup a controlled parent
+    // keeps open can still be closed: Escape (conventions 15, below) and Alt+ArrowUp, which
+    // closes without accepting. Every other key is the platform's (not prevented: Enter submits).
+    if (readOnly && !CARET_KEYS.has(event.key) && event.key !== "Escape") {
+      if (event.key !== "ArrowUp" || !event.altKey || !isOpen) return false;
+      event.preventDefault();
+      popover.requestClose(event, "activate");
+      return true;
+    }
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
