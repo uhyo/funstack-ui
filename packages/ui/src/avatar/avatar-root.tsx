@@ -55,8 +55,9 @@ interface Report {
 const IDLE: Report = { status: "idle", source: null };
 
 /**
- * `Avatar.Root`: a `span` that names the avatar and holds the image's status. Owned keys: `role`,
- * `aria-label`, `aria-hidden`, `data-status`. The status is a mirror of a browser-owned fact,
+ * `Avatar.Root`: a `span` that names the avatar and holds the image's status. Owned keys
+ * (conventions 1.5): `role`, `aria-label`, `aria-labelledby` (always absent: the one naming route
+ * is `alt`, and a second name would win over it), `aria-hidden`, `data-status`. The status is a mirror of a browser-owned fact,
  * written urgently (conventions 2.6), never inside a transition.
  *
  * @see https://ui.funstack.work/components/avatar
@@ -105,6 +106,8 @@ export function AvatarRoot({ alt, className, style, children, render, ...rest }:
   const libraryProps: Partial<ComponentPropsWithRef<"span">> & DataAttributes = {
     role: named ? "img" : undefined,
     "aria-label": named ? alt : undefined,
+    // Owned and absent, so a `render` element's own cannot take the name from `alt`.
+    "aria-labelledby": undefined,
     "aria-hidden": named ? undefined : true,
     "data-status": report.status,
   };

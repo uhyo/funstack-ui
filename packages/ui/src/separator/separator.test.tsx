@@ -22,6 +22,7 @@ describe("Separator", () => {
       expect(separator).not.toHaveAttribute("role");
       expect(separator).toHaveAttribute("aria-orientation", "horizontal");
       expect(separator).toHaveAttribute("data-orientation", "horizontal");
+      expect(separator).not.toHaveAttribute("data-decorative");
       expect(separator).not.toHaveAttribute("tabindex");
     });
 
@@ -32,7 +33,7 @@ describe("Separator", () => {
       expect(separator).toHaveAttribute("data-orientation", "vertical");
     });
 
-    it('decorative renders role="none" and no aria-orientation; data-orientation stays', () => {
+    it('decorative renders role="none", data-decorative and no aria-orientation; data-orientation stays', () => {
       render(<Separator decorative orientation="vertical" data-testid="s" />);
       expect(screen.queryByRole("separator")).toBeNull();
       const line = screen.getByTestId("s");
@@ -40,6 +41,8 @@ describe("Separator", () => {
       expect(line).toHaveAttribute("role", "none");
       expect(line).not.toHaveAttribute("aria-orientation");
       expect(line).toHaveAttribute("data-orientation", "vertical");
+      // `state.decorative` has its attribute (conventions 4.1 rule 2).
+      expect(line).toHaveAttribute("data-decorative", "");
     });
 
     it("is not focusable", () => {
@@ -152,7 +155,9 @@ describe("Separator", () => {
       expect(html).toContain(
         '<hr class="sep-horizontal" aria-orientation="horizontal" data-orientation="horizontal"/>',
       );
-      expect(html).toContain('<hr class="d" role="none" data-orientation="vertical"/>');
+      expect(html).toContain(
+        '<hr class="d" role="none" data-orientation="vertical" data-decorative=""/>',
+      );
     });
 
     it("hydrates without a mismatch", async () => {

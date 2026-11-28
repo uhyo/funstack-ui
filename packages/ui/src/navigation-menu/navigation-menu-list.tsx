@@ -34,6 +34,9 @@ export interface NavigationMenuListProps extends Omit<
  * Safari drops under `list-style: none` (design 1); it is a default the consumer may override.
  * Directive-free, so a Server Component may render it.
  *
+ * Owned keys (conventions 1.5): none. `role="list"` is a default under the consumer's props, not
+ * owned.
+ *
  * @see https://ui.funstack.work/components/navigation-menu
  */
 export function NavigationMenuList({

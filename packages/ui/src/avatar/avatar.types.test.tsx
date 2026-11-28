@@ -23,6 +23,9 @@ describe("Avatar props", () => {
   it("the Root owns role and aria-label", () => {
     // @ts-expect-error the role follows from alt
     void (<Avatar.Root alt="J" role="presentation" />);
+    // @ts-expect-error the name is `alt` only (owned, always absent)
+    const labelledBy: AvatarRootProps = { alt: "J", "aria-labelledby": "x" };
+    void labelledBy;
   });
 
   it("the Image takes the img element's props but not alt", () => {

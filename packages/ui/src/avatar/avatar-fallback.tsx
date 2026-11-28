@@ -27,7 +27,9 @@ export interface AvatarFallbackProps extends Omit<
 /**
  * `Avatar.Fallback`: what shows when there is no picture. Rendered in every status but
  * `"loaded"`, from the server render on, **under** the image (the consumer's CSS stacks them):
- * nothing is swapped while the image loads, so there is no delay prop. Owned key: `data-status`.
+ * nothing is swapped while the image loads, so there is no delay prop.
+ *
+ * Owned keys (conventions 1.5): `data-status`.
  *
  * @see https://ui.funstack.work/components/avatar
  */

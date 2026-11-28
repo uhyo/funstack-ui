@@ -232,6 +232,76 @@ describe("NavigationMenu", () => {
     });
   });
 
+  // The Item is an owner that is not a Root and carries its state as attributes (conventions 4.1,
+  // 4.3), as Accordion.Item and Collapsible.Root do.
+  describe("Item attributes", () => {
+    it("library mode: data-open (optimistic) and data-pending on the li, with the state fields", async () => {
+      const d = deferred();
+      const states: { open: boolean; pending: boolean }[] = [];
+      render(
+        <NavigationMenu.Root aria-label="Main">
+          <NavigationMenu.List>
+            <NavigationMenu.Item
+              data-testid="item"
+              defaultOpen={false}
+              openChangeAction={() => d.promise}
+              className={(s) => {
+                states.push(s);
+                return undefined;
+              }}
+            >
+              <NavigationMenu.Trigger data-testid="trigger">Products</NavigationMenu.Trigger>
+              <NavigationMenu.Popup data-testid="popup">content</NavigationMenu.Popup>
+            </NavigationMenu.Item>
+          </NavigationMenu.List>
+        </NavigationMenu.Root>,
+      );
+      const item = screen.getByTestId("item");
+      expect(item).not.toHaveAttribute("data-open");
+      expect(item).not.toHaveAttribute("data-pending");
+
+      await setupUser().click(trigger());
+      expect(item).toHaveAttribute("data-open", "");
+      expect(item).toHaveAttribute("data-pending", "");
+      expect(states.at(-1)).toEqual({ open: true, pending: true });
+
+      await act(async () => {
+        d.resolve();
+      });
+      await flushTasks();
+      expect(item).toHaveAttribute("data-open", "");
+      expect(item).not.toHaveAttribute("data-pending");
+      expect(states.at(-1)).toEqual({ open: true, pending: false });
+    });
+
+    it("JS-free mode: neither attribute, state.open false while the panel is open", async () => {
+      const states: { open: boolean; pending: boolean }[] = [];
+      render(
+        <NavigationMenu.Root aria-label="Main">
+          <NavigationMenu.List>
+            <NavigationMenu.Item
+              data-testid="item"
+              className={(s) => {
+                states.push(s);
+                return undefined;
+              }}
+            >
+              <NavigationMenu.Trigger data-testid="trigger">Products</NavigationMenu.Trigger>
+              <NavigationMenu.Popup data-testid="popup">content</NavigationMenu.Popup>
+            </NavigationMenu.Item>
+          </NavigationMenu.List>
+        </NavigationMenu.Root>,
+      );
+      await setupUser().click(trigger());
+      await flushTasks();
+      expect(isOpen()).toBe(true);
+      const item = screen.getByTestId("item");
+      expect(item).not.toHaveAttribute("data-open");
+      expect(item).not.toHaveAttribute("data-pending");
+      expect(states.at(-1)).toEqual({ open: false, pending: false });
+    });
+  });
+
   describe("JS-free mode", () => {
     it("the Trigger is the browser's: no click handler, data-open kept from the DOM", async () => {
       const user = setupUser();

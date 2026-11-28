@@ -2,6 +2,7 @@
 // render it and it runs once, on the server (design/components/separator.md 7). It must not
 // import from any "use client" module (checked by src/__tests__/directives.test.ts).
 import type { ComponentPropsWithRef, CSSProperties } from "react";
+import { dataAttr } from "../internal/data-attr.js";
 import { mergeRenderRef, renderElement } from "../internal/render-element.js";
 import type { DataAttributes } from "../internal/render-element.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
@@ -13,7 +14,7 @@ export type SeparatorOrientation = "horizontal" | "vertical";
 export interface SeparatorState {
   /** The `orientation` prop. */
   readonly orientation: SeparatorOrientation;
-  /** The `decorative` prop. */
+  /** The `decorative` prop (`data-decorative`). */
   readonly decorative: boolean;
 }
 
@@ -55,9 +56,9 @@ export interface SeparatorProps extends Omit<
  * `data-orientation`, or with `decorative` a `role="none"` line with no `aria-orientation`. Not
  * focusable. Directive-free, so a Server Component may render it.
  *
- * Owned keys (conventions 1.2): `aria-orientation`, `data-orientation`, and `role` while
- * `decorative` (`"none"`, which wins over a `render` element's own). While not decorative no
- * `role` is rendered, so a `render` element keeps the one it carries.
+ * Owned keys (conventions 1.5): `aria-orientation`, `data-orientation`, `data-decorative`, and
+ * `role` while `decorative` (`"none"`, which wins over a `render` element's own). While not
+ * decorative no `role` is rendered, so a `render` element keeps the one it carries.
  *
  * @see https://ui.funstack.work/components/separator
  */
@@ -71,9 +72,14 @@ export function Separator({
   ...rest
 }: SeparatorProps) {
   const state: SeparatorState = { orientation, decorative };
-  const libraryProps: Partial<ComponentPropsWithRef<"hr">> & DataAttributes = decorative
-    ? { role: "none", "aria-orientation": undefined, "data-orientation": orientation }
-    : { "aria-orientation": orientation, "data-orientation": orientation };
+  const libraryProps: Partial<ComponentPropsWithRef<"hr">> & DataAttributes = {
+    ...(decorative
+      ? { role: "none", "aria-orientation": undefined }
+      : { "aria-orientation": orientation }),
+    "data-orientation": orientation,
+    // Every boolean of the state is also an attribute (conventions 4.1 rule 2).
+    "data-decorative": dataAttr(decorative),
+  };
 
   return renderElement<ComponentPropsWithRef<"hr">, SeparatorState>({
     defaultElement: "hr",

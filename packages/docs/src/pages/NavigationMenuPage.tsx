@@ -274,7 +274,9 @@ export function NavigationMenuPage() {
         state={
           '`NavigationMenuItemState` is `{ open, pending }`; `open` is optimistic, both are `false` in JS-free mode. `NavigationMenuOpenChangeDetails` is `{ reason }` plus the virtual `event`: `"activate"` for the Trigger and a followed Link, `"dismiss"` for everything else, `"platform"` for a panel found open at hydration.'
         }
-        owned={"nothing rendered: no attributes on the `<li>`."}
+        owned={
+          "`data-open` (optimistic) and `data-pending` on the `<li>`, in library mode only; JS-free mode renders neither (style the open Item with `:has(:popover-open)`)."
+        }
         note={
           "The focus-leave listener is attached through the `ref`, so `onBlur` stays yours. Every `li` prop passes through."
         }
@@ -397,6 +399,8 @@ export function NavigationMenuPage() {
             "Library mode: optimistic open state. JS-free mode: kept from the panel's `toggle` after hydration (use `:has(+ :popover-open)` before it).",
           ],
           ["`data-pending`", "Trigger", "Library mode: an open or a close is in flight."],
+          ["`data-open`", "Item", "Library mode: optimistic open state of its panel."],
+          ["`data-pending`", "Item", "Library mode: an open or a close is in flight."],
           ["`data-disabled`", "Trigger", "The `disabled` prop."],
           [
             "`data-side`, `data-align`",
