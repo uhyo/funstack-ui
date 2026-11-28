@@ -786,7 +786,7 @@ Chromium only).
 - A range always has a value; nothing is `required` and `validity.valid` is always `true`.
 - `disabled` on Root disables every input: not submitted, not focusable. Never disabled while
   pending (conventions 3.6).
-- **`readOnly`** on Root (conventions 3.6.1; **proposed**, #203; a boolean prop of
+- **`readOnly`** on Root (conventions 3.6.1; accepted, not implemented yet (#203); a boolean prop of
   `SliderRootProps`, and `readOnly` in every part's state): every input stays focusable and is submitted, and nothing steps or commits.
   The `pointerdown` handlers of Track and Thumb do nothing, as when disabled; the Thumb's
   `keydown` cancels the keys that move a range (the four arrows, Home, End, Page Up, Page

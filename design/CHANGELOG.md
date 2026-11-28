@@ -16559,13 +16559,25 @@ Escape while a Combobox open is on its way; the revert target's wording"):
   close request (`"activate"`), the text stays and the key is consumed; the revert applies
   while the listbox is closed and no open is on its way.
 
-## 2026-11-28, #203, #204: `readOnly` on every form value control; a subpath for the shared types (design, proposed)
+## 2026-11-28, #203, #204: `readOnly` on every form value control; a subpath for the shared types (design, accepted)
 
 Architect. Two follow-ups of the consistency alignment (the entry "2026-11-28, #199:
 consistency alignment, one standard per topic (design)": user decision 6 left a real
 `readOnly` as a feature of its own, V-M5; the product-owner default deferred the types subpath,
-X-L1). **Proposed**: design documents only, nothing is implemented, and four choices below are
-the user's. The documents are written as if the recommended option of each were taken.
+X-L1). **Accepted by the user on 2026-11-28**: all four choices below were decided as
+recommended (option A of each), and the product-owner defaults stand. Design documents only:
+nothing is implemented yet. The new rules carry the inline marker "accepted, not implemented
+yet (#203)" / "(#204)", which the developers remove as each lands.
+
+### The user's decisions (2026-11-28)
+
+1. `readOnly` on every component that joins a Field, and on `Field.Root` (choice 1, A).
+2. A read-only `Select` renders its unselected options natively `disabled` (choice 2, A).
+3. The popup of a read-only Combobox or MultiSelect does not open (choice 3, A).
+4. The shared types are imported from `@funstack/ui/types`; the root entry keeps exporting
+   them and the component subpaths do not (choice 4, A).
+
+The options as they were put, kept for the reasoning:
 
 Changed: conventions 1.5 (owned keys), 2.3 item 7, 3.6 (the `readOnly` paragraph became a
 pointer), **3.6.1 (new)**, 4.1 (rules 2 and 4, the `disabled` and `readOnly` rows), 7.2, 9.2,
@@ -16613,7 +16625,7 @@ Slider; no popup on Combobox and MultiSelect. `data-readonly` / `state.readOnly`
 the text controls included, replacing the `:read-only` rule of number-field.md decision 15
 (which cannot work outside a text input).
 
-### Choices for the user (recommended option first)
+### The choices as put to the user (recommended option first; A taken in each)
 
 1. **Which controls take `readOnly` (#203).**
    - A (recommended, written): every component that joins a Field: adds Checkbox, Switch,
@@ -16678,7 +16690,43 @@ types (the prop is the Root's, or re-declared as the library's on Checkbox and S
 observable changes for existing code: the text controls gain `data-readonly`, and the
 reconciliation default above.
 
-### Checklist, #203 (after the user's choices)
+### Checklist, #203
+
+**Run first: the cross-engine probes.** Rules 6 and 13 of conventions 3.6.1 rest on browser
+behaviour that was reasoned from the specifications and the engines' sources, not observed.
+Before any component code, write these as browser rows (Chromium, Firefox, WebKit) against a
+minimal prototype, and report a failing one to the architect: the rule changes, not the test.
+
+- [ ] **P1, checkbox.** A controlled `<input type="checkbox">` whose React `onChange` calls
+  `event.preventDefault()` and updates nothing: after a mouse click, Space, and a click on
+  its `<label>`, `checked` is unchanged and neither `input` nor `change` reached a listener
+  on the form. Same for `role="switch"`.
+- [ ] **P2, radio click.** The same on an unchecked radio of a group: the previously checked
+  radio is checked again, no `input` / `change`.
+- [ ] **P3, radio arrows.** With P2's handler on every radio, ArrowDown / ArrowRight /
+  ArrowUp / ArrowLeft move focus to the neighbour and check nothing; the checked radio is
+  still the group's Tab stop afterwards (Tab out and back). WebKit: the stop-at-end
+  behaviour is unchanged. If an engine checks without a cancelable click, the fallback is a
+  `keydown` handler and `onKeyDown` becomes an owned key of `RadioGroup.Item` (1.5).
+- [ ] **P4, select.** A `<select value>` whose other options are `disabled`: a click in the
+  picker (customizable in Chromium, native elsewhere), ArrowDown / ArrowUp, Home / End and
+  typeahead on the closed select change nothing and fire no `change`; the select is in the
+  Tab order; `new FormData(form)` has its value; after `form.reset()` and the re-render that
+  follows, the newly selected option is enabled and posted.
+- [ ] **P5, range keys.** `preventDefault()` on `keydown` of the arrows, Home, End, Page Up
+  and Page Down on `<input type="range">` leaves `value` unchanged and fires no `input`.
+- [ ] **P6, range write-back.** A native `input` on a controlled range whose `onChange`
+  updates nothing (simulate the assistive-technology path by setting `value` and dispatching
+  `input`): the element shows the old value when the event ends.
+- [ ] **P7, before hydration.** A read-only checkbox and a read-only range changed before
+  hydration are back at the rendered value after mount, with no dispatch; a read-only
+  `<select>` and text input could not be changed at all.
+- [ ] **P8, validation.** A `required` control rendered without the native attribute while
+  read-only does not block `requestSubmit()`; `readonly` on a required empty text input does
+  not either (the platform's own bar, for reference).
+
+Then the implementation:
+
 
 - [ ] `internal/form/use-field-control.ts`, `field-context.ts`: `readOnly` option, "own or the
   Field's" in `resolveFieldDefaults`, `readOnly` in the registration and in `FieldState`.
@@ -16714,12 +16762,8 @@ reconciliation default above.
   input path; `data-readonly` / `state.readOnly`; the ARIA mark; not `valueMissing` with
   `required`; form reset still follows; `readOnly` turned on while pending; own prop and
   `Field.Root readOnly`.
-- [ ] Browser rows, all three engines, **to verify before the rules are final**:
-  a cancelled click from React's `onChange` leaves a checkbox and a radio unchanged with no
-  `input` / `change`; a radio group's arrows under it move focus and check nothing (WebKit's
-  stop-at-end included); a select whose other options are disabled cannot be changed by
-  click, closed-select arrows or typeahead, and posts its value; a range input's keys with
-  `keydown` cancelled; a click before hydration on a read-only checkbox is undone at mount.
+- [ ] Browser rows per component, all three engines: P1 to P8 above, kept as the
+  components' own rows once they pass on the prototype.
 - [ ] Screen-reader pass (NVDA, JAWS, VoiceOver): what is announced for `aria-readonly` on a
   checkbox, a switch, a `radiogroup` fieldset, a `<select>` and a range input. Support for the
   state outside text fields is uneven; the behaviour does not depend on it.
@@ -16727,7 +16771,7 @@ reconciliation default above.
   table of each page; a "disabled or read-only" paragraph on the Field / Form page; the
   skill (`skills/funstack-ui-knowledge`).
 
-### Checklist, #204 (option A)
+### Checklist, #204
 
 - [ ] `packages/ui/src/types/index.ts`: `export type { Action, ActionDetails, ChangeAction,
   ChangeReason, RenderProp, StateValue, UrgentChangeHandler, UrgentHandler, WhilePending }

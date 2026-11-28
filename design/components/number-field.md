@@ -1057,7 +1057,7 @@ who needs negatives on iPhone passes `inputMode="text"` (a default, 3.2). Sectio
 | --- | --- | --- | --- | --- | --- |
 | `data-pending` | yes | yes | yes | the button the latest step or commit came from | A step or commit is in flight (including the Suspense wait of a step's render). |
 | `data-disabled` | yes | yes | yes | yes (prop, inherited, `readOnly`, or at the bound) | Also native `disabled` on both inputs and the buttons; `:disabled` sees `<fieldset disabled>` too. |
-| `data-readonly` | yes | yes | yes | yes | The Root's `readOnly` or the Field's (conventions 3.6.1 rule 10; **proposed**, #203). The buttons are also `data-disabled` then. |
+| `data-readonly` | yes | yes | yes | yes | The Root's `readOnly` or the Field's (conventions 3.6.1 rule 10; accepted, not implemented yet (#203)). The buttons are also `data-disabled` then. |
 | `data-invalid` | yes | | yes | | From a Field (section 7); never outside one. |
 
 Platform pseudo-classes documented next to them: `:disabled`, `:user-invalid` and

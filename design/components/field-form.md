@@ -625,7 +625,7 @@ export interface FieldRootProps
 Owned keys: `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending`.
 `Field.Root` has no `id` of its own; the ids live on the parts.
 
-**`Field.Root readOnly`** (conventions 3.6.1; **proposed**, #203) reaches the control the way
+**`Field.Root readOnly`** (conventions 3.6.1; accepted, not implemented yet (#203)) reaches the control the way
 `disabled` and `required` do: `useFieldControl` takes the control's own `readOnly` and returns
 "own or the Field's", and the registration carries it, so every Field part shows
 `data-readonly` whichever of the two set it. While the control is read-only the Field treats

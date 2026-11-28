@@ -429,7 +429,7 @@ every other value control (conventions 5.1): the flip is CSS on `:checked` / `[d
 and the types serve a consumer's own `<ViewTransition>` around content that changes when the
 action settles.
 
-**`readOnly`** (conventions 3.6.1; **proposed**, #203) is the library's prop, not the HTML attribute, which does not apply to a
+**`readOnly`** (conventions 3.6.1; accepted, not implemented yet (#203)) is the library's prop, not the HTML attribute, which does not apply to a
 checkbox: the input stays focusable and submitted, the click that would toggle it is cancelled
 from the part's own `onChange` (mouse, Space and a label alike; no `input` or `change` fires,
 nothing dispatches), and it carries `aria-readonly="true"` (owned) and `data-readonly`. Native

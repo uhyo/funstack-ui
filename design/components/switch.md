@@ -329,7 +329,7 @@ Omissions from the native prop set:
 | `checked`, `defaultChecked` | Re-declared as the controllable triple. The DOM `checked` is `optimistic`; the DOM `defaultChecked` is managed by the hook (section 7). |
 | `onChange` | The library's own handler (conventions 1.5). React drives it from the native `click`, so `details.event` is a `PointerEvent`/`MouseEvent` for mouse, keyboard and label activation alike. |
 | `aria-checked` | Forbidden on native inputs (ARIA in HTML); owned with value `undefined` so a `render` element cannot add it. `Omit` cannot exclude a hyphenated prop at the type level (Toggle row 3); the runtime removal is the guarantee. |
-| `readOnly`, `aria-readonly` | Re-declared as the library's `readOnly?: boolean` (conventions 3.6.1; **proposed**, #203): HTML's `readonly` does not apply to a checkbox input, so the part refuses the change itself (the click is cancelled from its `onChange`; focusable, submitted, no dispatch) and renders `aria-readonly="true"` (owned) and `data-readonly`, never the HTML attribute. `SwitchState.readOnly` is the prop or the Field's. As Checkbox (`design/components/checkbox.md` 8). |
+| `readOnly`, `aria-readonly` | Re-declared as the library's `readOnly?: boolean` (conventions 3.6.1; accepted, not implemented yet (#203)): HTML's `readonly` does not apply to a checkbox input, so the part refuses the change itself (the click is cancelled from its `onChange`; focusable, submitted, no dispatch) and renders `aria-readonly="true"` (owned) and `data-readonly`, never the HTML attribute. `SwitchState.readOnly` is the prop or the Field's. As Checkbox (`design/components/checkbox.md` 8). |
 | `children` | Void element. |
 | `className`, `style` | Re-declared with the function-of-state form. |
 

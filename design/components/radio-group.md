@@ -700,7 +700,7 @@ What animates when, applying conventions 5.1 and the Tabs 10.1 table:
   attributes are all optimistic (conventions 5.1, the one rule for Toggle, Checkbox, Switch,
   the group items, Select and Slider). On a void input a boundary could only animate
   `data-pending` leaving and the rollback write.
-- **`readOnly` is the Root's** (conventions 3.6.1; **proposed**, #203): `RadioGroupRootProps.readOnly?: boolean`, with
+- **`readOnly` is the Root's** (conventions 3.6.1; accepted, not implemented yet (#203)): `RadioGroupRootProps.readOnly?: boolean`, with
   `readOnly` in `RadioGroupRootState` and `RadioGroupItemState`. The fieldset renders
   `aria-readonly="true"` (the `radiogroup` role has the state; owned) and `data-readonly`, and
   every Item `data-readonly`. Each Item's `onChange` cancels its click and dispatches nothing,

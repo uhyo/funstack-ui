@@ -147,7 +147,7 @@ Every part renders exactly one element and none renders a `<ViewTransition>` (de
 | validity (`required`, `:user-invalid`) | DOM | | Browser-owned; not mirrored. | n/a |
 | `name`, `form`, `required`, `disabled`, `autoComplete` | `Root` | config | n/a | Plain native props. |
 
-**`readOnly`** (conventions 3.6.1; **proposed**, #203) is `SelectRootProps.readOnly?: boolean` (`state.readOnly` on the Root, the
+**`readOnly`** (conventions 3.6.1; accepted, not implemented yet (#203)) is `SelectRootProps.readOnly?: boolean` (`state.readOnly` on the Root, the
 Trigger and every Option). HTML has no read-only select and `change` cannot be cancelled, so
 the platform is made to refuse the pick: **every `Select.Option` except the one with the
 optimistic value renders native `disabled`** (with `data-disabled` and `state.disabled`). The
