@@ -346,7 +346,7 @@ export interface TabsTabProps
 **Owned keys are omitted from the props type, in every part.** A key the part writes itself in
 at least one mode (1.2: its `role`, the ARIA state it computes such as `aria-selected`,
 `aria-pressed`, `aria-expanded`, `aria-orientation`, `aria-disabled` on a part that takes
-`disabled`, `type`, a roving `tabIndex`, the invoker attributes `commandfor` / `command` /
+`disabled`, `aria-readonly` on a part that carries the read-only mark (3.6.1 rule 9), `type`, a roving `tabIndex`, the invoker attributes `commandfor` / `command` /
 `popoverTarget` / `popoverTargetAction` of a Trigger or Close part, `popover` and `open` on a
 Popup, `name` and `open` on a `<details>`, `focusgroup` on a container that takes
 `experimental_focusGroup` and `focusgroupstart` on its items) is removed from the type **in
@@ -662,7 +662,8 @@ What a consumer can rely on:
    action opens the confirmation (sync prefix, or urgently outside the action scope) and
    returns; the confirmation's own Close action does the work" (`design/components/dialog.md`
    12.5). The same applies to any "ask then continue" flow: split it into two actions.
-7. **Disabled parts never dispatch for user interaction.** A disabled Tab does not call
+7. **Disabled parts never dispatch for user interaction, and neither does a read-only control**
+   (3.6.1). A disabled Tab does not call
    `valueChangeAction`. Platform dispatches that the *form owner* causes are not blocked by
    `disabled`: `form.reset()` resets a `<fieldset disabled>` group too, and the group follows it
    with `reason: "platform"` (section 3.8), because the form's author acted on the whole form,
@@ -1463,14 +1464,8 @@ is disabled, by its own prop or by `Field.Root disabled`, as a hidden native inp
 (NumberField). A disabled hidden input is still form-associated: it still receives `reset`
 and still registers with the Field.
 
-**`readOnly` exists only where it is honoured.** The text controls honour it (TextField,
-NumberField, OTPField: focusable, no dispatch for user input, still submitted,
-`state.readOnly`). A part that renders a native input but would not honour the attribute omits
-`readOnly` from its props type, so that passing it is a type error and not a silent no-op:
-`Combobox.Input` (the attribute would block typing while the options, the Trigger and `Clear`
-still changed the value), and the checkable inputs `Checkbox`, `Switch`, `RadioGroup.Item`,
-`CheckboxGroup.Item` and `CheckboxGroup.Parent` (HTML's `readonly` does not apply to them). A
-library `readOnly` for those components is a feature of its own, not designed.
+**`readOnly` is the other way to lock a value**: the control stays focusable and is still
+submitted. It has its own section, 3.6.1.
 
 However a part is disabled, natively or through `aria-disabled`, it emits `data-disabled` and
 never dispatches for user interaction (platform dispatches from the form owner are the
@@ -1527,6 +1522,121 @@ cannot hold validity at all (MultiSelect's `button[role=combobox]`) has no mirro
 element is a hidden one-option `<select>` with a computed `required`, whose `invalid` is
 cancelled; a submission attempt focuses the surface through the Field's first-invalid
 collector, and the message is `Field.Error`'s (`design/components/multi-select.md` B.10).
+
+#### 3.6.1 `readOnly`
+
+Status: **proposed** (#203). The text controls implement it today; the rest of this section
+is not in the code yet.
+
+**Every form value control takes `readOnly`, and nothing else does.** A form value control is
+a component that joins a Field (`design/components/field-form.md` 7.2): TextField,
+NumberField, OTPField, Checkbox, Switch, RadioGroup, CheckboxGroup, Select, Combobox,
+MultiSelect and Slider. The prop has one meaning everywhere: **the user can reach, read and
+submit the value, and cannot change it.**
+
+| | `disabled` | `readOnly` |
+| --- | --- | --- |
+| Focusable, in the Tab order | no (or `aria-disabled` in a composite) | **yes** |
+| Submitted with the form | no | **yes** |
+| The user can change the value | no | no |
+| Dispatches for user interaction | never | never |
+| Constraint validation | barred | barred |
+| Follows a form reset | yes | yes |
+| Announced as | unavailable | read-only, where the role has the state |
+
+The rules:
+
+1. **The prop is on the value owner**: the Root, or the single element (`TextField`,
+   `Checkbox`, `Switch`), and on `Field.Root`, which hands it to its control as it hands
+   `disabled` and `required` (the control's `readOnly` is its own or the Field's). **Never on
+   an item or an inner part**: `RadioGroup.Item`, `CheckboxGroup.Item` and `Parent`,
+   `Select.Option`, `Slider.Thumb`, `Combobox.Input`, `NumberField.Input` and `OTPField.Input`
+   keep `readOnly` out of their props types. Read-only is a fact about the value, and the
+   owner holds the value; a single choice that cannot be picked is `disabled`. There is no
+   inherited `readOnly`: `<fieldset>` has no such attribute, so a group of read-only Fields is
+   the prop on each.
+2. **Nothing is dispatched for user interaction**: no action, no urgent handler
+   (`onInputValueChange`), no optimistic update, no pending state. `readOnly` is read at the
+   event, as `disabled` is. What still changes the value is what changes a native read-only
+   input: the parent's controlled prop, and a platform dispatch the form owner causes (a form
+   reset, 2.3 item 7).
+3. **The control stays in the Tab order and keeps every key that does not change the value**:
+   Tab, the arrows that move focus between the radios of a group or the chips of a Combobox,
+   the caret, selection and copy in a text input. `readOnly` never renders native `disabled`
+   or `aria-disabled` on the control itself.
+4. **It is submitted.** Native inputs keep their `name` and value; the hidden inputs of
+   Combobox and MultiSelect are not `disabled`.
+5. **It is barred from constraint validation**, as HTML bars a read-only text input: a value
+   the user cannot change must not block a submission. On the text controls the platform does
+   it. On the others the library does: the part does not render its native `required`
+   (computed ones included: CheckboxGroup's and MultiSelect's "at least one") while read-only,
+   and inside a Field the custom-validity slot stays empty, so `validate` and a server error
+   never block. `aria-required`, `data-required` and `state.required` stay the prop's, and a
+   server error is still **shown** (`data-invalid`, `Field.Error`): the server said it.
+6. **A change is refused at its source, by the platform's own means where it has one.** No
+   `input` or `change` event fires for a change that did not happen:
+
+   | Control | How the change is refused |
+   | --- | --- |
+   | TextField, `NumberField.Input`, `OTPField.Input`, `Combobox.Input` | native `readonly` |
+   | Checkbox, Switch, `CheckboxGroup.Item` / `Parent`, `RadioGroup.Item` | the part's `onChange`, which React runs inside the native `click`, cancels that click (`preventDefault()`) and dispatches nothing: the browser's cancelled-activation steps put `checked` back and fire neither `input` nor `change`. One path for the mouse, Space, a label and a radio group's arrows, which move focus and check nothing. No new `on*` key is owned (1.5) |
+   | Select | every `Select.Option` other than the selected one renders native `disabled`: the picker opens and shows the list, and no pick, arrow or typeahead can leave the current option, in every engine and before hydration. `change` is not cancelable, so there is nothing to cancel |
+   | Slider | the pointer handlers of Track and Thumb do nothing, as when disabled; the Thumb's `keydown` cancels the keys that move a range (the arrows, Home, End, Page Up, Page Down) |
+   | Combobox, MultiSelect | the popup does not open (rule 8), and the parts of rule 7 are disabled |
+
+   **The fallback** for a native change that arrives with no cancelable event before it (an
+   assistive technology's increment action on a range, autofill): the part's change handler
+   steps and dispatches nothing, and the controlled value is written back to the element
+   before the event ends. The `input` / `change` this leaves behind is not an edit for an
+   enclosing Field.
+7. **A part whose only job is to change the value is disabled while its owner is read-only**,
+   natively, with `data-disabled` and `state.disabled`: NumberField's `Increment` and
+   `Decrement`, `Combobox.Trigger`, `Combobox.Clear`, `Combobox.ChipRemove`, and the
+   unselected `Select.Option`s of rule 6. These are not the control: focus and the value stay
+   where they were.
+8. **A popup the library opens does not open while read-only** (Combobox, MultiSelect): the
+   control already shows the value, and a list in which nothing can be picked is noise. The
+   requests are not made: the Input's and the Trigger's keys and presses do nothing, and
+   `aria-expanded` stays `"false"`. A popup that is open when `readOnly` turns on closes as it
+   does when `disabled` turns on. Select's picker is the browser's and has no open event
+   (4.1): it opens, and rule 6 makes it inert.
+9. **The mark for assistive technology** is the platform's where there is one, else
+   `aria-readonly="true"` on the element whose role has the state (ARIA 1.2: `checkbox` and
+   `switch`, `combobox`, `listbox`, `radiogroup`, `slider`, `spinbutton`, `textbox`; not
+   `radio`, `option`, `button` or `group`):
+
+   | Element | Mark |
+   | --- | --- |
+   | A text input or textarea (TextField, `NumberField.Input`, `OTPField.Input`, `Combobox.Input`) | native `readonly` only (ARIA in HTML: no `aria-readonly` next to it) |
+   | `input[type=checkbox]` (Checkbox, Switch, `CheckboxGroup.Item` and `Parent`) | `aria-readonly="true"`; never the HTML attribute, which does not apply to the type |
+   | RadioGroup | `aria-readonly="true"` on the Root (`radiogroup`); nothing on the radios |
+   | CheckboxGroup | on each Item and Parent (the Root is a `group`, which has no such state) |
+   | `<select>` (`Select.Root`) | `aria-readonly="true"` |
+   | `input[type=range]` (each `Slider.Thumb`) | `aria-readonly="true"` |
+   | `button[role=combobox]` (`MultiSelect.Trigger`) | `aria-readonly="true"` |
+
+   `aria-readonly` is an owned key of those parts (1.5): absent while not read-only.
+10. **Exposure**: `state.readOnly` and `data-readonly` (4.1), on the owner's element and on
+    every part that carries the owner's `data-disabled`, `Label` parts included, and on every
+    Field part under `Field.Root readOnly`. The attribute is the hook on every control, the
+    text controls too: `:read-only` matches every element that is not editable (a checkbox, a
+    `<select>`, a `div`), so it tells nothing outside a text input.
+11. **`disabled` wins.** A control that is both is disabled: not focusable, not submitted.
+    `state.readOnly` and `data-readonly` stay the prop's.
+12. **Pending is untouched.** Turning `readOnly` on while an action is in flight cancels
+    nothing: the action settles, the optimistic value stays or rolls back, `data-pending`
+    leaves as usual; only new interaction is refused. A Slider gesture under way takes no
+    further step and commits where it stopped (`design/components/slider.md` 4.1).
+13. **Before hydration** the platform's means already hold (native `readonly`, the disabled
+    options of a Select). A checkable input or a range can still be changed there, so **mount
+    reconciliation of a read-only control writes the rendered value back to the DOM and
+    dispatches nothing** (`design/internal-hooks.md` 3.8 rule 10), for every control.
+14. **Not form controls, so no `readOnly`**: Toggle, ToggleGroup, Tabs, Accordion, the menu
+    items. They submit nothing, and the `button` role has no read-only state: "shown,
+    reachable, not changeable" is `disabled` there, which a composite keeps focusable (3.6,
+    3.10). A `Field.Control` passes the native attribute through and renders the Field's; the
+    platform honours it on text-like inputs and a textarea only, and the part warns in
+    development on any other element (a `<select>`, a checkbox: use the library's component).
 
 ### 3.7 `keepMounted` on content regions
 
@@ -1619,10 +1729,11 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
    required for: a member that is neither (`value`, `values`, `char`, `query`, `toast`); a part
    that renders no element (a Root without DOM shows its state through `children(state)` only);
    and a fact the component's **native control** already carries, which a stylesheet reaches
-   with a pseudo-class on the control or `:has()` from a wrapper: `readOnly` (`:read-only`) and
-   `required` (`:required`) have no attribute on a component whose control is a native input
-   or a group of them. A control with no such element emits `data-required`
-   (`MultiSelect.Trigger`), as the Field parts do.
+   with a pseudo-class on the control or `:has()` from a wrapper: `required` (`:required`) has
+   no attribute on a component whose control is a native input or a group of them. A control
+   with no such element emits `data-required` (`MultiSelect.Trigger`), as the Field parts do.
+   `readOnly` is not such a fact: `:read-only` matches every element that is not editable, so
+   every control emits `data-readonly`, the text controls included (3.6.1 rule 10).
 3. **In JS-free mode `state.open` is `false`.** Where the browser owns an open state and React
    holds no value for it (Accordion and Collapsible without their state props; the JS-free
    mode of Popover, Dialog, AlertDialog, Drawer and `NavigationMenu.Item`, 3.9.11), every
@@ -1634,10 +1745,10 @@ function props and `render`, and under that name in docs. No `is` prefix (`press
    both modes, the state field is not, and each such Trigger's docs row says so. A `<summary>`
    Trigger (Accordion, Collapsible) renders no `data-open` in JS-free mode and needs none: it
    is a child of the `<details>` the browser opens, so `details[open] > summary` selects it.
-4. **A `Label` part carries its owner's `data-disabled`, and `data-pending` where the owner has
-   one**, with the matching state fields, so a label can be dimmed or show progress without a
+4. **A `Label` part carries its owner's `data-disabled` and `data-readonly`, and `data-pending`
+   where the owner has one**, with the matching state fields, so a label can be dimmed or show progress without a
    wrapper selector. A `<legend>` Label (RadioGroup, CheckboxGroup) is the exception: it sits
-   inside the `<fieldset>` that carries both, and CSS reaches it from there.
+   inside the `<fieldset>` that carries them, and CSS reaches it from there.
 5. **`state.invalid` and `state.required` exist wherever the fact does.** Every control part
    that renders `data-invalid` inside a `Field.Root` has `state.invalid` (`false` outside a
    Field). Every part that takes or inherits `required` has `state.required` (its own prop or
@@ -1651,7 +1762,7 @@ here, a new name or a new meaning does.
 | Name | Kind | Meaning |
 | --- | --- | --- |
 | `pending` | boolean | An action dispatched through this part's owner is in flight, including the Suspense wait of the resulting render. Which parts carry it is 4.3. For a toast: the promise given to `toast.promise` is unsettled, or an action dispatched through its `Action` part runs; not set while the toast's content is merely suspended. For a form-channel part (every Field part, `Form.Root`, `Form.Submit`): the enclosing form's submission (`useFormStatus`, 2.7). |
-| `disabled` | boolean | Disabled by prop or inherited from the owner; not by an ancestor `<fieldset disabled>` (3.6). Also a step button whose next step would change nothing (NumberField's `Increment` / `Decrement` at a bound or under `readOnly`). Emitted in **every mode** in which the part renders `disabled` or `aria-disabled` (the JS-free Triggers included), so the styling hook and the ARIA state never disagree. |
+| `disabled` | boolean | Disabled by prop or inherited from the owner; not by an ancestor `<fieldset disabled>` (3.6). Also a step button whose next step would change nothing (NumberField's `Increment` / `Decrement` at a bound), and a part whose only job is to change the value while its owner is read-only (3.6.1 rule 7: those two, `Combobox.Trigger`, `Clear` and `ChipRemove`, an unselected `Select.Option`). Emitted in **every mode** in which the part renders `disabled` or `aria-disabled` (the JS-free Triggers included), so the styling hook and the ARIA state never disagree. |
 | `pressed` | boolean | Optimistic pressed state of a toggle button. |
 | `selected` | boolean | This part is, or belongs to, the selected choice: optimistic on the element the user picks (a Tab; an option, with `aria-selected`; on a native `<option>` identical to `:checked`, since the `<select>` renders `value={optimistic}`) and on `Tabs.Indicator` (a tab is selected); committed on a content region (`Tabs.Panel`). Never "the owner has a value", which is `:not([data-empty])`. Radio-like and checkbox-like parts use `checked`. |
 | `checked` | boolean | Optimistic checked state, the platform's word for a checkbox, a switch, a radio (not `selected`) and a menu's checkable items (there as `aria-checked` on a `button`). On a native input the DOM holds the optimistic value (3.2), so `:checked` matches it, with the caveats in 4.2. |
@@ -1664,7 +1775,7 @@ here, a new name or a new meaning does.
 | `stale` | boolean | The results shown are for an older text (`inputValue !== useDeferredValue(inputValue)`); the previous results stay visible meanwhile (Combobox `Popup`, `List`, `Input`). The listbox also has `aria-busy="true"` while stale **or loading** (a `Status` mounted inside the List); loading itself is not a data attribute. |
 | `invalid` | boolean | An error is shown for the field: the control matches `:user-invalid`, or a server error for it is shown (Field 2.2). On every Field part and on every control part inside a `Field.Root` (rule 5); the control also carries an explicit `aria-invalid="true" \| "false"`. |
 | `required` | boolean | `Field.Root required` or the control's own `required`. As an attribute: on every Field part, and on a control with no native element to carry `:required` (rule 2). |
-| `readOnly` | boolean | State field only (rule 2: `:read-only` on the input). The text controls (3.6). |
+| `readOnly` | boolean | The owner's `readOnly` prop or its Field's: the value is shown, focusable and submitted, and the user cannot change it (3.6.1). The attribute is **`data-readonly`**, in HTML's lower case, the one name whose two forms differ in case. On every form value control and its parts (3.6.1 rule 10) and on every Field part. A prop echo: also set while `disabled`. |
 | `modal` | boolean | The Root's `modal` prop of a Dialog (default `true`), on its Popup: the dialog is opened with `showModal()` (library mode) or the invoker's `show-modal` command (JS-free). **A prop echo**, not a state: rendered in every mode, server HTML included, so a stylesheet can lay out a non-modal panel (`.dialog:not([data-modal])`) before hydration and while closed, where `:modal` is false either way. |
 | `orientation` | `"horizontal" \| "vertical"` | The axis of a composite or a line, on the part that owns it and on each part laid out along it (3.10 rule 6). A `ToggleGroup` inside a Toolbar reports the Toolbar's; a `Toolbar.Separator` its own, perpendicular to the toolbar's. Enum attribute with value. |
 | `decorative` | boolean | `Separator`'s `decorative` prop: a line with `role="none"`, not a thematic break. A prop echo. |
@@ -2129,7 +2240,7 @@ the top of each (verified against tsdown 0.23.1; the default bundled build strip
 warning). `sideEffects: false` stays.
 
 The configuration is `packages/ui/tsdown.config.ts`: `entry` lists the root `src/index.ts`,
-every component's `src/<component>/index.ts`, `src/csp/index.ts` and the skill-installer bin
+every component's `src/<component>/index.ts`, `src/csp/index.ts`, the types entry (9.2) and the skill-installer bin
 (`src/bin/skill-installer.ts`); `format` is ESM only; `unbundle` and `dts` are on; and
 `exports` generates the package's exports map from the entry list (9.2), with the bin excluded
 from the map and declared as the package's `bin`.
@@ -2424,11 +2535,34 @@ import { Tabs, Toggle } from "@funstack/ui";   // also works
 
 With an unbundled build both resolve to the same files, so there is no duplication. The exports
 map is generated by tsdown from the entry list (section 7.2); adding a component means adding its
-`index.ts` to `entry`. One subpath is not a component: `@funstack/ui/csp` (`CSPProvider`,
-`STYLE_SHA256`; section 12). Single-element components have their own subpath like any other
+`index.ts` to `entry`. Two subpaths are not components: `@funstack/ui/csp` (`CSPProvider`,
+`STYLE_SHA256`; section 12) and `@funstack/ui/types` (below). Single-element components have their own subpath like any other
 (`@funstack/ui/button`, `@funstack/ui/toggle`, `@funstack/ui/separator`). A multi-part
 component's subpath is its kebab-case name (`@funstack/ui/number-field`,
 `@funstack/ui/otp-field`).
+
+**The shared types have one subpath, `@funstack/ui/types`** (status: **proposed**, #204; today
+they are exported from the root entry only):
+
+```tsx
+import { Tabs, type TabsValueChangeDetails } from "@funstack/ui/tabs";
+import type { ChangeReason, ActionDetails } from "@funstack/ui/types";   // documented
+import type { ChangeReason } from "@funstack/ui";                        // also works
+```
+
+- **What it exports**: the shared types of 9.4 (`Action`, `ActionDetails`, `ChangeAction`,
+  `ChangeReason`, `UrgentChangeHandler`, `UrgentHandler`, `WhilePending`, `RenderProp`,
+  `StateValue`), and nothing else: every type in it is used by more than one component and
+  belongs to none. A type that names one component stays on that component's subpath.
+- **Types only.** The entry has `export type` lines and no value, no directive and no
+  platform-typings import (7.4 is for entries that render elements); its JavaScript output is
+  an empty module, so an import that a compiler does not erase costs nothing.
+- **A component subpath does not re-export them.** One home per name: an editor's auto-import
+  offers `@funstack/ui/types` and the root, not one subpath per component, and a new shared
+  type is added in one file. This is the one exception to "everything a public type names is
+  exported from the component's `index.ts`" (9.4): a shared type that a component's props
+  name is exported from the types subpath and the root entry.
+- The root entry keeps exporting them, as it re-exports everything.
 
 ### 9.3 Namespace object
 
@@ -2490,7 +2624,8 @@ re-exports them.
   `StateValue<T, State> = T | ((state: State) => T)`,
   `WhilePending` (`"run" | "ignore"`, the pure triggers' `whilePending` prop, section 2.5.1,
   one shared union, never a per-part one, so a later mode is added in one place). They are
-  exported from the root entry. The `transition` prop's type is React's own
+  exported from `@funstack/ui/types` and the root entry (9.2), not from the component
+  subpaths. The `transition` prop's type is React's own
   `ViewTransitionClass` (section 5.2), which the library does not re-export.
 - Props interfaces are `interface`s extending the element props (section 1.5); state objects are
   `interface`s with readonly members. A set-valued prop is a `readonly string[]` (3.1).
@@ -2499,7 +2634,8 @@ re-exports them.
   the shape is fixed at mount (a switch warns in development, like a mode switch).
 - **Everything a public type names is exported**, with `export type`, from the component's
   `index.ts` and the root entry: the base and variant interfaces of a props union, and the type
-  of every member (`NumberFieldSource`). Nothing from `internal/` is public.
+  of every member (`NumberFieldSource`). A shared type is exported from the types subpath
+  instead of the component's `index.ts` (9.2). Nothing else from `internal/` is public.
 
 ### 9.5 Errors and development warnings
 

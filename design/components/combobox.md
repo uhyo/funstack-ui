@@ -375,6 +375,11 @@ export interface ComboboxRootProps {
   form?: string;
   /** Disables the Input, Trigger and Clear; nothing dispatches. */
   disabled?: boolean;
+  /**
+   * The selection is shown, focusable and submitted, and cannot be changed: native `readonly`
+   * on the Input, the popup never opens, Trigger, Clear and every ChipRemove are disabled.
+   */
+  readOnly?: boolean;
   children?: StateValue<ReactNode, ComboboxRootState>;
 }
 ```
@@ -424,10 +429,9 @@ dismiss, 5.4; `onFocus`: it starts the press watch that `onBlur` relies on, so t
 pair is owned together, conventions 1.5), `data-open`, `data-pending`, `data-empty`
 (the optimistic selection is empty: `value === null`, or no values with `multiple`; the same
 attribute `Chips` and `MultiSelect.Value` carry, and "has a value" is `:not([data-empty])`),
-`data-stale`, `data-disabled`, `data-invalid`. **`readOnly` is not in the props type**
-(conventions 3.6): the attribute would block typing while the options, the Trigger and `Clear`
-still changed the value, so a prop that cannot work is a type error; a read-only Combobox is a
-feature of its own. `name` passes through (a second,
+`data-stale`, `data-disabled`, `data-invalid`. **`readOnly` is not in the Input's props type**: it is the Root's
+(11.1), which renders the native attribute here; on the Input alone it would block typing
+while the options, the Trigger and `Clear` still changed the value. `name` passes through (a second,
 visible field for the raw text; the selection's `name` is the Root's). `placeholder`,
 `aria-describedby`, `inputMode`, `onCompositionStart`, the capture-phase handlers
 (`onFocusCapture`, `onBlurCapture`) and the rest pass through; a consumer who needs to react to
@@ -1238,6 +1242,17 @@ optimistic value, `A` = active value, `P` = Root pending. Uncontrolled, `default
   input**: a disabled Combobox is not submitted, the HTML rule for every control (conventions
   3.6). A disabled hidden input is still form-associated, so the reset listener and the Field
   registration are unaffected. Never disabled while pending.
+- **`readOnly`** on Root (its own prop or the Field's) (conventions 3.6.1; **proposed**, #203): the Input renders native
+  `readonly` (no `aria-readonly` next to it), so it stays in the Tab order with its text
+  selectable, and the platform bars it from constraint validation. **The popup never opens**:
+  ArrowDown / ArrowUp, Alt+ArrowDown, a click on the Input and the Trigger request nothing,
+  and `aria-expanded` stays `"false"`; a popup that is open when the prop turns on closes as
+  it does when `disabled` turns on. `Trigger`, `Clear` and every `ChipRemove` are natively
+  disabled (`data-disabled`); with `multiple`, the chip keys still move focus between chips
+  and Backspace / Delete remove nothing. Neither `valueChangeAction` nor
+  `onInputValueChange` is called, `allowCustomValue` commits nothing, and Escape has nothing
+  to revert. The hidden inputs are **not** disabled: the selection is submitted. `readOnly`
+  is in the state of the Root and of every part that has `disabled`, as `data-readonly`.
 
 ### 11.2 Server rendering and before hydration
 

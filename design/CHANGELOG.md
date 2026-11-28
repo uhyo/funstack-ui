@@ -16558,3 +16558,189 @@ Escape while a Combobox open is on its way; the revert target's wording"):
   does: such an open counts as shown, the Escape is the listbox's, it cancels the open with a
   close request (`"activate"`), the text stays and the key is consumed; the revert applies
   while the listbox is closed and no open is on its way.
+
+## 2026-11-28, #203, #204: `readOnly` on every form value control; a subpath for the shared types (design, proposed)
+
+Architect. Two follow-ups of the consistency alignment (the entry "2026-11-28, #199:
+consistency alignment, one standard per topic (design)": user decision 6 left a real
+`readOnly` as a feature of its own, V-M5; the product-owner default deferred the types subpath,
+X-L1). **Proposed**: design documents only, nothing is implemented, and four choices below are
+the user's. The documents are written as if the recommended option of each were taken.
+
+Changed: conventions 1.5 (owned keys), 2.3 item 7, 3.6 (the `readOnly` paragraph became a
+pointer), **3.6.1 (new)**, 4.1 (rules 2 and 4, the `disabled` and `readOnly` rows), 7.2, 9.2,
+9.4; `internal-hooks.md` 3.8 rule 9 and **rule 10 (new)**; `checkbox.md`, `switch.md`,
+`radio-group.md`, `checkbox-group.md`, `select.md`, `slider.md`, `combobox.md`,
+`multi-select.md`, `number-field.md`, `text-field.md`, `otp-field.md`, `toggle.md`,
+`field-form.md` (4.1, 6.1, 7.1, 7.4).
+
+### #203: what the platform and the prior art say
+
+- **HTML.** `readonly` applies to text-like `<input>` types and `<textarea>` only. It does not
+  apply to checkbox, radio, range, color, file or hidden, and `<select>` has no such
+  attribute. A read-only control is focusable, is submitted, is reset by a form reset, and is
+  **barred from constraint validation**. `<fieldset>` has `disabled` and no `readonly`.
+  `:read-only` matches every element that is not `:read-write`, so a checkbox, a select and a
+  `div` always match it: it is a usable hook on text inputs only.
+- **ARIA 1.2, `aria-readonly`**: "not editable, but otherwise operable"; authors "SHOULD NOT
+  restrict navigation to the element". Used in roles `checkbox`, `combobox`, `grid`,
+  `gridcell`, `listbox`, `radiogroup`, `slider`, `spinbutton`, `textbox`; inherited by
+  `switch`, `searchbox`, `menuitemcheckbox`, `menuitemradio`, the grid headers. **Not** on
+  `radio`, `option`, `button`, `group`. So every form value control has an element that can
+  carry the state except a CheckboxGroup's fieldset (the items carry it) and the radios (the
+  `radiogroup` does); Toggle and ToggleGroup (`button`) have none.
+- **ARIA in HTML**: use native `readonly` where HTML allows it; `aria-readonly` MAY be used on
+  an element whose role allows it; SHOULD NOT `aria-readonly="true"` next to `readonly`. The
+  APG has no read-only pattern beyond naming the attribute for grids.
+- **Prior art.** Base UI: `readOnly` and `data-readonly` on Checkbox, Radio and RadioGroup,
+  Switch, Select (blocks opening the popup), Combobox, NumberField; none on Slider,
+  CheckboxGroup, Toggle, ToggleGroup, Field (read from its docs, 1.6). React Aria Components:
+  `isReadOnly` on Checkbox, CheckboxGroup, RadioGroup, Switch, TextField, NumberField,
+  ComboBox; none on Slider or Select (from memory, not re-read). Ark UI: `readOnly` on every
+  form control, Slider and `Field.Root` included (from memory, not re-read). Nobody puts it on
+  toggle buttons.
+
+### #203: the design in one paragraph
+
+Conventions 3.6.1. `readOnly` is a prop of the **value owner** of every component that joins a
+Field, and of `Field.Root`; nothing else takes it. One meaning: reachable, readable,
+submitted, not changeable, never dispatching, barred from validation. The change is refused
+at its source so that no `input` / `change` fires for a change that did not happen: native
+`readonly` on text inputs; a cancelled click from the already-owned `onChange` on checkable
+inputs (which keeps `onClick` out of the owned keys, so **no props type loses a key**);
+disabled unselected options on a Select; cancelled keys and inert pointer handlers on a
+Slider; no popup on Combobox and MultiSelect. `data-readonly` / `state.readOnly` everywhere,
+the text controls included, replacing the `:read-only` rule of number-field.md decision 15
+(which cannot work outside a text input).
+
+### Choices for the user (recommended option first)
+
+1. **Which controls take `readOnly` (#203).**
+   - A (recommended, written): every component that joins a Field: adds Checkbox, Switch,
+     RadioGroup, CheckboxGroup, Select, Combobox, MultiSelect, Slider and `Field.Root`. One
+     rule with no exception list; Slider and Select go beyond Base UI and React Aria.
+   - B: the prior-art set only (no Slider, no Select): less to build, and "which controls"
+     stays a list to remember.
+   - C: keep it on the text controls and close #203: nothing to build; a locked checkbox or
+     select stays the consumer's `disabled` plus a hidden input.
+   None is breaking.
+2. **A read-only `Select` (#203).**
+   - A (recommended, written): the unselected options render native `disabled`. The platform
+     refuses the pick in every engine and before hydration with no handler; the picker still
+     opens, and the other options look and are announced as unavailable.
+   - B: let the pick happen and write the value back in `onChange`. The options look
+     pickable, the picker snaps back, and `input` / `change` fire for a change that did not
+     stay.
+   - C: no `readOnly` on Select (React Aria's choice): `Field.Root readOnly` then has one
+     control it cannot lock.
+   None is breaking.
+3. **The popup of a read-only Combobox / MultiSelect (#203).**
+   - A (recommended, written): it does not open (Base UI, React Aria). The control shows the
+     value; differs from Select, whose picker is the browser's and cannot be kept shut.
+   - B: it opens with every option unpickable, like the Select: the user can read the
+     alternatives, at the cost of a listbox of disabled options that virtual focus must still
+     walk.
+   None is breaking.
+4. **Where the shared types are imported from (#204).**
+   - A (recommended, written): a types-only subpath `@funstack/ui/types`, next to the root
+     entry. One home, one import line to document; a second import next to the component's.
+   - B: every component subpath re-exports the shared types its props name (`import { Tabs,
+     type ChangeReason } from "@funstack/ui/tabs"`). One import per file; each name gets about
+     thirty homes in auto-import, and 36 `index.ts` files plus a lint check keep the lists.
+   - C: root entry only, as today, and the docs say so. Nothing to build; the documented form
+     (subpaths) keeps one exception, and under `verbatimModuleSyntax` an inline
+     `import { type X } from "@funstack/ui"` leaves an import of the whole root entry.
+   None is breaking.
+
+### Product-owner defaults (alignment to the platform or to an existing rule)
+
+- `data-readonly` on every control, the text controls too; the attribute is lower case, the
+  state field `readOnly`. Additive.
+- Read-only is barred from constraint validation everywhere, as HTML does for text inputs: a
+  required, unchecked, read-only checkbox must not trap the form. The library withholds the
+  native `required` and the Field keeps its slot empty.
+- No item-level `readOnly` (`RadioGroup.Item`, `CheckboxGroup.Item`, `Slider.Thumb`). The
+  common "one locked box in a group" case is not covered in this version; it can be added
+  later without a break, and needs the Parent's arithmetic thought through.
+- Mount reconciliation of a read-only control restores instead of dispatching, for the text
+  controls too (a small behaviour change for a read-only TextField / NumberField / OTPField
+  whose DOM value differed at hydration: it used to dispatch `"platform"`).
+- A function part is disabled while its owner is read-only (NumberField's buttons already
+  are): `Combobox.Trigger`, `Clear`, `ChipRemove`.
+- Toggle and ToggleGroup take no `readOnly`.
+- No `readOnly` inherited from a `<fieldset>`, and no library `Fieldset` for it.
+
+### Not breaking
+
+Every option above is additive. The recommended set changes no existing prop, type name,
+attribute or default; `Combobox.Input` and the checkable parts keep `readOnly` out of their
+types (the prop is the Root's, or re-declared as the library's on Checkbox and Switch). Two
+observable changes for existing code: the text controls gain `data-readonly`, and the
+reconciliation default above.
+
+### Checklist, #203 (after the user's choices)
+
+- [ ] `internal/form/use-field-control.ts`, `field-context.ts`: `readOnly` option, "own or the
+  Field's" in `resolveFieldDefaults`, `readOnly` in the registration and in `FieldState`.
+- [ ] `field/field-root.tsx`: the `readOnly` prop, `data-readonly` on every Field part; an
+  empty custom-validity slot, no first-invalid focus and "not an edit" for a read-only
+  control; server errors still shown. `field/field-control.tsx`: render the Field's
+  `readOnly`; the development warning on an element or input type the attribute does not
+  apply to.
+- [ ] `internal/form/use-native-checked.ts` (`guardCheckableChange`),
+  `use-checkable-input.ts`, `group-member.ts`: the read-only branch of rule 9 (cancel the
+  click, no dispatch, no warning); `aria-readonly`, `data-readonly`; no native `required`.
+- [ ] `use-native-group-reconciliation.ts`, `use-native-checked.ts`,
+  `use-native-select-value.ts`: rule 10 (restore at mount, late members included; reset
+  unchanged).
+- [ ] `checkbox/checkbox.tsx`, `switch/switch.tsx`: the prop and state field.
+- [ ] `use-fieldset-group.ts`, `radio-group/*`, `checkbox-group/*`: the Root prop;
+  `aria-readonly` on the radiogroup fieldset / on each checkbox Item and Parent; the computed
+  `required` withheld.
+- [ ] `select/select-root.tsx`, `select-option.tsx`, `select-trigger.tsx`: the prop;
+  unselected options `disabled` + `data-disabled`; `aria-readonly`; no `required`.
+- [ ] `slider/slider-root.tsx`, `slider-thumb.tsx`, `slider-track.tsx`: the prop; pointer
+  bail; `keydown` cancel; the write-back on a stray `input`; `aria-readonly` per input; a
+  gesture under way stops stepping.
+- [ ] `combobox/*`: the Root prop; native `readonly` on the Input; no open requests; Trigger,
+  Clear, ChipRemove disabled; chip removal keys inert; hidden inputs enabled.
+- [ ] `multi-select/*`: the Root prop; Trigger `aria-readonly`; no open requests; hidden
+  inputs enabled; the validity element's `required` withheld.
+- [ ] `text-field/text-field.tsx`, `number-field/*`, `otp-field/*`: `data-readonly`.
+- [ ] Types: `aria-readonly` in the `Omit` of every part that carries the mark, with a typed
+  object-literal `@ts-expect-error` row (hyphenated key); `readOnly` still a type error on
+  `RadioGroup.Item`, `CheckboxGroup.Item` / `Parent`, `Combobox.Input`.
+- [ ] Tests per control (jsdom): focusable; submitted in `FormData`; no dispatch for each
+  input path; `data-readonly` / `state.readOnly`; the ARIA mark; not `valueMissing` with
+  `required`; form reset still follows; `readOnly` turned on while pending; own prop and
+  `Field.Root readOnly`.
+- [ ] Browser rows, all three engines, **to verify before the rules are final**:
+  a cancelled click from React's `onChange` leaves a checkbox and a radio unchanged with no
+  `input` / `change`; a radio group's arrows under it move focus and check nothing (WebKit's
+  stop-at-end included); a select whose other options are disabled cannot be changed by
+  click, closed-select arrows or typeahead, and posts its value; a range input's keys with
+  `keydown` cancelled; a click before hydration on a read-only checkbox is undone at mount.
+- [ ] Screen-reader pass (NVDA, JAWS, VoiceOver): what is announced for `aria-readonly` on a
+  checkbox, a switch, a `radiogroup` fieldset, a `<select>` and a range input. Support for the
+  state outside text fields is uneven; the behaviour does not depend on it.
+- [ ] Docs: a "Read-only" row in the props table and `data-readonly` in the data-attributes
+  table of each page; a "disabled or read-only" paragraph on the Field / Form page; the
+  skill (`skills/funstack-ui-knowledge`).
+
+### Checklist, #204 (option A)
+
+- [ ] `packages/ui/src/types/index.ts`: `export type { Action, ActionDetails, ChangeAction,
+  ChangeReason, RenderProp, StateValue, UrgentChangeHandler, UrgentHandler, WhilePending }
+  from "../internal/types.js"`. No directive, no platform-typings import, a header comment
+  saying it is a pure types module (conventions 7.1).
+- [ ] `tsdown.config.ts`: add it to `entry`; the exports map gains `"./types"`. Verify that
+  the unbundled build emits `dist/types/index.mjs` (an empty module) and its `.d.mts`, and
+  that `directives.test.ts` and `pack:check` accept the new entry.
+- [ ] `src/index.ts`: re-export the shared types from the new entry (same names, no change
+  for consumers).
+- [ ] A type test: each shared type imported from `@funstack/ui/types` is identical to the
+  root's.
+- [ ] Docs: `GettingStartedPage.tsx` ("Shared types live in `@funstack/ui/types`"), the
+  skill's import rule, and any page that imports a shared type from the root.
+- [ ] If the script that checks 7.4's "every component `index.ts` imports the platform
+  typings" exists by then, exempt the types entry as `csp` is.

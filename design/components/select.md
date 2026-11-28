@@ -147,6 +147,19 @@ Every part renders exactly one element and none renders a `<ViewTransition>` (de
 | validity (`required`, `:user-invalid`) | DOM | | Browser-owned; not mirrored. | n/a |
 | `name`, `form`, `required`, `disabled`, `autoComplete` | `Root` | config | n/a | Plain native props. |
 
+**`readOnly`** (conventions 3.6.1; **proposed**, #203) is `SelectRootProps.readOnly?: boolean` (`state.readOnly` on the Root, the
+Trigger and every Option). HTML has no read-only select and `change` cannot be cancelled, so
+the platform is made to refuse the pick: **every `Select.Option` except the one with the
+optimistic value renders native `disabled`** (with `data-disabled` and `state.disabled`). The
+picker still opens and shows the list; no click, Enter, arrow on a closed select or typeahead
+can leave the current option, in every engine and before hydration, and no `input` / `change`
+fires. The select itself is not disabled: it stays in the Tab order and posts its value (the
+selected option is enabled; a consumer-disabled selected option posts nothing, as today). It
+renders `aria-readonly="true"` (owned; the `combobox` role has the state) and `data-readonly`,
+and no native `required`. The options follow the optimistic value, so after a form reset or
+a controlled change the newly selected option is the enabled one. `Select.Option` has no
+`readOnly`.
+
 There is no activation mode: the engine decides whether arrows commit (Firefox, native) or move
 focus until Enter (Chromium customizable select). Section 9.4 covers what that means for an
 awaited action.
@@ -606,7 +619,8 @@ the contingency is to defer the refresh until `:open` is false (re-checked on th
 | `data-pending` | `Trigger` | Root pending | – | Same value; on the element the user sees. |
 | `data-pending` | `Option` | `pending && optimistic === value` | – | The option the user is waiting on. |
 | `data-selected` | `Option` | optimistic | `:checked` (identical, 4.1) | Immediate. |
-| `data-disabled` | `Root`, `Option`, `Trigger` | prop (Option: own, its Group's or Root's) | `:disabled` | |
+| `data-disabled` | `Root`, `Option`, `Trigger` | prop (Option: own, its Group's or Root's; also an unselected Option while the Root is read-only) | `:disabled` | |
+| `data-readonly` | `Root`, `Option`, `Trigger` | the Root's `readOnly` or the Field's | none (`:read-only` matches every select) | Shown, focusable, submitted, not changeable. |
 | – | `Root` | | `:open` (Chromium 133, Firefox 154, Safari 26.5), `:focus-within` | Picker open. Browser-owned, no attribute. In Chromium focus is on the option while open, so `select:focus-within` is the robust "has focus" selector. |
 | – | `Root` | | `:required`, `:user-invalid`, `:valid` | Platform only. |
 

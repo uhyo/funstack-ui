@@ -566,9 +566,10 @@ no form whose settle would show one), which is why the examples above use their 
 | --- | --- |
 | `data-pending` | A commit is in flight (including the Suspense wait of its render). |
 | `data-disabled` | The `disabled` prop, or the Field's. `:disabled` also sees `<fieldset disabled>`. |
+| `data-readonly` | The `readOnly` prop, or the Field's (conventions 3.6.1 rule 10; **proposed**, #203). The hook every control shares; `:read-only` also matches here, and on every non-editable element elsewhere. |
 | `data-invalid` | From a Field (section 7); never outside one. |
 
-Platform pseudo-classes next to them: `:focus` (being edited), `:read-only`,
+Platform pseudo-classes next to them: `:focus` (being edited),
 `:placeholder-shown` (empty), `:user-invalid`.
 
 ```css

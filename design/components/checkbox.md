@@ -217,6 +217,8 @@ export interface CheckboxState {
   readonly pending: boolean;
   /** The `disabled` prop. */
   readonly disabled: boolean;
+  /** The `readOnly` prop, or the Field's (`data-readonly`). */
+  readonly readOnly: boolean;
 }
 
 /** Details passed as the second argument of `checkedChangeAction`. */
@@ -228,7 +230,7 @@ export interface CheckboxCheckedChangeDetails extends ActionDetails {
 export interface CheckboxProps
   extends Omit<
     ComponentPropsWithRef<"input">,
-    "type" | "checked" | "defaultChecked" | "onChange" | "aria-checked" | "readOnly" | "className" | "style" | "children"
+    "type" | "checked" | "defaultChecked" | "onChange" | "aria-checked" | "aria-readonly" | "readOnly" | "className" | "style" | "children"
   > {
   /** Controlled checked state. `undefined` means uncontrolled. */
   checked?: boolean;
@@ -245,6 +247,12 @@ export interface CheckboxProps
   /** See Switch. */
   checkedChangeAction?: ChangeAction<boolean, CheckboxCheckedChangeDetails>;
   disabled?: boolean;
+  /**
+   * The box keeps its state: focusable, submitted, never toggled by the user and never
+   * dispatching. Rendered as `aria-readonly="true"` and `data-readonly`, not as the HTML
+   * attribute. Default `false`.
+   */
+  readOnly?: boolean;
   /** Submitted as the value when checked. Default `"on"`. In a future CheckboxGroup it identifies the item. */
   value?: string;
   className?: StateValue<string | undefined, CheckboxState>;
@@ -421,8 +429,13 @@ every other value control (conventions 5.1): the flip is CSS on `:checked` / `[d
 and the types serve a consumer's own `<ViewTransition>` around content that changes when the
 action settles.
 
-`readOnly` is not in the props type (conventions 3.6): HTML's `readonly` does not apply to a
-checkbox, so the box would still toggle. `state.invalid` is `true` while the enclosing Field
+**`readOnly`** (conventions 3.6.1; **proposed**, #203) is the library's prop, not the HTML attribute, which does not apply to a
+checkbox: the input stays focusable and submitted, the click that would toggle it is cancelled
+from the part's own `onChange` (mouse, Space and a label alike; no `input` or `change` fires,
+nothing dispatches), and it carries `aria-readonly="true"` (owned) and `data-readonly`. Native
+`required` is not rendered while read-only (rule 5), so a locked unchecked box never blocks a
+submission. A click made before hydration is undone at mount instead of dispatched (rule 13).
+`indeterminate` is unaffected. Switch is the same. `state.invalid` is `true` while the enclosing Field
 shows an error (`data-invalid`), `false` outside a Field (conventions 4.1 rule 5).
 
 ---

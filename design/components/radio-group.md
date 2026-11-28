@@ -699,8 +699,16 @@ What animates when, applying conventions 5.1 and the Tabs 10.1 table:
 - **No part has a `transition` prop**, `Item` included: a radio is a value control whose
   attributes are all optimistic (conventions 5.1, the one rule for Toggle, Checkbox, Switch,
   the group items, Select and Slider). On a void input a boundary could only animate
-  `data-pending` leaving and the rollback write. `readOnly` is not in `Item`'s props type
-  either: HTML's `readonly` does not apply to a radio (conventions 3.6).
+  `data-pending` leaving and the rollback write.
+- **`readOnly` is the Root's** (conventions 3.6.1; **proposed**, #203): `RadioGroupRootProps.readOnly?: boolean`, with
+  `readOnly` in `RadioGroupRootState` and `RadioGroupItemState`. The fieldset renders
+  `aria-readonly="true"` (the `radiogroup` role has the state; owned) and `data-readonly`, and
+  every Item `data-readonly`. Each Item's `onChange` cancels its click and dispatches nothing,
+  which also covers the arrows: the browser moves focus to the next radio and clicks it, the
+  click is cancelled, and the checked radio stays checked and stays the group's tab stop. The
+  group is submitted; native `required` is not rendered. `Item` has no `readOnly` (it stays
+  out of the props type): HTML's `readonly` does not apply to a radio, the `radio` role has no
+  read-only state, and one choice that cannot be picked is `disabled`.
 - **Dependent content is the consumer's boundary.** The library adds `fsui-radio-group` to every
   dispatch, so a consumer's own `<ViewTransition default={{ "fsui-radio-group": "fade", default: "none" }}>`
   around `<PlanDetails>` animates exactly the commits the group caused (walkthrough 9.2) and not

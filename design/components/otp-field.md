@@ -254,6 +254,9 @@ Where the props live: the constraints and the form wiring are on the **Root** (i
 state the Slots read, and the Field registration), everything that is about the element (`id`,
 `aria-label`, `aria-describedby`, `autoFocus`, `title`, `ref`) is on the **Input**.
 
+`readOnly` (the Root's prop or the Field's) is also `data-readonly` on the Root and the Input
+(conventions 3.6.1 rule 10; **proposed**, #203).
+
 Owned keys (conventions 1.2). Root: `data-*` above; `position` in `style` unless the consumer
 sets it. Input: `type`, `value`, `pattern`, `name`, `form`, `required`, `disabled`, `readOnly`,
 the library's `onChange` (omitted from the props type, conventions 1.5) and its native

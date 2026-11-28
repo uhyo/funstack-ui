@@ -238,7 +238,16 @@ Rules, which component docs cite instead of restating:
 9. **Click guard**, shared by every part's `onChange` (`guardCheckableChange(event, dispatch,
    componentName?)` in `use-native-checked.ts`): if `event.defaultPrevented` is already true,
    return without dispatching **and without warning** (2.3 item 3); otherwise dispatch, then in
-   development warn once per element if the event is now `defaultPrevented`.
+   development warn once per element if the event is now `defaultPrevented`. **While the owner
+   is read-only the guard cancels the click itself** (`event.preventDefault()`) and returns
+   without dispatching or warning: the browser's cancelled-activation steps restore `checked`
+   and no `input` / `change` fires (3.6.1 rule 6; proposed, #203).
+10. **A read-only control's mount reconciliation restores, and its reset still dispatches**
+   (3.6.1 rule 13; proposed, #203). With `readOnly` set at mount, the reconciliation of rule 3
+   (the late-member path included) writes the rendered value back to the DOM and dispatches
+   nothing: what it found is a change made before hydration to a control the user may not
+   change. The reset path of rules 4 to 7 is unchanged, because a form reset resets a native
+   read-only input too. One rule for every caller, the text controls included.
 
 ## The files of `internal/` (conventions 9.1)
 

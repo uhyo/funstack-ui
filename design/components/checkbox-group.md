@@ -986,8 +986,14 @@ controls whose attributes are all optimistic (conventions 5.1), and the check is
 CSS on `:checked` / `:indeterminate`. Dependent content elsewhere keys the type map of its own
 `<ViewTransition>` on `fsui-checkbox-group` (`-check` / `-uncheck` for direction).
 
-`readOnly` is not in the props types of `Item` and `Parent` (it does not apply to a checkbox
-input, conventions 3.6). `value` / `defaultValue` on the Root and `values` on a `Parent` accept
+**`readOnly` is the Root's** (conventions 3.6.1; **proposed**, #203): `CheckboxGroupRootProps.readOnly?: boolean`, with `readOnly`
+in the state of the Root, every Item and every Parent, and `data-readonly` on each. The
+fieldset is a `group`, which has no read-only state, so `aria-readonly="true"` is on each Item
+and Parent (owned). Their `onChange` cancels the click and dispatches nothing, a Parent's
+included: its checked / mixed state still follows the set. The group is submitted, and the
+computed "at least one" `required` of section 7 is not rendered while read-only. `Item` and
+`Parent` have no `readOnly` of their own (it stays out of their props types): the value is the
+Root's, and one box that cannot be changed is `disabled`. `value` / `defaultValue` on the Root and `values` on a `Parent` accept
 a `readonly string[]` (conventions 3.1). `CheckboxGroupRootState` has `invalid` and `required`
 (conventions 4.1 rule 5): the Root renders `data-invalid` inside a Field that shows an error.
 

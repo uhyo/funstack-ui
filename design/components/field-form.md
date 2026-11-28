@@ -582,6 +582,8 @@ export interface FieldState {
   readonly validity: FieldValidity;
   readonly disabled: boolean;
   readonly required: boolean;
+  /** `Field.Root readOnly` or the control's own (`data-readonly`). */
+  readonly readOnly: boolean;
   /** The enclosing form's submission is in flight (`useFormStatus().pending`); `false` outside a form. */
   readonly pending: boolean;
 }
@@ -596,6 +598,11 @@ export interface FieldRootProps
   disabled?: boolean;
   /** Makes the control `required` (native) and marks every part `data-required`. */
   required?: boolean;
+  /**
+   * Makes the control read-only (conventions 3.6.1) and marks every part `data-readonly`: the
+   * value is focusable and submitted, the user cannot change it, and it never blocks a submission.
+   */
+  readOnly?: boolean;
   /**
    * A custom constraint, written into the control with `setCustomValidity`. Sync. Receives the
    * field's submitted value (`formData.get(name)` as a string, `""` when absent) and the whole
@@ -615,8 +622,22 @@ export interface FieldRootProps
 }
 ```
 
-Owned keys: `data-invalid`, `data-disabled`, `data-required`, `data-pending`. `Field.Root` has no
-`id` of its own; the ids live on the parts.
+Owned keys: `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending`.
+`Field.Root` has no `id` of its own; the ids live on the parts.
+
+**`Field.Root readOnly`** (conventions 3.6.1; **proposed**, #203) reaches the control the way
+`disabled` and `required` do: `useFieldControl` takes the control's own `readOnly` and returns
+"own or the Field's", and the registration carries it, so every Field part shows
+`data-readonly` whichever of the two set it. While the control is read-only the Field treats
+it as HTML treats a read-only text input, **barred from constraint validation**: the
+custom-validity slot is kept empty (a `validate` result and a server error do not block the
+submission, and the control is skipped by the first-invalid focus), an `input` / `change` from
+it is not an edit, and a server error for the field is still shown, with nothing to dismiss
+it until the next submission. There is no inherited `readOnly`: a native `<fieldset>` has none
+(7.4), so a read-only group of Fields is the prop on each. A `Field.Control` renders the
+attribute natively, which the platform honours on text-like inputs and a textarea; on any
+other element (`render={<select />}`, a checkbox) it warns in development, because nothing
+would be read-only there: use `Select`, `Checkbox` and the other library controls.
 
 **`Field.Root disabled` means the control is not submitted**, whatever the control is
 (conventions 3.6): a native control gets `disabled`, and a control that submits through hidden
@@ -924,6 +945,7 @@ focuses (or activates) the labelable control. The library installs no key handle
 | `data-invalid` | every Field part | an error is shown (`FieldState.invalid`) |
 | `data-disabled` | every Field part, `Form.Submit` | disabled by prop (Field or control) |
 | `data-required` | every Field part | `Field.Root required` or the control's own `required` (the control reports its own through the registration) |
+| `data-readonly` | every Field part | `Field.Root readOnly` or the control's own `readOnly` (through the registration; conventions 3.6.1) |
 | `data-pending` | every Field part, `Form.Root`, `Form.Submit` | the form's submission is in flight |
 
 Platform pseudo-classes next to them (conventions 4.2): `:user-invalid` / `:user-valid` on the
@@ -981,6 +1003,7 @@ export function useFieldControl(options: {
   name?: string;
   disabled?: boolean;
   required?: boolean;
+  readOnly?: boolean;
   /** The consumer's own `id`: ignored inside a Field (the Field owns it), with a warning. */
   id?: string;
   /** Dev warning tag. */
@@ -993,6 +1016,7 @@ export function useFieldControl(options: {
   readonly name: string | undefined;               // own ?? the Field's
   readonly disabled: boolean;                      // own || the Field's
   readonly required: boolean;                      // own || the Field's
+  readonly readOnly: boolean;                      // own || the Field's (conventions 3.6.1)
   /** Owned attributes, empty outside a Field: `id` (labelable), `aria-labelledby` (groups: the Label id), `aria-describedby` (description + error while invalid; token-merged by the part), `aria-invalid` ("true" | "false"), `data-invalid`. */
   readonly attributes: FieldControlAttributes;
   readonly state: FieldState | undefined;
@@ -1125,6 +1149,8 @@ element, which already does the three jobs a part would have:
 
 - **Naming and description.** `<legend>` names the `group`; `aria-describedby` describes it.
   Screen readers read both when focus enters the group, before the control's own label.
+- **No `readOnly`.** A fieldset has no read-only attribute, and the library adds none: lock
+  each Field with `Field.Root readOnly` (4.1).
 - **`disabled`.** `<fieldset disabled>` disables every native control inside it, which is
   every FUNSTACK form control's own element (`Field.Control`, Checkbox, Switch, the radios, the
   `<select>`, a Thumb's range input, NumberField's two inputs, the Combobox Input, MultiSelect's

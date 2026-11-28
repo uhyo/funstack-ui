@@ -634,6 +634,9 @@ The thin client wrapper of 2.2 is optional. Function-form `className`, `style`, 
 - **Form participation** (`name`/`value` posted with a form): no hidden input in v0. `type` is
   fixed to `"button"`.
 - **Tri-state / `aria-pressed="mixed"`**: never for Toggle.
+- **`readOnly`**: never for Toggle or `ToggleGroup` (conventions 3.6.1 rule 14). They are not
+  form controls and the `button` role has no read-only state; a toggle the user may not change
+  is `disabled`, which stays focusable inside a Toolbar.
 - **`Switch`**: a different APG pattern (`role="switch"`, on/off semantics, label changes allowed);
   it is not a Toggle variant and gets its own design.
 - **`errorAction`**: none in v0 (conventions 2.4).

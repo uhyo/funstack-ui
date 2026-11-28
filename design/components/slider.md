@@ -650,6 +650,7 @@ renders is the number the DOM holds and `FormData` posts (research §1):
 | `data-dragging` | while a pointer is captured | | | on the captured thumb | urgent; keyboard never sets it |
 | `data-orientation` | `horizontal` / `vertical` | same | same | same | |
 | `data-disabled` | | | | | the Root's `disabled` |
+| `data-readonly` | | | | | the Root's `readOnly` or the Field's, on the same parts as `data-disabled` |
 | `data-index` | | | | `0`, `1`, … | style the min and max thumbs differently |
 
 A drag with no `valueChangeAction` never sets `data-pending` (no step transition runs). With
@@ -785,6 +786,16 @@ Chromium only).
 - A range always has a value; nothing is `required` and `validity.valid` is always `true`.
 - `disabled` on Root disables every input: not submitted, not focusable. Never disabled while
   pending (conventions 3.6).
+- **`readOnly`** on Root (conventions 3.6.1; **proposed**, #203; a boolean prop of
+  `SliderRootProps`, and `readOnly` in every part's state): every input stays focusable and is submitted, and nothing steps or commits.
+  The `pointerdown` handlers of Track and Thumb do nothing, as when disabled; the Thumb's
+  `keydown` cancels the keys that move a range (the four arrows, Home, End, Page Up, Page
+  Down; with a modifier too), so no native `input` fires; a native `input` that arrives anyway
+  (an assistive technology's increment action) steps nothing, and the shown value is written
+  back to the input in that event. Each input renders `aria-readonly="true"` (owned; the
+  `slider` role has the state). Turning `readOnly` on during a drag ends the stepping: the
+  gesture commits where it stopped. Keys pressed before hydration are undone at mount, not
+  dispatched. `Slider.Thumb` has no `readOnly`.
 - `<form action>` and `useFormStatus` are the form channel (conventions 2.7): a Slider with no
   actions inside a `<form action={serverFn}>` posts its value with the form. "Submit on
   release" is `valueCommitAction={() => formRef.current?.requestSubmit()}`.
