@@ -17,8 +17,9 @@ export function RoadmapPage() {
       <h3>Changelog</h3>
       <p>
         Alpha releases (<code>0.1.0-alpha.N</code>) are published on npm under the{" "}
-        <code>alpha</code> dist-tag: <code>npm install @funstack/ui@alpha</code>. Each release is
-        listed on <a href={`${GITHUB_URL}/releases`}>GitHub Releases</a>; between releases, the{" "}
+        <code>alpha</code> dist-tag: <code>npm install @funstack/ui@alpha</code>. Until 1.0, each
+        release also moves the <code>latest</code> dist-tag. Each release is listed on{" "}
+        <a href={`${GITHUB_URL}/releases`}>GitHub Releases</a>; between releases, the{" "}
         <a href={`${GITHUB_URL}/commits/master`}>commit history</a> is the changelog.
       </p>
 

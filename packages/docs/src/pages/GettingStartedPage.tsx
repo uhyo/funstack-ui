@@ -20,7 +20,9 @@ export function GettingStartedPage() {
       <Callout kind="warning" title="Alpha">
         <p>
           <code>@funstack/ui</code> is published as alpha releases under the <code>alpha</code>{" "}
-          dist-tag; there is no <code>latest</code> release yet. APIs change without notice.
+          dist-tag. Until 1.0, each release also moves <code>latest</code>, so{" "}
+          <code>npm install @funstack/ui</code> installs the same version. APIs change without
+          notice.
         </p>
       </Callout>
       <p>

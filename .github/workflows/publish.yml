@@ -36,17 +36,48 @@ jobs:
       - name: Check package contents
         run: pnpm --filter @funstack/ui pack:check
 
-      - name: Determine npm tag
+      # Stable versions go to `latest`. A prerelease gets its prerelease name as the dist-tag
+      # ("alpha" for 0.1.0-alpha.30). Until 1.0 (a 0.x prerelease, or a 1.0.0-* one) it is
+      # published under `latest` as well, so `npm i @funstack/ui` installs the newest release;
+      # from 1.0 on a prerelease gets only its prerelease tag.
+      - name: Determine npm tags
         id: npm-tag
         run: |
           VERSION=$(node -p "require('./packages/ui/package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if [[ "$VERSION" == *"-"* ]]; then
             # Prerelease version - extract tag (e.g., "alpha" from "0.0.1-alpha.0")
-            TAG=$(echo "$VERSION" | sed 's/.*-\([a-zA-Z]*\).*/\1/')
-            echo "tag=$TAG" >> $GITHUB_OUTPUT
+            PRERELEASE_TAG=$(echo "$VERSION" | sed 's/.*-\([a-zA-Z]*\).*/\1/')
+            if [[ -z "$PRERELEASE_TAG" ]]; then
+              echo "::error::Cannot derive a dist-tag from prerelease version $VERSION"
+              exit 1
+            fi
+            CORE="${VERSION%%-*}"
+            if [[ "$CORE" == 0.* || "$CORE" == "1.0.0" ]]; then
+              echo "tag=latest" >> "$GITHUB_OUTPUT"
+              echo "extra-tag=$PRERELEASE_TAG" >> "$GITHUB_OUTPUT"
+            else
+              echo "tag=$PRERELEASE_TAG" >> "$GITHUB_OUTPUT"
+              echo "extra-tag=" >> "$GITHUB_OUTPUT"
+            fi
           else
-            echo "tag=latest" >> $GITHUB_OUTPUT
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+            echo "extra-tag=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish
         run: pnpm --filter @funstack/ui publish --access public --tag ${{ steps.npm-tag.outputs.tag }} --no-git-checks
+
+      # Keeps the prerelease tag (for example `alpha`) current for `npm i @funstack/ui@alpha`
+      # when the publish above went to `latest`. OIDC covers dist-tag operations only with the
+      # "Allow npm dist-tag" option of the trusted publisher configuration and npm 11.21.0 or
+      # later, hence npx.
+      - name: Add prerelease dist-tag
+        if: steps.npm-tag.outputs.extra-tag != ''
+        working-directory: packages/ui
+        env:
+          VERSION: ${{ steps.npm-tag.outputs.version }}
+          EXTRA_TAG: ${{ steps.npm-tag.outputs.extra-tag }}
+        run: |
+          npx --yes npm@^11.21.0 dist-tag add "@funstack/ui@$VERSION" "$EXTRA_TAG"
+          npx --yes npm@^11.21.0 dist-tag ls @funstack/ui
