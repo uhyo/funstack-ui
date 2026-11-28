@@ -250,7 +250,7 @@ import { Separator } from "@funstack/ui/separator";
           '`data-complete`, `data-pending`, `data-disabled`, `data-readonly`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it. `dir` defaults to `"ltr"`; yours wins.'
         }
         note={
-          'Both details objects are `{ reason, event }`. `onValueChange`: `"activate"` for an edit (`event` is the `input` event, or the `compositionend` that ended a composition), `"platform"` for a form reset (the `reset` event), text found at hydration and a WebOTP fill (`undefined`). `completeAction`: `"activate"` for an edit, `"platform"` for a WebOTP fill. Serialisable: a Server Function receives `{ reason }`.'
+          'Both details objects are `{ reason, event }`; `completeAction`\'s also has `valid`, `false` only when the Field\'s `validate` rejects the code (see [details.valid](/components/field#details-valid)). `onValueChange`: `"activate"` for an edit (`event` is the `input` event, or the `compositionend` that ended a composition), `"platform"` for a form reset (the `reset` event), text found at hydration and a WebOTP fill (`undefined`). `completeAction`: `"activate"` for an edit, `"platform"` for a WebOTP fill. Serialisable: a Server Function receives `{ reason }` (`{ reason, valid }` for `completeAction`).'
         }
       />
 

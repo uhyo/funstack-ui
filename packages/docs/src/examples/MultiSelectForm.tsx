@@ -43,9 +43,7 @@ export function MultiSelectForm() {
         <MultiSelect.Root>
           <MultiSelect.Trigger className="demo-multi-select-trigger">
             <MultiSelect.Value placeholder="Choose days">
-              {({ value }) =>
-                value.length === 0 ? "Choose days" : value.map((v) => NAMES[v] ?? v).join(", ")
-              }
+              {({ value }) => value.map((v) => NAMES[v] ?? v).join(", ")}
             </MultiSelect.Value>
             <span className="demo-multi-select-chevron" aria-hidden>
               ▾

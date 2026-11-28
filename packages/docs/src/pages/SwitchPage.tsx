@@ -68,7 +68,12 @@ export function SwitchPage() {
                 <code>event</code> is the native <code>click</code>, for Space and label clicks too)
                 or <code>"platform"</code> for a form reset (<code>event</code> is the{" "}
                 <code>reset</code> event) or a change found at hydration (<code>event</code> is{" "}
-                <code>undefined</code>).
+                <code>undefined</code>). <code>details.valid</code>: the control would be valid with
+                the requested value (
+                <a href="/components/field#details-valid">
+                  native constraints and the Field's <code>validate</code>
+                </a>
+                ); information only, the change is dispatched anyway.
               </>
             ),
           },

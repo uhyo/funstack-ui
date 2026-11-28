@@ -232,7 +232,7 @@ export function SliderPage() {
           '`role` (`"group"` with several thumbs), `aria-labelledby` (the Label\'s id while a Label is mounted and there are several thumbs; merged with yours), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`, `data-readonly`, and the `--slider-*` custom properties in `style` (your entries win).'
         }
         note={
-          'Details are `{ reason, thumb, event }`: `reason` is `"activate"`, `"platform"` (a form reset, a value found at hydration) or `"dismiss"` (the revert after a failed save, steps only), and `thumb` the index that moved (`null` on platform paths and the revert). There is no `transition` prop on any part.'
+          'Details are `{ reason, thumb, valid, event }`: `valid` is `true` unless the Field\'s `validate` rejects the value (a range is never invalid natively; see [details.valid](/components/field#details-valid)); `reason` is `"activate"`, `"platform"` (a form reset, a value found at hydration) or `"dismiss"` (the revert after a failed save, steps only), and `thumb` the index that moved (`null` on platform paths and the revert). There is no `transition` prop on any part.'
         }
       />
 

@@ -150,10 +150,12 @@ export function CheckboxGroupPage() {
               <>
                 Runs in the Root's transition whenever the set changes; sync, async or a Server
                 Function. Rejections reach the nearest Error Boundary and roll the change back.{" "}
-                <code>details</code> is <code>{"{ reason, added, removed }"}</code> (plus the
+                <code>details</code> is <code>{"{ reason, added, removed, valid }"}</code> (plus the
                 virtual <code>event</code>): <code>reason</code> is <code>"activate"</code> for an
                 Item or Parent click and <code>"platform"</code> for a form reset or a change found
-                at hydration.
+                at hydration; <code>valid</code>: the group would be valid with the next set
+                (&quot;at least one&quot; and the Field's <code>validate</code>, see{" "}
+                <a href="/components/field#details-valid">details.valid</a>).
               </>
             ),
           },

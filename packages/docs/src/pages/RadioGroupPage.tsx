@@ -92,7 +92,12 @@ export function RadioGroupPage() {
                 Server Function. Rejections reach the nearest Error Boundary and roll the selection
                 back. <code>next</code> is a string for every user interaction; it is{" "}
                 <code>null</code> only with <code>reason: "platform"</code>, when a form reset
-                empties the group. Every arrow key press dispatches; the latest wins.
+                empties the group. Every arrow key press dispatches; the latest wins.{" "}
+                <code>details.valid</code>: the control would be valid with the requested value (
+                <a href="/components/field#details-valid">
+                  native constraints and the Field's <code>validate</code>
+                </a>
+                ); information only, the change is dispatched anyway.
               </>
             ),
           },

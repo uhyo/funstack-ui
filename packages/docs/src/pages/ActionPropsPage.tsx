@@ -244,6 +244,36 @@ type UrgentHandler<Details extends ActionDetails = ActionDetails> = (details: De
         <a href="/concepts/browser-owned-state">Browser-owned state</a>.
       </p>
 
+      <h3 id="details-valid">
+        <code>details.valid</code>
+      </h3>
+      <p>
+        Every value action of a form control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select,
+        MultiSelect, Combobox, TextField, NumberField, Slider, and OTPField's{" "}
+        <code>completeAction</code>) says whether the requested value passes constraint validation:
+        the control's native constraints (<code>required</code>, <code>pattern</code>,{" "}
+        <code>min</code> / <code>max</code> / <code>step</code>, a group's &quot;at least one&quot;)
+        and, inside a <a href="/components/field">Field</a>, the Field's <code>validate</code>, for
+        that value. A server error does not count: it is about a value already submitted. Every
+        reason carries it (a form reset, a value adopted at mount, NumberField's{" "}
+        <code>"dismiss"</code>). Handlers and the actions of other components have none.
+      </p>
+      <CodeBlock>{`<TextField
+  required
+  defaultValue={task.title}
+  valueCommitAction={async (next, details) => {
+    if (!details.valid) return; // nothing saved
+    await saveTitle(next);
+  }}
+/>`}</CodeBlock>
+      <p>
+        It is information, not a gate: the library dispatches an invalid value like any other (the
+        control holds what the user entered, and a Field shows the error). An action that saves
+        checks it. Uncontrolled, the early return keeps the invalid value in the control and saves
+        nothing; a controlled parent that does not adopt it rolls back instead. It is an ordinary
+        boolean field, so a Server Function passed directly receives it.
+      </p>
+
       <h3>What happens on a click</h3>
       <p>
         In one transition of its own, the component tags the transition with its{" "}

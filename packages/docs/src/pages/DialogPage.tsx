@@ -419,15 +419,17 @@ export function DialogPage() {
               <>
                 With a function <code>action</code>: close the dialog once the action settles
                 without throwing and, when the form is rendered as a <code>Form.Root</code> (
-                <code>{"render={<Form.Root errors={state.errors} />}"}</code>), with no field error:
-                a settle whose <code>errors</code> has a non-empty entry (hidden stale ones
-                included, the <code>autoReset</code> rule) keeps the dialog open and the Form
-                focuses the first errored field. Without a <code>Form.Root</code> the library never
-                sees a result, so any settle that does not throw counts, including a{" "}
-                <code>useActionState</code> result that reports errors: render the form as a{" "}
-                <code>Form.Root</code> to route them, throw to keep the dialog open, or set{" "}
-                <code>false</code> and close it yourself (a <code>Dialog.Close</code>, a submit
-                button in a separate <code>method="dialog"</code> form, or a controlled{" "}
+                <code>{"render={<Form.Root errors={state.errors} error={state.error} />}"}</code>
+                ), with no error: a settle whose <code>errors</code> has a non-empty entry (hidden
+                stale ones included) or whose form-level <code>error</code> is not empty (the{" "}
+                <code>autoReset</code> rule) keeps the dialog open; the Form focuses the first
+                errored field or announces the form-level error (
+                <a href="/components/field#form-level-errors">Form-level errors</a>). Without a{" "}
+                <code>Form.Root</code> the library never sees a result, so any settle that does not
+                throw counts, including a <code>useActionState</code> result that reports errors:
+                render the form as a <code>Form.Root</code> to route them, throw to keep the dialog
+                open, or set <code>false</code> and close it yourself (a <code>Dialog.Close</code>,
+                a submit button in a separate <code>method="dialog"</code> form, or a controlled{" "}
                 <code>open</code>; a <code>formMethod="dialog"</code> submitter inside this form
                 runs the action again instead). The dialog is never closed when it was closed while
                 the action ran, even if the user re-opened it meanwhile.

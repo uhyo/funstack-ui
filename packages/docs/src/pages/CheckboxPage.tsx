@@ -117,7 +117,12 @@ export function CheckboxPage() {
                 transition. Sync, async or a Server Function; rejections reach the nearest Error
                 Boundary. <code>details.reason</code>: <code>"activate"</code> (the native{" "}
                 <code>click</code>) or <code>"platform"</code> (a form reset with the{" "}
-                <code>reset</code> event, or a change found at hydration with no event).
+                <code>reset</code> event, or a change found at hydration with no event).{" "}
+                <code>details.valid</code>: the control would be valid with the requested value (
+                <a href="/components/field#details-valid">
+                  native constraints and the Field's <code>validate</code>
+                </a>
+                ); information only, the change is dispatched anyway.
               </>
             ),
           },

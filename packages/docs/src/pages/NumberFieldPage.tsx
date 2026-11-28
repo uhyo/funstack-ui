@@ -171,7 +171,10 @@ export function NumberFieldPage() {
         step would change nothing (judged from the draft while one is open; an unreachable{" "}
         <code>max</code> stays unreachable: <code>0</code>–<code>5</code> by <code>2</code> stops at{" "}
         <code>4</code>). To clamp typed values, do it in a controlled parent's{" "}
-        <code>valueChangeAction</code>.
+        <code>valueChangeAction</code>. The actions are told: <code>details.valid</code> is{" "}
+        <code>false</code> for such a value, so an action that must not save it returns early (
+        <code>{"if (!details.valid) return;"}</code>; see{" "}
+        <a href="/components/field#details-valid">details.valid</a>).
       </p>
 
       <h3 id="props">Props</h3>
@@ -288,7 +291,7 @@ export function NumberFieldPage() {
           "`role` (`\"group\"`), `aria-labelledby` (your tokens, then the Label's id while one is mounted, then a Field label's), `data-pending`, `data-disabled`, `data-readonly`, `data-invalid` (inside a Field)."
         }
         note={
-          'Details are `{ reason, source, event }`, typed `NumberFieldValueChangeDetails` for `valueChangeAction` and `NumberFieldValueCommitDetails` for `valueCommitAction` (never `"dismiss"`): `reason` is `"activate"`, `"platform"` (a form reset, text found at hydration) or `"dismiss"` (the revert after a failed save, steps only); `source` is a `NumberFieldSource` (`"input"`, `"increment"`, `"decrement"`, `"keyboard"`, `"wheel"`), or `null` on platform paths and the revert; `event` is the DOM event, and `undefined` for the repeats of a held button, a hold that ended at its bound, hydration and the revert. There is no `transition` prop on any part; the dispatches carry the types `fsui-number-field` plus `fsui-number-field-change` (step) or `fsui-number-field-commit` (gesture) for your own boundaries.'
+          'Details are `{ reason, source, valid, event }`, typed `NumberFieldValueChangeDetails` for `valueChangeAction` and `NumberFieldValueCommitDetails` for `valueCommitAction` (never `"dismiss"`): `reason` is `"activate"`, `"platform"` (a form reset, text found at hydration) or `"dismiss"` (the revert after a failed save, steps only); `source` is a `NumberFieldSource` (`"input"`, `"increment"`, `"decrement"`, `"keyboard"`, `"wheel"`), or `null` on platform paths and the revert; `valid` is whether the field would be valid holding the value (`required`, `min`, `max`, `step` and the Field\'s `validate`: a typed `0` with `min={1}` is dispatched with `valid: false`; see [details.valid](/components/field#details-valid)); `event` is the DOM event, and `undefined` for the repeats of a held button, a hold that ended at its bound, hydration and the revert. There is no `transition` prop on any part; the dispatches carry the types `fsui-number-field` plus `fsui-number-field-change` (step) or `fsui-number-field-commit` (gesture) for your own boundaries.'
         }
       />
 

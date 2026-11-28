@@ -17069,3 +17069,64 @@ Tests, per control (jsdom unless marked):
 
 Not done here: the screen-reader pass for the `Form.Error` announcement (NVDA, JAWS,
 VoiceOver), which is a human task.
+## 2026-11-28, dogfood run 1: #208, #209, #210 implemented
+
+Developer. The three checklists of the entry "2026-11-28, dogfood run 1: `Form.Root error` and
+`Form.Error` (#208), `MultiSelect.Value placeholder` (#209), `details.valid` (#210)" are in the
+code, for every control at once, as decided. Branch `dev/208`.
+
+### #209
+
+`MultiSelect.Value` renders `placeholder` while the selection is empty and `placeholder` is not
+`null` / `undefined`, whatever `children` is; `children` (or the default labels) otherwise. The
+"rollback" row is a controlled parent that does not adopt the first pick (a rejection unmounts
+the control into the boundary, so the placeholder cannot be seen after it). The two docs
+examples lost their empty branch.
+
+### #208
+
+- `hasFormError(errors, error)` in `validity.ts`; `FormContextValue` gains `error` (normalised)
+  and `registerFormError` (a count in a ref). `Form.Root` reads `error` through `latest` in the
+  settle; `Dialog.Form`'s settle reads it through the context.
+- The announcement: `announce(form, messages)` when no Field shows a server error or when focus
+  moves to the first one; when focus is already on it, one `announce` on that control with the
+  form-level text first (the target of the merged announcement is the control, as 3.5's).
+- `Form.Error` is `form/form-error.tsx`, `"use client"`, `data-pending` from `useFormStatus`
+  (as the Field parts). Its types are on `@funstack/ui/form` and the root entry; not on
+  `@funstack/ui/types`, which holds only the shared types no component owns (conventions 9.2),
+  so the checklist's "and `@funstack/ui/types`" was not applied.
+- **11.9 holds in library mode only.** In JS-free mode (a `Dialog.Root` with none of `open`,
+  `defaultOpen`, `openChangeAction`, `onOpenChange`, which is the example's `<Dialog.Root>`) the
+  Popup's content is always mounted, so `useActionState` inside it still outlives the close and
+  the stale errors come back at the next open; the jsdom row failed exactly that way. The test
+  row, the docs recipe and the live example use `defaultOpen={false}`. The rule text of 11.9
+  (and its example) should say so: left to the architect.
+
+### #210
+
+- `nativeValid(element)` and `setEntries(name, values, disabled)` in `validity.ts`;
+  `useNextValidity()` in `internal/form/use-next-validity.ts`; the Field exposes
+  `validateNext(patch)` on `FieldContextValue` (reads the latest `validate`, `name`, `readOnly`
+  and the control's form owner; writes nothing).
+- Read controls: the checkable machinery (Checkbox, Switch) and Select read their element;
+  RadioGroup the first `willValidate` radio of its name; TextField its element; NumberField the
+  hidden input.
+- Computed controls: CheckboxGroup (the derived `required` predicate over the registry, the
+  patch is the next values with an enabled Item, in document order); MultiSelect and Combobox
+  through `useMultipleSelection`'s new `validOf` option; Combobox single in `dispatchValue`.
+  The Combobox's `required` lives on the Input, so the Input writes it into a `requiredRef` of
+  the context after each commit and the Root reads it there.
+- `useStepCommit`'s `details` option takes the value as a third argument and is now called in
+  the event (before the step transition's callback), after `onStep`. **NumberField needed no
+  reorder**: the typed-text commit already goes through `step`, whose `onStep` writes the hidden
+  input before either dispatch, and the commit follows in the same task.
+- Slider: native `true`; the patch sets each enabled, named thumb input to its next value in
+  document order per name.
+- OTPField: `completeAction` only; the patch sets the name to the filtered code.
+- Combobox single, the medium-risk row: `allowCustomValue` never commits empty text (an empty
+  text commits `null`), so a custom value is valid; an Option whose label is `""` is reachable
+  and is documented as out of scope on the Combobox page.
+- Tests: `field/details-valid.test.tsx` (jsdom, every control) and
+  `field/details-valid.browser.test.tsx` (the click-time read of Checkbox and Switch,
+  controlled too; TextField with real keys; NumberField's hidden-input flags). The shared
+  suites' expected details gained `valid: true`.

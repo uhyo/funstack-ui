@@ -155,11 +155,14 @@ export function SelectPage() {
         }
       />
       <p>
-        <code>SelectValueChangeDetails</code>: <code>{"{ reason, event }"}</code>.{" "}
-        <code>reason</code> is <code>"activate"</code> for a pick (pointer, keyboard, typeahead or
-        autofill; <code>event</code> is the native <code>change</code>) and <code>"platform"</code>{" "}
-        for a form reset (<code>event</code> is the <code>reset</code> event) or a pick made before
-        hydration (no event).
+        <code>SelectValueChangeDetails</code>: <code>{"{ reason, valid, event }"}</code>.{" "}
+        <code>valid</code>: the Select would be valid with the requested value (
+        <code>required</code> and the empty option, the Field's <code>validate</code>; see{" "}
+        <a href="/components/field#details-valid">details.valid</a>). <code>reason</code> is{" "}
+        <code>"activate"</code> for a pick (pointer, keyboard, typeahead or autofill;{" "}
+        <code>event</code> is the native <code>change</code>) and <code>"platform"</code> for a form
+        reset (<code>event</code> is the <code>reset</code> event) or a pick made before hydration
+        (no event).
       </p>
 
       <h4>

@@ -403,30 +403,36 @@ export function ComboboxPage() {
         }
       />
       <p>
-        <code>ComboboxValueChangeDetails</code>: <code>{"{ reason, custom, event }"}</code>.{" "}
-        <code>reason</code> is <code>"activate"</code> (an accepted option: the <code>keydown</code>{" "}
-        or <code>click</code>; free text: the <code>keydown</code> or <code>focusout</code>; Clear:
-        the <code>click</code>) or <code>"platform"</code> (a form reset: the <code>reset</code>{" "}
-        event). <code>ComboboxInputValueChangeDetails</code>: <code>{"{ reason, event }"}</code>,
-        with <code>"activate"</code> for typing (the <code>input</code> event), an accepted label
-        and Clear, <code>"dismiss"</code> for a revert (focus leaving with unmatched text, a
-        rolled-back selection, Escape on edited text with the listbox closed: the{" "}
-        <code>keydown</code>), <code>"platform"</code> for a reset or text found at mount (no
-        event). <code>ComboboxOpenChangeDetails</code>: <code>{"{ reason, event }"}</code>; the
-        reasons are listed with <code>openChangeAction</code> and <code>onOpenChange</code> above.
+        <code>ComboboxValueChangeDetails</code>: <code>{"{ reason, custom, valid, event }"}</code>.{" "}
+        <code>valid</code> (see <a href="/components/field#details-valid">details.valid</a>): the
+        Input's <code>required</code> for the next selection (a committed value always has text, a
+        cleared one has none) and the Field's <code>validate</code>; other constraints on the Input
+        (<code>pattern</code>, <code>minLength</code>) describe the typed text and are not part of
+        it, and neither is an Option whose label is empty text. <code>reason</code> is{" "}
+        <code>"activate"</code> (an accepted option: the <code>keydown</code> or <code>click</code>;
+        free text: the <code>keydown</code> or <code>focusout</code>; Clear: the <code>click</code>)
+        or <code>"platform"</code> (a form reset: the <code>reset</code> event).{" "}
+        <code>ComboboxInputValueChangeDetails</code>: <code>{"{ reason, event }"}</code>, with{" "}
+        <code>"activate"</code> for typing (the <code>input</code> event), an accepted label and
+        Clear, <code>"dismiss"</code> for a revert (focus leaving with unmatched text, a rolled-back
+        selection, Escape on edited text with the listbox closed: the <code>keydown</code>),{" "}
+        <code>"platform"</code> for a reset or text found at mount (no event).{" "}
+        <code>ComboboxOpenChangeDetails</code>: <code>{"{ reason, event }"}</code>; the reasons are
+        listed with <code>openChangeAction</code> and <code>onOpenChange</code> above.
       </p>
       <p>
         <code>ComboboxMultipleValueChangeDetails</code> (with <code>multiple</code>):{" "}
-        <code>{"{ reason, added, removed, custom, event }"}</code>. <code>added</code> lists the
-        values this dispatch added, in the order they join; <code>removed</code> the values it
-        removed, in value order; <code>custom</code> is <code>true</code> for free text.{" "}
-        <code>reason</code> is <code>"activate"</code> (a toggled option: the <code>keydown</code>{" "}
-        or <code>click</code>; a removed chip: the <code>keydown</code> of Backspace or Delete, the{" "}
-        <code>click</code> of <code>ChipRemove</code>; Clear; free text: the <code>keydown</code> or{" "}
-        <code>focusout</code>) or <code>"platform"</code> (a form reset, dispatched whole with the
-        diff). With <code>multiple</code> the library writes the text on typing, a pick (
-        <code>""</code>, <code>"activate"</code>), Clear, focus leaving and Escape with the listbox
-        closed (<code>""</code>, <code>"dismiss"</code>), a reset and at mount.
+        <code>{"{ reason, added, removed, custom, valid, event }"}</code> (<code>valid</code>:{" "}
+        <code>required</code> means at least one value). <code>added</code> lists the values this
+        dispatch added, in the order they join; <code>removed</code> the values it removed, in value
+        order; <code>custom</code> is <code>true</code> for free text. <code>reason</code> is{" "}
+        <code>"activate"</code> (a toggled option: the <code>keydown</code> or <code>click</code>; a
+        removed chip: the <code>keydown</code> of Backspace or Delete, the <code>click</code> of{" "}
+        <code>ChipRemove</code>; Clear; free text: the <code>keydown</code> or <code>focusout</code>
+        ) or <code>"platform"</code> (a form reset, dispatched whole with the diff). With{" "}
+        <code>multiple</code> the library writes the text on typing, a pick (<code>""</code>,{" "}
+        <code>"activate"</code>), Clear, focus leaving and Escape with the listbox closed (
+        <code>""</code>, <code>"dismiss"</code>), a reset and at mount.
       </p>
 
       <h4>

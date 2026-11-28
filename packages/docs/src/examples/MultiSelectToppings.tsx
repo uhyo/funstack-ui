@@ -82,9 +82,7 @@ export function MultiSelectToppings() {
           <MultiSelect.Label className="demo-field">Toppings</MultiSelect.Label>
           <MultiSelect.Trigger className="demo-multi-select-trigger">
             <MultiSelect.Value placeholder="Choose toppings">
-              {({ value }) =>
-                value.length === 0 ? "Choose toppings" : value.map((v) => NAMES[v] ?? v).join(", ")
-              }
+              {({ value }) => value.map((v) => NAMES[v] ?? v).join(", ")}
             </MultiSelect.Value>
             <span className="demo-multi-select-chevron" aria-hidden>
               ▾

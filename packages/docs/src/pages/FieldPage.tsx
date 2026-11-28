@@ -6,6 +6,7 @@ import { DocPage } from "../components/DocPage.js";
 import { PartFacts, PropsTable, Table } from "../components/Tables.js";
 import { FieldAddress } from "../examples/FieldAddress.js";
 import { FieldControls } from "../examples/FieldControls.js";
+import { FieldNewTask } from "../examples/FieldNewTask.js";
 import { FieldSignUp } from "../examples/FieldSignUp.js";
 import { functionProps, renderProp, stylingProps } from "./shared-props.js";
 
@@ -39,7 +40,8 @@ export function FieldPage() {
       <CodeBlock>{`import { Field } from "@funstack/ui/field";
 import { Form } from "@funstack/ui/form";
 
-<Form.Root action={formAction} errors={state.errors}>              {/* form */}
+<Form.Root action={formAction} errors={state.errors} error={state.error}>  {/* form */}
+  <Form.Error />                                                   {/* div, only while error is set */}
   <Field.Root name="email" required>                               {/* div */}
     <Field.Label>Email</Field.Label>                               {/* label[for] */}
     <Field.Control type="email" autoComplete="email" />            {/* input */}
@@ -94,6 +96,13 @@ import { Form } from "@funstack/ui/form";
         </li>
         <li>
           <code>Field.Description</code> is always referenced by the control, rendered or not.
+        </li>
+        <li>
+          <strong>
+            <code>Form.Error</code> is rendered only while the form has a form-level error
+          </strong>{" "}
+          (<code>Form.Root error</code>): a failed submission that is not about one field. See{" "}
+          <a href="#form-level-errors">Form-level errors</a>.
         </li>
       </ul>
 
@@ -154,6 +163,40 @@ import { Form } from "@funstack/ui/form";
         <code>validate</code> is rendered from a client component (a function is not serialisable).
       </p>
 
+      <h4 id="details-valid">
+        Inline saves: <code>details.valid</code>
+      </h4>
+      <CodeBlock>{`<Field.Root name="title" required>
+  <Field.Label>Title</Field.Label>
+  <TextField
+    defaultValue={task.title}
+    valueCommitAction={async (next, details) => {
+      if (!details.valid) return; // nothing saved; the error stays next to the text
+      await saveTitle(next);
+    }}
+  />
+  <Field.Error />
+</Field.Root>`}</CodeBlock>
+      <p>
+        Every value action of a form control (Checkbox, Switch, RadioGroup, CheckboxGroup, Select,
+        MultiSelect, Combobox, TextField, NumberField, Slider, and OTPField's{" "}
+        <code>completeAction</code>) gets <code>details.valid</code>: the control would be valid
+        holding the value the action is called with. It covers the control's native constraints (
+        <code>required</code>, <code>pattern</code>, <code>minLength</code>, <code>min</code> /{" "}
+        <code>max</code> / <code>step</code>, a group's &quot;at least one&quot;) and, inside a
+        Field, the Field's <code>validate</code> for that value. It does not cover a server error
+        (that is about a value already submitted, and the change is the edit that dismisses it).
+      </p>
+      <p>
+        It is information, not a gate: the library dispatches an invalid value like any other, and
+        the Field shows the error. An action that saves checks it. Uncontrolled, the early return
+        keeps the invalid value in the control and saves nothing; a controlled parent that does not
+        adopt the value rolls back instead. <code>valid</code> is an ordinary boolean field, so a
+        Server Function passed directly receives it. Handlers (<code>onValueChange</code>,{" "}
+        <code>onInputValueChange</code>) and the actions of components that are not form controls
+        (Toggle, Tabs, menus) have none.
+      </p>
+
       <h4>Submission and server errors</h4>
       <p>
         With a function <code>action</code> (a Server Function, a <code>useActionState</code>{" "}
@@ -176,6 +219,16 @@ import { Form } from "@funstack/ui/form";
           shows its errors again, even identical strings.
         </li>
         <li>
+          <strong>A field error is a statement about that value.</strong> Because it blocks a
+          resubmission of the unchanged value, it is right for &quot;this title is taken&quot; and
+          wrong for &quot;the request failed&quot;: a transient failure, or anything the user cannot
+          fix by editing that field, goes in <code>error</code> (
+          <a href="#form-level-errors">Form-level errors</a>). An entry of <code>errors</code> whose
+          key matches no Field is shown by nothing and focuses nothing, but still counts as an error
+          for <code>autoReset</code> and a dialog's close (an error summary of your own can rely on
+          that); it is not the form-level channel, and a misspelt field name ends up there silently.
+        </li>
+        <li>
           After a submission with errors, the first field with an error is focused (its message is
           announced with <code>ariaNotify()</code> when focus is already on it). Errors present at
           mount (a progressive-enhancement post-back, a Server Component prop) are shown without
@@ -188,9 +241,9 @@ import { Form } from "@funstack/ui/form";
         <li>
           <strong>Reset only on success.</strong> React resets a form after every successful action,
           including one that returned field errors, which wipes what the user typed. The Form resets
-          (<code>form.reset()</code>) only when the submission settles with no error in{" "}
-          <code>errors</code>; pass <code>autoReset={"{false}"}</code> to keep the values (a
-          settings form).
+          (<code>form.reset()</code>) only when the submission settles with no error: no entry in{" "}
+          <code>errors</code> and an empty <code>error</code>; pass{" "}
+          <code>autoReset={"{false}"}</code> to keep the values (a settings form).
         </li>
         <li>
           An action that throws reaches the nearest Error Boundary above <code>Form.Root</code>;
@@ -205,38 +258,135 @@ import { Form } from "@funstack/ui/form";
           if you need to; the button is never disabled.
         </li>
       </ul>
+      <h5 id="form-level-errors">
+        Form-level errors: <code>error</code> and <code>Form.Error</code>
+      </h5>
+      <CodeBlock>{`const [state, formAction] = useActionState(createTask, {});
+// state: { errors?: { title?: string }, error?: string }
+
+<Form.Root action={formAction} errors={state.errors} error={state.error}>
+  <Form.Error className="form-error" />
+  <Field.Root name="title" required>…</Field.Root>
+  <Form.Submit>Create</Form.Submit>
+</Form.Root>`}</CodeBlock>
+      <p>
+        A failure that is not about one field (&quot;the server is unavailable&quot;) is the{" "}
+        <code>error</code> prop, with the type of one entry of <code>errors</code> (a string,
+        several strings, or nothing). The two props are the two kinds of failure:
+      </p>
+      <Table
+        head={["", "errors[name]", "error"]}
+        rows={[
+          ["Says", "this field's value is wrong", "the submission failed"],
+          ["Shown by", "the `Field.Error` of the Field with that name", "`Form.Error`"],
+          ["Custom validity", "written on the control while shown", "never"],
+          [
+            "Submitting the same values again",
+            "blocked until the field is edited",
+            "allowed: that is the retry",
+          ],
+          ["Dismissed by", "the field's next edit", "nothing; replaced by the next result"],
+          ["At the settle", "the first such field is focused", "announced, no focus move"],
+          ["`autoReset`, `Dialog.Form` close", "prevented", "prevented"],
+        ]}
+      />
+      <ul>
+        <li>
+          <code>Form.Error</code> mirrors the prop: it renders its <code>&lt;div&gt;</code> exactly
+          while <code>error</code> has a message, at mount (a post-back), after a settle, and while
+          the next submission is in flight (with <code>data-pending</code>, to dim it).
+        </li>
+        <li>
+          After a settle with an <code>error</code>, the Form speaks the messages through{" "}
+          <code>ariaNotify()</code> on the form, once per settle, also when the text is the same as
+          last time (a second failed retry is news). Only while a <code>Form.Error</code> is
+          mounted: if you render the message yourself, you own its announcement. When a field error
+          is announced in the same settle (focus was already on that field), the two are one
+          announcement, the form-level text first. Nothing is announced at mount.
+        </li>
+        <li>
+          Focus moves to the first errored field if there is one, else stays where it was (usually
+          the submit button, where the retry is). No <code>role=&quot;alert&quot;</code> and no{" "}
+          <code>aria-live</code>: a live region would read the message twice.
+        </li>
+        <li>
+          Several <code>Form.Error</code> parts may be mounted (top and bottom of a long form); the
+          announcement is still one. <code>error</code> is serialisable, so a Server Component may
+          pass it, and the part is plain markup in the server HTML.
+        </li>
+        <li>
+          An action that <strong>throws</strong> still reaches the Error Boundary.{" "}
+          <code>error</code> is for a failure the action caught and returned.
+        </li>
+      </ul>
       <h5 id="dialog-form">
         In a Dialog: <code>Dialog.Form</code> rendered as <code>Form.Root</code>
       </h5>
-      <CodeBlock>{`const [state, dispatch] = useActionState(saveProfile, {});
+      <Example file="FieldNewTask.tsx" css="field.css">
+        <FieldNewTask />
+      </Example>
+      <CodeBlock>{`"use client";
+async function createTask(_: State, formData: FormData): Promise<State> {
+  try {
+    const result = await api.createTask(formData);
+    return result.ok ? {} : { errors: result.fieldErrors }; // "title": "Already exists"
+  } catch {
+    return { error: "Could not reach the server. Try again." }; // nothing to fix in a field
+  }
+}
 
-<Dialog.Popup>
-  <Dialog.Title>Edit profile</Dialog.Title>
-  <Dialog.Form action={dispatch} render={<Form.Root errors={state.errors} />}>
-    <Field.Root name="email">
-      <Field.Label>Email</Field.Label>
-      <Field.Control type="email" required />
-      <Field.Error />
-    </Field.Root>
-    <Dialog.Close value="cancel">Cancel</Dialog.Close>
-    <Form.Submit value="save">Save</Form.Submit>
-  </Dialog.Form>
-</Dialog.Popup>`}</CodeBlock>
+function NewTaskForm() {
+  // Inside the Popup: the state starts fresh at every open.
+  const [state, formAction] = useActionState(createTask, {});
+  return (
+    <Dialog.Form action={formAction} render={<Form.Root errors={state.errors} error={state.error} />}>
+      <Form.Error />
+      <Field.Root name="title" required>
+        <Field.Label>Title</Field.Label>
+        <Field.Control />
+        <Field.Error />
+      </Field.Root>
+      <Dialog.Close value="cancel">Cancel</Dialog.Close>
+      <Form.Submit value="save">Create</Form.Submit>
+    </Dialog.Form>
+  );
+}
+
+<Dialog.Root defaultOpen={false}>
+  <Dialog.Trigger>New task</Dialog.Trigger>
+  <Dialog.Popup>
+    <NewTaskForm />
+  </Dialog.Popup>
+</Dialog.Root>`}</CodeBlock>
       <p>
         <code>Dialog.Form</code> renders a plain React form, which takes React's path: the form is
         reset after every successful action, also one that returned field errors. Rendered as{" "}
-        <code>Form.Root</code> (<code>render={"{<Form.Root errors={state.errors} />}"}</code>),{" "}
+        <code>Form.Root</code> (
+        <code>render={"{<Form.Root errors={state.errors} error={state.error} />}"}</code>),{" "}
         <code>Form.Root</code> receives the <code>action</code> and runs it, so its policy applies:
         server errors are routed to the fields and focused, and the form is reset only when the
         result has no error (<code>autoReset</code>, which you can pass on the{" "}
         <code>Form.Root</code> element). <code>Dialog.Form</code>'s <code>closeOnSettle</code>{" "}
-        follows the same rule: a result with a field error keeps the dialog open (the typed values
-        stay and the first errored field is focused), a result with no error resets the form and
-        closes the dialog with the <code>Form.Submit</code>'s <code>value</code> as{" "}
-        <code>returnValue</code>. An action that throws keeps the dialog open and reaches the
-        nearest Error Boundary. An error hidden because the user changed that value while the action
-        ran still counts: the dialog stays open and the user submits the new value.
+        follows the same rule: a result with a field error or a form-level <code>error</code> keeps
+        the dialog open (the typed values stay; the first errored field is focused, or the
+        form-level error is announced), a result with no error resets the form and closes the dialog
+        with the <code>Form.Submit</code>'s <code>value</code> as <code>returnValue</code>. An
+        action that throws keeps the dialog open and reaches the nearest Error Boundary. An error
+        hidden because the user changed that value while the action ran still counts: the dialog
+        stays open and the user submits the new value.
       </p>
+      <Callout title="Keep useActionState inside the Popup">
+        <p>
+          The Popup's content is unmounted while the dialog is closed (library mode, without{" "}
+          <code>keepMounted</code>), so a form component rendered inside it starts with a fresh
+          action state, and no errors, at every open. With the hook in the component that renders{" "}
+          <code>Dialog.Root</code>, the state outlives the close, and the next open shows the last
+          submission's errors on an empty form (errors present at mount are shown). In JS-free mode
+          (a <code>Dialog.Root</code> with none of <code>open</code>, <code>defaultOpen</code>,{" "}
+          <code>openChangeAction</code>, <code>onOpenChange</code>) the content is always mounted:
+          pass <code>defaultOpen={"{false}"}</code> to select library mode.
+        </p>
+      </Callout>
       <ul>
         <li>
           The reset runs before the close, so an exit animation shows the fields at their defaults.
@@ -420,14 +570,20 @@ import { Form } from "@funstack/ui/form";
             name: "errors",
             type: "FormErrors",
             description:
-              "`Record<string, string | readonly string[] | null | undefined>` keyed by field name. Shown on the matching Field, dismissed by its next edit, re-armed by the next settled submission.",
+              "`Record<string, string | readonly string[] | null | undefined>` keyed by field name. Shown on the matching Field, written into its control's validity (the same value cannot be resubmitted), dismissed by its next edit, re-armed by the next settled submission.",
+          },
+          {
+            name: "error",
+            type: "FieldErrorValue",
+            description:
+              "A form-level error: a failure that is not about one field (usually `state.error`). Shown by `Form.Error` and announced when a submission settles. Never written into a control's validity, so the same values can be submitted again. While it is not empty the form is not reset and a `Dialog.Form` stays open. See [Form-level errors](#form-level-errors).",
           },
           {
             name: "autoReset",
             type: "boolean",
             default: "true",
             description:
-              "Reset the form when a submission the Form ran settles with no non-empty entry in `errors`. `false`: never.",
+              "Reset the form when a submission the Form ran settles with no error: no non-empty entry in `errors` (one hidden because the user replaced the value still counts) and an empty `error`. `false`: never.",
           },
           {
             name: "method",
@@ -472,6 +628,32 @@ import { Form } from "@funstack/ui/form";
         note={"`name`, `value` and `formAction` pass through."}
       />
 
+      <h4>
+        <code>Form.Error</code>
+      </h4>
+      <PropsTable
+        rows={[
+          {
+            name: "children",
+            type: "ReactNode | ((state: FormErrorState) => ReactNode)",
+            default: 'messages.join(" ")',
+            description:
+              "Rendered only while `Form.Root error` has a message. A function gets the state. Must not suspend.",
+          },
+          ...stylingProps("FormErrorState"),
+          renderProp("div", "FormErrorState"),
+        ]}
+      />
+      <PartFacts
+        state={
+          "`FormErrorState` is `{ messages, pending }`; `messages`: `Form.Root error`, normalised (never empty while the part renders); `pending`: the enclosing form's submission is in flight."
+        }
+        owned={"`data-pending`."}
+        note={
+          "Throws outside a `Form.Root`. No `role` and no live region: while it is mounted the Form announces the messages with `ariaNotify()` at each settle. `id` is yours (nothing references the part)."
+        }
+      />
+
       <h3 id="data-attributes">Data attributes</h3>
       <Table
         head={["Attribute", "On", "Meaning"]}
@@ -495,7 +677,7 @@ import { Form } from "@funstack/ui/form";
           ],
           [
             "`data-pending`",
-            "every Field part, Form.Root, Form.Submit",
+            "every Field part, Form.Root, Form.Submit, Form.Error",
             "The form's submission is in flight. A FUNSTACK control inside keeps its own `data-pending` for its own action.",
           ],
           [

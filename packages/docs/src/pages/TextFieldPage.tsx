@@ -114,9 +114,14 @@ export function TextFieldPage() {
       />
       <ul>
         <li>
-          The commit does not look at validity: text that fails <code>required</code> or{" "}
-          <code>pattern</code> is committed like any other. An action that must not save such text
-          checks it.
+          The commit does not wait for validity: text that fails <code>required</code> or{" "}
+          <code>pattern</code> is committed like any other, and the action is told:{" "}
+          <code>details.valid</code> is <code>false</code> (the native constraints of the committed
+          text and, inside a Field, <code>validate</code>). An action that must not save it returns
+          early: <code>{"if (!details.valid) return;"}</code>. Uncontrolled, the text then stays on
+          screen with the Field's error and the next valid commit saves; a controlled parent that
+          does not adopt it shows the saved text again. See{" "}
+          <a href="/components/field#details-valid">details.valid</a>.
         </li>
         <li>
           A controlled <code>value</code> that changes from outside shows at once when no draft is
@@ -222,7 +227,7 @@ export function TextFieldPage() {
           "`value` (the shown text), `onChange`, `onKeyDown`, `onBlur` (`onInput`, `onFocus`, `onKeyUp` and the rest pass through), `data-pending`, `data-disabled`, `data-readonly`; inside a Field also `id`, `name`, `disabled`, `required`, `readOnly`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`."
         }
         note={
-          '`TextFieldValueCommitDetails` is `{ reason, event }`: `"activate"` for a commit (`event` is the `focusout` or the `keydown` of the commit key), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`). Serialisable: a Server Function receives `{ reason }`. In development a field with no accessible name (no `<label>`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning.'
+          '`TextFieldValueCommitDetails` is `{ reason, valid, event }`: `"activate"` for a commit (`event` is the `focusout` or the `keydown` of the commit key), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`); `valid`: the field would be valid holding the committed text (native constraints, the Field\'s `validate`; tooShort / tooLong only as the platform flags them, for edited text). Serialisable: a Server Function receives `{ reason, valid }`. In development a field with no accessible name (no `<label>`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning.'
         }
       />
 

@@ -74,9 +74,11 @@ export function MultiSelectPage() {
           <strong>Value shows what you render.</strong> The library keeps no item list and the
           options are not rendered while the listbox is closed, so for a preselected value it does
           not know a name until the option was seen once (never in the server HTML). Pass function{" "}
-          <code>children</code> with your own names, as above. Without children it shows the
-          placeholder, else the labels it has seen joined with <code>", "</code> (the raw value for
-          one it has not).
+          <code>children</code> with your own names, as above. While the selection is empty it shows{" "}
+          <code>placeholder</code> when you give one, whatever <code>children</code> is (a function
+          is not called), so the function needs no empty branch: <code>children</code> describes the
+          selection, <code>placeholder</code> its absence. Without children it shows the labels it
+          has seen joined with <code>", "</code> (the raw value for one it has not).
         </li>
         <li>
           <strong>Popup and List are separate</strong> because a listbox may contain only options
@@ -250,11 +252,13 @@ export function MultiSelectPage() {
       />
       <p>
         <code>MultiSelectValueChangeDetails</code>:{" "}
-        <code>{"{ reason, added, removed, event }"}</code>. <code>reason</code> is{" "}
-        <code>"activate"</code> for a pick (<code>event</code> is the <code>keydown</code> or{" "}
-        <code>click</code>) and <code>"platform"</code> for a form reset ( the <code>reset</code>{" "}
-        event; it can add and remove at once). <code>added</code> is in the order the values join,{" "}
-        <code>removed</code> in value order.
+        <code>{"{ reason, added, removed, valid, event }"}</code>. <code>valid</code>: the selection
+        would be valid (<code>required</code>: not empty, and the Field's <code>validate</code> for
+        the next set; see <a href="/components/field#details-valid">details.valid</a>).{" "}
+        <code>reason</code> is <code>"activate"</code> for a pick (<code>event</code> is the{" "}
+        <code>keydown</code> or <code>click</code>) and <code>"platform"</code> for a form reset (
+        the <code>reset</code> event; it can add and remove at once). <code>added</code> is in the
+        order the values join, <code>removed</code> in value order.
       </p>
 
       <h4>
@@ -314,15 +318,16 @@ export function MultiSelectPage() {
           {
             name: "placeholder",
             type: "ReactNode",
-            description: "Shown by the default content while the selection is empty.",
+            description:
+              "Shown while the selection is empty, instead of `children` (a function `children` is not called then). `null` counts as not given; without it, `children` renders the empty selection too.",
           },
           ...stylingProps("MultiSelectValueState"),
           {
             name: "children",
             type: "ReactNode | ((state: MultiSelectValueState) => ReactNode)",
-            default: 'placeholder, else the labels joined with ", "',
+            default: 'the labels joined with ", "',
             description:
-              "The summary, usually a function of `{ value }` with your own names. `labels[i]` is the text of the option for `value[i]` as the library last saw it, `undefined` if it never saw one. Must not suspend.",
+              "The summary, usually a function of `{ value }` with your own names. Not used while the selection is empty and `placeholder` is given. `labels[i]` is the text of the option for `value[i]` as the library last saw it, `undefined` if it never saw one. Must not suspend.",
           },
           renderProp("span", "MultiSelectValueState"),
         ]}

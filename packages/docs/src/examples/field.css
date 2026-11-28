@@ -71,6 +71,25 @@
   }
 }
 
+/* Form.Error: the form-level error (a failed submission), rendered only while there is one.
+   Dimmed while the retry is in flight (`data-pending`); the message stays until the result. */
+.demo-form-error {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.9rem;
+  opacity: 1;
+  transition: opacity 150ms;
+  @starting-style {
+    opacity: 0;
+  }
+}
+.demo-form-error[data-pending] {
+  opacity: 0.6;
+}
+
 .demo-radio-row {
   display: flex;
   gap: 1.2em;
@@ -106,7 +125,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .demo-field-error {
+  .demo-field-error,
+  .demo-form-error {
     transition: none;
   }
 }
