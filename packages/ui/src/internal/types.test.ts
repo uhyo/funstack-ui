@@ -4,6 +4,7 @@ import type {
   Action,
   ActionDetails,
   ChangeAction,
+  Rejectable,
   UrgentChangeHandler,
   WhilePending,
 } from "./types.js";
@@ -37,7 +38,7 @@ describe("Action types", () => {
   it("returns unknown and receives (next, details)", () => {
     expectTypeOf<Action>().returns.toBeUnknown();
     expectTypeOf<ChangeAction<string>>().parameters.toEqualTypeOf<
-      [next: string, details: ActionDetails]
+      [next: string, details: ActionDetails & Rejectable]
     >();
     expectTypeOf<ActionDetails["event"]>().toEqualTypeOf<Event | undefined>();
   });

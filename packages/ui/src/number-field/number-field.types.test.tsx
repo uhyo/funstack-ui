@@ -1,6 +1,7 @@
 import type { Ref } from "react";
 import { describe, expectTypeOf, it } from "vitest";
 import { NumberField } from "./index.js";
+import type { Rejectable } from "../internal/types.js";
 import type {
   NumberFieldInputProps,
   NumberFieldInputState,
@@ -24,12 +25,12 @@ describe("NumberField types", () => {
         value={null}
         valueChangeAction={(next, details) => {
           expectTypeOf(next).toEqualTypeOf<number | null>();
-          expectTypeOf(details).toEqualTypeOf<NumberFieldValueChangeDetails>();
+          expectTypeOf(details).toEqualTypeOf<NumberFieldValueChangeDetails & Rejectable>();
         }}
         valueCommitAction={(next, details) => {
           expectTypeOf(next).toEqualTypeOf<number | null>();
           // A commit action has its own details type (conventions 9.4).
-          expectTypeOf(details).toEqualTypeOf<NumberFieldValueCommitDetails>();
+          expectTypeOf(details).toEqualTypeOf<NumberFieldValueCommitDetails & Rejectable>();
         }}
       >
         {(state) => {

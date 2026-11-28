@@ -29,6 +29,7 @@ import { describeValueAction } from "../__tests__/value-action-suite.js";
 import { Field } from "../field/index.js";
 import { Select } from "../select/index.js";
 import { MultiSelect } from "./index.js";
+import type { Rejectable } from "../internal/types.js";
 import type {
   MultiSelectOpenChangeDetails,
   MultiSelectRootProps,
@@ -259,6 +260,32 @@ describe("MultiSelect (jsdom)", () => {
         expect.objectContaining({ reason: "dismiss" }),
       );
       expect(document.activeElement).toBe(trigger());
+    });
+
+    // #207 (conventions 2.4.1): `open` stays as it was, in both directions.
+    it("openChangeAction with details.reject(): an open stays closed, a close stays open", async () => {
+      const user = setupUser();
+      const reportError = vi.fn();
+      vi.stubGlobal("reportError", reportError);
+      let refuse = true;
+      const openChangeAction = vi.fn(
+        (_next: boolean, d: MultiSelectOpenChangeDetails & Rejectable) => {
+          if (refuse) d.reject();
+        },
+      );
+      render(<Harness root={{ openChangeAction }} />);
+      await user.click(trigger());
+      await flushTasks(2);
+      expect(isOpen()).toBe(false);
+      refuse = false;
+      await openWithClick(user);
+      expect(isOpen()).toBe(true);
+      refuse = true;
+      await user.click(trigger());
+      await flushTasks(2);
+      expect(isOpen()).toBe(true);
+      expect(openChangeAction).toHaveBeenCalledTimes(3);
+      expect(reportError).not.toHaveBeenCalled();
     });
 
     it("Alt+ArrowUp closes without toggling; Tab closes without toggling", async () => {

@@ -3,10 +3,11 @@
 // rules (reportError, not the boundary; every one of a burst; unmount; the console fallback) and
 // the uncontrolled reducer commit (#150) also have direct rows here.
 import { act, render } from "@testing-library/react";
-import { Activity } from "react";
+import { Activity, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { deferred, ErrorCatcher, silenceErrors } from "../../__tests__/helpers.js";
-import type { ActionDetails } from "../types.js";
+import type { ActionDetails, ChangeAction, Rejectable } from "../types.js";
+import { createActionDetails } from "./action-details.js";
 import { intendedValue, useControllableAction } from "./use-controllable-action.js";
 import type { ControllableAction } from "./use-controllable-action.js";
 
@@ -512,5 +513,276 @@ describe("intendedValue (conventions 3.8 rule 1)", () => {
   it("is the optimistic value with nothing in flight, or no latestInFlight at all", () => {
     expect(intendedValue(() => null, "a")).toBe("a");
     expect(intendedValue(undefined, "a")).toBe("a");
+  });
+});
+
+// #207 (conventions 2.4.1): an action that called `details.reject()` before it settled is treated
+// as if it had rejected, except that nothing is thrown and nothing is reported.
+describe("useControllableAction: details.reject()", () => {
+  type RejectAction = ChangeAction<string, ActionDetails>;
+
+  function RejectProbe({
+    controlled,
+    action,
+    onHook,
+  }: {
+    controlled?: string;
+    action: RejectAction;
+    onHook: (hook: Hook) => void;
+  }) {
+    const hook = useControllableAction<string, ActionDetails>({
+      controlled,
+      defaultValue: undefined,
+      initialValue: "a",
+      action,
+      warn: { component: "RejectProbe", prop: "value" },
+    });
+    onHook(hook);
+    return (
+      <output data-testid="value">
+        {hook.committed}|{hook.optimistic}|{String(hook.pending)}
+      </output>
+    );
+  }
+
+  function setupReject(action: RejectAction, controlled?: string) {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const caught = vi.fn();
+    let hook!: Hook;
+    const view = render(
+      <ErrorCatcher onError={caught}>
+        <RejectProbe controlled={controlled} action={action} onHook={(h) => (hook = h)} />
+      </ErrorCatcher>,
+    );
+    return {
+      reportError,
+      caught,
+      view,
+      dispatch: (next: string) => hook.dispatch(next, createActionDetails(undefined, {})),
+      value: () => view.queryByTestId("value")?.textContent,
+    };
+  }
+
+  it("uncontrolled, async: optimistic reverts, nothing committed, no boundary, no reportError; pending ends at the settle", async () => {
+    const run = deferred();
+    let details!: Rejectable;
+    const t = setupReject(async (_next, d) => {
+      details = d;
+      await run.promise;
+    });
+    act(() => t.dispatch("b"));
+    expect(t.value()).toBe("a|b|true");
+    // Read at the settle, not at the call: still pending, still optimistic.
+    await act(async () => details.reject());
+    expect(t.value()).toBe("a|b|true");
+    await act(async () => run.resolve());
+    expect(t.value()).toBe("a|a|false");
+    expect(t.caught).not.toHaveBeenCalled();
+    expect(t.reportError).not.toHaveBeenCalled();
+  });
+
+  it("uncontrolled, sync: reject() before returning does the same", async () => {
+    const t = setupReject((_next, d) => {
+      d.reject();
+    });
+    await act(async () => t.dispatch("b"));
+    expect(t.value()).toBe("a|a|false");
+    expect(t.caught).not.toHaveBeenCalled();
+    expect(t.reportError).not.toHaveBeenCalled();
+  });
+
+  it("controlled, without adopting: the value shown is the prop", async () => {
+    const t = setupReject((_next, d) => d.reject(), "a");
+    await act(async () => t.dispatch("b"));
+    expect(t.value()).toBe("a|a|false");
+    expect(t.caught).not.toHaveBeenCalled();
+  });
+
+  it("controlled, the parent adopts and calls reject(): the adopted value", async () => {
+    vi.stubGlobal("reportError", vi.fn());
+    let hook!: Hook;
+    function Parent() {
+      const [value, setValue] = useState("a");
+      return (
+        <RejectProbe
+          controlled={value}
+          action={(next, d) => {
+            setValue(next);
+            d.reject();
+          }}
+          onHook={(h) => (hook = h)}
+        />
+      );
+    }
+    const view = render(<Parent />);
+    await act(async () => hook.dispatch("b", createActionDetails(undefined, {})));
+    expect(view.getByTestId("value").textContent).toBe("b|b|false");
+  });
+
+  it("twice equals once", async () => {
+    const t = setupReject(async (_next, d) => {
+      d.reject();
+      d.reject();
+    });
+    await act(async () => t.dispatch("b"));
+    expect(t.value()).toBe("a|a|false");
+    expect(t.caught).not.toHaveBeenCalled();
+  });
+
+  it("after the settle: no effect, and one development warning", async () => {
+    const error = silenceErrors();
+    let details!: Rejectable;
+    const t = setupReject((_next, d) => {
+      details = d;
+    });
+    await act(async () => t.dispatch("b"));
+    expect(t.value()).toBe("b|b|false");
+    await act(async () => details.reject());
+    expect(t.value()).toBe("b|b|false");
+    expect(error).toHaveBeenCalledOnce();
+    expect(String(error.mock.calls[0]![0])).toMatch(/^RejectProbe: `details\.reject\(\)`/);
+  });
+
+  it("reject() and then a throw: the boundary gets the error", async () => {
+    silenceErrors();
+    const failure = new Error("failed");
+    const t = setupReject(async (_next, d) => {
+      d.reject();
+      throw failure;
+    });
+    await act(async () => t.dispatch("b"));
+    expect(t.caught).toHaveBeenCalledWith(failure);
+  });
+
+  it("overlap: the latest calls reject(), the older resolves: nothing committed", async () => {
+    const runs = [deferred(), deferred()];
+    const calls: Rejectable[] = [];
+    const t = setupReject(async (_next, d) => {
+      const i = calls.push(d) - 1;
+      await runs[i]!.promise;
+    });
+    act(() => {
+      t.dispatch("b");
+      t.dispatch("c");
+    });
+    expect(t.value()).toBe("a|c|true");
+    calls[1]!.reject();
+    await act(async () => runs[1]!.resolve());
+    await act(async () => runs[0]!.resolve());
+    expect(t.value()).toBe("a|a|false");
+    expect(t.reportError).not.toHaveBeenCalled();
+    expect(t.caught).not.toHaveBeenCalled();
+  });
+
+  it("overlap: the older calls reject(), the latest resolves: the latest is committed, nothing reported", async () => {
+    const runs = [deferred(), deferred()];
+    const calls: Rejectable[] = [];
+    const t = setupReject(async (_next, d) => {
+      const i = calls.push(d) - 1;
+      await runs[i]!.promise;
+    });
+    act(() => {
+      t.dispatch("b");
+      t.dispatch("c");
+    });
+    calls[0]!.reject();
+    await act(async () => runs[0]!.resolve());
+    await act(async () => runs[1]!.resolve());
+    expect(t.value()).toBe("c|c|false");
+    expect(t.reportError).not.toHaveBeenCalled();
+    expect(t.caught).not.toHaveBeenCalled();
+  });
+
+  it("owner gone: unmounted before the settle, then reject(): nothing thrown, nothing reported", async () => {
+    const run = deferred();
+    let details!: Rejectable;
+    const t = setupReject(async (_next, d) => {
+      details = d;
+      await run.promise;
+    });
+    act(() => t.dispatch("b"));
+    t.view.unmount();
+    details.reject();
+    await act(async () => run.resolve());
+    expect(t.reportError).not.toHaveBeenCalled();
+    expect(t.caught).not.toHaveBeenCalled();
+  });
+
+  it("hidden by <Activity> when it settles: nothing reported", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const run = deferred();
+    let hook!: Hook;
+    const probe = (mode: "visible" | "hidden") => (
+      <Activity mode={mode}>
+        <RejectProbe
+          action={async (_next, d) => {
+            d.reject();
+            await run.promise;
+          }}
+          onHook={(h) => (hook = h)}
+        />
+      </Activity>
+    );
+    const view = render(probe("visible"));
+    act(() => hook.dispatch("b", createActionDetails(undefined, {})));
+    view.rerender(probe("hidden"));
+    await act(async () => run.resolve());
+    view.rerender(probe("visible"));
+    expect(reportError).not.toHaveBeenCalled();
+    expect(view.getByTestId("value").textContent).toBe("a|a|false");
+  });
+});
+
+describe("useControllableAction: details.reject() in set-valued state", () => {
+  interface Toggle extends ActionDetails {
+    readonly item: string;
+    readonly on: boolean;
+  }
+  type SetHook = ControllableAction<readonly string[], Toggle>;
+  const apply = (prev: readonly string[], details: Toggle): readonly string[] =>
+    details.on
+      ? [...prev.filter((v) => v !== details.item), details.item].sort()
+      : prev.filter((v) => v !== details.item);
+
+  it("A calls reject(), B resolves: the set ends with B only (the replay drops A)", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const runs = [deferred(), deferred()];
+    const calls: Rejectable[] = [];
+    let hook!: SetHook;
+    function SetProbe() {
+      const h = useControllableAction<readonly string[], Toggle>({
+        controlled: undefined,
+        defaultValue: undefined,
+        initialValue: [],
+        action: async (_next, d) => {
+          const i = calls.push(d) - 1;
+          await runs[i]!.promise;
+        },
+        reducer: (prev, _next, details) => apply(prev, details),
+        warn: { component: "SetProbe", prop: "value" },
+      });
+      hook = h;
+      return (
+        <output data-testid="value">
+          {h.committed.join(",")}|{h.optimistic.join(",")}
+        </output>
+      );
+    }
+    const view = render(<SetProbe />);
+    const toggle = (item: string) => {
+      const details = createActionDetails(undefined, { item, on: true });
+      hook.dispatch(apply(hook.optimistic, details), details);
+    };
+    act(() => toggle("a"));
+    act(() => toggle("b"));
+    expect(view.getByTestId("value").textContent).toBe("|a,b");
+    calls[0]!.reject();
+    await act(async () => runs[0]!.resolve());
+    await act(async () => runs[1]!.resolve());
+    expect(view.getByTestId("value").textContent).toBe("b|b");
+    expect(reportError).not.toHaveBeenCalled();
   });
 });

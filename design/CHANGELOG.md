@@ -17352,6 +17352,48 @@ From the review of `dev/216`. Amends the test plan of the #216 entry above.
 - With both `NumberField.Label` and `Field.Label` the name holds both texts ("Increase Qty
   Quantity"), as designed; documented in 8.4.
 
+## 2026-11-28, dogfood run 1: #207 implemented
+
+Developer. The checklist of the entry "2026-11-28, dogfood run 1: `details.reject()` (#207), and
+where an Error Boundary goes in a Toast and an AlertDialog" is in the code. Branch `dev/207`.
+
+- **The mechanism.** `callAction(part, details, call)` in `internal/action/call-action.ts`
+  (directive-free) gives `details` its `reject`, calls the action, marks the dispatch settled at
+  the synchronous return or when the returned thenable resolves, and turns a `reject()` made
+  before that into a throw of an internal sentinel (`isHandledRejection`). The sentinel is a
+  frozen object, not an `Error`. `useControllableAction` and `useActionTrigger` take it in their
+  existing `catch`: settle, then return, with no rethrow and no `reportDropped`, whether the
+  dispatch is the latest, superseded or its owner gone. Nothing else in the hooks changed.
+- **Not a second builder.** The checklist's "variant of `createActionDetails` for actions" is
+  done at the call instead: `createActionDetails` keeps a per-object slot that serves the virtual
+  `reject` (and `"reject" in details`), empty until `attachReject` (called by `callAction` only)
+  fills it. The details object keeps its identity, which the library's own maps keyed by a
+  dispatch's details need (Menu's close continuations, Combobox's dispatch records). A handler's
+  details never gets a `reject`; writes to `reject` are refused as writes to `event` are, on
+  every details object. A plain object (only tests pass one) is copied into a new details object.
+- **Library wrappers that act on the outcome** call the consumer's action through `callAction`
+  themselves, because a `reject()` must also skip what they do after it: `Menu.CheckboxItem` and
+  `Menu.RadioGroup` (the close), Combobox's `runValueAction` (the text rollback and the close),
+  `useStepCommit`'s commit (the `"dismiss"` revert step) and its steps. The nested call attaches
+  a fresh `reject` to the same object; the inner sentinel propagates to the hook. The pure
+  triggers (Button, Menu.Item, Toast.Action, the overlay Close parts, `AlertDialog.Action`) and
+  OTPField's `completeAction` wrap their `run` work in it.
+- **The late-call warning** is a `console.error` once per dispatch, prefixed with the part name
+  the hook already has (`warn.component`, or the part's name at a pure trigger).
+- **Types.** `Rejectable` in `internal/types.ts`, exported from `@funstack/ui/types` and the root
+  entry; `ChangeAction` intersects it; `Action<[details: XDetails & Rejectable]>` on every pure
+  trigger and on `completeAction`. `action-naming.test.ts` checks every public action prop's last
+  parameter has it (form actions, whose last parameter is `FormData`, excluded) and no own `on*`
+  handler's does, with a self-test of the guard.
+- **Tests.** The rows of the test plan: `call-action.test.ts` (the virtual property and the
+  contract), the hooks' own files, one row per state owner through the shared suites
+  (`value-action-suite`, `checkable-input-suite`, `commit-action-suite`), overlay `open` both
+  ways through `overlay-open-state-suite` (Dialog, AlertDialog, Drawer, Popover, Menu, Combobox,
+  NavigationMenu) plus HoverCard and MultiSelect rows, the closing triggers through
+  `overlay-close-part-suite` and Menu, Toast, Button, OTPField and TextField `valid` rows, and the
+  two Toast boundary placements. All jsdom: the native `checked` rollback is visible there.
+  Tooltip and Select have no `openChangeAction`, so no row.
+
 ## 2026-11-29, #217: a Field references its Label, Description and Error only while mounted
 
 From the #216 review (finding 3), filed as #217 and assigned to the developer. The Field always

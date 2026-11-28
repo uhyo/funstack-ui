@@ -1,5 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 import { Accordion } from "./index.js";
+import type { Rejectable } from "../internal/types.js";
 import type {
   AccordionItemState,
   AccordionPanelState,
@@ -25,7 +26,7 @@ describe("AccordionRootProps", () => {
         defaultValue={[]}
         valueChangeAction={(next, details) => {
           expectTypeOf(next).toEqualTypeOf<string[]>();
-          expectTypeOf(details).toEqualTypeOf<AccordionValueChangeDetails>();
+          expectTypeOf(details).toEqualTypeOf<AccordionValueChangeDetails & Rejectable>();
         }}
       />
     );

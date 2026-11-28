@@ -2,8 +2,15 @@
 import { useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
+import { callAction } from "../internal/action/call-action.js";
 import { dataAttr } from "../internal/data-attr.js";
-import type { Action, RenderProp, StateValue, WhilePending } from "../internal/types.js";
+import type {
+  Action,
+  Rejectable,
+  RenderProp,
+  StateValue,
+  WhilePending,
+} from "../internal/types.js";
 import { usePureTrigger } from "../internal/action/use-pure-trigger.js";
 import { disabledButton, rendersButton, useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -36,12 +43,14 @@ export interface ToastActionProps extends Omit<
    * Runs in this part's own transition: `data-pending` on the Action and the Root, the toast's
    * timer paused. When it resolves the toast closes with `reason: "activate"` (unless
    * `closeOnActivate` is `false`); a rejection keeps the toast and reaches the nearest Error
-   * Boundary above the Viewport. A caught error counts as success and closes the toast: rethrow
-   * after `toast.update`, or use `closeOnActivate={false}`.
+   * Boundary above this part: put one around the Action, so a failure replaces the button and
+   * not the toast. A caught error counts as success and closes the toast: to keep it, show the
+   * failure (`toast.update`) and call `details.reject()`, which keeps the toast with no boundary;
+   * the Action can then be pressed again (conventions 2.4.1).
    *
    * @defaultValue the toast's `action.action`
    */
-  action?: Action<[details: ToastActionDetails]>;
+  action?: Action<[details: ToastActionDetails & Rejectable]>;
   /**
    * Close the toast when the action resolves.
    *
@@ -137,7 +146,7 @@ export function ToastAction({
     // is cancelled (the hook's guard): one Undo, one Retry.
     trigger.runActivation(
       event,
-      () => effective(details),
+      () => callAction("Toast.Action", details, effective),
       () => {
         // Closing is idempotent: a dismissal meanwhile already closed it.
         if (closeOnActivate) root.close("activate", native);

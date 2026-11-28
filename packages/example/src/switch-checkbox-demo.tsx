@@ -56,6 +56,47 @@ function RejectingDemo() {
   );
 }
 
+// #207: the uncontrolled counterpart of the veto below. The action handles its own failure and
+// calls `details.reject()`: the box rolls back as on a rejection, with no Error Boundary.
+function RejectDemo() {
+  const [error, setError] = useState<string | null>(null);
+  const saves = useRef(0);
+  return (
+    <section>
+      <h3>
+        Uncontrolled, <code>details.reject()</code> after a caught error
+      </h3>
+      <p>
+        Every second save fails. The action catches the error, shows it inline and calls{" "}
+        <code>details.reject()</code>, so the checkbox (uncontrolled, no parent state) unchecks
+        again and stays mounted. Without the call the caught error would count as success and the
+        box would stay checked.
+      </p>
+      <label className="row">
+        <Checkbox
+          className="sc-checkbox"
+          checkedChangeAction={async (next, details) => {
+            setError(null);
+            const fail = ++saves.current % 2 === 0;
+            try {
+              await fakeSave("reject", next, { fail });
+            } catch (e) {
+              startTransition(() => setError(e instanceof Error ? e.message : String(e)));
+              details.reject();
+            }
+          }}
+        />
+        Archive the thread
+      </label>
+      {error && (
+        <output className="readout">
+          <span className="inline-error">{error}</span>
+        </output>
+      )}
+    </section>
+  );
+}
+
 function ControlledVetoDemo() {
   const [enabled, setEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -284,6 +325,7 @@ export function SwitchCheckboxDemo() {
     <Demo title="Switch and Checkbox">
       <AutosaveDemo />
       <RejectingDemo />
+      <RejectDemo />
       <ControlledVetoDemo />
       <FormDemo />
       <SelectAllDemo />

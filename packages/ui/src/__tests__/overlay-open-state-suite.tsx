@@ -26,6 +26,7 @@ import type {
 import { describe, expect, it, vi } from "vitest";
 import type { Mock, MockInstance } from "vitest";
 import type { OverlayCloseIntent } from "../internal/overlay/use-overlay-root.js";
+import type { Rejectable } from "../internal/types.js";
 import {
   createSuspender,
   deferred,
@@ -56,7 +57,7 @@ export type OpenChangeFn<D> = (next: boolean, details: D) => unknown;
 export interface OverlayRootProps<D> {
   open?: boolean;
   defaultOpen?: boolean;
-  openChangeAction?: (next: boolean, details: D) => Promise<void>;
+  openChangeAction?: (next: boolean, details: D & Rejectable) => Promise<void>;
   onOpenChange?: (next: boolean, details: D) => void;
 }
 
@@ -65,7 +66,7 @@ export interface OverlayHarnessProps<D> {
   /** Initial committed open state. */
   initialOpen?: boolean;
   /** The consumer's work, awaited by the harness's `openChangeAction`. */
-  action?: OpenChangeFn<D>;
+  action?: OpenChangeFn<D & Rejectable>;
   /**
    * The consumer's `onOpenChange` body (a fact, #148): called by the harness's handler before it
    * adopts the value; what it returns is returned to the library (a promise's rejection goes to
@@ -80,6 +81,8 @@ export interface OverlayHarnessProps<D> {
   factAdoption?: "urgent" | "transition" | "omit";
   /** Catch errors thrown by `action` (turns a rejection into success for the library). */
   catchErrors?: boolean;
+  /** With `catchErrors`: call `details.reject()` after catching (conventions 2.4.1). */
+  rejectCaught?: boolean;
   /**
    * Controlled mode: never adopt `false` (a parent that refuses to close), from the action or
    * from `onOpenChange`.
@@ -113,6 +116,7 @@ export function createOverlayHarness<D, P extends object>(
     fact,
     factAdoption = "urgent",
     catchErrors = false,
+    rejectCaught = false,
     refuseClose = false,
     refuseOpen = false,
     boundary,
@@ -122,11 +126,12 @@ export function createOverlayHarness<D, P extends object>(
   }: OverlayHarnessProps<D> & P) {
     const [open, setOpen] = useState(initialOpen);
 
-    const openChangeAction = async (next: boolean, details: D) => {
+    const openChangeAction = async (next: boolean, details: D & Rejectable) => {
       try {
         await action?.(next, details);
       } catch (error) {
         if (!catchErrors) throw error;
+        if (rejectCaught) details.reject();
         return;
       }
       if ((next && refuseOpen) || (!next && refuseClose)) return;
@@ -767,6 +772,59 @@ export function describeOverlayOpenState<D extends OverlayDetailsLike>(
         if (mode === "uncontrolled") expect(trigger()).toHaveAttribute("data-open", "");
         else expect(trigger()).not.toHaveAttribute("data-open");
       });
+
+      // #207 (conventions 2.4.1): a rejection the action handled; `open` stays as it was.
+      it("open, details.reject(): stays closed, no boundary, no reportError", async () => {
+        const user = setupUser();
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const open = spyOpen();
+        const caught = vi.fn();
+        const d = deferred();
+        render(
+          <Harness
+            mode={mode}
+            boundary={caught}
+            catchErrors
+            rejectCaught
+            action={() => d.promise}
+          />,
+        );
+        await user.click(trigger());
+        expect(trigger()).toHaveAttribute("data-open", "");
+        await act(async () => d.reject(new Error("refused")));
+        await flushTasks(2);
+        expect(isOpen()).toBe(false);
+        expect(open).not.toHaveBeenCalled();
+        expect(trigger()).not.toHaveAttribute("data-open");
+        expect(caught).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expect(committedText()).toBe("false");
+      });
+
+      for (const part of partCloses)
+        it(`part-initiated close, details.reject(): stays open, no boundary${partName(part)}`, async () => {
+          const user = setupUser();
+          const reportError = vi.fn();
+          vi.stubGlobal("reportError", reportError);
+          const caught = vi.fn();
+          const action = vi.fn<Action>();
+          render(
+            <Harness mode={mode} action={action} boundary={caught} catchErrors rejectCaught />,
+          );
+          await openThroughTrigger(user);
+          const close = spyClose();
+          action.mockImplementation(async () => {
+            throw new Error("refused");
+          });
+          await part.close(user);
+          await flushTasks(2);
+          expect(isOpen()).toBe(true);
+          expect(close).not.toHaveBeenCalled();
+          expect(caught).not.toHaveBeenCalled();
+          expect(reportError).not.toHaveBeenCalled();
+          expect(committedText()).toBe("true");
+        });
 
       for (const part of partCloses)
         it(`part-initiated close rejects: the boundary gets it, the library never closed the popup${partName(part)}`, async () => {

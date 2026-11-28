@@ -23,6 +23,7 @@ import {
   hydrateFromServer,
   silenceErrors,
 } from "./helpers.js";
+import type { Rejectable } from "../internal/types.js";
 
 /** The details fields the suite reads from both channels. */
 export interface ChannelDetails {
@@ -34,8 +35,8 @@ export interface ChannelDetails {
 export interface CommitRootProps<V, C, M> {
   readonly value?: V;
   readonly defaultValue?: V;
-  readonly valueChangeAction?: (next: V, details: C) => unknown;
-  readonly valueCommitAction?: (next: V, details: M) => unknown;
+  readonly valueChangeAction?: (next: V, details: C & Rejectable) => unknown;
+  readonly valueCommitAction?: (next: V, details: M & Rejectable) => unknown;
   readonly name?: string;
   readonly disabled?: boolean;
 }
@@ -95,8 +96,8 @@ export function eachCommitMode(name: string, body: (mode: CommitMode) => void): 
 export interface CommitFixtureProps<V, C, M, P> {
   readonly mode: CommitMode;
   readonly initial: V;
-  readonly onChange?: (next: V, details: C) => unknown;
-  readonly onCommit?: (next: V, details: M) => unknown;
+  readonly onChange?: (next: V, details: C & Rejectable) => unknown;
+  readonly onCommit?: (next: V, details: M & Rejectable) => unknown;
   readonly rootProps?: Partial<P>;
   /** Content under the Root, rendered from the parent's committed value. */
   readonly below?: (value: V) => ReactNode;
@@ -336,6 +337,64 @@ export function describeCommitAction<V, C extends ChannelDetails, M extends Chan
         });
         render(<Fixture mode={mode} initial={values[0]} onCommit={onCommit} />);
         await gesture(0);
+        driver.expectShown(values[1]);
+        expectNotPending(root());
+      });
+    });
+
+    // #207 (conventions 2.4.1): each channel's `details.reject()` is that channel's rejection,
+    // minus the boundary and `reportError`; the other channel is unaffected.
+    describe("details.reject() (uncontrolled)", () => {
+      it('in valueCommitAction: the control returns to the committed value through a "dismiss" step, no boundary', async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const caught = vi.fn();
+        const d = deferred();
+        const onChange = vi.fn<ChangeFn>();
+        render(
+          <Fixture
+            mode="uncontrolled"
+            initial={values[0]}
+            onChange={onChange}
+            onCommit={async (_next, details) => {
+              await d.promise;
+              details.reject();
+            }}
+            boundary={caught}
+          />,
+        );
+        await gesture(0);
+        driver.expectShown(values[1]);
+        onChange.mockClear();
+        await act(async () => d.resolve());
+        await flushMicrotasks();
+        expect(caught).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expect(screen.getByTestId("root")).toBeInTheDocument();
+        driver.expectShown(values[0]);
+        for (const el of driver.pendingOn(0)) expectNotPending(el);
+        expect(onChange.mock.calls.filter((c) => c[1].reason === "dismiss")).toHaveLength(1);
+      });
+
+      it("in valueChangeAction: nothing reaches a boundary; the commit channel still commits", async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const caught = vi.fn();
+        const onCommit = vi.fn<CommitFn>();
+        render(
+          <Fixture
+            mode="uncontrolled"
+            initial={values[0]}
+            onChange={(_next, details) => details.reject()}
+            onCommit={onCommit}
+            boundary={caught}
+          />,
+        );
+        await gesture(0);
+        await act(async () => {});
+        expect(caught).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expect(onCommit).toHaveBeenCalledTimes(1);
         driver.expectShown(values[1]);
         expectNotPending(root());
       });

@@ -11,6 +11,7 @@ export type {
   ActionDetails,
   ChangeAction,
   ChangeReason,
+  Rejectable,
   RenderProp,
   StateValue,
   UrgentChangeHandler,

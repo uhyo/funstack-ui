@@ -22,6 +22,7 @@ import {
   silenceErrors,
 } from "./helpers.js";
 import type { ControlMode } from "./helpers.js";
+import type { Rejectable } from "../internal/types.js";
 import { addTransitionTypeSpy, recordedTransitionTypes } from "./transition-type-spy.js";
 
 type UserEvent = ReturnType<typeof setupUser>;
@@ -33,7 +34,7 @@ export type TransitionProp = ViewTransitionClass;
 export interface ControlProps<V, D> {
   readonly value?: V;
   readonly defaultValue?: V;
-  readonly changeAction?: (next: V, details: D) => unknown;
+  readonly changeAction?: (next: V, details: D & Rejectable) => unknown;
   readonly transition?: TransitionProp;
   /** Pass-through props for the part that owns the value (a ref, `disabled`, …). */
   readonly extra?: Readonly<Record<string, unknown>>;
@@ -134,9 +135,11 @@ export interface ValueHarnessProps<V, D extends { readonly event: Event | undefi
   /** Initial committed value; defaults to `driver.values[0]`. */
   readonly initial?: V;
   /** The consumer's work; awaited by the harness's change action. */
-  readonly action?: (next: V, details: D) => unknown;
+  readonly action?: (next: V, details: D & Rejectable) => unknown;
   /** Catch errors thrown by `action` (turns a rejection into success for the library). */
   readonly catchErrors?: boolean;
+  /** With `catchErrors`: call `details.reject()` after catching (conventions 2.4.1). */
+  readonly rejectCaught?: boolean;
   /** Controlled only: the parent never adopts a value. */
   readonly veto?: boolean;
   /** Controlled only: the parent does not adopt `"platform"` dispatches (form reset, hydration). */
@@ -167,6 +170,7 @@ export function ValueHarness<V, D extends { readonly event: Event | undefined }>
   initial = driver.values[0],
   action,
   catchErrors = false,
+  rejectCaught = false,
   veto = false,
   refusePlatform = false,
   inForm = false,
@@ -182,12 +186,13 @@ export function ValueHarness<V, D extends { readonly event: Event | undefined }>
   const [error, setError] = useState<unknown>(null);
   const format = driver.format ?? JSON.stringify;
 
-  const changeAction = async (next: V, details: D) => {
+  const changeAction = async (next: V, details: D & Rejectable) => {
     try {
       await action?.(next, details);
     } catch (e) {
       if (!catchErrors) throw e;
       startTransition(() => setError(e));
+      if (rejectCaught) details.reject();
       return;
     }
     if (veto) return;
@@ -256,7 +261,7 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
   /** What the harness commits for the dispatch recorded as `call` on top of `prev`. */
   const commitOf = (prev: V, call: readonly [V, D]) =>
     driver.commit ? driver.commit(prev, call[0], call[1]) : call[0];
-  type ActionFn = (next: V, details: D) => unknown;
+  type ActionFn = (next: V, details: D & Rejectable) => unknown;
   const Harness = (props: Omit<ValueHarnessProps<V, D>, "driver">) => (
     <ValueHarness driver={driver} {...props} />
   );
@@ -403,6 +408,38 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
         driver.expectShown(settled);
         driver.expectCommitted?.(settled);
       });
+
+      // #207 (conventions 2.4.1): the action shows its own message and rolls back, in both modes.
+      it("caught, then details.reject(): rolls back without the boundary or reportError", async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const onError = vi.fn();
+        const d = deferred();
+        render(
+          <Harness
+            mode={mode}
+            action={() => d.promise}
+            catchErrors
+            rejectCaught
+            boundary={onError}
+          />,
+        );
+        await driver.gesture(setupUser(), 0);
+        driver.expectShown(values[1]);
+        expectAllPending(0);
+        await act(async () => {
+          d.reject(new Error("vetoed"));
+        });
+
+        expectNonePending(0);
+        expect(screen.getByTestId("error")).toHaveTextContent("vetoed");
+        expect(onError).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expect(driver.queryControl()).not.toBeNull();
+        expect(committed().textContent).toBe(format(values[0]));
+        driver.expectShown(values[0]);
+        driver.expectCommitted?.(values[0]);
+      });
     });
 
     describe("overlapping actions (uncontrolled)", () => {
@@ -474,6 +511,39 @@ export function describeValueAction<V, D extends { readonly event: Event | undef
           driver.expectCommitted?.(settled);
         },
       );
+
+      it("drops a change whose action called details.reject(); the newer one is committed", async () => {
+        const reportError = vi.fn();
+        vi.stubGlobal("reportError", reportError);
+        const ds = sequencedDeferreds(2);
+        const onError = vi.fn();
+        let call = 0;
+        render(
+          <Harness
+            mode="uncontrolled"
+            action={(_next, details) => {
+              if (call++ === 0) details.reject();
+              return ds.next();
+            }}
+            boundary={onError}
+          />,
+        );
+        const user = setupUser();
+        await driver.gesture(user, 0);
+        await driver.gesture(user, 1);
+        await act(async () => {
+          ds[0]!.resolve();
+        });
+        await act(async () => {
+          ds[1]!.resolve();
+        });
+        expect(onError).not.toHaveBeenCalled();
+        expect(reportError).not.toHaveBeenCalled();
+        expectNonePending(1);
+        const settled = driver.withoutFirstGesture ?? values[2];
+        driver.expectShown(settled);
+        driver.expectCommitted?.(settled);
+      });
 
       it("stays pending until every in-flight action settles", async () => {
         const ds = sequencedDeferreds(2);

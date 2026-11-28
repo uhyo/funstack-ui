@@ -4,6 +4,7 @@ import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import type {
   Action,
+  Rejectable,
   ActionDetails,
   RenderProp,
   StateValue,
@@ -61,13 +62,14 @@ export interface DialogCloseProps extends Omit<
    * dialog with `value` as `returnValue`: in library mode through the Root
    * (`openChangeAction(false)` awaited, view transition if set), in JS-free mode with
    * `close(value)`. A rejection reaches the nearest Error Boundary above the Close part and
-   * leaves the dialog open. If the dialog was dismissed and opened again while the action ran,
+   * leaves the dialog open; `details.reject()` keeps it open with no boundary (conventions
+   * 2.4.1). If the dialog was dismissed and opened again while the action ran,
    * the close is dropped: it belonged to the earlier open. With `action` the button is no native
    * close invoker (no `commandfor` / `command`), so a click before hydration does nothing
    * instead of closing the dialog without running the action. Without `action` in JS-free mode
    * the button is a native `command="request-close"` invoker.
    */
-  action?: Action<[details: DialogCloseActionDetails]>;
+  action?: Action<[details: DialogCloseActionDetails & Rejectable]>;
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`

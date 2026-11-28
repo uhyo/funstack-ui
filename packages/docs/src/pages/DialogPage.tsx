@@ -331,7 +331,7 @@ export function DialogPage() {
         rows={[
           {
             name: "action",
-            type: "Action<[details: DialogCloseActionDetails]>",
+            type: "Action<[details: DialogCloseActionDetails & Rejectable]>",
             description: (
               <>
                 Runs in this button's own transition (<code>data-pending</code> on it), then closes

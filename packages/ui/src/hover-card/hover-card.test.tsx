@@ -597,6 +597,34 @@ describe("Async open: pending, Suspense, overlap, rejection", () => {
     expect(screen.queryByRole("link", { name: "@ada" })).toBeNull();
   });
 
+  // #207 (conventions 2.4.1): a handled rejection of the open; the card stays closed.
+  it("an open whose action calls details.reject(): stays closed, no boundary, no reportError", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const onError = vi.fn();
+    const d = deferred();
+    await renderAsync(
+      <ErrorCatcher onError={onError}>
+        <Harness
+          root={{
+            openChangeAction: async (_next, details) => {
+              await d.promise;
+              details.reject();
+            },
+          }}
+        />
+      </ErrorCatcher>,
+    );
+    await hoverOpen();
+    expect(trigger()).toHaveAttribute("data-open");
+    await act(async () => d.resolve());
+    await task();
+    expect(trigger()).not.toHaveAttribute("data-open");
+    expect(isPopoverOpen(popup())).toBe(false);
+    expect(onError).not.toHaveBeenCalled();
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
   it("an Error Boundary inside the Popup keeps the link when the content fails", async () => {
     silenceErrors();
     function Fails(): ReactNode {

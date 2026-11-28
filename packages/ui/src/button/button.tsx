@@ -9,11 +9,13 @@ import type {
 } from "react";
 import { useFormStatus } from "react-dom";
 import { createActionDetails } from "../internal/action/action-details.js";
+import { callAction } from "../internal/action/call-action.js";
 import { dataAttr } from "../internal/data-attr.js";
 import { useToolbarContext } from "../internal/toolbar-context.js";
 import { useTransitionBoundary } from "../internal/transition-boundary.js";
 import type {
   Action,
+  Rejectable,
   ActionDetails,
   RenderProp,
   StateValue,
@@ -56,7 +58,7 @@ export interface ButtonProps extends Omit<
    * Boundary above the Button. A click while it is pending runs it again unless `whilePending`
    * is `"ignore"`. Not combinable with `formAction` (development error).
    */
-  action?: Action<[details: ButtonActionDetails]>;
+  action?: Action<[details: ButtonActionDetails & Rejectable]>;
   /**
    * React's `formAction`: a function (a Server Function, a `useActionState` dispatch, a client
    * function) or a URL, run by React instead of the form's `action` when this Button submits the
@@ -256,7 +258,7 @@ export function Button({
         }
         const details: ButtonActionDetails = createActionDetails(event.nativeEvent, {});
         // Ignored while pending (`"ignore"` only): do not navigate, submit or run a command either.
-        trigger.runActivation(event, () => action(details));
+        trigger.runActivation(event, () => callAction("Button", details, action));
       },
     },
   });

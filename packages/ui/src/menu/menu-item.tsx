@@ -1,8 +1,10 @@
 "use client";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
+import { callAction } from "../internal/action/call-action.js";
 import type {
   Action,
+  Rejectable,
   ActionDetails,
   RenderProp,
   StateValue,
@@ -50,9 +52,10 @@ export interface MenuItemProps extends Omit<
    * Runs inside this item's own transition (`data-pending` on the item); the menu stays open
    * until it settles, then the whole menu closes (`closeOnActivate`). May be a Server Function
    * (`details.event` is virtual). A rejection leaves the menu open and reaches the nearest Error
-   * Boundary above the item. Without `action`, activation only closes.
+   * Boundary above the item; `details.reject()` leaves it open with no boundary (conventions
+   * 2.4.1). Without `action`, activation only closes.
    */
-  action?: Action<[details: MenuItemActionDetails]>;
+  action?: Action<[details: MenuItemActionDetails & Rejectable]>;
   /**
    * Close the whole menu once `action` settles.
    *
@@ -148,7 +151,7 @@ export function MenuItem({
       }
       trigger.runActivation(
         event,
-        () => action?.(details),
+        () => (action === undefined ? undefined : callAction("Menu.Item", details, action)),
         closeOnActivate ? () => menu.root.popover.requestClose(event, "activate") : undefined,
       );
     },

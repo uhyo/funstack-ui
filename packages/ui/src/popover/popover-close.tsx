@@ -4,6 +4,7 @@ import { createActionDetails } from "../internal/action/action-details.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type {
   Action,
+  Rejectable,
   ActionDetails,
   RenderProp,
   StateValue,
@@ -52,13 +53,14 @@ export interface PopoverCloseProps extends Omit<
    * Runs inside this part's own transition (`data-pending` on the button), then closes the
    * popover: in library mode through the Root (`openChangeAction(false)` awaited, view
    * transition if set), in JS-free mode with `hidePopover()`. A rejection reaches the nearest
-   * Error Boundary above the Close part and leaves the popover open. If the popover was
+   * Error Boundary above the Close part and leaves the popover open; `details.reject()` keeps it
+   * open with no boundary (conventions 2.4.1). If the popover was
    * dismissed and opened again while the action ran, the close is dropped. With `action` the
    * button is no native close invoker (no `commandfor` / `command`), so a click before hydration
    * does nothing instead of hiding the popover without running the action. Without `action` in
    * JS-free mode the button is a native `command="hide-popover"` invoker.
    */
-  action?: Action<[details: PopoverCloseActionDetails]>;
+  action?: Action<[details: PopoverCloseActionDetails & Rejectable]>;
   /**
    * What a click does while this part's `action` is pending. `"ignore"`: nothing (the click is
    * cancelled, `aria-disabled="true"` meanwhile). `"run"`: the action runs again (`data-pending`

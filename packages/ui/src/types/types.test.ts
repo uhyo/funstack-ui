@@ -12,6 +12,7 @@ describe("@funstack/ui/types", () => {
     expectTypeOf<types.ActionDetails>().toEqualTypeOf<root.ActionDetails>();
     expectTypeOf<types.ChangeAction<string>>().toEqualTypeOf<root.ChangeAction<string>>();
     expectTypeOf<types.ChangeReason>().toEqualTypeOf<root.ChangeReason>();
+    expectTypeOf<types.Rejectable>().toEqualTypeOf<root.Rejectable>();
     expectTypeOf<types.RenderProp<{ id: string }, { open: boolean }>>().toEqualTypeOf<
       root.RenderProp<{ id: string }, { open: boolean }>
     >();
