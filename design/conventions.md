@@ -2724,15 +2724,23 @@ enclosing layer closes. The revert cancels nothing in flight.
 - **TextField, NumberField**: the text is a library draft. The revert drops the draft and
   dispatches nothing.
 - **Combobox**: the text is the urgent `inputValue`, and "the text of the shown value" is
-  what a blur would leave, in both modes. Single selection: the label of the optimistic
+  the committed value's text, in both modes. Single selection: the label of the optimistic
   selection, the committed custom value with `allowCustomValue`, or `""` with no selection.
   With `multiple`: `""`, since the values are the chips and the text is a search, so Escape
-  clears leftover search text. The rule applies **while the
-  listbox is closed**; while it is open, Escape is the listbox's (its close watcher closes it
-  and the text stays), so the first Escape closes the listbox and the second reverts the text.
-  The revert is an urgent write reported to `onInputValueChange` with `reason: "dismiss"`, the
-  reason the blur revert uses, and no value is dispatched. It never clears the selection
-  (`design/components/combobox.md` 8).
+  clears leftover search text. It is not "what a blur would leave": with `allowCustomValue` a
+  blur commits the typed text, while Escape goes back to the committed value, as a TextField's
+  revert does. The rule applies **while the listbox is closed and no open is on its way**.
+  While the listbox is open, Escape is the listbox's (its close watcher closes it and the text
+  stays). **An open that is requested but not shown yet** (intended open, committed closed:
+  the keystroke's own open still rendering, a slow `openChangeAction`) **counts as shown**:
+  the Escape is the listbox's there too, it cancels the coming open with a close request
+  (`openChangeAction(false)`, `reason: "activate"`, since nothing was shown and so nothing was
+  dismissed), the text stays and the key is consumed (rule 3). Otherwise the text would
+  revert and the listbox would then appear over it. So the sequence is the same either way:
+  the first Escape closes the listbox or cancels its open, the second reverts the text, the
+  next reaches the enclosing layer. The revert is an urgent write reported to
+  `onInputValueChange` with `reason: "dismiss"`, the reason the blur revert uses, and no value
+  is dispatched. It never clears the selection (`design/components/combobox.md` 8).
 
 `internal/escape-key.ts` holds all of it: `isEscapeRequest` (rules 1 and 2),
 `consumeEscape` (rule 3), `decideEscapeLast` and `createEscapeRecord` (rule 4), and

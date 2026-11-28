@@ -16530,3 +16530,31 @@ Item 4, `focusgroup`:
   container: without the flag, a `render` element's `focusgroup` is not on the DOM node.
 - [ ] Docs: the owned-key notes of `TabsPage.tsx`, `ToolbarPage.tsx`, `ToggleGroupPage.tsx`,
   `MenuPage.tsx`, and `ExperimentalPage.tsx` if it shows the attribute as a prop.
+
+## 2026-11-28, #199 follow-up: the user accepted the handler rule and the rendered separator role; conventions 15 follows combobox.md 8
+
+Architect. Two questions of the entry "2026-11-28, #199 follow-up: four rules the reviews of
+#201 and #202 left open (design)" were put to the user, who decided both on 2026-11-28 as that
+entry recommends. Its section "For the product owner" is closed by this.
+
+- **Event handlers (decision 2 there).** The mechanical rule B stands: an `on*` key a part
+  passes to its element in prop form in at least one mode is omitted from its props type in
+  every mode, whatever the handler does (conventions 1.5). Rule A (by what the handler does)
+  is not taken. The four checklist rows stay: `Dialog.Trigger` `onPointerDown`, `Menu.Trigger`
+  `onPointerMove`, `Form.Submit` `onClick`, `Field.Label` `onClick`.
+- **Separators (decision 3 there).** Every library separator renders and owns its role
+  (`Separator`, `Menu.Separator`, `Toolbar.Separator`); `Select.Separator` is the exception,
+  its element being fixed as an `<hr>` (`design/components/separator.md` 3 and 5).
+
+No rule text changes for these two: the documents already state them.
+
+Changed in this commit, conventions 15, the Combobox paragraph of "Edited text reverted on
+Escape", to agree with `design/components/combobox.md` 8 (the entry "2026-11-28, #200 review:
+Escape while a Combobox open is on its way; the revert target's wording"):
+
+- The revert target is "the committed value's text", not "what a blur would leave" (with
+  `allowCustomValue` a blur commits the typed text; Escape does not). The targets are the same.
+- The paragraph did not have the rule for an open that is requested but not shown yet. It now
+  does: such an open counts as shown, the Escape is the listbox's, it cancels the open with a
+  close request (`"activate"`), the text stays and the key is consumed; the revert applies
+  while the listbox is closed and no open is on its way.
