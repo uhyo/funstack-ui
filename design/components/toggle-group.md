@@ -27,7 +27,7 @@ the items and pending exposed.
 
 | # | Topic | Decision |
 | --- | --- | --- |
-| 1 | Anatomy | Two namespaces. `ToggleGroup.Root` (`div role="group"`) and `ToggleGroup.Item` (`button type="button" aria-pressed`, the same element and states as `Toggle`). `Toolbar.Root` (`div role="toolbar" aria-orientation`) and `Toolbar.Separator` (`hr aria-orientation`). No `Toolbar.Button`, `Toolbar.Group`, `Toolbar.Link`, `Toolbar.Input` or `Toolbar.ToggleGroup`: a command button is `Button` from `@funstack/ui/button`, which stays focusable when disabled inside a Toolbar (`button.md` 7.3), and a Toolbar's items are its focusable descendants, found in the DOM, so library parts and plain elements join without wrappers. |
+| 1 | Anatomy | Two namespaces. `ToggleGroup.Root` (`div role="group"`) and `ToggleGroup.Item` (`button type="button" aria-pressed`, the same element and states as `Toggle`). `Toolbar.Root` (`div role="toolbar" aria-orientation`) and `Toolbar.Separator` (`hr role="separator" aria-orientation`). No `Toolbar.Button`, `Toolbar.Group`, `Toolbar.Link`, `Toolbar.Input` or `Toolbar.ToggleGroup`: a command button is `Button` from `@funstack/ui/button`, which stays focusable when disabled inside a Toolbar (`button.md` 7.3), and a Toolbar's items are its focusable descendants, found in the DOM, so library parts and plain elements join without wrappers. |
 | 2 | Value model | Discriminated on `exclusive`, as Accordion: `exclusive` → `value: string \| null`; otherwise `string[]` (the default, as `Toggle` 10 forecast). One `ToggleGroupValueChangeDetails = { added, removed }` for both modes (conventions 2.2, set-valued diff); `next` and `state.value` in document order. |
 | 3 | Deselecting in exclusive mode | **Allowed by default**: pressing the pressed Item releases it (`null`). `deselectable={false}` keeps one Item pressed (a view switcher); it exists only on the `exclusive` props variant. An exclusive, required *form* choice is a RadioGroup, not a ToggleGroup (research 1.2). |
 | 4 | Semantics | `aria-pressed` Items in `role="group"` in both modes; no `aria-orientation` on the group (not allowed on `group`), `data-orientation` only. Arrows move focus and never press. |
@@ -55,7 +55,7 @@ ToggleGroup.Root        div role="group"                          state owner: v
 Toolbar.Root            div role="toolbar" aria-orientation       roving-focus owner, ToolbarContext
   ToggleGroup.Root      div role="group"                          joins the Toolbar's sequence; no engine of its own
     ToggleGroup.Item    button aria-pressed
-  Toolbar.Separator     hr aria-orientation
+  Toolbar.Separator     hr role="separator" aria-orientation
   Button                button type="button" [aria-disabled]      from @funstack/ui/button; focusable when disabled here
   Menu.Root / Menu.Trigger, Popover.Trigger, Dialog.Trigger, Toggle, Tooltip.Trigger,
   a plain <button>, <a href>, <input>                              all items: found in the DOM
@@ -268,7 +268,7 @@ export interface ToggleGroupRootState {
 }
 
 interface ToggleGroupRootBaseProps
-  extends Omit<ComponentPropsWithRef<"div">, "role" | "onKeyDown" | "onFocus" | "onBlur" | "onPointerDown" | "defaultValue" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "role" | "focusgroup" | "onKeyDown" | "onFocus" | "onBlur" | "onPointerDown" | "defaultValue" | "className" | "style" | "children"> {
   /** Axis of the arrow keys and `data-orientation`. Default `"horizontal"`. Ignored inside a Toolbar (dev warning). */
   orientation?: ToggleGroupOrientation;
   /** Whether arrows wrap from the last Item to the first. Default `true`. Ignored inside a Toolbar (dev warning). */
@@ -336,8 +336,10 @@ a type error rather than a silently ignored prop. No dev warning when neither `v
 
 Owned keys (conventions 1.2): `role`, `data-orientation`, `data-pending`, `data-disabled`,
 `onKeyDown`, `onFocus`, `onBlur`, `onPointerDown` (the roving engine's; installed standalone only,
-omitted from the props type in both cases, the rule for every handler a Root owns), and `focusgroup`
-while `experimental_focusGroup` is on and the group is standalone. The in-Toolbar warnings fire for
+omitted from the props type in both cases, conventions 1.5), and `focusgroup`: the token list
+while `experimental_focusGroup` is on and the group is standalone, `undefined` otherwise (owned in
+every mode and omitted from the props type: a consumer's `focusgroup` would run the browser's
+arrow keys beside the engine's, or split a Toolbar's single Tab stop). The in-Toolbar warnings fire for
 `orientation` / `loop` when passed and for `experimental_focusGroup` only when it is `true`, so a
 wrapper that forwards defaults does not warn. `aria-label`, `aria-labelledby`
 and everything else on `<div>` pass through.
@@ -359,7 +361,7 @@ export interface ToggleGroupItemState {
 }
 
 export interface ToggleGroupItemProps
-  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "type" | "value" | "tabIndex" | "aria-pressed" | "aria-disabled" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"button">, "onClick" | "type" | "value" | "tabIndex" | "focusgroupstart" | "aria-pressed" | "aria-disabled" | "className" | "style" | "children"> {
   /** The value this Item presses. Unique within the group. */
   value: string;
   /**
@@ -383,7 +385,9 @@ it is the Item's own prop; it is not rendered as an HTML attribute (a `render={<
 is computed.
 
 Owned keys: `type` (on a `<button>` only), `aria-pressed`, `disabled`, `aria-disabled`, `data-pressed`,
-`data-pending`, `data-disabled`, `data-orientation`, `onClick`, and the registration `ref`.
+`data-pending`, `data-disabled`, `data-orientation`, `onClick`, `focusgroupstart` (on the first
+pressed Item of a standalone group with the flag on; `undefined` otherwise, owned in every mode and
+omitted from the props type), and the registration `ref`.
 
 ### 3.3 `Toolbar.Root`
 
@@ -396,7 +400,7 @@ export interface ToolbarRootState {
 }
 
 export interface ToolbarRootProps
-  extends Omit<ComponentPropsWithRef<"div">, "role" | "aria-orientation" | "onKeyDown" | "onFocus" | "onBlur" | "onPointerDown" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "role" | "aria-orientation" | "focusgroup" | "onKeyDown" | "onFocus" | "onBlur" | "onPointerDown" | "className" | "style" | "children"> {
   /** Axis of the arrow keys; also `aria-orientation`. Default `"horizontal"`. */
   orientation?: ToolbarOrientation;
   /** Whether arrows wrap from the last item to the first. Default `true`. */
@@ -421,7 +425,9 @@ nothing to disable them with; consumers disable items individually (or wrap the 
 which is urgent and lives outside React (section 6).
 
 Owned keys: `role`, `aria-orientation`, `data-orientation`, `onKeyDown`, `onFocus`, `onBlur`,
-`onPointerDown` (all omitted from the props type), and `focusgroup` while the flag is on.
+`onPointerDown`, and `focusgroup` (the token list while the flag is on, `undefined` otherwise:
+a consumer's `focusgroup` would put the browser's arrow keys beside the engine's). All are omitted
+from the props type (conventions 1.5).
 
 ### 3.4 Command buttons: `Button`
 
@@ -447,16 +453,24 @@ export interface ToolbarSeparatorState {
 }
 
 export interface ToolbarSeparatorProps
-  extends Omit<ComponentPropsWithRef<"hr">, "aria-orientation" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"hr">, "role" | "aria-orientation" | "className" | "style" | "children"> {
   className?: StateValue<string | undefined, ToolbarSeparatorState>;
   style?: StateValue<CSSProperties | undefined, ToolbarSeparatorState>;
   render?: RenderProp<ComponentPropsWithRef<"hr">, ToolbarSeparatorState>;
 }
 ```
 
-An `<hr>` (implicit `separator`, conventions 1.1) with `aria-orientation="vertical"` in a horizontal
-Toolbar and `"horizontal"` in a vertical one, mirrored in `data-orientation`. It is not focusable and
-not an item. No `children` (an `hr` is void). Owned keys: `aria-orientation`, `data-orientation`.
+An `<hr role="separator">` with `aria-orientation="vertical"` in a horizontal Toolbar and
+`"horizontal"` in a vertical one, mirrored in `data-orientation`. It is not focusable and not an
+item. No `children` (an `hr` is void). Owned keys: `role`, `aria-orientation`,
+`data-orientation`; `role` and `aria-orientation` are omitted from the props type.
+
+The role is **rendered, not left to the `<hr>`**: `render={<div />}` is then a separator with no
+`role` of the consumer's, and `aria-orientation` is never left on an element whose role does not
+support it. On the default `<hr>` the attribute repeats the implicit role; that is the cost (a
+markup validator may note the redundant role, assistive technology reads the same thing). It is
+the rule of every library separator that takes `render` freely (`Separator`,
+`design/components/separator.md` 3; `Menu.Separator`, `design/components/menu.md` 3.7).
 
 ### 3.6 Namespaces
 
@@ -852,7 +866,7 @@ to be recorded in `memo/developer/cross-engine.md` by the implementer.
 | `ToggleGroup.Item` | `type="button"` (on a `<button>`), `aria-pressed="true" \| "false"` (optimistic, never `"mixed"`), `disabled` (standalone) or `aria-disabled="true"` (inside a Toolbar), `data-pressed`, `data-pending`, `data-disabled`, `data-orientation`; `tabindex` written by the engine on the JS path; `focusgroupstart` on the first pressed Item when standalone with the flag on (every engine) |
 | `Toolbar.Root` | `role="toolbar"`, `aria-orientation` (always emitted, as Tabs.List), `data-orientation`; with the flag: `focusgroup`; `aria-label` / `aria-labelledby` pass through (required by APG; docs) |
 | `Button`, `Toggle`, an overlay Trigger (inside a Toolbar) | as its own design, with `aria-disabled="true"` when disabled (no native `disabled`, no invoker attribute); `tabindex` by the engine |
-| `Toolbar.Separator` | `<hr aria-orientation="vertical" \| "horizontal">` (perpendicular to the Toolbar), `data-orientation` (the same value) |
+| `Toolbar.Separator` | `<hr role="separator" aria-orientation="vertical" \| "horizontal">` (perpendicular to the Toolbar; the role is explicit so that a `render` element is a separator too), `data-orientation` (the same value) |
 
 Ids: none are needed (no `aria-controls`, no labelling between parts). Items are registered by
 element, not id.

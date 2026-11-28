@@ -123,7 +123,7 @@ anatomy section says what the part renders there; this table fixes what the name
 | `Button` | A pure-trigger `button` with a bare `action` and its own `data-pending`. The general one is the single-element `Button` (`@funstack/ui/button`; `whilePending`, 2.5.1), which is also a Toolbar's command button: the Toolbar has no button part, and every library button-like part reads `ToolbarContext` so that a disabled one stays focusable there (3.6). | `button` |
 | `Image` | A picture the owner shows while it is available, mirrored as a load `status` (Avatar): an `<img alt="">` rendered from the server render on, unmounted once its source failed; the owner carries the name. Never an `onLoad` prop of the library's (react-dom's commit wait, `design/components/avatar.md` 5). | `img` |
 | `Fallback` | What the owner shows in an `Image`'s place: rendered until the image has loaded, **under** it (the consumer's CSS stacks them), so nothing is swapped while it loads (Avatar). | `span` |
-| `Group`, `Separator`, `Arrow` | Structural or decorative. There is no `Header` part: a heading goes inside the `Trigger` (Accordion). `Separator` is an `<hr>` by default; inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. The standalone single-element `Separator` (`@funstack/ui/separator`, directive-free) takes `orientation` and `decorative` (`role="none"`, no `aria-orientation`, `data-decorative`; the one spelling allowed inside a listbox). | as named |
+| `Group`, `Separator`, `Arrow` | Structural or decorative. There is no `Header` part: a heading goes inside the `Trigger` (Accordion). `Separator` is an `<hr>` by default and renders `role="separator"` itself, so a `render` element of another tag is a separator too (`Select.Separator` is the exception: it must stay an `<hr>` and writes no role); inside a Toolbar it carries `aria-orientation` perpendicular to the toolbar's. The standalone single-element `Separator` (`@funstack/ui/separator`, directive-free) takes `orientation` and `decorative` (`role="none"`, no `aria-orientation`, `data-decorative`; the one spelling allowed inside a listbox). | as named |
 
 There is deliberately **no `Portal` and no `Positioner` part**: the Popover API puts content in the
 top layer and CSS Anchor Positioning places it, so the platform does both jobs (see
@@ -304,13 +304,34 @@ Parts that render no DOM (`Tooltip.Root`) do not accept `ref`.
 ### 1.5 Native prop pass-through
 
 A part's props type is the rendered element's props (`ComponentPropsWithRef<"button">`) minus the
-props the part owns. The library's own **prop-form** event handlers are **omitted from the type**
-so that a consumer cannot silently clobber them. A part that attaches its listeners through
-`addEventListener` on its ref instead (section 7.4; Tooltip does this because its hover/focus
-handlers are feature-detected away when `interestfor` is native) omits nothing, and the consumer's
-`on*` props for those events pass through and run independently:
+props the part owns. **An event the part listens to in prop form is the part's: its `on*` key is
+omitted from the type.** One test decides it, with no judgement about what the handler does:
+the part passes that `on*` key to its element in at least one mode. So the key is omitted
+
+- **in every mode**, also where the handler is installed in one mode or context only (the
+  roving handlers of a standalone `ToggleGroup.Root`, `Menu.Trigger`'s `onPointerMove` inside a
+  Menubar, `Dialog.Trigger`'s `onPointerDown` in non-modal JS-free mode, a cancelled click that
+  exists only while the part is disabled, as on `Form.Submit`);
+- **whatever the handler does**: it dispatches the action, moves focus, cancels the default, or
+  only records a fact for a later event. There is no "chained" kind of handler that stays.
+
+The reason is the "no handlers" rule (2.6), not the merge: `mergeProps` runs every handler it
+is given, so a consumer handler would not be lost. But the part's API for the event is its
+action prop or its documented behaviour, what a consumer's handler may cancel or rely on
+there is in no part's contract, and a key that is typed in one part and not in its neighbour
+for a reason only the source shows is the inconsistency this rule removes. A consumer who
+needs the raw event has two supported routes: a handler on the `render` **element**
+(`render={<button onPointerDown={…} />}`; 1.2: both run, the element's first), or `ref` and
+`addEventListener`.
+
+A part that attaches its listeners through `addEventListener` on its ref instead (section 7.4;
+Tooltip does this because its hover/focus handlers are feature-detected away when
+`interestfor` is native) omits nothing, and the consumer's `on*` props for those events pass
+through and run independently. That route is for the cases of 7.4, not a way to keep a key in
+the type.
 
 ```ts
+// `onClick`, `onKeyDown` and `onFocus` are the Tab's: it passes them to its element.
 export interface TabsTabProps
   extends Omit<ComponentPropsWithRef<"button">, "onClick" | "onKeyDown" | "onFocus" | "className" | "style" | "children"> {
   value: string;
@@ -327,10 +348,13 @@ at least one mode (1.2: its `role`, the ARIA state it computes such as `aria-sel
 `aria-pressed`, `aria-expanded`, `aria-orientation`, `aria-disabled` on a part that takes
 `disabled`, `type`, a roving `tabIndex`, the invoker attributes `commandfor` / `command` /
 `popoverTarget` / `popoverTargetAction` of a Trigger or Close part, `popover` and `open` on a
-Popup, `name` and `open` on a `<details>`) is removed from the type **in every mode**, so
-passing it is a type error rather than a prop that is silently overwritten or removed. One
-props type per part: a key owned in one mode only is still omitted. Three kinds of key stay in
-the type:
+Popup, `name` and `open` on a `<details>`, `focusgroup` on a container that takes
+`experimental_focusGroup` and `focusgroupstart` on its items) is removed from the type **in
+every mode**, so passing it is a type error rather than a prop that is silently overwritten or
+removed. One props type per part: a key owned in one mode only is still omitted, and the part
+then owns it **in the other modes too, as `undefined`**, wherever a consumer's value would
+work against the part (`focusgroup` with the flag off: it would put the browser's arrow-key
+handling beside the JS engine's on one container). Three kinds of key stay in the type:
 
 - an ARIA id-reference list the part **token-merges** (`aria-labelledby`, `aria-describedby`,
   `aria-controls`, `aria-owns`; 1.2), because the consumer's tokens take effect;
@@ -343,6 +367,28 @@ A part never omits a key it does not own (`Avatar.Root` owns `aria-labelledby`, 
 the name is `alt`). What a `render` **element** carries is not the part's props and follows
 1.2. Each part's JSDoc has an "Owned keys" line, and the list equals the `Omit` of its props
 type plus the `data-*` attributes and the three kinds above.
+
+**What the type error covers.** TypeScript checks a JSX attribute against the props type only
+when its name is an identifier. A **hyphenated** attribute (`aria-*`, `data-*`) that the props
+type does not declare is accepted in JSX without an error, so:
+
+| Where the key is written | Identifier key (`role`, `tabIndex`, `type`, `onClick`, `focusgroup`) | Hyphenated key (`aria-selected`, `aria-disabled`, `aria-orientation`) |
+| --- | --- | --- |
+| A JSX attribute (`<Tabs.Tab role="link">`) | type error | **compiles** |
+| An object literal typed as the props (`const p: TabsTabProps = { … }`) | type error | type error |
+
+The omission is therefore complete for identifier keys and, for hyphenated keys, reaches
+typed objects but not inline JSX. No type-level trick closes the gap without
+giving up `data-*` and `aria-*` pass-through, so the rule does not depend on it: **at runtime
+the library's value wins** (1.2). An owned key that slipped through is overwritten, or removed
+where the part computes `undefined`, in every mode in which the part writes it; in a mode in
+which the part does not write the key it reaches the element, which is unsupported and not
+warned about. The library's type rows follow from this (`testing.md`, "Types"): an identifier
+key is pinned with `@ts-expect-error` on a JSX attribute, a hyphenated key with
+`@ts-expect-error` on an **object literal typed as the props** (a JSX row for a hyphenated key
+would be an unused directive). The runtime half is `mergeProps`'s own rows (an owned key beats
+the pass-through props and the `render` element, an owned `undefined` included); parts need no
+row each.
 
 DOM event props the part does *not* use (say `onPointerEnter` on a `Tab`) pass through untouched.
 They are the platform's API, not the library's; the library neither documents nor wraps them. See

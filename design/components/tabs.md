@@ -160,7 +160,7 @@ export interface TabsListState {
 }
 
 export interface TabsListProps
-  extends Omit<ComponentPropsWithRef<"div">, "onKeyDown" | "onFocus" | "role" | "aria-orientation" | "tabIndex" | "className" | "style" | "children"> {
+  extends Omit<ComponentPropsWithRef<"div">, "onKeyDown" | "onFocus" | "role" | "aria-orientation" | "tabIndex" | "focusgroup" | "className" | "style" | "children"> {
   /**
    * Render `focusgroup="tablist …"` and, where the browser implements it, let the browser handle
    * arrow keys, Home and End. Chromium 150+ only; elsewhere the JS path stays active. Default false.
@@ -191,7 +191,7 @@ export interface TabsTabState {
 export interface TabsTabProps
   extends Omit<
     ComponentPropsWithRef<"button">,
-    | "onClick" | "onKeyDown" | "onFocus" | "id" | "value" | "role" | "type" | "tabIndex"
+    | "onClick" | "onKeyDown" | "onFocus" | "id" | "value" | "role" | "type" | "tabIndex" | "focusgroupstart"
     | "aria-selected" | "aria-disabled" | "className" | "style" | "children"
   > {
   /** The value this tab selects. Must be unique within the Root. */
@@ -247,9 +247,11 @@ export interface TabsPanelProps
 `hidden` is omitted because the library controls it in `"until-found"` mode and `<Activity>`
 controls visibility in `keepMounted` mode. `tabIndex` passes through; the default is `0` (section 8).
 
-Owned keys are omitted from the props types (conventions 1.5): `role`, `aria-orientation` and
-`tabIndex` on the List; `role`, `type`, `tabIndex`, `aria-selected` and `aria-disabled` on a
-Tab; `role` on the Panel. `aria-controls` and `aria-labelledby` stay: they are token-merged.
+Owned keys are omitted from the props types (conventions 1.5): `role`, `aria-orientation`,
+`tabIndex` and `focusgroup` on the List; `role`, `type`, `tabIndex`, `focusgroupstart`,
+`aria-selected` and `aria-disabled` on a Tab; `role` on the Panel. `focusgroup` and
+`focusgroupstart` are written with `experimental_focusGroup` on and owned as `undefined` with
+it off: a consumer's `focusgroup` would put the browser's arrow keys beside the List's. `aria-controls` and `aria-labelledby` stay: they are token-merged.
 
 ### 3.5 `Tabs.Indicator`
 

@@ -16293,3 +16293,240 @@ row, the revert rows' wording), its 2.2 text-write table and 5.4 Escape row;
 - Tests: a jsdom row with a deferred `openChangeAction`, a browser row (Escape right after the
   keystroke inside a modal Dialog). `form-reset-button.browser.test.tsx` no longer needs to wait
   for the listbox before its Escape.
+
+## 2026-11-28, #199 follow-up: four rules the reviews of #201 and #202 left open (design)
+
+Architect. The reviews of the alignment code (`memo/reviewer/review-201.md` findings 2 and 3,
+`memo/reviewer/align-202.md` findings 2 and 4) found four places where conventions 1.5 or a
+component document did not say what the code does, or said two things. Each is settled here
+under the user's principle for #199 (consistency and simplicity; breaking changes ship cleanly
+in alpha.28, no aliases). Design documents only; the code follows from the checklist at the
+end. #200 (value inputs, under review) is not touched by any of this except through the two
+files named in the checklist.
+
+### 1. What the type error of 1.5 covers (align-202 finding 4)
+
+1.5 said that passing an owned key "is a type error". For a hyphenated key in JSX it is not:
+TypeScript checks a JSX attribute against the props type only when the name is an identifier,
+so `<Tabs.Tab aria-selected>` and `<Menubar aria-orientation="vertical">` compile, while
+`<Tabs.Tab role="link">` and `const p: TabsTabProps = { "aria-selected": true }` do not.
+
+1.5 now has a paragraph and a table, "What the type error covers": complete for identifier
+keys; for hyphenated keys an error in an object literal typed as the props and nothing in
+inline JSX. The rule does not lean on the gap being closed: at runtime the library's value
+wins (1.2), overwritten or removed, in every mode in which the part writes the key. In a mode
+in which it does not, the key reaches the element; that is unsupported and not warned about
+(a warning would need each part to know the keys of its other modes at runtime, for a mistake
+the type already reports wherever TypeScript lets it).
+
+Tests (`testing.md` 10.1, "Types"): `@ts-expect-error` on a JSX attribute for an identifier
+key, on an object literal typed as the props for a hyphenated key (a JSX row would be an
+unused directive, which is how the gap was found). The runtime half is `mergeProps`'s own
+rows; no row per part. This is what the #201 and #202 tests already do; no code change.
+
+Not done: a type that rejects hyphenated owned keys in JSX. The known tricks (a `never`-typed
+declaration of each owned key, a template-literal index signature) either do not fire for JSX
+attributes or take `data-*` and `aria-*` pass-through away from every part.
+
+### 2. Event handlers the part also listens to (review-201 finding 3)
+
+`Dialog.Trigger` kept `onPointerDown` in its type as "chained: the library's handler runs
+after yours", while `onClick`, which `mergeProps` chains in exactly the same way, is omitted
+on every trigger. "Chained" cannot be the test: `mergeProps` chains every handler, so by that
+test nothing would be omitted.
+
+Two rules were weighed.
+
+- **A. By what the handler does.** The key stays when the consumer's handler always runs and
+  the library's only observes or guards; it is omitted when the library's handler is the
+  part's behaviour. This keeps `onPointerDown` on `Dialog.Trigger`, `onClick` on `Form.Submit`
+  and `Field.Label`. It needs a judgement per handler ("is cancelling a disabled click
+  behaviour or a guard?"), the judgement is invisible at the call site, and it is the kind of
+  per-part reasoning that produced the differences #199 removed.
+- **B. By whether the part passes the key to its element.** A key the part installs in prop
+  form in at least one mode is omitted in every mode, whatever the handler does.
+
+**B is the rule** (1.5, first paragraphs). It is the rule the code already followed in about
+forty parts (`toggle-group.md` 3.1 said it for the Roots: "installed standalone only, omitted
+from the props type in both cases"); it can be checked by a script, as the survey below was;
+and it is the reading of "no handlers" (2.6) that needs no exception: on a part, the events
+the part uses are spoken for by its action props and its documented behaviour. The reason
+given in 1.5 changed with it: not "so that a consumer cannot clobber them" (they would be
+chained), but that a second, unspecified channel beside the action prop is not offered.
+
+What a consumer who needs the raw event does is written into the rule: a handler on the
+`render` element (1.2: both run, the element's first) or `ref` with `addEventListener`.
+Runtime behaviour does not change: `mergeProps` still runs every handler it is given.
+
+The `addEventListener` route (7.4: Tooltip, HoverCard, `NavigationMenu.Link`, the capture
+listeners of `Menu.ContextTrigger`, NumberField's `wheel`) is unchanged: those parts omit
+nothing for those events. 1.5 now says the route is for the cases of 7.4 and not a way to
+keep a key typed.
+
+Survey of the code at f8ee0fea (every `on*` key a part passes in its library props, against
+its `Omit`), for the handlers the question named and the rest:
+
+| Key | Parts | In the code | Under the rule |
+| --- | --- | --- | --- |
+| `onClick` | the Triggers of Popover, Menu, Dialog (AlertDialog, Drawer through it), Accordion, Collapsible, Combobox, MultiSelect; the Close parts (`Dialog.Close`, `Popover.Close`, `AlertDialog.Action` / `Cancel`, `Drawer.Close`, `Toast.Close` / `Action`); items (`Menu.Item` and the parts on `MenuItemProps`, `Tabs.Tab`, `ToggleGroup.Item`, the options); `Button`, `Toggle`; `MultiSelect.Label` | omitted | as is |
+| `onClick` | `Form.Submit` (installed while disabled, cancels the click) | typed | **omit** |
+| `onClick` | `Field.Label` (a `<button>` control: cancels the label activation, focuses the control) | typed, "composed with the consumer's" | **omit** |
+| `onKeyDown` | `Menu.Trigger`, `Menu.Item` and its derivatives, `Menu.Popup`, `Tabs.List`, `Tabs.Tab`, the Roots with the roving engine, `Accordion.Root`, the text inputs | omitted | as is |
+| `onPointerDown` | `Combobox.Trigger` / `Clear` / `Option` / `Popup`, `MultiSelect.Option` / `Popup`, Slider Thumb and Track, the roving Roots, `Menu.ContextTrigger`, the NumberField step buttons | omitted | as is |
+| `onPointerDown` | `Dialog.Trigger` (non-modal JS-free mode; records whether the dialog was open at the press) | typed, "chained" | **omit** |
+| `onPointerMove` | `Menu.Item` and its derivatives (`SubmenuTrigger` included), the options, `Menu.ContextTrigger` | omitted | as is |
+| `onPointerMove` | `Menu.Trigger` (inside a Menubar: the hover switch) | typed | **omit** |
+
+`NavigationMenu.Trigger` and `Popover.Trigger` install `onClick` only, and omit it. No other
+part installs a handler its type keeps.
+
+The cost of B, stated: three keys a consumer could write and no longer can
+(`Form.Submit onClick`, `Field.Label onClick`, `Dialog.Trigger onPointerDown`;
+`Menu.Trigger onPointerMove` would go under A too). `Form.Submit` is the one somebody may
+have used; the migration is the `render` element, or, for "which button submitted", the
+submitter's `name` / `value` in the `FormData`, which is the platform's answer.
+
+### 3. `Toolbar.Separator` renders its role; so do `Separator` and `Menu.Separator` (align-202 finding 2)
+
+#202 made `Toolbar.Separator` own and render `role="separator"` (checklist C-M5 of the #199
+entry), and `toggle-group.md` still described the implicit role. Amended: decision row 1, the
+anatomy tree, 3.5 (the `Omit`, the owned keys, the reason) and the attribute table of
+section 8.
+
+That left three library separators with three rules for one key: `Toolbar.Separator` rendered
+the role; `Separator` rendered it only while `decorative` and asked a `render` element to
+carry `role="separator"` itself; `Menu.Separator` wrote nothing and asked the same. No reason
+separated them: `Separator`'s rule was "`Menu.Separator`'s rule", `Menu.Separator`'s was the
+first one written, and `Toolbar.Separator`'s came from 1.5 noticing that its type omitted a
+key the part did not own.
+
+**Aligned on the rendered role.** Every library separator whose element `render` may replace
+freely writes `role` and owns it: `"separator"`, or `"none"` for `Separator decorative`
+(`separator.md` summary rows 3, 6, 7, sections 1, 3, 4, 5; `menu.md` anatomy, 3.7 and the
+ARIA summary; conventions 1.1, the `Separator` row). Reasons, in `separator.md` 3:
+`render={<div />}` is a separator without a rule to remember at the call site, and a part
+named Separator that silently is not one is the worse failure; `aria-orientation` is never on
+an element without a role that supports it; `role` is owned one way, with no "owned while
+decorative" case.
+
+The cost is `role="separator"` on the default `<hr>`, which restates the implicit role. A
+markup validator may note it (ARIA in HTML says authors should not restate an implicit role;
+it is not an error); nothing changes for assistive technology. Rendering the role only on a
+non-`<hr>` was rejected: the part cannot see what a component or function `render` produces
+(1.2, the same limit as `type`). Aligning the other way (no part writes the role;
+`Toolbar.Separator` reverts) keeps the markup minimal and keeps the call-site rule in three
+places; rejected for that.
+
+`Select.Separator` is the exception and is recorded as one (`separator.md` 5): its element
+cannot be replaced by another tag (inside `<select>` the parser keeps only `<hr>`), so the
+implicit role cannot be lost and the part writes and owns nothing.
+
+Breaking, for the alpha.28 notes: `Separator` and `Menu.Separator` render `role="separator"`
+on the `<hr>`; `role` on `Menu.Separator` is a type error; a `render` element's own `role` on
+either no longer wins.
+
+### 4. `focusgroup` and `focusgroupstart` (1.5, "owned in one mode is still omitted")
+
+`Tabs.List`, `Toolbar.Root`, `ToggleGroup.Root` and `Menu.Popup` write `focusgroup` with
+`experimental_focusGroup` on and, with it off, spread no key at all, so a consumer's
+`focusgroup` passed through and the type allowed it. `Tabs.Tab` and `ToggleGroup.Item` did
+the same with `focusgroupstart`. By 1.5 a key owned in one mode is omitted in every mode; the
+four containers and the two items now say so (`tabs.md` 3, `toggle-group.md` 3.1 to 3.3,
+`menu.md` 3.3), and 1.5 names the two keys.
+
+One thing more than the type: with the flag off the part **owns the key as `undefined`**. A
+consumer's `focusgroup` on a container whose JS arrow keys are running puts two arrow-key
+handlers on one container in an engine with `focusgroup` (whether focus then moves twice was
+not measured), and on a ToggleGroup inside a Toolbar it would split the
+Toolbar's single Tab stop, which is what the existing warning for the flag there is about. Leaving it to pass through would make the type
+the only guard, and a `render` element is not typed by the part. 1.5 states the general form:
+a key owned in one mode is owned as `undefined` in the others wherever a consumer's value
+would work against the part.
+
+`Menubar` and the listbox parts never write `focusgroup` and keep it in their types (a part
+does not omit a key it does not own). `focusgroup="none"` on a consumer's own element inside
+a container, to take it out of a native focusgroup, is the consumer's element and unaffected.
+
+Also corrected in `menu.md` 3.3: the `Omit` of `MenuPopupProps` listed `aria-labelledby`
+(token-merged, so it stays in the type) and not `tabIndex`; the code was fixed in the #201
+review and the document had not followed.
+
+### Breaking changes added to alpha.28
+
+| Component | Change | Migration |
+| --- | --- | --- |
+| Dialog, AlertDialog, Drawer | `onPointerDown` on the Trigger is a type error | a handler on the `render` element, or `ref` |
+| Menu | `onPointerMove` on `Menu.Trigger`, `role` on `Menu.Separator` and `focusgroup` on `Menu.Popup` are type errors; `Menu.Separator` renders `role="separator"` | remove them; a `render` element needs no `role` |
+| Form | `onClick` (and `aria-disabled`) on `Form.Submit` are type errors | the `render` element; `name` / `value` on the submitter to tell buttons apart |
+| Field | `onClick` on `Field.Label` is a type error | the `render` element |
+| Separator | renders `role="separator"` when not `decorative`; a `render` element's `role` no longer wins | remove the `role` from the `render` element |
+| Tabs, Toolbar, ToggleGroup | `focusgroup` on `Tabs.List`, `Toolbar.Root`, `ToggleGroup.Root` and `focusgroupstart` on `Tabs.Tab`, `ToggleGroup.Item` are type errors, and are removed at runtime without `experimental_focusGroup` | use `experimental_focusGroup` |
+
+### For the product owner
+
+- Decision 2 takes rule B where the issue text suggested A. The difference is three keys
+  (`Form.Submit onClick`, `Field.Label onClick`, `Dialog.Trigger onPointerDown`). If the user
+  prefers A, 1.5 needs a second kind of handler and the three rows of the checklist below are
+  dropped; `Menu.Trigger onPointerMove` is omitted under both.
+- Decision 3 changes rendered HTML (`role="separator"` on two more `<hr>`s). The alternative
+  is the implicit role everywhere, with `Toolbar.Separator` reverted.
+
+### Implementation checklist
+
+Paths are under `packages/ui/src/`. Each item also updates the part's "Owned keys" JSDoc line,
+its type rows (1.5: JSX for an identifier key, a typed object literal for a hyphenated one),
+the props table of its docs page (`packages/docs/src/pages/<Component>Page.tsx`) and the
+skill where it lists owned keys. `field/` and `form/` are #200's folders: do those two rows
+after #200 is merged.
+
+Item 2, event handlers:
+
+- [ ] `dialog/dialog-trigger.tsx`: add `"onPointerDown"` to the `Omit` of
+  `DialogTriggerProps` (`AlertDialogTriggerProps` and `DrawerTriggerProps` are aliases of
+  it). Replace the JSDoc sentence
+  "`onPointerDown` (non-modal JS-free mode) stays in the type: the library's handler is
+  chained after yours" with the key in the owned list. The handler itself does not change.
+- [ ] `menu/menu-trigger.tsx`: add `"onPointerMove"` to the `Omit` of `MenuTriggerProps`.
+  Keep the conditional spread (the key is installed in a Menubar only, so a `render`
+  element's own `onPointerMove` still runs outside one); fix its comment, which speaks of
+  "the consumer's handler".
+- [ ] `form/form-submit.tsx` (after #200): add `"onClick"` and `"aria-disabled"` to the
+  `Omit` of `FormSubmitProps` (the part writes `aria-disabled` in the link branch and takes
+  `disabled`; 1.5). The "Owned keys" line cites conventions 1.2: make it 1.5.
+- [ ] `field/field-label.tsx` (after #200): add `"onClick"` to the `Omit` of
+  `FieldLabelProps`. Keep the `event.defaultPrevented` check (a `render` element's handler
+  runs first).
+- [ ] Type rows: `@ts-expect-error` JSX rows for the four keys; one object-literal row for
+  `FormSubmitProps["aria-disabled"]`.
+- [ ] Docs and playground: remove any `onClick` / `onPointerDown` / `onPointerMove` passed to
+  these four parts (a same-line search of `packages/docs/src` and `packages/example/src` at
+  f8ee0fea found none).
+
+Item 3, separators:
+
+- [ ] `separator/separator.tsx`: library props `role: decorative ? "none" : "separator"`
+  (always present). JSDoc: `role` owned in both modes; drop "Another element must carry
+  `role="separator"` itself" from `render`. Tests: the default renders `role="separator"`;
+  `render={<div />}` is a separator; a `render` element's `role` loses in both modes.
+- [ ] `menu/menu-group.tsx` (`MenuSeparator`): add `"role"` to the `Omit` of
+  `MenuSeparatorProps`, pass `libraryProps: { role: "separator" }`, JSDoc "Owned keys:
+  `role`", drop the `render` caveat. Tests as above, and a `@ts-expect-error` row for `role`.
+- [ ] `toolbar/toolbar-separator.tsx`: nothing (already so).
+- [ ] `select/select-separator.tsx`: nothing; its JSDoc may say why it writes no role.
+- [ ] Docs: `SeparatorPage.tsx`, `MenuPage.tsx` (rendered attributes, the `render` notes),
+  the skill.
+
+Item 4, `focusgroup`:
+
+- [ ] `tabs/tabs-list.tsx`, `toolbar/toolbar-root.tsx`, `toggle-group/toggle-group-root.tsx`,
+  `menu/menu-popup.tsx`: add `"focusgroup"` to the `Omit` of the props type
+  (`ToggleGroupRootBaseProps` for the ToggleGroup), and always pass the key in the library
+  props: the token list with the flag (for the ToggleGroup: standalone and the flag),
+  `undefined` otherwise, in place of the conditional spread.
+- [ ] `tabs/tabs-tab.tsx`, `toggle-group/toggle-group-item.tsx`: add `"focusgroupstart"` to
+  the `Omit`; always pass the key (`""` on the selected Tab / the first pressed Item with the
+  flag, `undefined` otherwise).
+- [ ] Tests: a `@ts-expect-error` JSX row for each of the six; one behaviour row per
+  container: without the flag, a `render` element's `focusgroup` is not on the DOM node.
+- [ ] Docs: the owned-key notes of `TabsPage.tsx`, `ToolbarPage.tsx`, `ToggleGroupPage.tsx`,
+  `MenuPage.tsx`, and `ExperimentalPage.tsx` if it shows the attribute as a prop.
