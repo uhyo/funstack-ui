@@ -70,7 +70,7 @@ export function ComboboxCountry() {
           }}
         >
           <Combobox.Label>Country</Combobox.Label>
-          <div className="demo-combobox-field">
+          <div className="demo-combobox-field demo-combobox-country">
             <Combobox.Input className="demo-combobox-input" placeholder="Type to search" />
             <Combobox.Clear className="demo-combobox-icon demo-combobox-clear" aria-label="Clear">
               ×
@@ -78,8 +78,14 @@ export function ComboboxCountry() {
             <Combobox.Trigger className="demo-combobox-icon" aria-label="Show countries">
               ▾
             </Combobox.Trigger>
+            {/* As wide as the field with its buttons: the field is the anchor (the Root anchors to
+                the Input, and the inline min-width would match the Input alone). */}
             <Combobox.Popup
               className="demo-combobox-popup"
+              style={{
+                positionAnchor: "--demo-country",
+                minWidth: "anchor-size(--demo-country width)",
+              }}
               transition={{
                 "fsui-combobox-open": "demo-combobox-pop",
                 "fsui-combobox-close": "demo-combobox-pop",

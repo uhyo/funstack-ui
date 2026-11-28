@@ -36,6 +36,13 @@
   font: inherit;
   cursor: pointer;
 }
+/* The Country example's field (input, Clear, Trigger) is named as an anchor, so the listbox can
+   be as wide as the whole field rather than the input alone (the Popup's `style` in the example).
+   Each example on the page uses its own anchor name: with a shared name, every Popup would anchor
+   to the last field. */
+.demo-combobox-country {
+  anchor-name: --demo-country;
+}
 /* Nothing to clear: hide Clear (the input shows its placeholder when empty). */
 .demo-combobox-field:has(.demo-combobox-input:placeholder-shown) .demo-combobox-clear {
   visibility: hidden;
