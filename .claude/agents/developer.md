@@ -31,7 +31,7 @@ or wrong, say so in your report instead of silently deviating.
   The git index is shared too: never leave changes staged that you are not committing in the same
   step. Prefer plain `mv`/`rm` plus `git add <old> <new>` over `git mv`/`git rm`, and commit with
   `git commit <paths>` (only those paths) so someone else's staged change is never swept in.
-  End commit messages with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+  End commit messages with the attribution trailers your session or task brief gives you.
 - **Push to `origin master` after each commit** (`git pull --rebase` first if the push is rejected) so
   finished work is never lost.
 - Keep personal working notes in `memo/developer/` (create it if missing).
