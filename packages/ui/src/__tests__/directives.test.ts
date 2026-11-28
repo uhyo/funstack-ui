@@ -365,6 +365,8 @@ const directiveFreeFiles = [
   "csp/index.mjs",
   "csp/style-hashes.mjs",
   "tooltip/tooltip-warm.mjs",
+  // The shared types subpath, a types-only entry (conventions 9.2).
+  "types/index.mjs",
   // A scheduling helper with no React: form reset and Dialog's Escape baseline (internal-hooks.md
   // 3.8 rule 5).
   "internal/after-dispatch.mjs",
@@ -392,6 +394,13 @@ describe("built files", () => {
 
   it.each(removedFiles)("%s no longer exists", (file) => {
     expect(existsSync(resolve(dist, file))).toBe(false);
+  });
+
+  // `@funstack/ui/types` costs nothing at runtime (conventions 9.2): an empty module, with the
+  // declarations next to it.
+  it("types/index.mjs is an empty module", () => {
+    expect(readFileSync(resolve(dist, "types/index.mjs"), "utf8").trim()).toBe("export {};");
+    expect(existsSync(resolve(dist, "types/index.d.mts"))).toBe(true);
   });
 });
 
