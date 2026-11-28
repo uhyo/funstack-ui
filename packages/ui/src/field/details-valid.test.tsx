@@ -38,6 +38,7 @@ import type { SliderValueChangeDetails, SliderValueCommitDetails } from "../slid
 import { Switch } from "../switch/index.js";
 import type { SwitchCheckedChangeDetails } from "../switch/index.js";
 import { TextField } from "../text-field/index.js";
+import type { Rejectable } from "../internal/types.js";
 import type { TextFieldValueCommitDetails } from "../text-field/index.js";
 import { Field } from "./index.js";
 
@@ -565,7 +566,7 @@ describe("details.valid: TextField", () => {
     await flushTasks(2);
     expect(valids(action)).toEqual([false]);
     expect(save).not.toHaveBeenCalled();
-    // Uncontrolled: the early return commits the text; it stays, invalid.
+    // Uncontrolled: the text stays as a draft (#220, conventions 3.3.1), invalid.
     expect(field().value).toBe("");
     expect(field().validity.valid).toBe(false);
     await user.type(field(), "Chores{Enter}");
@@ -857,6 +858,76 @@ describe("details.valid: OTPField", () => {
     expect(complete.mock.calls[0]![0]).toBe("1234");
     expect(valids(complete)).toEqual([false]);
     expect(seen).toContain("1234");
+  });
+});
+
+// The limit of #220 (conventions 3.3.1, "Why not the other controls"): a control with no draft
+// writes an invalid value that resolves, as before, and a later rejection returns to it.
+describe("details.valid: an invalid value is written where there is no draft", () => {
+  it("Checkbox: required, unchecked with an early return stays unchecked; a rejected check shows unchecked", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const action = vi.fn(
+      async (_next: boolean, details: CheckboxCheckedChangeDetails & Rejectable) => {
+        if (!details.valid) return;
+        details.reject();
+      },
+    );
+    render(<Checkbox aria-label="x" required defaultChecked checkedChangeAction={action} />);
+    const box = () => screen.getByRole("checkbox") as HTMLInputElement;
+    const user = setupUser();
+    await user.click(box());
+    await flushTasks(2);
+    expect(box().checked).toBe(false);
+    await user.click(box());
+    await flushTasks(2);
+    expect(valids(action)).toEqual([false, true]);
+    expect(box().checked).toBe(false);
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("Select: required, back to the placeholder, stays there", async () => {
+    const action = vi.fn(async (_next: string, details: SelectValueChangeDetails) => {
+      if (!details.valid) return;
+    });
+    render(
+      <Select.Root
+        aria-label="Fruit"
+        name="fruit"
+        required
+        defaultValue="a"
+        valueChangeAction={action}
+      >
+        <Select.Option value="">Choose</Select.Option>
+        <Select.Option value="a">A</Select.Option>
+      </Select.Root>,
+    );
+    const sel = () => screen.getByRole("combobox") as HTMLSelectElement;
+    await setupUser().selectOptions(sel(), "");
+    await flushTasks(2);
+    expect(valids(action)).toEqual([false]);
+    expect(sel().value).toBe("");
+  });
+
+  it("CheckboxGroup: required, the last Item unchecked stays empty", async () => {
+    const action = vi.fn(async (_next: string[], details: CheckboxGroupValueChangeDetails) => {
+      if (!details.valid) return;
+    });
+    render(
+      <InForm>
+        <CheckboxGroup.Root name="fruit" required defaultValue={["a"]} valueChangeAction={action}>
+          <CheckboxGroup.Label>Fruit</CheckboxGroup.Label>
+          <CheckboxGroup.Item value="a" aria-label="a" />
+          <CheckboxGroup.Item value="b" aria-label="b" />
+        </CheckboxGroup.Root>
+      </InForm>,
+    );
+    const item = (v: string) => screen.getByRole("checkbox", { name: v }) as HTMLInputElement;
+    await setupUser().click(item("a"));
+    await flushTasks(2);
+    expect(valids(action)).toEqual([false]);
+    expect(item("a").checked).toBe(false);
+    expect(item("b").checked).toBe(false);
   });
 });
 

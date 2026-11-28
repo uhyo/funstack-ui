@@ -78,6 +78,23 @@ export interface StepCommit<T, V, S> {
    * gesture is open or the value is back where the gesture began. Returns whether it dispatched.
    */
   readonly commit: (source: S | null, reason: ChangeReason, event: Event | undefined) => boolean;
+  /**
+   * The commit of a value that writes no state (conventions 3.3.1: NumberField's invalid typed
+   * draft, uncontrolled): no gesture, no `live` step, no optimistic value. Runs `stepAction` in
+   * the step transition and `commitAction` as a stateless dispatch, both with the same details
+   * (`valid: false`). When the commit action rejects, `onReject` runs (before the rethrow); it
+   * returns whether it dropped what the commit kept, having put the form value back to the shown
+   * value, and then, unless a writing commit came after this one, the preview channel hears one
+   * `"dismiss"` step of the shown value (no `live` step: the field already shows it). A stateless
+   * commit is not a later commit for a writing one's own `"dismiss"`.
+   */
+  readonly commitStateless: (
+    next: V,
+    source: S | null,
+    reason: ChangeReason,
+    event: Event | undefined,
+    onReject: () => boolean,
+  ) => void;
   /** Opens a gesture at the shown value. */
   readonly openGesture: () => void;
   /** Opens a gesture at the shown value and shows it as `live` (a pointer capture begins). */
@@ -134,8 +151,28 @@ export function useStepCommit<T, V, S, F extends object>(
    * `"activate"` dismisses a shown server error, a rollback does not.
    */
   const lastReason = useRef<ChangeReason | null>(null);
+  /**
+   * The stateless commits (`commitStateless`) by their details: the writing commit they follow
+   * (`commitSeq`, not advanced by them) and their `onReject`.
+   */
+  const statelessCommits = useRef(
+    new WeakMap<object, { readonly seq: number; readonly onReject: () => boolean }>(),
+  );
 
   const runCommit = async (next: T, details: F & ActionDetails): Promise<void> => {
+    const stateless = statelessCommits.current.get(details);
+    if (stateless !== undefined) {
+      try {
+        await (commitAction === undefined
+          ? undefined
+          : callAction(warn.component, details, (d) => commitAction(next, d)));
+      } catch (error) {
+        // `notifyDismiss` is declared below; this runs long after the render.
+        if (stateless.onReject() && stateless.seq === commitSeq.current) notifyDismiss();
+        throw error;
+      }
+      return;
+    }
     const seq = ++commitSeq.current;
     try {
       // Through `callAction` here, not only in `useControllableAction`: a `details.reject()`
@@ -252,6 +289,68 @@ export function useStepCommit<T, V, S, F extends object>(
     [dispatch, latest],
   );
 
+  const commitStateless = useCallback(
+    (
+      next: V,
+      source: S | null,
+      reason: ChangeReason,
+      event: Event | undefined,
+      onReject: () => boolean,
+    ): void => {
+      const {
+        stepAction: action,
+        stepTypes,
+        fromShown,
+        details,
+        runStep: run,
+        warnName,
+      } = latest.current;
+      // Built in the event: `details.valid` reads the DOM the caller has just written.
+      const fields = details(reason, source, next);
+      lastReason.current = reason;
+      setPendingSource(source);
+      // The commit's pending state holds `live` on screen: show what is shown now, not what an
+      // earlier gesture left behind.
+      const current = { value: shownRef.current };
+      liveRef.current = current;
+      setLive(current);
+      if (action !== undefined) {
+        run(() => {
+          for (const type of stepTypes) addTransitionType(type);
+          return callAction(warnName, createActionDetails(event, fields), (d) =>
+            action(fromShown(next), d),
+          );
+        });
+      }
+      const commitDetails = createActionDetails(event, fields);
+      statelessCommits.current.set(commitDetails, { seq: commitSeq.current, onReject });
+      dispatch(fromShown(next), commitDetails, { stateless: true });
+    },
+    [dispatch, latest, shownRef],
+  );
+
+  /** The `"dismiss"` notice of a rejected stateless commit: the shown value, no `live` step. */
+  const notifyDismiss = useCallback((): void => {
+    const {
+      stepAction: action,
+      stepTypes,
+      fromShown,
+      details,
+      runStep: run,
+      warnName,
+    } = latest.current;
+    const value = shownRef.current;
+    lastReason.current = "dismiss";
+    if (action === undefined) return;
+    const fields = details("dismiss", null, value);
+    run(() => {
+      for (const type of stepTypes) addTransitionType(type);
+      return callAction(warnName, createActionDetails(undefined, fields), (d) =>
+        action(fromShown(value), d),
+      );
+    });
+  }, [latest, shownRef]);
+
   const openGesture = useCallback(() => {
     const start = { value: shownRef.current };
     gestureStart.current = start;
@@ -284,6 +383,7 @@ export function useStepCommit<T, V, S, F extends object>(
     pendingSource,
     step,
     commit,
+    commitStateless,
     openGesture,
     captureGesture,
     markGestureStart,

@@ -786,3 +786,95 @@ describe("useControllableAction: details.reject() in set-valued state", () => {
     expect(reportError).not.toHaveBeenCalled();
   });
 });
+
+// #220 (conventions 3.3.1): the dispatch option that runs the action and writes no state.
+describe("useControllableAction: stateless dispatches", () => {
+  /** A Probe in a boundary whose action settles per dispatch when the test says. */
+  function setupStateless(controlled?: string) {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const runs: ReturnType<typeof deferred<void>>[] = [];
+    const action = vi.fn((_next: string) => {
+      const d = deferred();
+      runs.push(d);
+      return d.promise;
+    });
+    const caught = vi.fn();
+    let hook!: Hook;
+    const view = render(
+      <ErrorCatcher onError={caught}>
+        <Probe controlled={controlled} action={action} onHook={(h) => (hook = h)} />
+      </ErrorCatcher>,
+    );
+    return {
+      action,
+      runs,
+      caught,
+      reportError,
+      hook: () => hook,
+      value: () => view.getByTestId("value").textContent,
+    };
+  }
+
+  it("calls the action, is pending, writes no optimistic or committed value and no intent", async () => {
+    const { action, runs, hook, value } = setupStateless();
+    act(() => {
+      hook().dispatch("x", {} as ActionDetails, { stateless: true });
+    });
+    expect(action).toHaveBeenCalledExactlyOnceWith("x", {});
+    expect(value()).toBe("||true");
+    expect(hook().latestInFlight()).toBeNull();
+    await act(async () => runs[0]!.resolve());
+    expect(value()).toBe("||false");
+  });
+
+  it("does not supersede a writing dispatch in flight: it commits when it resolves", async () => {
+    const { runs, hook, value } = setupStateless();
+    act(() => {
+      hook().dispatch("a", {} as ActionDetails);
+      hook().dispatch("x", {} as ActionDetails, { stateless: true });
+    });
+    expect(value()).toBe("|a|true");
+    expect(hook().latestInFlight()).toEqual({ next: "a" });
+    await act(async () => runs[1]!.resolve());
+    await act(async () => runs[0]!.resolve());
+    expect(value()).toBe("a|a|false");
+  });
+
+  it("is the latest dispatch for errors: an older writing one's rejection is reported", async () => {
+    const { runs, caught, reportError, hook, value } = setupStateless();
+    act(() => {
+      hook().dispatch("a", {} as ActionDetails);
+      hook().dispatch("x", {} as ActionDetails, { stateless: true });
+    });
+    const older = new Error("older");
+    await act(async () => runs[0]!.reject(older));
+    expect(reportError).toHaveBeenCalledExactlyOnceWith(older);
+    expect(caught).not.toHaveBeenCalled();
+    await act(async () => runs[1]!.resolve());
+    expect(value()).toBe("||false");
+  });
+
+  it("its own rejection calls onReject and then reaches the boundary", async () => {
+    silenceErrors();
+    const { runs, caught, hook } = setupStateless();
+    const onReject = vi.fn();
+    act(() => {
+      hook().dispatch("x", {} as ActionDetails, { stateless: true, onReject });
+    });
+    const error = new Error("no");
+    await act(async () => runs[0]!.reject(error));
+    expect(onReject).toHaveBeenCalledTimes(1);
+    expect(caught).toHaveBeenCalledExactlyOnceWith(error);
+  });
+
+  it("controlled: the same, the parent's value shows throughout", async () => {
+    const { runs, hook, value } = setupStateless("p");
+    act(() => {
+      hook().dispatch("x", {} as ActionDetails, { stateless: true });
+    });
+    expect(value()).toBe("p|p|true");
+    await act(async () => runs[0]!.resolve());
+    expect(value()).toBe("p|p|false");
+  });
+});

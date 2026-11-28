@@ -278,6 +278,44 @@ describe("NumberField (browser)", () => {
     expect(action.mock.calls[0]![0].get("quantity")).toBe("12");
   });
 
+  // #220 (conventions 3.3.1, design 4.1): an invalid typed value stays a draft and the hidden
+  // input keeps its number, so the visible input's mirror and `:user-invalid` follow the text.
+  it("an invalid typed value stays a draft: :user-invalid and the Field's error while it is kept", async () => {
+    const commit = vi.fn<Fn>();
+    render(
+      <Field.Root name="quantity">
+        <Field.Label>Quantity</Field.Label>
+        <NumberField.Root locale="en-US" min={1} defaultValue={5} valueCommitAction={commit}>
+          <NumberField.Input data-testid="input" />
+        </NumberField.Root>
+        <Field.Error data-testid="error" />
+        <button type="button">Next</button>
+      </Field.Root>,
+    );
+    await flushMicrotasks();
+    await user.clear(input());
+    await user.type(input(), "0");
+    await user.tab();
+    await flushMicrotasks();
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(commit.mock.calls[0]![1].valid).toBe(false);
+    expect(input().value).toBe("0");
+    expect(hidden().value).toBe("0");
+    expect(input().validationMessage).toBe(hidden().validationMessage);
+    expect(input().validationMessage).not.toBe("");
+    expect(input().matches(":user-invalid")).toBe(true);
+    expect(screen.getByTestId("error")).not.toBeEmptyDOMElement();
+    // Escape ends the kept draft: the saved number, valid again.
+    await act(async () => input().focus());
+    await user.keyboard("{Escape}");
+    await flushMicrotasks();
+    expect(input().value).toBe("5");
+    expect(hidden().value).toBe("5");
+    expect(input().validity.valid).toBe(true);
+    expect(screen.queryByTestId("error")).toBeNull();
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
   it("Enter submits with the new value", async () => {
     const action = vi.fn<(formData: FormData) => void>();
     render(

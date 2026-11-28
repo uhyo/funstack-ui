@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type {
   ChangeEvent,
   ComponentPropsWithRef,
@@ -54,8 +54,9 @@ export interface TextFieldValueCommitDetails extends ActionDetails {
   /**
    * The field would be valid holding this text: its native constraints (`required`,
    * `pattern`, `minLength`, `type`, ...) and, inside a Field, `validate`. Not a server error.
-   * Information only: the commit is dispatched either way; an action that must not save invalid
-   * text returns early (`if (!details.valid) return;`, conventions 2.2).
+   * The action is called either way; an action that must not save invalid text returns early
+   * (`if (!details.valid) return;`, conventions 2.2). Uncontrolled, invalid text is not written:
+   * it stays in the field as a draft and the saved text stays (conventions 3.3.1).
    */
   readonly valid: boolean;
 }
@@ -215,6 +216,12 @@ export function TextField(props: TextFieldProps) {
 
   const [draft, setDraft] = useState<string | null>(null);
   const draftRef = useRef<string | null>(null);
+  /**
+   * The draft is a kept draft (conventions 3.3.1): the text of the invalid uncontrolled commit
+   * it was dispatched for, unchanged since. One object per commit, so a rejection drops only the
+   * draft it was dispatched for. `null` for an ordinary draft and for none.
+   */
+  const keptRef = useRef<{ readonly text: string } | null>(null);
   const elementRef = useRef<TextElement | null>(null);
 
   const text = draft ?? optimistic;
@@ -228,16 +235,19 @@ export function TextField(props: TextFieldProps) {
   // hears; typing does too, which the Field heard already (design 7, no `takeEdit`).
   useFieldValueChange(text);
 
-  const latest = useLatest({ optimistic, disabled, readOnly });
+  const latest = useLatest({ optimistic, disabled, readOnly, uncontrolled: value === undefined });
 
   const openDraft = useCallback((next: string) => {
     draftRef.current = next;
+    // An edit makes a kept draft an ordinary one again (conventions 3.3.1 rule 4).
+    keptRef.current = null;
     setDraft(next);
   }, []);
 
   const clearDraft = useCallback(() => {
     if (draftRef.current === null) return;
     draftRef.current = null;
+    keptRef.current = null;
     setDraft(null);
   }, []);
 
@@ -259,14 +269,41 @@ export function TextField(props: TextFieldProps) {
     (event: Event) => {
       const open = draftRef.current;
       if (open === null) return;
-      const { optimistic: shown, disabled: off, readOnly: ro } = latest.current;
-      clearDraft();
+      const { optimistic: shown, disabled: off, readOnly: ro, uncontrolled } = latest.current;
       // Disabled or read-only, or nothing changed (conventions 2.3 item 8): no dispatch.
-      if (off || ro || open === shown) return;
-      dispatch(open, details(event, "activate"));
+      if (off || ro || open === shown) {
+        clearDraft();
+        return;
+      }
+      const commitDetails = details(event, "activate");
+      if (!commitDetails.valid) {
+        // Step 4: a kept draft that has not changed (an edit drops it) is not dispatched again.
+        if (keptRef.current !== null) return;
+        // Step 5: uncontrolled, invalid text stays a draft; the action runs, nothing is written.
+        if (uncontrolled) {
+          const token = { text: open };
+          keptRef.current = token;
+          dispatch(open, commitDetails, {
+            stateless: true,
+            // Rule 6: a rejection drops the draft it was dispatched for, not a newer one.
+            onReject: () => {
+              if (keptRef.current === token) clearDraft();
+            },
+          });
+          return;
+        }
+      }
+      clearDraft();
+      dispatch(open, commitDetails);
     },
     [clearDraft, dispatch, latest, details],
   );
+
+  // `disabled` or `readOnly` turning on ends a kept draft (conventions 3.3.1 rule 4); an open
+  // draft is dropped by its commit (4.2 step 2).
+  useLayoutEffect(() => {
+    if ((disabled || readOnly) && keptRef.current !== null) clearDraft();
+  }, [disabled, readOnly, clearDraft]);
 
   const keyDown = useCallback(
     (event: globalThis.KeyboardEvent, element: TextElement) => {

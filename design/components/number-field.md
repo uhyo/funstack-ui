@@ -522,7 +522,9 @@ Subpath `@funstack/ui/number-field`; the root entry re-exports the namespace.
   - a second blur or Enter on the unchanged, still invalid draft dispatches nothing;
   - Escape reverts it (4.2); a step uses it as the base and replaces it (5.5); a valid typed
     value commits normally; a reset, `disabled` or `readOnly` drops it; a rejection of the
-    invalid dispatch (a throw or `details.reject()`) drops it and shows the saved number.
+    invalid dispatch (a throw or `details.reject()`) drops it and shows the saved number, and
+    `valueChangeAction` (which heard the typed number) hears one `"dismiss"` step of the shown
+    number, unless the user typed again meanwhile or a writing commit came after it.
   A later commit that fails therefore rolls back to the saved number, not to the invalid one.
   Steps (keys, buttons, wheel) have no draft and are written as before. Controlled mode is
   unchanged: the draft is cleared and the parent decides. `"platform"` values (reset, mount)

@@ -49,12 +49,14 @@ import { Dialog } from "../dialog/index.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { isEscapeRequest } from "../internal/escape-key.js";
+import type { Rejectable } from "../internal/types.js";
 import { NumberField } from "./index.js";
 import type {
   NumberFieldButtonState,
   NumberFieldRootProps,
   NumberFieldState,
   NumberFieldValueChangeDetails,
+  NumberFieldValueCommitDetails,
 } from "./index.js";
 
 type Fn = (next: number | null, details: NumberFieldValueChangeDetails) => unknown;
@@ -1857,6 +1859,330 @@ describe("NumberField", () => {
       await flushMicrotasks();
       expect(onCommit).toHaveBeenCalledWith(2, expect.anything());
     });
+  });
+});
+
+// #220, conventions 3.3.1 and design 4.1: an uncontrolled commit of an invalid typed value calls
+// both actions, writes nothing and keeps the draft; the hidden input holds the draft's number.
+describe("NumberField: an invalid typed value stays a draft (#220)", () => {
+  type CommitFn = (
+    next: number | null,
+    details: NumberFieldValueCommitDetails & Rejectable,
+  ) => unknown;
+
+  function Inline({
+    change,
+    commit,
+    seen,
+    ...props
+  }: Omit<NumberFieldRootProps, "valueChangeAction" | "valueCommitAction"> & {
+    change?: Fn;
+    commit?: CommitFn;
+    seen?: NumberFieldState[];
+  }) {
+    return (
+      <form data-testid="form">
+        <Field.Root name="qty">
+          <NumberField.Root
+            data-testid="root"
+            locale="en-US"
+            defaultValue={5}
+            min={1}
+            className={(state) => {
+              seen?.push(state);
+              return undefined;
+            }}
+            {...(change === undefined ? {} : { valueChangeAction: change })}
+            {...(commit === undefined ? {} : { valueCommitAction: commit })}
+            {...props}
+          >
+            <Parts />
+          </NumberField.Root>
+          <Field.Error data-testid="error" />
+        </Field.Root>
+      </form>
+    );
+  }
+
+  it("typed out of range: both actions with valid: false, the draft stays, state.value and the hidden input", async () => {
+    const change = vi.fn<Fn>();
+    const commit = vi.fn<CommitFn>();
+    const seen: NumberFieldState[] = [];
+    render(<Inline change={change} commit={commit} seen={seen} />);
+    input().focus();
+    typeText("0");
+    key("Enter");
+    await flushMicrotasks(2);
+    expect(change).toHaveBeenCalledTimes(1);
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(change.mock.calls[0]![0]).toBe(0);
+    expect(commit.mock.calls[0]![0]).toBe(0);
+    expect(JSON.stringify(change.mock.calls[0]![1])).toBe(
+      '{"reason":"activate","source":"input","valid":false}',
+    );
+    expect(commit.mock.calls[0]![1].valid).toBe(false);
+    expect(input().value).toBe("0");
+    expect(seen.at(-1)).toMatchObject({ value: 5, text: "0", pending: false });
+    expect(hidden().value).toBe("0");
+    expect(hidden().validity.rangeUnderflow).toBe(true);
+    expect(input().validationMessage).toBe(hidden().validationMessage);
+    expect(input().validationMessage).not.toBe("");
+    // Blur on the unchanged draft: nothing more.
+    blur();
+    await flushMicrotasks();
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(input().value).toBe("0");
+    expect(hidden().value).toBe("0");
+    // A submission attempt shows the Field's error for the draft.
+    act(() => (screen.getByTestId("form") as HTMLFormElement).requestSubmit());
+    await flushMicrotasks();
+    expect(screen.getByTestId("error")).not.toBeEmptyDOMElement();
+    expect(new FormData(screen.getByTestId("form") as HTMLFormElement).get("qty")).toBe("0");
+  });
+
+  it("pending: data-pending on the Root during the invalid dispatch", async () => {
+    const d = deferred();
+    render(<Inline commit={() => d.promise} />);
+    typeText("0");
+    blur();
+    expectPending(root());
+    await act(async () => d.resolve());
+    expectNotPending(root());
+    expect(input().value).toBe("0");
+  });
+
+  it("a later failure rolls back to the saved number, not to the invalid one", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const commit = vi.fn<CommitFn>(async (next, details) => {
+      if (!details.valid) return;
+      if (next === 7) details.reject();
+    });
+    render(<Inline commit={commit} />);
+    typeText("0");
+    blur();
+    await flushMicrotasks();
+    typeText("7");
+    blur();
+    await flushMicrotasks(2);
+    expect(commit).toHaveBeenCalledTimes(2);
+    expect(input().value).toBe("5");
+    expect(hidden().value).toBe("5");
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("empty with required: the empty draft is kept, hidden empty and valueMissing", async () => {
+    const commit = vi.fn<CommitFn>();
+    const seen: NumberFieldState[] = [];
+    render(<Inline commit={commit} required seen={seen} />);
+    typeText("");
+    blur();
+    await flushMicrotasks();
+    expect(commit).toHaveBeenCalledExactlyOnceWith(null, expect.anything());
+    expect(commit.mock.calls[0]![1].valid).toBe(false);
+    expect(input().value).toBe("");
+    expect(hidden().value).toBe("");
+    expect(hidden().validity.valueMissing).toBe(true);
+    expect(seen.at(-1)).toMatchObject({ value: 5, text: "" });
+  });
+
+  it("Escape on a kept draft: the saved number, the hidden input back to it, consumed", async () => {
+    render(<Inline commit={() => undefined} />);
+    input().focus();
+    typeText("0");
+    key("Enter");
+    await flushMicrotasks();
+    const notPrevented = key("Escape");
+    expect(notPrevented).toBe(false);
+    expect(input().value).toBe("5");
+    expect(hidden().value).toBe("5");
+    expect(hidden().validity.valid).toBe(true);
+    expect(input().validationMessage).toBe("");
+  });
+
+  it("an edit that is still invalid dispatches again; a lifted constraint makes it a normal commit", async () => {
+    const commit = vi.fn<CommitFn>();
+    const seen: NumberFieldState[] = [];
+    const { rerender } = render(<Inline commit={commit} seen={seen} />);
+    typeText("0");
+    blur();
+    await flushMicrotasks();
+    typeText("-1");
+    blur();
+    await flushMicrotasks();
+    expect(commit.mock.calls.map(([n, d]) => [n, d.valid])).toEqual([
+      [0, false],
+      [-1, false],
+    ]);
+    rerender(<Inline commit={commit} seen={seen} min={-5} />);
+    blur();
+    await flushMicrotasks();
+    expect(commit.mock.calls.map(([n, d]) => [n, d.valid])).toEqual([
+      [0, false],
+      [-1, false],
+      [-1, true],
+    ]);
+    expect(seen.at(-1)).toMatchObject({ value: -1, text: "-1" });
+  });
+
+  it("a step from a kept draft: steps from the parsed draft, a normal gesture, the draft is gone", async () => {
+    const commit = vi.fn<CommitFn>();
+    const seen: NumberFieldState[] = [];
+    render(<Inline commit={commit} seen={seen} max={10} />);
+    input().focus();
+    typeText("0");
+    key("Enter");
+    await flushMicrotasks();
+    key("ArrowUp");
+    await flushMicrotasks();
+    expect(commit.mock.calls.map(([n, d]) => [n, d.source, d.valid])).toEqual([
+      [0, "input", false],
+      [1, "keyboard", true],
+    ]);
+    expect(input().value).toBe("1");
+    expect(hidden().value).toBe("1");
+    expect(seen.at(-1)).toMatchObject({ value: 1, text: "1" });
+  });
+
+  it("a step made invalid by validate is written as before", async () => {
+    const commit = vi.fn<CommitFn>();
+    const seen: NumberFieldState[] = [];
+    render(
+      <form>
+        <Field.Root name="qty" validate={(v) => (v === "6" ? "Not six." : null)}>
+          <NumberField.Root
+            locale="en-US"
+            defaultValue={5}
+            valueCommitAction={commit}
+            className={(state) => {
+              seen.push(state);
+              return undefined;
+            }}
+          >
+            <Parts />
+          </NumberField.Root>
+        </Field.Root>
+      </form>,
+    );
+    press(inc());
+    await flushMicrotasks();
+    expect(commit.mock.calls[0]![1].valid).toBe(false);
+    expect(seen.at(-1)).toMatchObject({ value: 6, text: "6" });
+    expect(hidden().value).toBe("6");
+  });
+
+  it("reset: the kept draft is dropped, the hidden input holds the reset target", async () => {
+    const commit = vi.fn<CommitFn>();
+    render(<Inline commit={commit} />);
+    typeText("0");
+    blur();
+    await flushMicrotasks();
+    await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+    await flushMicrotasks();
+    expect(input().value).toBe("5");
+    expect(hidden().value).toBe("5");
+    expect(commit).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["readOnly", "disabled"] as const)("%s turning on drops the kept draft", async (prop) => {
+    const commit = vi.fn<CommitFn>();
+    const { rerender } = render(<Inline commit={commit} />);
+    typeText("0");
+    blur();
+    await flushMicrotasks();
+    rerender(<Inline commit={commit} {...{ [prop]: true }} />);
+    expect(input().value).toBe("5");
+    expect(hidden().value).toBe("5");
+    rerender(<Inline commit={commit} />);
+    expect(input().value).toBe("5");
+  });
+
+  it("return details.reject() on the invalid dispatch: the draft is dropped, one dismiss notice", async () => {
+    const change = vi.fn<Fn>();
+    render(<Inline change={change} commit={async (_n, details) => details.reject()} />);
+    typeText("0");
+    blur();
+    await flushMicrotasks(3);
+    expect(input().value).toBe("5");
+    expect(hidden().value).toBe("5");
+    expect(change.mock.calls.map(([n, d]) => [n, d.reason, d.valid])).toEqual([
+      [0, "activate", false],
+      [5, "dismiss", true],
+    ]);
+  });
+
+  it("a rejection after the user typed more: the newer draft stays, no dismiss notice", async () => {
+    const change = vi.fn<Fn>();
+    const d = deferred();
+    render(
+      <Inline
+        change={change}
+        commit={async (_n, details) => {
+          await d.promise;
+          details.reject();
+        }}
+      />,
+    );
+    typeText("0");
+    blur();
+    typeText("3");
+    await act(async () => d.resolve());
+    await flushMicrotasks();
+    expect(input().value).toBe("3");
+    expect(change).toHaveBeenCalledTimes(1);
+  });
+
+  it("overlap: valid A in flight, invalid B, A resolves: the value is A, the input shows B", async () => {
+    const a = deferred();
+    const seen: NumberFieldState[] = [];
+    render(
+      <Inline
+        seen={seen}
+        commit={async (next) => {
+          if (next === 8) await a.promise;
+        }}
+      />,
+    );
+    typeText("8");
+    blur();
+    typeText("0");
+    blur();
+    await flushMicrotasks();
+    expect(hidden().value).toBe("0");
+    await act(async () => a.resolve());
+    await flushMicrotasks();
+    expect(input().value).toBe("0");
+    expect(hidden().value).toBe("0");
+    expect(seen.at(-1)).toMatchObject({ value: 8, text: "0", pending: false });
+    key("Escape");
+    expect(input().value).toBe("8");
+    expect(hidden().value).toBe("8");
+  });
+
+  it("controlled: unchanged, the draft is cleared and a non-adopting parent shows its value", async () => {
+    const commit = vi.fn<CommitFn>();
+    render(<Inline commit={commit} defaultValue={undefined} value={5} />);
+    typeText("0");
+    blur();
+    await flushMicrotasks();
+    expect(commit.mock.calls[0]![1].valid).toBe(false);
+    expect(input().value).toBe("5");
+    expect(hidden().value).toBe("5");
+  });
+
+  it("no action prop: the invalid draft is kept; a valid one commits", async () => {
+    const seen: NumberFieldState[] = [];
+    render(<Inline seen={seen} />);
+    typeText("0");
+    blur();
+    await flushMicrotasks();
+    expect(input().value).toBe("0");
+    expect(seen.at(-1)).toMatchObject({ value: 5, text: "0" });
+    typeText("3");
+    blur();
+    await flushMicrotasks();
+    expect(seen.at(-1)).toMatchObject({ value: 3, text: "3" });
+    expect(hidden().value).toBe("3");
   });
 });
 

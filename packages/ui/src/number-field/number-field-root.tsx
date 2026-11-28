@@ -1,5 +1,14 @@
 "use client";
-import { use, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  use,
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode, RefObject } from "react";
 import { announce as speak } from "../internal/announce.js";
 import { dataAttr } from "../internal/data-attr.js";
@@ -54,7 +63,8 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
   /**
    * The field would be valid holding this value: its native constraints (`required`, `min`,
    * `max`, `step`) and, inside a Field, `validate`. Not a server error. Information only: the
-   * value is dispatched either way (conventions 2.2).
+   * action is called either way (conventions 2.2). Uncontrolled, an invalid typed value is not
+   * written: the text stays a draft and the saved value stays (conventions 3.3.1).
    */
   readonly valid: boolean;
 }
@@ -75,7 +85,8 @@ export interface NumberFieldValueCommitDetails extends ActionDetails {
   /**
    * The field would be valid holding this value: its native constraints (`required`, `min`,
    * `max`, `step`) and, inside a Field, `validate`. Not a server error. Information only: the
-   * value is dispatched either way (conventions 2.2).
+   * action is called either way (conventions 2.2). Uncontrolled, an invalid typed value is not
+   * written: the text stays a draft and the saved value stays (conventions 3.3.1).
    */
   readonly valid: boolean;
 }
@@ -237,6 +248,16 @@ function identity(value: number | null): number | null {
   return value;
 }
 
+/**
+ * A typed draft that was invalid at its commit and stays a draft (uncontrolled, conventions
+ * 3.3.1): its text and the number the hidden input holds for it. One object per invalid commit,
+ * so a rejection drops only the draft it was dispatched for.
+ */
+interface KeptDraft {
+  readonly text: string;
+  readonly value: number | null;
+}
+
 /** The hidden input's value for `value`. */
 function hiddenText(value: number | null): string {
   return value === null ? "" : String(value);
@@ -356,6 +377,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   const [draft, setDraft] = useState<string | null>(null);
   const draftRef = useRef<string | null>(null);
+  const [kept, setKept] = useState<KeptDraft | null>(null);
+  const keptRef = useRef<KeptDraft | null>(null);
   const [hold, setHold] = useState<StepDirection | null>(null);
   /** The value the next tick of a hold steps from. */
   const holdBase = useRef<number | null>(null);
@@ -365,11 +388,19 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   const nextValidity = useNextValidity();
 
+  /** Ends a kept draft (conventions 3.3.1): the hidden input returns to the shown value. */
+  const dropKept = useCallback(() => {
+    if (keptRef.current === null) return;
+    keptRef.current = null;
+    setKept(null);
+  }, []);
+
   const clearDraft = useCallback(() => {
     if (draftRef.current === null) return;
     draftRef.current = null;
     setDraft(null);
-  }, []);
+    dropKept();
+  }, [dropKept]);
 
   /**
    * Writes `next` into the hidden input, then mirrors its validity onto the visible input, which
@@ -396,6 +427,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
     pendingSource,
     step,
     commit,
+    commitStateless,
     openGesture,
     captureGesture,
     takeEdit,
@@ -452,9 +484,11 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // A step, a key and a typed commit fire no `input` / `change` on the element the Field hears
   // for the value (the hidden input is written by script): tell it at the commit (design 7.2).
-  useFieldValueChange(optimistic, takeEdit);
+  // A kept draft writes the hidden input with no committed value either (conventions 3.3.1).
+  useFieldValueChange(kept ?? optimistic, takeEdit);
 
   const latest = useLatest({
+    uncontrolled: value === undefined,
     formatter,
     bounds,
     largeStep,
@@ -502,16 +536,21 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
 
   // --- Typing (design 4.1) ----------------------------------------------------------------------
 
-  const typed = useCallback((next: string) => {
-    draftRef.current = next;
-    setDraft(next);
-  }, []);
+  const typed = useCallback(
+    (next: string) => {
+      draftRef.current = next;
+      setDraft(next);
+      // An edit makes a kept draft an ordinary one again (conventions 3.3.1 rule 4).
+      dropKept();
+    },
+    [dropKept],
+  );
 
   const commitDraft = useCallback(
     (event: Event) => {
       const open = draftRef.current;
       if (open === null) return;
-      const { formatter: f, disabled: off, readOnly: ro } = latest.current;
+      const { uncontrolled, formatter: f, disabled: off, readOnly: ro } = latest.current;
       if (off || ro) {
         clearDraft();
         return;
@@ -522,12 +561,53 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
         clearDraft();
         return;
       }
+      // An invalid typed value stays a draft, uncontrolled (conventions 3.3.1; design 4.1). The
+      // hidden input is written first, so `details.valid` reads it (field-form.md 7.5).
+      const next = parsed === null ? parsed : f.round(parsed);
+      if (uncontrolled && !Object.is(next, shownRef.current)) {
+        syncHidden(next);
+        const hidden = hiddenRef.current;
+        const valid = nextValidity(hidden === null || nativeValid(hidden), null);
+        if (!valid) {
+          // Rule 5: a kept draft that has not changed (an edit drops it) is not dispatched again.
+          if (keptRef.current !== null) return;
+          const token: KeptDraft = { text: open, value: next };
+          keptRef.current = token;
+          setKept(token);
+          commitStateless(next, "input", "activate", event, () => {
+            // Rule 6: a rejection drops the draft it was dispatched for, not a newer one, and the
+            // hidden input returns to the shown value at once (the `"dismiss"` notice reads it).
+            if (keptRef.current !== token) return false;
+            clearDraft();
+            syncHidden(shownRef.current);
+            return true;
+          });
+          return;
+        }
+      }
       openGesture();
       step(parsed, "input", "activate", event);
       commit("input", "activate", event);
     },
-    [clearDraft, commit, latest, openGesture, shownRef, step],
+    [
+      clearDraft,
+      commit,
+      commitStateless,
+      hiddenRef,
+      latest,
+      nextValidity,
+      openGesture,
+      shownRef,
+      step,
+      syncHidden,
+    ],
   );
+
+  // `disabled` or `readOnly` turning on ends a kept draft (conventions 3.3.1 rule 4); an open
+  // draft is dropped by its commit (4.1).
+  useLayoutEffect(() => {
+    if ((disabled || readOnly) && keptRef.current !== null) clearDraft();
+  }, [disabled, readOnly, clearDraft]);
 
   // --- Keyboard and wheel (design 4.2, 4.4) ----------------------------------------------------
 
@@ -731,6 +811,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       endHold,
       activate,
       syncHidden,
+      hiddenValue: kept === null ? shown : kept.value,
       registerLabel,
       onItemMounted,
     }),
@@ -759,6 +840,8 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
       endHold,
       activate,
       syncHidden,
+      kept,
+      shown,
       registerLabel,
       onItemMounted,
     ],

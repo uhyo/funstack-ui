@@ -45,6 +45,15 @@ const { committed, optimistic, pending, dispatch, latestInFlight, adopt, adoptFa
   under the root and comparing their DOM order.
 - `latestInFlight()` is the base of the residual paths (3.8 rule 1, `intendedValue`);
   `adopt(next)` takes a browser default without a dispatch (uncontrolled Select, 3.8).
+- `dispatch(next, details, { stateless: true, onReject })` runs the action and writes no
+  state (conventions 3.3.1, an invalid typed draft): no transition types, no optimistic value,
+  no uncontrolled write, not the in-flight intent, no burst entry. It counts for `pending` and,
+  as the latest dispatch, for the error routing of 2.4, but a writing dispatch still in flight
+  still commits when it resolves (the uncontrolled write has its own latest-dispatch guard,
+  which only writing dispatches and `adoptFact` advance). `onReject` (any dispatch) runs when
+  the action rejects, before the error takes its route. TextField dispatches through it
+  directly; NumberField through `useStepCommit`'s `commitStateless`, which also runs the step
+  action and sends the `"dismiss"` notice of number-field.md 4.1.
 
 **The `reducer` option.** A component passes **no `reducer`** for single-valued state (the
 optimistic value is the dispatched `next`, the uncontrolled commit is the latest dispatch's

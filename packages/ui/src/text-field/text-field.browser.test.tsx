@@ -3,7 +3,8 @@
 // key), and the same Escape rows for NumberField's Input (testing.md 10.1 "Draft revert"); real
 // Ctrl+Enter / Cmd+Enter in a textarea (no line, no form submission); blurs by a real Tab, a
 // real click on a button and focus moving into another frame, a real reset click with a draft
-// open and a save pending (#185), the IME rows (Chromium through CDP), and no document view
+// open and a save pending (#185), `tooShort` and `:user-invalid` on a kept invalid draft (#220),
+// the IME rows (Chromium through CDP), and no document view
 // transition. The real-key rows inside a Field (#193) are in field/field-edit.browser.test.tsx.
 // The window itself losing focus (another application) cannot be driven in any engine; focus
 // moving into an iframe is the nearest the harness gets. Runs in Chromium, Firefox and WebKit.
@@ -21,12 +22,14 @@ import { user } from "../__tests__/browser-user.js";
 import { browserName, pressFocusesButtons } from "../__tests__/engine.js";
 import { deferred, ErrorCatcher, flushMicrotasks, silenceErrors } from "../__tests__/helpers.js";
 import { Dialog } from "../dialog/index.js";
+import { Field } from "../field/index.js";
 import { NumberField } from "../number-field/index.js";
+import type { Rejectable } from "../internal/types.js";
 import { Popover } from "../popover/index.js";
 import { TextField } from "./index.js";
 import type { TextFieldValueCommitDetails } from "./index.js";
 
-type Fn = (next: string, details: TextFieldValueCommitDetails) => unknown;
+type Fn = (next: string, details: TextFieldValueCommitDetails & Rejectable) => unknown;
 
 const field = () => screen.getByTestId("field") as HTMLInputElement;
 
@@ -91,6 +94,78 @@ describe("TextField (browser)", () => {
         await settle(() => expect(popup.matches(":popover-open")).toBe(false));
       });
     }
+  });
+
+  // #220 (conventions 3.3.1): the platform flags `tooShort` only for text the user edited, which
+  // is why an invalid uncontrolled commit keeps the draft instead of writing it.
+  describe("an invalid draft stays a draft (#220)", () => {
+    function Inline({ action }: { action: Fn }) {
+      return (
+        <Field.Root name="title" required>
+          <Field.Label>Title</Field.Label>
+          <TextField
+            data-testid="field"
+            defaultValue="Untitled draft"
+            minLength={3}
+            valueCommitAction={action}
+          />
+          <Field.Error data-testid="error" />
+          <button type="button">Next</button>
+        </Field.Root>
+      );
+    }
+
+    /** Counts the writes to the input's `value` (react-dom's value tracker stays in the chain). */
+    function spyValueWrites(element: HTMLInputElement): { count: number } {
+      const writes = { count: 0 };
+      let owner: object | null = element;
+      let descriptor: PropertyDescriptor | undefined;
+      while (owner !== null && descriptor === undefined) {
+        descriptor = Object.getOwnPropertyDescriptor(owner, "value");
+        owner = Object.getPrototypeOf(owner) as object | null;
+      }
+      const inner = descriptor!;
+      Object.defineProperty(element, "value", {
+        configurable: true,
+        enumerable: inner.enumerable ?? false,
+        get() {
+          return inner.get!.call(this);
+        },
+        set(next: string) {
+          writes.count += 1;
+          inner.set!.call(this, next);
+        },
+      });
+      return writes;
+    }
+
+    it("tooShort keeps flagging after the invalid commit settles; a later failure rolls back to the saved text", async () => {
+      const action = vi.fn<Fn>(async (next, details) => {
+        if (!details.valid) return;
+        if (next === "Escalation notes") details.reject();
+      });
+      render(<Inline action={action} />);
+      await flushMicrotasks();
+      const writes = spyValueWrites(field());
+      await retype("ab");
+      await user.keyboard("{Enter}");
+      await settle(() => expect(action).toHaveBeenCalledTimes(1));
+      expect(action.mock.calls[0]![1].valid).toBe(false);
+      await user.tab();
+      await flushMicrotasks();
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(writes.count).toBe(0);
+      expect(field().value).toBe("ab");
+      expect(field().validity.tooShort).toBe(true);
+      expect(field().matches(":user-invalid")).toBe(true);
+      expect(screen.getByTestId("error")).not.toBeEmptyDOMElement();
+
+      await retype("Escalation notes");
+      await user.keyboard("{Enter}");
+      await settle(() => expect(field().value).toBe("Untitled draft"));
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(field().validity.valid).toBe(true);
+    });
   });
 
   describe("blur commits", () => {

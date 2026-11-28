@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { field, textFieldDriver } from "../__tests__/drivers/text-field.js";
 import {
   deferred,
+  ErrorCatcher,
   expectNotPending,
   expectPending,
   flushMicrotasks,
@@ -31,10 +32,11 @@ import { Dialog } from "../dialog/index.js";
 import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { isEscapeRequest } from "../internal/escape-key.js";
+import type { Rejectable } from "../internal/types.js";
 import { TextField } from "./index.js";
 import type { TextFieldProps, TextFieldState, TextFieldValueCommitDetails } from "./index.js";
 
-type Fn = (next: string, details: TextFieldValueCommitDetails) => unknown;
+type Fn = (next: string, details: TextFieldValueCommitDetails & Rejectable) => unknown;
 
 describeValueAction(textFieldDriver);
 describeNativeGroupPlatform(textFieldDriver);
@@ -1109,6 +1111,370 @@ describe("TextField", () => {
       expect(screen.getByTestId("custom")).toBe(field());
       expect(seen.at(-1)).toMatchObject({ value: "Draft", text: "Draft" });
     });
+  });
+});
+
+// #220, conventions 3.3.1: an uncontrolled commit of invalid text calls the action, writes
+// nothing and keeps the draft. jsdom never flags `tooShort` (no dirty flag), so these rows use
+// `pattern`; the `minLength` row is in text-field.browser.test.tsx.
+describe("TextField: an invalid draft stays a draft (#220)", () => {
+  /** Uncontrolled, `required`, at least three characters; `seen` records every render's state. */
+  function Inline({
+    action,
+    seen,
+    ...props
+  }: Omit<TextFieldProps, "valueCommitAction"> & { action?: Fn; seen?: TextFieldState[] }) {
+    return (
+      <form data-testid="form">
+        <Field.Root name="title" required>
+          <Field.Label>Title</Field.Label>
+          <TextField
+            defaultValue="Untitled draft"
+            pattern=".{3,}"
+            className={(state) => {
+              seen?.push(state);
+              return undefined;
+            }}
+            {...(action === undefined ? {} : { valueCommitAction: action })}
+            {...props}
+          />
+          <Field.Error data-testid="error" />
+        </Field.Root>
+      </form>
+    );
+  }
+
+  it("the issue: valid: false, the draft stays with its error, a later failure rolls back to the saved text", async () => {
+    const seen: TextFieldState[] = [];
+    const action = vi.fn<Fn>(async (next, details) => {
+      if (!details.valid) return;
+      if (next === "Escalation notes") details.reject();
+    });
+    render(<Inline seen={seen} action={action} />);
+    field().focus();
+    typeText("ab");
+    key("Enter");
+    await flushMicrotasks(2);
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(action.mock.calls[0]![0]).toBe("ab");
+    expect(JSON.stringify(action.mock.calls[0]![1])).toBe('{"reason":"activate","valid":false}');
+    expect(field().value).toBe("ab");
+    expect(seen.at(-1)).toMatchObject({ value: "Untitled draft", text: "ab", pending: false });
+    blur();
+    await flushMicrotasks();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(field().value).toBe("ab");
+    // The element holds the draft, so it is invalid (the Field's error is the form row's and
+    // the browser row's: jsdom has no `:user-invalid`).
+    expect(field().validity.patternMismatch).toBe(true);
+    // A later valid commit that the action rejects returns to the saved text, not to "ab".
+    field().focus();
+    typeText("Escalation notes");
+    key("Enter");
+    await flushMicrotasks(2);
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(field().value).toBe("Untitled draft");
+    expect(seen.at(-1)).toMatchObject({ value: "Untitled draft", text: "Untitled draft" });
+  });
+
+  it("pending: data-pending during the invalid dispatch, gone after", async () => {
+    const d = deferred();
+    render(<Inline action={() => d.promise} />);
+    typeText("ab");
+    blur();
+    expectPending(field());
+    expect(field().value).toBe("ab");
+    await act(async () => d.resolve());
+    expectNotPending(field());
+    expect(field().value).toBe("ab");
+  });
+
+  it("not twice: Enter then blur is one call; a still invalid edit is a second; a lifted constraint commits", async () => {
+    const action = vi.fn<Fn>();
+    const { rerender } = render(<Inline action={action} />);
+    field().focus();
+    typeText("ab");
+    key("Enter");
+    blur();
+    await flushMicrotasks();
+    expect(action).toHaveBeenCalledTimes(1);
+    field().focus();
+    typeText("a");
+    blur();
+    await flushMicrotasks();
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(action.mock.calls[1]![0]).toBe("a");
+    // The same kept draft, valid once the constraint is lifted: a normal commit.
+    rerender(<Inline action={action} pattern=".*" required={false} />);
+    field().focus();
+    key("Enter");
+    await flushMicrotasks();
+    expect(action).toHaveBeenCalledTimes(3);
+    expect(action.mock.calls[2]![1].valid).toBe(true);
+    expect(field().value).toBe("a");
+    // Written: Escape has no draft to revert.
+    expect(key("Escape").defaultPrevented).toBe(false);
+  });
+
+  it("Escape on a kept draft shows the saved text and is consumed", async () => {
+    render(<Inline action={() => undefined} />);
+    field().focus();
+    typeText("ab");
+    key("Enter");
+    await flushMicrotasks();
+    const event = key("Escape");
+    expect(event.defaultPrevented).toBe(true);
+    expect(isEscapeRequest(event)).toBe(false);
+    expect(field().value).toBe("Untitled draft");
+  });
+
+  it("fix and commit: a normal commit, the new text is the value", async () => {
+    const seen: TextFieldState[] = [];
+    const action = vi.fn<Fn>();
+    render(<Inline seen={seen} action={action} />);
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    typeText("Escalation notes");
+    blur();
+    await flushMicrotasks();
+    expect(action.mock.calls.map(([n, d]) => [n, d.valid])).toEqual([
+      ["ab", false],
+      ["Escalation notes", true],
+    ]);
+    expect(seen.at(-1)).toMatchObject({ value: "Escalation notes", text: "Escalation notes" });
+    expect(key("Escape").defaultPrevented).toBe(false);
+  });
+
+  it("return details.reject() on the invalid dispatch: the draft is dropped, the saved text shows", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    render(<Inline action={async (_next, details) => details.reject()} />);
+    typeText("ab");
+    blur();
+    await flushMicrotasks(2);
+    expect(field().value).toBe("Untitled draft");
+    expect(reportError).not.toHaveBeenCalled();
+  });
+
+  it("a throw from the invalid dispatch reaches the boundary", async () => {
+    silenceErrors();
+    const onError = vi.fn();
+    render(
+      <ErrorCatcher onError={onError}>
+        <Inline
+          action={async () => {
+            throw new Error("no");
+          }}
+        />
+      </ErrorCatcher>,
+    );
+    typeText("ab");
+    blur();
+    await flushTasks(2);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("error-catcher")).toHaveTextContent("no");
+  });
+
+  it("a rejection after the user typed more: the newer draft stays", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const d = deferred();
+    render(
+      <Inline
+        action={async (_next, details) => {
+          await d.promise;
+          details.reject();
+        }}
+      />,
+    );
+    typeText("ab");
+    blur();
+    typeText("abc");
+    await act(async () => d.resolve());
+    await flushMicrotasks();
+    expect(field().value).toBe("abc");
+    key("Escape");
+    expect(field().value).toBe("Untitled draft");
+  });
+
+  it("overlap: valid A in flight, invalid B, A resolves: the value is A, the input shows B", async () => {
+    const seen: TextFieldState[] = [];
+    const a = deferred();
+    render(
+      <Inline
+        seen={seen}
+        action={async (next) => {
+          if (next === "Alpha") await a.promise;
+        }}
+      />,
+    );
+    typeText("Alpha");
+    blur();
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    await act(async () => a.resolve());
+    await flushMicrotasks();
+    expect(field().value).toBe("ab");
+    expect(seen.at(-1)).toMatchObject({ value: "Alpha", text: "ab", pending: false });
+    key("Escape");
+    expect(field().value).toBe("Alpha");
+  });
+
+  it("overlap: valid A in flight, invalid B, A throws: reportError, the saved text is unchanged", async () => {
+    const reportError = vi.fn();
+    vi.stubGlobal("reportError", reportError);
+    const seen: TextFieldState[] = [];
+    const a = deferred();
+    render(
+      <Inline
+        seen={seen}
+        action={async (next) => {
+          if (next === "Alpha") await a.promise;
+        }}
+      />,
+    );
+    typeText("Alpha");
+    blur();
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    await act(async () => a.reject(new Error("A failed")));
+    await flushMicrotasks();
+    expect(reportError).toHaveBeenCalledTimes(1);
+    expect(field().value).toBe("ab");
+    expect(seen.at(-1)).toMatchObject({ value: "Untitled draft", text: "ab" });
+  });
+
+  it("reset: the kept draft is dropped; the reset text is the value even when invalid", async () => {
+    const action = vi.fn<Fn>();
+    render(<Inline action={action} defaultValue="" />);
+    typeText("Good title");
+    blur();
+    await flushMicrotasks();
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+    await flushMicrotasks();
+    expect(action.mock.calls.map(([n, d]) => [n, d.reason, d.valid])).toEqual([
+      ["Good title", "activate", true],
+      ["ab", "activate", false],
+      ["", "platform", false],
+    ]);
+    expect(field().value).toBe("");
+    // Written: there is no draft for Escape.
+    expect(key("Escape").defaultPrevented).toBe(false);
+  });
+
+  it.each(["readOnly", "disabled"] as const)("%s turning on drops the kept draft", async (prop) => {
+    const action = vi.fn<Fn>();
+    const { rerender } = render(<Inline action={action} />);
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    expect(field().value).toBe("ab");
+    rerender(<Inline action={action} {...{ [prop]: true }} />);
+    expect(field().value).toBe("Untitled draft");
+    rerender(<Inline action={action} />);
+    expect(field().value).toBe("Untitled draft");
+  });
+
+  it("form: a submission with a kept draft is blocked; FormData holds the draft", async () => {
+    const submit = vi.fn((e: Event) => e.preventDefault());
+    render(<Inline action={() => undefined} />);
+    const form = screen.getByTestId("form") as HTMLFormElement;
+    form.addEventListener("submit", submit);
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    expect(new FormData(form).get("title")).toBe("ab");
+    expect(form.checkValidity()).toBe(false);
+    act(() => form.requestSubmit());
+    await flushMicrotasks();
+    expect(submit).not.toHaveBeenCalled();
+    expect(screen.getByTestId("error")).not.toBeEmptyDOMElement();
+    expect(field().value).toBe("ab");
+  });
+
+  it("controlled: unchanged, the draft is cleared and a non-adopting parent shows the saved text", async () => {
+    const action = vi.fn<Fn>();
+    render(<Inline action={action} defaultValue={undefined} value="Untitled draft" />);
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(action.mock.calls[0]![1].valid).toBe(false);
+    expect(field().value).toBe("Untitled draft");
+  });
+
+  it("no action prop: the invalid draft is kept; a valid one commits", async () => {
+    const seen: TextFieldState[] = [];
+    render(<Inline seen={seen} />);
+    typeText("ab");
+    blur();
+    await flushMicrotasks();
+    expect(field().value).toBe("ab");
+    expect(seen.at(-1)).toMatchObject({ value: "Untitled draft", text: "ab" });
+    typeText("Good title");
+    blur();
+    await flushMicrotasks();
+    expect(seen.at(-1)).toMatchObject({ value: "Good title", text: "Good title" });
+  });
+
+  it("textarea: the same with Ctrl+Enter", async () => {
+    const action = vi.fn<Fn>();
+    const seen: TextFieldState[] = [];
+    render(
+      <Field.Root name="notes" required>
+        <TextField
+          aria-label="Notes"
+          render={<textarea />}
+          defaultValue="Saved notes"
+          className={(state) => {
+            seen.push(state);
+            return undefined;
+          }}
+          valueCommitAction={action}
+        />
+      </Field.Root>,
+    );
+    field().focus();
+    typeText("");
+    key("Enter", { ctrlKey: true });
+    blur();
+    await flushMicrotasks();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(action.mock.calls[0]![1].valid).toBe(false);
+    expect(field().value).toBe("");
+    expect(seen.at(-1)).toMatchObject({ value: "Saved notes", text: "" });
+  });
+
+  it("validate only: native-valid text that validate rejects is kept as well", async () => {
+    const action = vi.fn<Fn>();
+    const seen: TextFieldState[] = [];
+    render(
+      <form>
+        <Field.Root name="handle" validate={(v) => (v.includes(" ") ? "No spaces." : null)}>
+          <TextField
+            aria-label="Handle"
+            defaultValue="ada"
+            className={(state) => {
+              seen.push(state);
+              return undefined;
+            }}
+            valueCommitAction={action}
+          />
+        </Field.Root>
+      </form>,
+    );
+    typeText("a b");
+    blur();
+    await flushMicrotasks();
+    expect(action.mock.calls[0]![1].valid).toBe(false);
+    expect(field().value).toBe("a b");
+    expect(seen.at(-1)).toMatchObject({ value: "ada", text: "a b" });
   });
 });
 

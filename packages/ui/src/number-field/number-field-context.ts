@@ -62,6 +62,11 @@ export interface NumberFieldContextValue {
    * input (6.2).
    */
   readonly syncHidden: (value: number | null) => void;
+  /**
+   * The number the hidden input holds after every commit: the kept draft's while one is kept
+   * (conventions 3.3.1), else the shown value.
+   */
+  readonly hiddenValue: number | null;
   /** Called by the Label from a layout effect; returns the unregistration. */
   readonly registerLabel: () => () => void;
   /** Called by the Input from its mount layout effect (late mount reconciliation). */

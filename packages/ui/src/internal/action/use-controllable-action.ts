@@ -103,6 +103,20 @@ export interface ControllableAction<T, Details extends ActionDetails> {
 export interface DispatchOptions {
   /** Adopt `next` whole instead of applying `reducer` (see `dispatch`). Default `false`. */
   readonly whole?: boolean | undefined;
+  /**
+   * Run the action and write no state (conventions 3.3.1, an invalid typed draft): no transition
+   * types, no optimistic value, no uncontrolled commit, not the in-flight intent
+   * (`latestInFlight`), no burst entry. It counts for `pending` and, as the latest dispatch, for
+   * the error routing of 2.4, but it does not advance the guard of the uncontrolled write: a
+   * writing dispatch still in flight commits when it resolves. Default `false`.
+   */
+  readonly stateless?: boolean | undefined;
+  /**
+   * Called when the action rejects (a throw or `details.reject()`), whatever route the
+   * rejection then takes, before it is rethrown. The caller drops what it kept for the dispatch
+   * (a stateless dispatch's kept draft, conventions 3.3.1 rule 6).
+   */
+  readonly onReject?: (() => void) | undefined;
 }
 
 /** One uncontrolled reducer-mode dispatch of a burst; `resolved` once its action resolved. */
@@ -166,7 +180,10 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
           : patch.next,
   );
   const [pending, startOwnTransition] = useTransition();
+  /** The latest dispatch, for the error routing of 2.4 (stateless ones included). */
   const latest = useRef(0);
+  /** The latest writing dispatch, for the uncontrolled write (stateless ones excluded). */
+  const latestWrite = useRef(0);
   const inFlight = useRef<{ count: number; next: T | undefined }>({ count: 0, next: undefined });
   /** The uncontrolled reducer-mode dispatches of the current burst (overlapping), in order. */
   const burst = useRef<BurstEntry<T, Details>[]>([]);
@@ -212,6 +229,8 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
   const dispatch = useCallback(
     (next: T, details: Details, options?: DispatchOptions): void => {
       const whole = options?.whole ?? false;
+      const stateless = options?.stateless ?? false;
+      const onReject = options?.onReject;
       // Read once, at the call, as the per-render closure did: the action, the mode and the
       // previous value belong to the UI the user acted on, even after the `await`.
       const {
@@ -223,22 +242,30 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
         component,
       } = props.current;
       const id = ++latest.current;
+      const writeId = stateless ? null : ++latestWrite.current;
       const dispatchEpoch = epochRef.current;
-      inFlight.current.count += 1;
-      inFlight.current.next = next;
+      if (!stateless) {
+        inFlight.current.count += 1;
+        inFlight.current.next = next;
+      }
       // Uncontrolled with a reducer: committed from the burst once every dispatch settled.
       const entry: BurstEntry<T, Details> | null =
-        !isControlled && reducer ? { next, details, reducer, whole, resolved: false } : null;
+        !stateless && !isControlled && reducer
+          ? { next, details, reducer, whole, resolved: false }
+          : null;
       if (entry) burst.current.push(entry);
       startOwnTransition(async () => {
-        for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
-        setOptimistic({ next, details, epoch: dispatchEpoch, whole });
+        if (!stateless) {
+          for (const type of transitionTypes?.(next, prev, details) ?? []) addTransitionType(type);
+          setOptimistic({ next, details, epoch: dispatchEpoch, whole });
+        }
         try {
           await (action === undefined
             ? undefined
             : callAction(component, details, (d) => action(next, d)));
         } catch (error) {
-          settle();
+          if (!stateless) settle();
+          onReject?.();
           // The action called `details.reject()` (2.4.1): the rejection path above and below,
           // minus the boundary and `reportError`, whether latest, superseded or owner gone.
           if (isHandledRejection(error)) return;
@@ -249,9 +276,10 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
           reportDropped(error);
           return;
         }
+        if (stateless) return;
         if (entry) entry.resolved = true;
         settle();
-        if (!isControlled && !entry && id === latest.current) {
+        if (!isControlled && !entry && writeId === latestWrite.current) {
           startTransition(() => setInternal(next));
         }
       });
@@ -276,6 +304,7 @@ export function useControllableAction<T, Details extends ActionDetails = ActionD
       // Supersede: no dispatch in flight is the latest any more, so none commits and a later
       // rejection is reported (2.4). Their settles still count down `inFlight`.
       latest.current += 1;
+      latestWrite.current += 1;
       if (inFlight.current.count > 0) inFlight.current.next = next;
       burst.current = [];
       epochRef.current += 1;

@@ -153,9 +153,11 @@ export function NumberFieldInput({
   const hiddenMergedRef = useMergedRefs<HTMLInputElement | null>(hiddenRef, hiddenInputRef);
 
   // After every commit: the hidden input holds the shown value (a rollback, a controlled change,
-  // a reset) and the visible input mirrors its validity (a changed `min` / `max` / `required`).
+  // a reset), or a kept draft's number (conventions 3.3.1), and the visible input mirrors its
+  // validity (a changed `min` / `max` / `required`).
+  const { hiddenValue } = ctx;
   useLayoutEffect(() => {
-    syncHidden(state.value);
+    syncHidden(hiddenValue);
   });
 
   // The hidden input is never the one the browser reports on (6.3); the visible input is

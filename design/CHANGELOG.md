@@ -17661,3 +17661,39 @@ Unchanged controls (one pinning row each, so the limit of the rule is tested): C
 `required` unchecked with an early return stays unchecked and a later rejected "check" shows
 unchecked; Select `required` returns to the placeholder and stays; CheckboxGroup `required`
 with the last Item unchecked stays empty.
+
+## 2026-11-29, #220 implemented: implementation notes
+
+The rule of the entry above, implemented as designed, with one gap filled.
+
+- `useControllableAction`: `DispatchOptions` gains `stateless` and `onReject`
+  (internal-hooks.md 3.4 has the contract). Two guards now: `latest` (every dispatch, for the
+  error routing of 2.4) and `latestWrite` (writing dispatches and `adoptFact`, for the
+  uncontrolled write). A stateless dispatch also adds no transition types: it commits nothing
+  the commit types describe.
+- TextField: a `keptRef` holding `{ text }` per invalid commit, cleared by every edit and every
+  draft clear. Steps 4 and 5 of 4.2 read `details.valid` once, from the details object the
+  dispatch then carries. `disabled` / `readOnly` turning on drops a kept draft in a layout
+  effect (an unfocused kept draft has no blur that would drop it).
+- NumberField: `kept` state plus ref (`{ text, value }`); the hidden input is written with the
+  rounded draft number before `valid` is read (field-form.md 7.5) and the Input's layout
+  effect syncs to `hiddenValue` (the kept number while one is kept, else the shown value).
+  `useFieldValueChange(kept ?? optimistic, takeEdit)`, so the Field re-reads the hidden input
+  when a draft is kept and when it ends. `useStepCommit.commitStateless` runs the step action
+  and the stateless commit with the same fields; a stateless commit does not advance
+  `commitSeq`, so a writing commit before it keeps its own `"dismiss"` revert.
+- **Gap filled, for the architect to confirm**: what `valueChangeAction` hears when the
+  invalid commit is rejected. It heard the typed number (both actions are called), so the
+  implementation sends one `"dismiss"` step of the shown number, when the draft was dropped
+  (not when the user typed again) and no writing commit came after; the existing row
+  `details-valid.test.tsx` "the dismiss notice of a rejected commit carries it" (a typed `0`
+  with `min={1}`, the commit throws) keeps passing unchanged. number-field.md 4.1 now says so.
+  Not covered: a kept draft ended by Escape, an edit or a step sends no `"dismiss"`, so a
+  preview that adopted the typed number keeps it until the next step.
+- Tests: the rows of the plan above in `text-field.test.tsx`, `number-field.test.tsx`,
+  `use-controllable-action.test.tsx` (stateless dispatch rows) and `details-valid.test.tsx`
+  (the three pinning rows); browser rows in `text-field.browser.test.tsx` (`tooShort` and
+  `:user-invalid` after the settle, no `value` write, the later rollback to the saved text)
+  and `number-field.browser.test.tsx` (`:user-invalid` and the Field's error while kept,
+  Escape). jsdom never flags `tooShort` (no dirty flag), so the jsdom TextField rows use
+  `pattern`.
