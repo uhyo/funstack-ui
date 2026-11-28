@@ -43,7 +43,7 @@ reported no errors**, so a failed submission never wipes what the user typed.
 | 2 | Validity source | Native constraints (`required`, `type`, `pattern`, `min`/`max`, `minLength`, …) plus **one custom-validity slot** the Field owns: `validate(value, formData)` (sync, re-run on every `input` / `change` in the form and after a FUNSTACK control's value change that fired no event, 7.1) and the server error for the field, both written with `setCustomValidity`. Cleared on the control's next edit. No JS schema, no `validationMode`. |
 | 3 | When an error is shown | `invalid = userInvalid \|\| serverShown`. `userInvalid` is read from the DOM (`control.matches(":user-invalid")`) on `input`, `change`, `focusout`, `invalid` and after `reset`: the platform's heuristic (changed-then-blurred, or a submission attempt; live afterwards; cleared by a reset). `serverShown` is the field's entry in `Form.Root errors` until the user edits the control, re-armed by the next settled submission (each Field re-arms itself on its own `useFormStatus` edge, in the settle commit, 3.4). |
 | 4 | The display state is urgent | `invalid`, `messages` and `validity` are a **mirror of a browser-owned fact**, written with plain `useState` from the DOM event (the urgent lane of conventions 2.6, like virtual focus): the DOM already holds the truth, and the error must be in the DOM when focus moves to the field. No `transition` prop on any Field or Form part; `Field.Error` animates with CSS. |
-| 5 | ARIA | `Field.Label` is `<label for>` (for a group control it renders no `for` and the group gets `aria-labelledby`). The control carries `aria-describedby` = consumer tokens + the description id + the error id while invalid, and an **explicit** `aria-invalid="true" \| "false"` (for a CheckboxGroup, on every Item: ARIA 1.2 does not support it on `group`, 5.1). `aria-errormessage` is **not rendered in v1** (VoiceOver ignores it, NVDA would read the error twice); if it is ever added it is only ever in addition to `aria-describedby`. No live region on the error: focus moving to the control reads it, and when focus is already there the message is spoken through `ariaNotify()` (2.5, 3.5). |
+| 5 | ARIA | `Field.Label` is `<label for>` (for a group control it renders no `for` and the group gets `aria-labelledby`). The control carries `aria-describedby` = consumer tokens + the description id + the error id while invalid, and a group's `aria-labelledby` the label id, each **only while its part is mounted** (registered from a layout effect; every part counts as mounted until the Field's first commit, so the server HTML references them all, 4.2), and an **explicit** `aria-invalid="true" \| "false"` (for a CheckboxGroup, on every Item: ARIA 1.2 does not support it on `group`, 5.1). `aria-errormessage` is **not rendered in v1** (VoiceOver ignores it, NVDA would read the error twice); if it is ever added it is only ever in addition to `aria-describedby`. No live region on the error: focus moving to the control reads it, and when focus is already there the message is spoken through `ariaNotify()` (2.5, 3.5). |
 | 6 | The bubble | After hydration a Field cancels the control's `invalid` event **when a `Field.Error` is mounted and the control matches `:user-invalid`** (a submission attempt), renders the message instead, and focuses the first such control in document order (module-level collector, works in any form). A `checkValidity()` or `reportValidity()` call, and a Field without `Field.Error`, keep the platform's behaviour. Before hydration the bubble is the fallback. |
 | 7 | Submission | `Form.Root` renders `<form action={action}>` **unwrapped** (progressive enhancement: the server HTML posts to the Server Function) and, after hydration, intercepts `submit`: `preventDefault()` and `await action(formData)` inside the Form's own `useTransition`. react-dom then skips its own action run (and its automatic reset) and still starts the form's pending status, so `useFormStatus` and `Form.Submit` work unchanged. A submitter with its own `formaction` and a string `action` are left to React / the browser. |
 | 8 | Reset policy | `autoReset` (default `true`): the form is reset when a submission the Form ran **settles with no errors** (`errors` has no non-empty entry at the settle commit, hidden stale ones included). A submission that returns field errors leaves every value, `:user-invalid` and custom validity in place. `false`: never; the consumer resets. |
@@ -88,6 +88,7 @@ Rendered HTML (idle, no error; ids come from one `useId` in `Field.Root`):
   </div>
   <div>
     <label id="_r_2_-label" for="_r_2_-control">Newsletter</label>
+    <!-- no Field.Description: the server HTML still references one; hydration drops the token (4.2) -->
     <input id="_r_2_-control" name="newsletter" type="checkbox" aria-describedby="_r_2_-description" aria-invalid="false">
   </div>
   <button type="submit">Create account</button>
@@ -110,10 +111,10 @@ message, and focused the control):
 | Part | Element | Role (native) | Library state rendered | Notes |
 | --- | --- | --- | --- | --- |
 | `Field.Root` | `div` | | `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending` (form channel) | Owns `useId`, `name`, `disabled`, `required`, `readOnly`, `validate`, the validity mirror, the control registration and the listeners. `children(state)` receives `FieldState`. |
-| `Field.Label` | `label` | | same five attributes | `id`; `for` → the control id while the registered control is labelable (default); a group control (a `<fieldset>` Root) removes it and names itself with `aria-labelledby` → this id. |
+| `Field.Label` | `label` | | same five attributes | `id`; `for` → the control id while the registered control is labelable (default); a group control (a `<fieldset>` Root) removes it and names itself with `aria-labelledby` → this id while the Label is mounted (it registers, 4.2). |
 | `Field.Control` | `input` (`textarea` / `select` through `render`) | the element's | `data-invalid`, `data-disabled`, `data-required`, `data-readonly`, `data-pending` | `id`, `name` (the Field's unless given), `disabled` / `required` / `readOnly` (own or the Field's), `aria-describedby` (token-merged), `aria-invalid`. The native constraint attributes are ordinary pass-through. Must stay a native form control. |
-| `Field.Description` | `p` | | same five attributes | `id` = `${id}-description`; always referenced by the control's `aria-describedby` (a dangling reference is skipped, the Dialog rule), so no registration. |
-| `Field.Error` | `div` | | same five attributes | `id` = `${id}-error`; renders **nothing** while `invalid` is false. Default content: the messages (`validationMessage` for a native or custom constraint, the server's text for a server error). Its mount registers "an error element exists" so the Field knows it may cancel the bubble. |
+| `Field.Description` | `p` | | same five attributes | `id` = `${id}-description`; referenced by the control's `aria-describedby` while it is mounted (it registers, 4.2). |
+| `Field.Error` | `div` | | same five attributes | `id` = `${id}-error`; renders **nothing** while `invalid` is false. Default content: the messages (`validationMessage` for a native or custom constraint, the server's text for a server error). Its mount registers "an error element exists" so the Field knows it may cancel the bubble, and the control lists its id only then (4.2). |
 | `Form.Root` | `form` | form | `data-pending` | Owns the submission intercept, `errors`, the submitted `FormData` (for the stale-value rule), the first-error focus, the cross-field refresh and the reset policy. `children(state)` receives `{ pending }`. |
 | `Form.Submit` | `button` | button | `data-pending`, `data-disabled` | `type="submit"`; `useFormStatus().pending` of the enclosing form. `name` / `value` pass through (the submitter's value reaches the action's `FormData`). |
 
@@ -780,13 +781,33 @@ and has broken `aria-describedby` in older VoiceOver), and a consumer who wants 
 a blur-time error adds `aria-live="polite"` through pass-through, accepting the double read after
 a submission.
 
-`Field.Error` registers its presence with the Field from a layout effect (2.5) and unregisters on
-unmount. It renders `null` while `invalid` is false: no element, no id in the DOM, and the
-control's `aria-describedby` does not list the error id either, so nothing dangles **while
-valid**. While invalid the error id is listed whether or not a `Field.Error` is mounted (the
-count of mounted errors is a ref, not state, and gating the token on it would cost a render for
-nothing); without one the reference dangles, which the platform ignores, as it does for an
-unmounted `Field.Description` (developer choice 5, accepted by the review as L5).
+**Referenced only while mounted (#217).** `Field.Label`, `Field.Description` and `Field.Error`
+each register their presence with the Field from a layout effect and unregister on unmount
+(`usePartPresence`, one per kind). A control references a part's id only while that part is
+mounted: the description id in `aria-describedby`, the error id there while `invalid` as well
+(`Field.Error` renders `null` while valid: no element, no id), and the label id in a group
+control's `aria-labelledby` and in the other library references to the Field label (the
+NumberField step buttons, the Combobox and MultiSelect List, Combobox's chips). The Field
+exposes these as `referencedIds` (`undefined` for a part that is not mounted) next to `ids`, the
+parts' own ids. A key with nothing to reference is omitted from the control's owned attributes,
+not set to `undefined`, so the consumer's own tokens stay. No reference dangles after the
+Field's first commit; a part mounted later (behind a condition, revealed by a Suspense boundary)
+adds its token when it mounts and removes it when it unmounts. `Field.Error`'s registration
+also tells the Field it may cancel the bubble (2.5).
+
+Server rendering and hydration: **every part counts as mounted until the Field's first commit.**
+The server cannot know whether a part rendered after the control exists (a Description below
+the input is the common layout), and the hydration render must match the server HTML, so both
+reference every part; the Field's own layout effect, which runs after its children's, settles
+the real presence before the first paint and the next render drops the tokens of absent parts.
+No hydration mismatch: the change is a post-hydration render. The trade-off: a server page (and
+a no-JS page) with a `Field.Label` keeps the label token, as before, but one **without** a
+Description, Error or group Label references ids no element has until hydration. The
+alternatives were worse: registering into a mutable object during render reaches only the
+controls rendered after the part (never a Description below the control) and is a render-phase
+side effect; starting from "not mounted", as `useRegisterCount` does for `NumberField.Label`,
+would drop the Field label from every server page. A part inside a Suspense boundary that is
+still dehydrated has not registered yet, so its token is missing until the boundary hydrates.
 
 ### 4.3 `Field.Control`
 
@@ -996,8 +1017,8 @@ rules are section 3.7.
 | Element | Attributes |
 | --- | --- |
 | `Field.Label` | `id`; `for` → the control id (labelable control); none for a group control, which renders `aria-labelledby` → this id |
-| the control (`Field.Control` or a FUNSTACK control's labelable element) | `id`; `aria-describedby` = consumer tokens + `${id}-description` + (`invalid` ? `${id}-error`); `aria-invalid="true" \| "false"`; `required` / `disabled` native |
-| a group control (`RadioGroup.Root`, `CheckboxGroup.Root`, multi-thumb `Slider.Root`) | `aria-labelledby` → the Label id (token-merged); `aria-describedby` as above on the group element (a global property, read when focus enters the group); `required` / `disabled` through the group's own props |
+| the control (`Field.Control` or a FUNSTACK control's labelable element) | `id`; `aria-describedby` = consumer tokens + `${id}-description` (while a `Field.Description` is mounted) + (`invalid` ? `${id}-error`, while a `Field.Error` is mounted), absent when that leaves nothing (4.2); `aria-invalid="true" \| "false"`; `required` / `disabled` native |
+| a group control (`RadioGroup.Root`, `CheckboxGroup.Root`, multi-thumb `Slider.Root`) | `aria-labelledby` → the Label id while a `Field.Label` is mounted (token-merged; 4.2); `aria-describedby` as above on the group element (a global property, read when focus enters the group); `required` / `disabled` through the group's own props |
 | `aria-invalid` for a group | **RadioGroup**: on the `radiogroup` fieldset (a supported role). **CheckboxGroup**: on every Item (`checkbox`), not on the fieldset: WAI-ARIA 1.2 made `aria-invalid` widget-specific and deprecated it on `group` (review L1; the first draft's "valid on `group` / `radiogroup`" held for `radiogroup` only). The Items need it explicitly anyway: the slot's `customError` sits on the first Item, which Chromium would otherwise expose as invalid too early (2.3). The fieldset keeps `data-invalid` and `aria-describedby`. The multi-thumb Slider (#60) is a `group` and gets the same treatment (each thumb's `slider` input). |
 | `Field.Description` | `id` |
 | `Field.Error` | `id`; no role, no live region |
@@ -1130,7 +1151,7 @@ export function useFieldControl(options: {
   readonly disabled: boolean;                      // own || the Field's
   readonly required: boolean;                      // own || the Field's
   readonly readOnly: boolean;                      // own || the Field's (conventions 3.6.1)
-  /** Owned attributes, empty outside a Field: `id` (labelable), `aria-labelledby` (groups: the Label id), `aria-describedby` (description + error while invalid; token-merged by the part), `aria-invalid` ("true" | "false"), `data-invalid`. */
+  /** Owned attributes, empty outside a Field: `id` (labelable), `aria-labelledby` (groups: the Label id), `aria-describedby` (description + error while invalid; token-merged by the part; each id only while its part is mounted, a key omitted when it has none, 4.2), `aria-invalid` ("true" | "false"), `data-invalid`. */
   readonly attributes: FieldControlAttributes;
   readonly state: FieldState | undefined;
 };
@@ -1225,9 +1246,9 @@ hook is also what Slider needs (#60): a pointer gesture fires no native `input` 
 | `RadioGroup.Root` | the `<fieldset>` | no | `aria-labelledby` on the fieldset; `RadioGroup.Label` (legend) is for standalone use | the first enabled radio (`:user-invalid` matches every radio of a required empty group, so one suffices; `setCustomValidity` on the first blocks the group) | `name` default from the Field (else the Root's `useId`); `required` / `disabled` on the Root. `aria-invalid` on the fieldset (`radiogroup`). Focus target: the checked radio, else the first enabled. `useFieldValueChange(optimistic)`. |
 | `CheckboxGroup.Root` | the `<fieldset>` | no | `aria-labelledby` | the first enabled **named** item (never the Parent) | the dynamic "at least one" `required` of its design is untouched (an attribute, not the slot); `Field.Root required` is that `required` (choice 6). `aria-invalid` on every Item, not the fieldset (5.1, L1). Focus target: the first Item, never a `CheckboxGroup.Parent` (L2). `useFieldValueChange` keyed on the sorted set + the derived `required`. |
 | `Select.Root` | the `<select>` | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. Nothing changes for `<selectedcontent>`. `useFieldValueChange(optimistic)`. |
-| `Combobox` | `Combobox.Input` registers the input (labelable); the Root reads `FieldContext` directly for the hidden input's `name` and `disabled`, the Input's id, and the List's `aria-labelledby` when no `Combobox.Label` is mounted (choice 7) | yes | `for` on the Input | the Input (`required` lands there) | `Combobox.Root name` defaults from the Field (hidden input). `validate`'s `value` is `formData.get(name)`, the hidden input: the **selection**, not the typed text. A pick is an edit: `useFieldValueChange(selection, takeEdit)` re-runs `validate` and dismisses a server error at once (H1). `Combobox.Label` stays for use outside a Field. |
+| `Combobox` | `Combobox.Input` registers the input (labelable); the Root reads `FieldContext` directly for the hidden input's `name` and `disabled`, the Input's id, and the List's `aria-labelledby` when no `Combobox.Label` is mounted (choice 7; the Field's `referencedIds.label`, so only while a `Field.Label` is mounted, 4.2) | yes | `for` on the Input | the Input (`required` lands there) | `Combobox.Root name` defaults from the Field (hidden input). `validate`'s `value` is `formData.get(name)`, the hidden input: the **selection**, not the typed text. A pick is an edit: `useFieldValueChange(selection, takeEdit)` re-runs `validate` and dismisses a server error at once (H1). `Combobox.Label` stays for use outside a Field. |
 | `Slider` (#60, **proposed**: the design is slider.md 9.4, pending product-owner acceptance) | `Slider.Root` calls the hook (the thumb count is known there) with `labelable: count === 1`; the returned ref registers the only Thumb's `<input type="range">` (through context) or, with several thumbs, the Root's group `div` | per shape | `for` (the Root makes `thumbId(0)` the Field's control id) / `aria-labelledby` on the Root, token-merged with `Slider.Label`'s id | the first Thumb's input in DOM order (a range has no native constraints; the slot carries `validate` and server errors; `:user-invalid` matches it after a submit attempt) | `name` / `disabled` default from the Field (a Thumb's own `name` still wins; `errors` and `validate` key on the Field's name). `required` is not applicable (a range always has a value; `Field.Root required` warns). `aria-invalid` on every Thumb input (never on the group `div`, 5.1); `aria-describedby`: the input (one thumb) or the Root (several). `useFieldValueChange` keyed on the optimistic values, `edit = true` for `"activate"` commits (pointer and normalised keys fire no native event). `Slider.Label` stays for use outside a Field. |
-| `MultiSelect` | `MultiSelect.Trigger` registers the button (labelable) with the validity element as `validityElement` while `required` is set; the Root reads `FieldContext` for `name`, `disabled`, `required`, the Trigger's id and the List's `aria-labelledby` | yes | `for` on the Trigger; the Label's click focuses it (4.2) | the hidden one-option `<select>` (with `required`), else none | `validate`'s `value` is the first value (`formData.get(name)`); a rule over the selection reads `formData.getAll(name)`. The browser's bubble is never shown (multi-select.md B.10), so `Field.Error` is where the `required` message appears. `useFieldValueChange(selection, takeEdit)`. |
+| `MultiSelect` | `MultiSelect.Trigger` registers the button (labelable) with the validity element as `validityElement` while `required` is set; the Root reads `FieldContext` for `name`, `disabled`, `required`, the Trigger's id and the List's `aria-labelledby` (`referencedIds.label`: only while a `Field.Label` is mounted, 4.2) | yes | `for` on the Trigger; the Label's click focuses it (4.2) | the hidden one-option `<select>` (with `required`), else none | `validate`'s `value` is the first value (`formData.get(name)`); a rule over the selection reads `formData.getAll(name)`. The browser's bubble is never shown (multi-select.md B.10), so `Field.Error` is where the `required` message appears. `useFieldValueChange(selection, takeEdit)`. |
 | `OTPField` (#171) | `OTPField.Input` registers the one `<input>` (labelable), as `Field.Control` does; the Root reads `FieldContext` for `name`, `disabled`, `required` and `data-invalid` | yes | `for` on the Input | the Input itself (`required`, the derived `pattern`) | No hidden input and no validity mirror: the text shown is the value posted (`design/components/otp-field.md` 7). `useFieldValueChange(value, takeEdit)`: `takeEdit` is `true` for the library's write-back and a WebOTP fill, `false` for a controlled change, a reset and text adopted at hydration. |
 | `TextField` (#181) | its one `<input>` or `<textarea>` (labelable), as `Field.Control` does | yes | `for` | itself | `name` / `required` / `disabled` default from the Field. The text shown is the value posted, the draft included, and `validate` sees it per keystroke (`design/components/text-field.md` 7). Its `data-pending` is its own `valueCommitAction`'s. `useFieldValueChange(text)` with no `takeEdit`: an Escape revert, a rollback and a controlled change move the text with no event. |
 | `Toggle`, `Menu`, `Tabs`, … | nothing | | | | not form controls; a Field around them is a dev warning (no registration). |
@@ -1403,7 +1424,7 @@ export function Subscribe() {
 | --- | --- | --- |
 | Constraint validation | native: `required` and `type="email"` block the submit; the **bubble** shows; the browser focuses the control | the Field cancels the bubble and renders `Field.Error`; the collector focuses |
 | Submission | the browser posts to the Server Function's endpoint (React's progressive enhancement: the `action` URL and hidden fields are in the server HTML); full page response | the Form runs the action in a transition; `data-pending` |
-| `aria-describedby`, `aria-invalid="false"`, ids | in the server HTML | unchanged |
+| `aria-describedby`, `aria-invalid="false"`, ids | in the server HTML; the label, description and error ids are referenced whether or not those parts are rendered (4.2) | unchanged where the part is mounted; a reference to a part that is not there is removed |
 | Server errors | with `useActionState(…, initial, permalink)` the post-back page renders the result state on the server: `Field.Error` with the messages, `aria-describedby` listing the error id, `aria-invalid="true"`, `data-invalid` | shown, dismissible, re-armed (3.4) |
 | `Field.Label` for a group control | `for` is in the server HTML pointing at the group's id (the default is "labelable"); a validator flags it until hydration removes it; browsers ignore a `for` that does not target a labelable element | removed; `aria-labelledby` on the group |
 | `data-pending` | never (no status without React) | `useFormStatus` |

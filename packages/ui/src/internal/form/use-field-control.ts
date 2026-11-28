@@ -2,6 +2,7 @@
 import { use, useCallback, useLayoutEffect, useRef } from "react";
 import type { RefCallback } from "react";
 import { dataAttr } from "../data-attr.js";
+import { mergeTokenLists } from "../merge-props.js";
 import { FieldContext } from "./field-context.js";
 import type { FieldContextValue, FieldState } from "./field-context.js";
 import { useDevWarning } from "../use-dev-warning.js";
@@ -59,7 +60,8 @@ export interface FieldControlBinding {
   /**
    * Owned attributes: `id` (labelable controls), `aria-invalid`, `data-invalid`,
    * `aria-labelledby` (groups) and `aria-describedby` (both token-merged by the owned layer, the
-   * consumer's tokens first). Empty outside a Field, so nothing is owned there.
+   * consumer's tokens first; each present only while it has a mounted part to reference, #217).
+   * Empty outside a Field, so nothing is owned there.
    */
   readonly attributes: FieldControlAttributes;
   /** The Field's state, `undefined` outside a Field. */
@@ -185,14 +187,17 @@ export function useFieldControl(options: UseFieldControlOptions): FieldControlBi
     };
   }
 
-  const { ids, state } = field;
+  const { ids, referencedIds, state } = field;
   const attributes: FieldControlAttributes = {
-    "aria-describedby": state.invalid ? `${ids.description} ${ids.error}` : ids.description,
     "aria-invalid": state.invalid ? "true" : "false",
     "data-invalid": dataAttr(state.invalid),
   };
+  // Only the ids of mounted parts (field-form.md 4.2, #217). A key is omitted rather than set to
+  // `undefined`: an owned `undefined` would remove the consumer's own tokens.
+  const describedBy = mergeTokenLists(referencedIds.description, referencedIds.error);
+  if (describedBy !== "") attributes["aria-describedby"] = describedBy;
   if (labelable) attributes.id = ids.control;
-  else attributes["aria-labelledby"] = ids.label;
+  else if (referencedIds.label !== undefined) attributes["aria-labelledby"] = referencedIds.label;
 
   return {
     inField: true,

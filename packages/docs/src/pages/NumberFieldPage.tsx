@@ -351,7 +351,7 @@ export function NumberFieldPage() {
             type: "string",
             default: '"<own id> <label id>"',
             description:
-              'The button itself, then `NumberField.Label` (while one is mounted) and the Field\'s label, so the name is "Increase Quantity" (with both labels, both texts: "Increase Qty Quantity"). Not rendered outside a Field when no `NumberField.Label` is mounted. Before hydration only the Field\'s label is referenced; `NumberField.Label` joins at hydration. Yours replaces the whole and drops the default `aria-label`: for another word order, pass the full text as `aria-label` and `aria-labelledby` set to the button\'s own `id`.',
+              'The button itself, then `NumberField.Label` (while one is mounted) and the Field\'s label (while a `Field.Label` is mounted), so the name is "Increase Quantity" (with both labels, both texts: "Increase Qty Quantity"). Not rendered outside a Field when no `NumberField.Label` is mounted. Before hydration only the Field\'s label is referenced (the server HTML references it whether or not a `Field.Label` is rendered; hydration drops it when none is); `NumberField.Label` joins at hydration. Yours replaces the whole and drops the default `aria-label`: for another word order, pass the full text as `aria-label` and `aria-labelledby` set to the button\'s own `id`.',
           },
           {
             name: "id",

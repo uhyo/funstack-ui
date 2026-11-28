@@ -637,7 +637,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   // is mounted, then a Field's label.
   const buttonLabelIds = mergeTokenLists(
     labelCount > 0 ? labelId : undefined,
-    fieldContext?.ids.label,
+    fieldContext?.referencedIds.label,
   );
 
   // --- Residual browser paths: mount reconciliation and form reset (design 4.5, 6.4) ----------

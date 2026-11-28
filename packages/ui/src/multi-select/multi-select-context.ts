@@ -33,7 +33,10 @@ export interface MultiSelectContextValue {
   readonly loading: boolean;
   /** A `MultiSelect.Label` is mounted (the List's `aria-labelledby` names it only then). */
   readonly hasLabel: boolean;
-  /** The enclosing `Field.Label`'s id: names the List when no `MultiSelect.Label` is mounted. */
+  /**
+   * The enclosing `Field.Label`'s id while one is mounted (field-form.md 4.2, #217): names the
+   * List when no `MultiSelect.Label` is mounted.
+   */
   readonly fieldLabelId: string | undefined;
   readonly disabled: boolean;
   /** The Root's `readOnly` (or the Field's): the popup never opens, nothing dispatches. */

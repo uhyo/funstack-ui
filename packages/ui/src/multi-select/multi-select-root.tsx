@@ -459,7 +459,7 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     empty,
     loading,
     hasLabel: labelCount > 0,
-    fieldLabelId: field?.ids.label,
+    fieldLabelId: field?.referencedIds.label,
     disabled,
     readOnly,
     required,

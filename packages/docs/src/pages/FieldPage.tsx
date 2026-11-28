@@ -95,7 +95,13 @@ import { Form } from "@funstack/ui/form";
           button that moved; reserve the error's space if that matters.
         </li>
         <li>
-          <code>Field.Description</code> is always referenced by the control, rendered or not.
+          <strong>The control references only the parts that are mounted</strong>: the{" "}
+          <code>Field.Description</code> id while one is mounted, the <code>Field.Error</code> id
+          while one is mounted and shown, a group's <code>aria-labelledby</code> to{" "}
+          <code>Field.Label</code> while one is mounted. A part rendered later (behind a condition
+          or a Suspense boundary) is added when it mounts, so no reference points at a missing
+          element. The server HTML references every part, rendered or not; hydration drops the ones
+          that are not there.
         </li>
         <li>
           <strong>
@@ -479,7 +485,7 @@ function NewTaskForm() {
       <PartFacts
         state={"the Field's."}
         owned={
-          "Label: `id`, `htmlFor` (absent for a group control), `onClick` (for a button control the label activation is cancelled and the button focused; a `render` element's own handler runs first); Description: `id`; both also the Field's five `data-*` attributes."
+          "Label: `id`, `htmlFor` (absent for a group control), `onClick` (for a button control the label activation is cancelled and the button focused; a `render` element's own handler runs first); Description: `id`; both also the Field's five `data-*` attributes. Each registers with the Field when it mounts, so the control references its id only while it is mounted."
         }
       />
 
@@ -524,7 +530,7 @@ function NewTaskForm() {
       <PartFacts
         state={"the Field's."}
         owned={
-          'Inside a Field: `id`, `name`, `required`, `disabled`, `readOnly`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description, then the error while shown), and the Field\'s five `data-*` attributes.'
+          'Inside a Field: `id`, `name`, `required`, `disabled`, `readOnly`, `aria-invalid` (always `"true"` or `"false"`: it stops Chromium announcing a `typeMismatch` before it is shown, and exposes `valueMissing`, which it otherwise never does), `aria-describedby` (your tokens first, then the description while one is mounted, then the error while one is mounted and shown; absent with neither), and the Field\'s five `data-*` attributes.'
         }
         note={
           "Outside a `Field.Root` it is the plain native control: every prop passes through (`id` included), the library adds no attribute, and the function props receive a `FieldState` with the control's own `disabled` / `required` / `readOnly` and a constant valid, not-pending rest. The other Field parts still throw outside a Field. See [Field.Control on its own](#field-control-alone)."
@@ -757,7 +763,10 @@ export function Subscribe() {
           hydration the browser validates and shows its bubble, and the form posts to the Server
           Function; the ids, <code>aria-describedby</code> and <code>aria-invalid="false"</code> are
           in the server HTML. A group control's label carries <code>for</code> until hydration
-          replaces it with the group's <code>aria-labelledby</code>.
+          replaces it with the group's <code>aria-labelledby</code>. The server HTML references the
+          label, description and error ids whether or not those parts are rendered (the server
+          cannot know about a part rendered after the control); hydration removes a reference whose
+          part is not there.
         </p>
       </BehaviourSection>
 

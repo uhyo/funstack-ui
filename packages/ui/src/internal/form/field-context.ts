@@ -52,8 +52,23 @@ export interface FieldControlRegistration {
   readonly validityElement?: (() => ValidatableElement | null) | undefined;
 }
 
+/**
+ * The Field ids a control may reference (design/components/field-form.md 4.2, "Referenced only
+ * while mounted"): a part's id while that part is mounted, `undefined` otherwise, so no
+ * `aria-labelledby` / `aria-describedby` token dangles (#217). Before the Field's first commit
+ * every part counts as mounted (the server HTML and the hydration render). `error` also needs
+ * the error to be shown: `Field.Error` renders nothing while valid.
+ */
+export interface FieldReferencedIds {
+  readonly label: string | undefined;
+  readonly description: string | undefined;
+  readonly error: string | undefined;
+}
+
 export interface FieldContextValue {
+  /** The parts' own ids: each part renders its own; a control references `referencedIds`. */
   readonly ids: FieldIds;
+  readonly referencedIds: FieldReferencedIds;
   /** `Field.Root name`. */
   readonly name: string | undefined;
   /** `Field.Root disabled` / `required` / `readOnly` (the props, not the merged state). */
@@ -70,7 +85,14 @@ export interface FieldContextValue {
   readonly controlElement: () => HTMLElement | null;
   /** Registers the Field's control; returns the unregister function. The first one wins. */
   readonly registerControl: (registration: FieldControlRegistration) => () => void;
-  /** A `Field.Error` is mounted (the Field may cancel the platform bubble). */
+  /** A `Field.Label` is mounted. Call from a layout effect; returns the unregistration. */
+  readonly registerLabel: () => () => void;
+  /** A `Field.Description` is mounted. Call from a layout effect; returns the unregistration. */
+  readonly registerDescription: () => () => void;
+  /**
+   * A `Field.Error` is mounted: the Field may cancel the platform bubble, and lists its id while
+   * an error is shown. Call from a layout effect; returns the unregistration.
+   */
   readonly registerError: () => () => void;
   /**
    * The control's value changed in the DOM without an `input` / `change` event the Field could

@@ -566,7 +566,7 @@ export function ComboboxPage() {
       <PartFacts
         state={"`ComboboxListState` is `{ query, stale, empty }`."}
         owned={
-          '`id`, `role` (`"listbox"`), `aria-labelledby` (token-merged with yours; only while a `Combobox.Label` is rendered), `aria-busy`, `data-stale`, `data-empty`; with `multiple`, `aria-multiselectable` (`"true"`).'
+          '`id`, `role` (`"listbox"`), `aria-labelledby` (token-merged with yours; only while a `Combobox.Label` is rendered, else the enclosing `Field.Label` while one is mounted), `aria-busy`, `data-stale`, `data-empty`; with `multiple`, `aria-multiselectable` (`"true"`).'
         }
         note={
           'Without a Label give the List an `aria-label` (development warns otherwise). `aria-busy="true"` is set while the results are stale or loading (a `Status` fallback inside it); `data-empty` when settled with no options.'

@@ -15,6 +15,7 @@ import { FieldContext, fieldDataAttributes, FormContext } from "../internal/form
 import type {
   FieldContextValue,
   FieldControlRegistration,
+  FieldReferencedIds,
   FieldState,
   FormFieldRegistration,
 } from "../internal/form/field-context.js";
@@ -25,6 +26,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useFormOwnerEvent } from "../internal/form/use-form-owner-event.js";
 import { useFormReset } from "../internal/form/use-form-reset.js";
 import { useLatest } from "../internal/use-latest.js";
+import { usePartPresence } from "../internal/use-part-presence.js";
 import { useRender } from "../internal/use-render.js";
 import { useServerErrorVisibility } from "./use-server-error-visibility.js";
 import {
@@ -228,19 +230,25 @@ export function FieldRoot({
     };
   }, []);
 
-  const errorCount = useRef(0);
+  // The optional parts a control references (design 4.2, "Referenced only while mounted"): each
+  // id is listed only while its part is mounted, assumed mounted until the first commit (#217).
+  const { present: labelPresent, register: registerLabel } = usePartPresence();
+  const { present: descriptionPresent, register: registerDescription } = usePartPresence();
+  const {
+    present: errorPresent,
+    register: registerErrorPresence,
+    countRef: errorCount,
+  } = usePartPresence();
   const registerError = useCallback(() => {
-    errorCount.current += 1;
+    const unregister = registerErrorPresence();
     if (isDev && errorCount.current === 2) {
       console.error(
         "Field.Error: two Field.Error parts in one Field.Root. Render one; its function " +
           "`children` receives `validity` for per-constraint wording.",
       );
     }
-    return () => {
-      errorCount.current -= 1;
-    };
-  }, []);
+    return unregister;
+  }, [registerErrorPresence, errorCount]);
 
   // --- Server errors: shown, dismissed, re-armed, suppressed (design 3.4) -------------------
 
@@ -472,7 +480,7 @@ export function FieldRoot({
       element.removeEventListener("invalid", onInvalid, true);
       if (listenOutside) outside.removeEventListener("invalid", onInvalid, true);
     };
-  }, [element, control, refresh, refreshAfterEdit, latest]);
+  }, [element, control, refresh, refreshAfterEdit, latest, errorCount]);
 
   // The form owner's events: another field's edit re-runs `validate` (cross-field rules); a reset
   // clears the user-validity flag, re-read when the controls hold their reset values.
@@ -582,11 +590,21 @@ export function FieldRoot({
     [invalid, messages, validity, stateDisabled, stateRequired, stateReadOnly, formPending],
   );
 
+  const labelId = labelPresent ? ids.label : undefined;
+  const descriptionId = descriptionPresent ? ids.description : undefined;
+  // `Field.Error` renders only while `invalid`, so its id is listed only then.
+  const errorId = errorPresent && invalid ? ids.error : undefined;
+  const referencedIds = useMemo<FieldReferencedIds>(
+    () => ({ label: labelId, description: descriptionId, error: errorId }),
+    [labelId, descriptionId, errorId],
+  );
+
   const labelable = control?.labelable ?? true;
   const controlElement = useCallback(() => controlRef.current?.element ?? null, []);
   const context = useMemo<FieldContextValue>(
     () => ({
       ids,
+      referencedIds,
       name,
       disabled,
       required,
@@ -595,12 +613,15 @@ export function FieldRoot({
       labelable,
       controlElement,
       registerControl,
+      registerLabel,
+      registerDescription,
       registerError,
       notifyChange,
       validateNext,
     }),
     [
       ids,
+      referencedIds,
       name,
       disabled,
       required,
@@ -609,6 +630,8 @@ export function FieldRoot({
       labelable,
       controlElement,
       registerControl,
+      registerLabel,
+      registerDescription,
       registerError,
       notifyChange,
       validateNext,
