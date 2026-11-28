@@ -3,12 +3,16 @@ import { useMemo } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
 import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
+import { paragraphBreakMessage } from "../internal/paragraph-break.js";
+import { useElementCheck } from "../internal/use-element-check.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useAnchoredPlacement } from "../internal/overlay/use-resolved-placement.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import { TooltipPopupContext, useTooltipContext } from "./tooltip-context.js";
 import type { TooltipAlign, TooltipPopupContextValue, TooltipSide } from "./tooltip-context.js";
+
+const isDev = process.env.NODE_ENV !== "production";
 
 export type { TooltipAlign, TooltipSide } from "./tooltip-context.js";
 
@@ -112,7 +116,11 @@ export function TooltipPopup({
   const { side, align } = placement;
   const state: TooltipPopupState = { disabled: ctx.disabled, side, align };
   const arrow = useMemo<TooltipPopupContextValue>(() => ({ side, align }), [side, align]);
-  const ref = useMergedRefs(ctx.setPopupElement, placement.ref);
+  // A <div> inside a <p> breaks the server HTML; a <span> render is fine (conventions 9.5).
+  const checkParagraph = useElementCheck(
+    isDev && ((element) => paragraphBreakMessage("Tooltip.Popup", element, true)),
+  );
+  const ref = useMergedRefs(ctx.setPopupElement, placement.ref, checkParagraph);
 
   const libraryProps: ComponentPropsWithRef<"div"> & DataAttributes = {
     id: ctx.popupId,

@@ -17662,6 +17662,107 @@ Unchanged controls (one pinning row each, so the limit of the rule is tested): C
 unchecked; Select `required` returns to the placeholder and stays; CheckboxGroup `required`
 with the last Item unchecked stays empty.
 
+## 2026-11-29, #219: a development warning for two copies of the library
+
+Dogfood run 2, F5. Under `vite dev` with `@vitejs/plugin-rsc` (FUNSTACK Static) the library
+loads twice. `@vitejs/plugin-rsc` turns a `"use client"` module reached through a bare import
+into a `client-package-proxy` that the browser imports by the same bare specifier, so it goes
+through Vite's optimizer like any client import; but only when that module is the resolved
+package entry. Ours carry the directive per part file and the subpath entries have none (the
+namespaces must stay plain objects, 9.3), so the plugin reaches the parts through a
+`client-in-server-package-proxy` that imports the raw `dist/*.mjs` file, while a client
+component's `import` of the subpath resolves to `.vite/deps`. Two module instances, two sets of
+contexts: a `NavigationMenu.Link` in a client component cannot close a server-rendered Popup.
+Production builds are not affected. The workaround is `optimizeDeps: { exclude:
+["@funstack/ui"] }`; FUNSTACK Static still pre-bundles the root entry (it adds every
+`react`-peer dependency to the client `optimizeDeps.include` and ignores `exclude`).
+
+### What changed in the rules
+
+- conventions.md 9.5: the two-copies warning.
+- internal-hooks.md, the file index: `use-copy-check.ts`.
+
+### Considered and not done
+
+- **`"use client"` on the subpath entries**: the namespace objects would become client
+  references, and a Server Component cannot dot into one (`Tabs.Root`).
+- **Reaching each part through a self-referencing bare specifier** (`@funstack/ui/_parts/...`
+  exports), so that the plugin proxies it by specifier and the optimizer bundles it with the
+  subpath entry: some 185 part files (240 with the `"use client"` internals) behind new package
+  exports, and every one would be discovered at request time, forcing the re-optimization pass
+  that FUNSTACK Static avoids on purpose.
+- **A `react-server` export condition per subpath** (the reviewer's idea): the server entry of
+  `@funstack/ui/navigation-menu` builds the namespace from a `"use client"` bare-specifier entry
+  (`@funstack/ui/navigation-menu/client`), so plugin-rsc proxies the parts by specifier, and the
+  browser imports them through the optimizer. About 40 new `/client` entries rather than 185, and
+  a framework could list them in `optimizeDeps.include` to avoid the request-time discovery.
+  Costs: every bundler sees a changed exports map with a second entry per subpath; the
+  namespace stays a plain object only on the server side, so a Server Component dotting into
+  it still needs each part to be its own named client export; the directive-free parts
+  (Progress and Meter Roots, `NavigationMenu.Root` and `List`, Separator) must stay out of the
+  client entry or lose their server-only rendering; and FUNSTACK Static would still need
+  changing to include those entries. Not done; the upstream fix stays primary.
+- **Contexts kept on `globalThis` (`Symbol.for` keys)**: fixes context identity only (not
+  module state: the Escape layering of `escape-key.ts`, the modal registry, the `<details>` open
+  map), hides the duplicate bundle, and
+  ties every version's context shapes together.
+
+The fix belongs upstream (FUNSTACK Static, `@vitejs/plugin-rsc`); what to report is in
+`memo/developer/vite-rsc-duplicate-219.md`.
+
+### Test plan
+
+`internal/use-copy-check.test.tsx` (jsdom), with a token of the test's own standing in for the
+second copy: no warning for one copy (StrictMode); one warning when two copies are mounted, in
+either order, and none for a third; none when one copy unmounts before the other mounts, or when
+one commit swaps them (an HMR update); counted per part; nothing registered by a server render;
+the registry under its global key. Checked by hand on the dogfood app: without the workaround
+the warning fires and the panel stays open; with it, no warning and the Link closes the panel.
+
+## 2026-11-29, #221: a development warning for a Popup inside a `<p>`
+
+Dogfood run 2, F7, the remaining part of #221 (the docs bullets and skill rule 19 landed
+before). A Tooltip Popup (`div[popover]`) or a Popover Popup (`<dialog>`) inside a byline `<p>`
+made the production build fail hydration (React #418): the HTML parser closes the `<p>` at the
+`<div>` or `<dialog>` start tag, so the server HTML parses into a different tree from React's.
+
+### What changed in the rules
+
+- conventions.md 9.5: the Popup-inside-`<p>` warning.
+- internal-hooks.md, the file index: `paragraph-break.ts`.
+
+### The check, and why this one
+
+Warn when the Popup's element has a start tag that closes a paragraph (the parser's list: `div`,
+`dialog`, `section`, `ul`, ...) and a `<p>` is an ancestor in button scope (a `button`, `td`,
+`th`, `caption`, `table`, `object`, `marquee`, `applet`, `template` or `html` element, or any SVG
+or MathML element, ends the search). This is the parser's own rule, so it reports exactly the
+trees that break, and only those:
+
+- an ancestor, not only the parent: `<p><a><div popover>` breaks the same way;
+- not "a parent that allows phrasing content only": a `<div>` in a `<span>`, `<h2>`, `<label>` or
+  `<button>` is invalid HTML but parses as written and hydrates, so warning there would add
+  noise without a failure behind it (HTML validators report it);
+- a Tooltip or HoverCard Popup rendered as a `<span>` is not a paragraph-closing tag: no warning.
+
+The message names the fix the part allows: `render={<span />}` for Tooltip and HoverCard
+(HoverCard's allowed elements include `SPAN`), otherwise the text in a `<div>` or the Popup
+after the `<p>`. It runs in the existing element checks (`useElementCheck`, once per instance,
+in the ref callback, so the tree is in place): `usePopoverPopup` (Popover, HoverCard, Menu,
+Combobox, MultiSelect, NavigationMenu), `useDialogPopup` (Dialog, AlertDialog, Drawer) and a
+new check in `Tooltip.Popup`. A wrong element warns first; the paragraph check runs for the
+expected element only. Quirks mode (where `<table>` does not close a `<p>`) is not considered:
+Popups never render a table.
+
+### Test plan
+
+`internal/paragraph-break.test.tsx` (jsdom; the trees are built with DOM calls, as the parser
+would move the `<div>` out): the pure check (`<p>` parent and ancestor through phrasing
+elements; `<span>` inside `<p>`; `<span>` / `<h2>` / `<button>` parents; `<button>` and `<td>`
+boundaries; an SVG `foreignObject`; no `<p>`), the two message forms; then for each of the ten
+Popups: one warning inside a `<p>` across a re-render, none outside; Tooltip and HoverCard as a
+`<span>` inside a `<p>`, none.
+
 ## 2026-11-29, #220 implemented: implementation notes
 
 The rule of the entry above, implemented as designed, with one gap filled.

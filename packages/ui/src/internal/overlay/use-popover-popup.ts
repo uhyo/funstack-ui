@@ -17,6 +17,7 @@ import {
 import { createPopupFlags, showWithFocus } from "./overlay-show.js";
 import { useApplyOpenState } from "./use-apply-open-state.js";
 import { isPopoverOpen } from "./popover-open.js";
+import { paragraphBreakMessage } from "../paragraph-break.js";
 import { useElementCheck } from "../use-element-check.js";
 import { useInterestDismiss } from "./use-interest-dismiss.js";
 import { useLatest } from "../use-latest.js";
@@ -461,7 +462,8 @@ export function usePopoverPopup(
         !elements.includes(element.tagName)
           ? `${part}: expected to render ${describeElements(elements)} but got ` +
             `<${element.tagName.toLowerCase()}>.`
-          : null),
+          : // A <div> or <dialog> inside a <p> breaks the server HTML (conventions 9.5).
+            paragraphBreakMessage(part, element, elements.includes("SPAN"))),
   );
   const resetInterest = interest.reset;
   const setElement = useCallback(

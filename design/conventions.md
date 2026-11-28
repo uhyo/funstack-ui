@@ -2932,6 +2932,29 @@ re-exports them.
   without a `NumberField.Label`, Select, Checkbox, Switch, a RadioGroup or CheckboxGroup without
   a `Label` or `aria-label`, `ToggleGroup.Root`, an OTPField input, a Slider thumb, the
   Combobox and MultiSelect parts that need one).
+- **Two copies of the library warn once per page** (`use-copy-check.ts`, called by `useRender`,
+  development only): when parts of two copies are mounted at the same time, `console.error`
+  names the Vite + React Server Components cause and its `optimizeDeps.exclude` workaround
+  (#219). The copies meet in a registry on `globalThis` under
+  `Symbol.for("@funstack/ui/mounted-copies")` (a `Map` of copy token to mounted-part count and
+  a `warned` flag; its shape is shared across versions, so it only grows compatibly). Nothing
+  but the warning reads it. Mounted parts are counted, not loaded copies, so a server render,
+  modules loaded again by a test and an HMR update that swaps the parts in one commit do not
+  warn; directive-free parts do not register. Its message is the one exception to "a warning
+  names the part": no single part warns, so the prefix is the package, `@funstack/ui: `. It
+  says "if parts of the two copies are nested or share a page": two separately bundled apps on
+  one page (an embedded widget, micro-frontends) warn too, and there is no opt-out (development
+  only, once per page).
+- **A Popup inside a `<p>` warns** (`paragraph-break.ts`, from the element checks of
+  `usePopoverPopup`, `useDialogPopup` and `Tooltip.Popup`: every Popup), once per instance, in
+  development (#221). The check is the HTML parser's rule, not the content model: the Popup's
+  element is one whose start tag closes a paragraph (`<div>`, `<dialog>`, ...) and a `<p>` is an
+  ancestor in button scope (a `<button>`, `<td>`, `<object>`, ... or an SVG / MathML element
+  ends the search). That is exactly the server HTML that parses into another tree and fails
+  hydration (React #418). A `<div>` in a `<span>`, an `<h2>` or a `<button>` is invalid HTML
+  too, but parses as written and hydrates, so it does not warn; a Tooltip or HoverCard Popup
+  rendered as a `<span>` never warns. The message names the fix: `render={<span />}` where the
+  part allows it, otherwise a `<div>` for the text or the Popup after the `<p>`.
 
 ---
 

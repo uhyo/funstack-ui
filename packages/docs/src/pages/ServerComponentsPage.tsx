@@ -1,3 +1,4 @@
+import { Callout } from "../components/Callout.js";
 import { CodeBlock } from "../components/CodeBlock.js";
 import { ConceptExample, Term } from "../components/Concept.js";
 import { Example } from "../components/Example.js";
@@ -59,6 +60,40 @@ export function Settings() {
       <p>
         A framework that renders several server payloads into one page must give each its own{" "}
         <code>identifierPrefix</code>, or server-rendered ids from different payloads can collide.
+      </p>
+
+      <h3 id="vite-dev">With the Vite dev server</h3>
+      <Callout kind="warning" title='Add optimizeDeps: { exclude: ["@funstack/ui"] }'>
+        <p>
+          Under <code>vite dev</code> with <code>@vitejs/plugin-rsc</code> (FUNSTACK Static, and
+          other frameworks built on it), exclude the package from Vite's dependency pre-bundling.
+          Production builds do not need this.
+        </p>
+      </Callout>
+      <CodeBlock>{`// vite.config.ts
+export default defineConfig({
+  optimizeDeps: { exclude: ["@funstack/ui"] },
+  plugins: [/* funstackStatic(...) or rsc(...), react() */],
+});`}</CodeBlock>
+      <p>
+        Without it the dev server loads the library twice. The parts a Server Component renders are
+        loaded unbundled from <code>node_modules</code>, because their <code>"use client"</code> is
+        on each part's file rather than on the subpath entry. A client component's{" "}
+        <code>import</code> of the same subpath gets Vite's pre-bundled copy instead. Each copy has
+        its own contexts, so a part from one copy does not see the other's Root or Popup: a{" "}
+        <code>NavigationMenu.Link</code> in a client component, inside a Popup that a Server
+        Component rendered, does not close it.
+      </p>
+      <p>
+        In development the library logs an error when parts of two copies are mounted on one page.
+        It matters if parts of the two copies are nested or share a page; two separately bundled
+        apps on one page (an embedded widget, micro-frontends) log it too, and there they can ignore
+        it.
+      </p>
+      <p>
+        Import from the subpaths (<code>@funstack/ui/tabs</code>) in client components. FUNSTACK
+        Static pre-bundles the root entry <code>@funstack/ui</code> even when it is excluded, so a
+        client component that imports from the root entry still gets a second copy.
       </p>
 
       <h3 id="js-free">What "JS-free" means</h3>
