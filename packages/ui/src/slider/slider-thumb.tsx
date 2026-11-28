@@ -38,6 +38,8 @@ export interface SliderThumbState {
   readonly orientation: SliderOrientation;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
 }
 
 /**
@@ -222,6 +224,7 @@ export function SliderThumb({
     dragging,
     orientation: ctx.orientation,
     disabled: ctx.disabled,
+    invalid: ctx.field?.invalid === "true",
   };
 
   const { lower, upper } = thumbBounds(ctx.shown, index, ctx.min, ctx.max, ctx.gap);

@@ -1,8 +1,10 @@
 "use client";
 import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, MouseEvent, ReactNode } from "react";
+import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
+import type { DataAttributes } from "../internal/use-render.js";
 import { useMultiSelectContext } from "./multi-select-context.js";
 
 /**
@@ -12,6 +14,8 @@ import { useMultiSelectContext } from "./multi-select-context.js";
 export interface MultiSelectLabelState {
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `pending`: a value or open transition is in flight. */
+  readonly pending: boolean;
 }
 
 /**
@@ -39,7 +43,8 @@ export interface MultiSelectLabelProps extends Omit<
  * focuses the Trigger and does **not** open the listbox, as a label on a native `<select>`
  * (design/components/multi-select.md B.8): a `<label for>` on a button would forward the click.
  *
- * Owned keys (conventions 1.2): `id`, `htmlFor`, `onClick`.
+ * Owned keys (conventions 1.2): `id`, `htmlFor`, `onClick`, `data-disabled`, `data-pending` (the
+ * Root's, conventions 4.1 rule 4).
  *
  * @see https://ui.funstack.work/components/multi-select
  */
@@ -53,21 +58,24 @@ export function MultiSelectLabel({
   const ctx = useMultiSelectContext("MultiSelect.Label");
   const { registerLabel } = ctx;
   useLayoutEffect(registerLabel, [registerLabel]);
+  const libraryProps: ComponentPropsWithRef<"label"> & DataAttributes = {
+    id: ctx.ids.label,
+    htmlFor: ctx.ids.trigger,
+    onClick: (event: MouseEvent<HTMLLabelElement>) => {
+      ctx.labelClick(event.nativeEvent);
+    },
+    "data-disabled": dataAttr(ctx.disabled),
+    "data-pending": dataAttr(ctx.pending),
+  };
   return useRender<ComponentPropsWithRef<"label">, MultiSelectLabelState>({
     defaultElement: "label",
     render,
-    state: { disabled: ctx.disabled },
+    state: { disabled: ctx.disabled, pending: ctx.pending },
     className,
     style,
     children,
     props: rest,
-    libraryProps: {
-      id: ctx.ids.label,
-      htmlFor: ctx.ids.trigger,
-      onClick: (event: MouseEvent<HTMLLabelElement>) => {
-        ctx.labelClick(event.nativeEvent);
-      },
-    },
+    libraryProps,
   });
 }
 

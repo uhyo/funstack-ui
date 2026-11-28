@@ -242,7 +242,7 @@ import { Separator } from "@funstack/ui/separator";
       />
       <PartFacts
         state={
-          "`OTPFieldState` is `{ value, length, complete, pending, disabled, readOnly, invalid }`: `value` is the filtered text, `complete` is `value.length === length`, `pending` is a `completeAction` in flight, `invalid` an error shown by an enclosing Field (`false` outside one)."
+          "`OTPFieldState` (aliased as `OTPFieldRootState` and `OTPFieldInputState`) is `{ value, length, complete, pending, disabled, readOnly, invalid, required }`: `value` is the filtered text, `complete` is `value.length === length`, `pending` is a `completeAction` in flight, `invalid` an error shown by an enclosing Field (`false` outside one), `required` the prop or the Field's."
         }
         owned={
           '`data-complete`, `data-pending`, `data-disabled`, `data-invalid` (inside a Field), and `position` in `style` (`relative`) unless your style sets it. `dir` defaults to `"ltr"`; yours wins.'

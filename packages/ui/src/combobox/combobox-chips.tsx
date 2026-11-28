@@ -33,6 +33,8 @@ export interface ComboboxChipsState {
   readonly value: readonly string[];
   /** The Root's value action is in flight. */
   readonly pending: boolean;
+  /** No chips: nothing is selected (`data-empty`). */
+  readonly empty: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
 }
@@ -107,6 +109,7 @@ export function ComboboxChips({ className, style, children, render, ...rest }: C
   const state: ComboboxChipsState = {
     value: values,
     pending: ctx.multiple && ctx.valuePending,
+    empty,
     disabled: ctx.disabled,
   };
 

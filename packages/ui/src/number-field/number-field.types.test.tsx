@@ -3,9 +3,14 @@ import { describe, expectTypeOf, it } from "vitest";
 import { NumberField } from "./index.js";
 import type {
   NumberFieldInputProps,
+  NumberFieldInputState,
+  NumberFieldLabelState,
   NumberFieldRootProps,
+  NumberFieldRootState,
+  NumberFieldSource,
   NumberFieldState,
   NumberFieldValueChangeDetails,
+  NumberFieldValueCommitDetails,
 } from "./index.js";
 
 /**
@@ -21,8 +26,10 @@ describe("NumberField types", () => {
           expectTypeOf(next).toEqualTypeOf<number | null>();
           expectTypeOf(details).toEqualTypeOf<NumberFieldValueChangeDetails>();
         }}
-        valueCommitAction={(next) => {
+        valueCommitAction={(next, details) => {
           expectTypeOf(next).toEqualTypeOf<number | null>();
+          // A commit action has its own details type (conventions 9.4).
+          expectTypeOf(details).toEqualTypeOf<NumberFieldValueCommitDetails>();
         }}
       >
         {(state) => {
@@ -35,10 +42,23 @@ describe("NumberField types", () => {
     expectTypeOf<NumberFieldRootProps["defaultValue"]>().toEqualTypeOf<number | null | undefined>();
   });
 
-  it("the source union", () => {
-    expectTypeOf<NumberFieldValueChangeDetails["source"]>().toEqualTypeOf<
-      "input" | "increment" | "decrement" | "keyboard" | "wheel" | null
+  it("the source union, exported as NumberFieldSource", () => {
+    expectTypeOf<NumberFieldSource>().toEqualTypeOf<
+      "input" | "increment" | "decrement" | "keyboard" | "wheel"
     >();
+    expectTypeOf<
+      NumberFieldValueChangeDetails["source"]
+    >().toEqualTypeOf<NumberFieldSource | null>();
+    expectTypeOf<
+      NumberFieldValueCommitDetails["source"]
+    >().toEqualTypeOf<NumberFieldSource | null>();
+  });
+
+  it("every part has a state type; state.invalid is a boolean", () => {
+    expectTypeOf<NumberFieldRootState>().toEqualTypeOf<NumberFieldState>();
+    expectTypeOf<NumberFieldInputState>().toEqualTypeOf<NumberFieldState>();
+    expectTypeOf<NumberFieldLabelState>().toEqualTypeOf<NumberFieldState>();
+    expectTypeOf<NumberFieldState["invalid"]>().toEqualTypeOf<boolean>();
   });
 
   it("composition handlers pass through on Input", () => {

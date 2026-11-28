@@ -6,6 +6,7 @@
 //   press; the click handler does), and a press while the listbox is shown is no light dismiss
 //   (the `popovertarget` exemption): the click closes it as `"activate"`.
 // - Light dismiss, Escape (focus stays) and Escape inside a modal Dialog (the listbox first).
+// - A foreign `popovertarget` invoker's close is an `"activate"` fact (the shared popup hook).
 // - The real keyboard on a `<button>`: Space opens and toggles exactly once (no second toggle from
 //   the button's own `keyup` activation), Enter toggles, Tab closes without toggling.
 // - A `<label for>` press on the Trigger with the listbox open: light dismiss, then focus.
@@ -187,6 +188,27 @@ describe("MultiSelect (browser)", () => {
       [false, "dismiss"],
       [false, "dismiss"],
     ]);
+  });
+
+  it("a foreign popovertarget invoker's close is an 'activate' fact with the toggle event", async () => {
+    const onOpenChange = vi.fn<OpenHandler>();
+    const openChangeAction = vi.fn();
+    render(<Harness root={{ onOpenChange, openChangeAction }} />);
+    await user.click(trigger());
+    await settle(() => expect(isOpen()).toBe(true));
+    openChangeAction.mockClear();
+    const foreign = screen.getByTestId("after");
+    foreign.setAttribute("popovertarget", popup().id);
+    onCleanup(() => foreign.removeAttribute("popovertarget"));
+    // The click alone (no press): focus stays on the Trigger, so only the invoker closes it.
+    await act(async () => foreign.click());
+    await settle(() => expect(isOpen()).toBe(false));
+    expect(openChangeAction).not.toHaveBeenCalled();
+    expect(onOpenChange).toHaveBeenCalledTimes(1);
+    const [next, details] = onOpenChange.mock.calls[0]!;
+    expect(next).toBe(false);
+    expect(details.reason).toBe("activate");
+    expect(details.event?.type).toBe("beforetoggle");
   });
 
   it("Space opens and toggles exactly once per press; Enter toggles; nothing closes", async () => {

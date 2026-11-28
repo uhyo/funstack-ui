@@ -31,7 +31,7 @@ export interface SliderIndicatorProps extends Omit<
 /**
  * The fill between the first and last thumb (from `min` to the value for one thumb). Renders no
  * inline position: the consumer's CSS places it from the Root's inherited `--slider-start` /
- * `--slider-end`. Owned keys: `data-orientation`, `data-disabled`.
+ * `--slider-end`. Owned keys: `data-orientation`, `data-dragging`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/slider
  */
@@ -58,6 +58,7 @@ export function SliderIndicator({
     props: rest,
     libraryProps: {
       "data-orientation": ctx.orientation,
+      "data-dragging": dataAttr(state.dragging),
       "data-disabled": dataAttr(ctx.disabled),
     },
   });

@@ -1,8 +1,10 @@
 "use client";
 import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useRender } from "../internal/use-render.js";
+import type { DataAttributes } from "../internal/use-render.js";
 import { useComboboxContext } from "./combobox-context.js";
 
 /**
@@ -12,6 +14,8 @@ import { useComboboxContext } from "./combobox-context.js";
 export interface ComboboxLabelState {
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** The Root's `pending`: a value or open transition is in flight. */
+  readonly pending: boolean;
 }
 
 /**
@@ -35,8 +39,10 @@ export interface ComboboxLabelProps extends Omit<
 
 /**
  * The visible name of the combobox: `<label for={input}>`, whose id also names the listbox
- * (`aria-labelledby` on `Combobox.List`, emitted only while a Label is mounted). Owned keys:
- * `id`, `htmlFor`.
+ * (`aria-labelledby` on `Combobox.List`, emitted only while a Label is mounted).
+ *
+ * Owned keys (conventions 1.2): `id`, `htmlFor`, `data-disabled`, `data-pending` (the Root's,
+ * conventions 4.1 rule 4).
  *
  * @see https://ui.funstack.work/components/combobox
  */
@@ -44,15 +50,21 @@ export function ComboboxLabel({ className, style, children, render, ...rest }: C
   const ctx = useComboboxContext("Combobox.Label");
   const { registerLabel } = ctx;
   useLayoutEffect(registerLabel, [registerLabel]);
+  const libraryProps: ComponentPropsWithRef<"label"> & DataAttributes = {
+    id: ctx.ids.label,
+    htmlFor: ctx.ids.input,
+    "data-disabled": dataAttr(ctx.disabled),
+    "data-pending": dataAttr(ctx.pending),
+  };
   return useRender<ComponentPropsWithRef<"label">, ComboboxLabelState>({
     defaultElement: "label",
     render,
-    state: { disabled: ctx.disabled },
+    state: { disabled: ctx.disabled, pending: ctx.pending },
     className,
     style,
     children,
     props: rest,
-    libraryProps: { id: ctx.ids.label, htmlFor: ctx.ids.input },
+    libraryProps,
   });
 }
 

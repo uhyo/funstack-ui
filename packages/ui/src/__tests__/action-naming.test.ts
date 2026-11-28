@@ -122,11 +122,12 @@ type PublicProps = {
   ComboboxInputProps: UI.ComboboxInputProps;
   ComboboxLabelProps: UI.ComboboxLabelProps;
   ComboboxListProps: UI.ComboboxListProps;
-  ComboboxMultipleProps: UI.ComboboxMultipleProps;
+  ComboboxRootBaseProps: UI.ComboboxRootBaseProps;
+  ComboboxRootMultipleProps: UI.ComboboxRootMultipleProps;
   ComboboxOptionProps: UI.ComboboxOptionProps;
   ComboboxPopupProps: UI.ComboboxPopupProps;
   ComboboxRootProps: UI.ComboboxRootProps;
-  ComboboxSingleProps: UI.ComboboxSingleProps;
+  ComboboxRootSingleProps: UI.ComboboxRootSingleProps;
   ComboboxStatusProps: UI.ComboboxStatusProps;
   ComboboxTriggerProps: UI.ComboboxTriggerProps;
   DialogCloseProps: UI.DialogCloseProps;
@@ -288,11 +289,12 @@ const listedKeys = {
   ComboboxInputProps: true,
   ComboboxLabelProps: true,
   ComboboxListProps: true,
-  ComboboxMultipleProps: true,
+  ComboboxRootBaseProps: true,
+  ComboboxRootMultipleProps: true,
   ComboboxOptionProps: true,
   ComboboxPopupProps: true,
   ComboboxRootProps: true,
-  ComboboxSingleProps: true,
+  ComboboxRootSingleProps: true,
   ComboboxStatusProps: true,
   ComboboxTriggerProps: true,
   DialogCloseProps: true,
@@ -477,8 +479,9 @@ describe("action naming (conventions 10.1)", () => {
     expectTypeOf<WithOpenChange>().toEqualTypeOf<
       | "AlertDialogRootProps"
       | "ComboboxRootProps"
-      | "ComboboxSingleProps"
-      | "ComboboxMultipleProps"
+      | "ComboboxRootBaseProps"
+      | "ComboboxRootSingleProps"
+      | "ComboboxRootMultipleProps"
       | "DialogRootProps"
       | "DrawerRootProps"
       | "HoverCardRootProps"

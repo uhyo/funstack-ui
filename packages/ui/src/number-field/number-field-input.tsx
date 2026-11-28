@@ -14,6 +14,7 @@ import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useFieldControl } from "../internal/form/use-field-control.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
+import { CONTROL_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
 import type { NumberFieldState } from "./number-field-root.js";
@@ -137,7 +138,16 @@ export function NumberFieldInput({
     },
     [checkElement, visibleRef],
   );
-  const mergedRef = useMergedRefs<HTMLElement>(libraryRef, field.ref);
+  // Development check (conventions 9.5): without a `NumberField.Label` the input needs a name,
+  // from a `<label for>`, a wrapping `<label>` (a `Field.Label` included), `aria-label` or
+  // `aria-labelledby`.
+  const checkName = useNameWarning(
+    isDev &&
+      "NumberField.Input: the input has no accessible name. Render a NumberField.Label (or a " +
+        "Field.Label), associate a <label for>, or give it aria-label / aria-labelledby.",
+    CONTROL_NAME,
+  );
+  const mergedRef = useMergedRefs<HTMLElement>(libraryRef, field.ref, checkName);
 
   const hiddenMergedRef = useMergedRefs<HTMLInputElement | null>(hiddenRef, hiddenInputRef);
 

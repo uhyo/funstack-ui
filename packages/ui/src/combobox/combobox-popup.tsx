@@ -60,12 +60,19 @@ export interface ComboboxPopupProps extends Omit<
   /**
    * Forwarded to the `<ViewTransition default>` around the popover element itself. Animates
    * library-driven opens and closes (typing, the Trigger, an accepted option) in every engine;
-   * dismissals are the browser's (CSS only). **A deferred results render also activates the
-   * boundary** (React: updates from `useDeferredValue` animate), so use a type map with
-   * `default: "none"` unless every result change should cross-fade. Static. While a view
-   * transition runs, the popup's CSS transitions are turned off for the moment of the library's
-   * own show or hide (an inline `transition: none !important`, restored right after), so that
-   * show or hide runs no CSS transition (a `@keyframes` animation is not cut).
+   * dismissals (Escape, a click outside, focus leaving) are the browser's and animate with CSS
+   * only. **A deferred results render also activates the boundary** (React: updates from
+   * `useDeferredValue` animate), so use a type map with `default: "none"` unless every result
+   * change should cross-fade.
+   *
+   * Static: setting or unsetting it remounts the element. Any value, `"none"` included, makes a
+   * mount or `<Activity>` reveal of the Popup inside a transition start a document view
+   * transition (a ~250 ms page cross-fade that the next transition waits for); a plain open
+   * starts none, as the content mounts under the already-mounted popup element. While a view
+   * transition runs, the popup's CSS transitions are cut for the moment of the library's own
+   * show or hide (an inline `transition: none !important`, restored right after), so only the
+   * view transition animates it; a `@keyframes` animation is not cut, and a dismissal, which
+   * runs no view transition, keeps its CSS exit.
    */
   transition?: ViewTransitionClass;
   /** Class name, or a function of the part's state that returns one. */

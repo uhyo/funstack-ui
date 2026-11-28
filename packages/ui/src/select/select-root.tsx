@@ -20,6 +20,8 @@ import {
 import { useResetTarget } from "../internal/form/use-form-reset.js";
 import { useDevWarning } from "../internal/use-dev-warning.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
+import type { ElementCheck } from "../internal/use-element-check.js";
+import { CONTROL_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { useNativeSelectValue } from "../internal/form/use-native-select-value.js";
 import { useRender } from "../internal/use-render.js";
 import { SelectContext } from "./select-context.js";
@@ -50,9 +52,22 @@ export interface SelectRootState {
   readonly value: string;
   /** An action dispatched through this Select is in flight. */
   readonly pending: boolean;
-  /** The `disabled` prop. */
+  /** The `disabled` prop (or the enclosing `Field.Root`'s). */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
 }
+
+/** State of `Select.Trigger`: the Root's (conventions 9.4). */
+export type SelectTriggerState = SelectRootState;
+/** State of `Select.Value`: the Root's. */
+export type SelectValueState = SelectRootState;
+/** State of `Select.Group`: the Root's. */
+export type SelectGroupState = SelectRootState;
+/** State of `Select.GroupLabel`: the Root's. */
+export type SelectGroupLabelState = SelectRootState;
+/** State of `Select.Separator`: the Root's. */
+export type SelectSeparatorState = SelectRootState;
 
 /**
  * Props of `Select.Root`.
@@ -163,7 +178,16 @@ export function SelectRoot({
     component: "Select.Root",
   });
   const disabled = field.disabled;
-  const rootRef = useMergedRefs<HTMLSelectElement>(libraryRef, field.ref);
+  const invalid = field.state?.invalid ?? false;
+  // Development check (conventions 9.5): a `<select>` needs a name, from a `<label for>`, a
+  // wrapping `<label>` (a `Field.Label` included), `aria-label` or `aria-labelledby`.
+  const checkName: ElementCheck<HTMLSelectElement> | undefined = useNameWarning(
+    isDev &&
+      "Select.Root: the <select> has no accessible name. Associate a <label for>, use " +
+        "Field.Label, or give it aria-label / aria-labelledby.",
+    CONTROL_NAME,
+  );
+  const rootRef = useMergedRefs<HTMLSelectElement>(libraryRef, field.ref, checkName);
 
   const { optimistic, pending, dispatch, latestInFlight, adopt } = useControllableAction<
     string,
@@ -208,10 +232,10 @@ export function SelectRoot({
 
   // Memoised: every member is a state value, a prop or a stable callback.
   const context = useMemo<SelectContextValue>(
-    () => ({ optimistic, pending, disabled, groupDisabled: false, optionMounted }),
-    [optimistic, pending, disabled, optionMounted],
+    () => ({ optimistic, pending, disabled, invalid, groupDisabled: false, optionMounted }),
+    [optimistic, pending, disabled, invalid, optionMounted],
   );
-  const state: SelectRootState = { value: optimistic, pending, disabled };
+  const state: SelectRootState = { value: optimistic, pending, disabled, invalid };
 
   const element = useRender<ComponentPropsWithRef<"select">, SelectRootState>({
     defaultElement: "select",

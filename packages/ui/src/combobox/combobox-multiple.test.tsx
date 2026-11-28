@@ -28,7 +28,7 @@ import { Field } from "../field/index.js";
 import { Combobox } from "./index.js";
 import type {
   ComboboxChipState,
-  ComboboxMultipleProps,
+  ComboboxRootMultipleProps,
   ComboboxMultipleRootState,
   ComboboxMultipleValueChangeDetails,
   ComboboxOpenChangeDetails,
@@ -55,7 +55,7 @@ function Options({ query }: { query: string }) {
 }
 
 interface HarnessProps {
-  root?: Partial<ComboboxMultipleProps>;
+  root?: Partial<ComboboxRootMultipleProps>;
   required?: boolean;
   boundary?: (error: unknown) => void;
   /** Render the chips (default true). */
@@ -181,7 +181,7 @@ describe("Combobox multiple (jsdom)", () => {
         ["countries", "fr"],
       ]);
       expect(formValues()).toEqual(["jp", "fr"]);
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
       expect(input()).toHaveAttribute("role", "combobox");
       await typeText(user, "a");
       expect(list()).toHaveAttribute("aria-multiselectable", "true");
@@ -196,7 +196,7 @@ describe("Combobox multiple (jsdom)", () => {
       expect(chipsEl()).toHaveAttribute("data-empty", "");
       expect(hiddenValues()).toEqual([["", ""]]);
       expect(formValues()).toEqual([]);
-      expect(input()).not.toHaveAttribute("data-selected");
+      expect(input()).toHaveAttribute("data-empty", "");
     });
 
     it("a single Combobox has no aria-multiselectable and its state gains `values`", async () => {
@@ -1207,7 +1207,7 @@ describe("Combobox multiple (jsdom)", () => {
           String(c[0]).startsWith("Combobox.Root: `multiple` changed after mount"),
         ),
       ).toBe(true);
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
     });
 
     it("does not warn in normal use, nor for a value without defaultInputValue", async () => {

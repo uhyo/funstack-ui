@@ -68,6 +68,8 @@ export interface MultiSelectRootState {
   readonly pending: boolean;
   /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
+  /** The `required` prop, or the enclosing Field's. */
+  readonly required: boolean;
 }
 
 /**
@@ -77,13 +79,13 @@ export interface MultiSelectRootState {
  */
 export interface MultiSelectRootProps {
   /** Controlled selection. `[]`: nothing selected. `undefined`: uncontrolled. Duplicates are ignored. */
-  value?: string[];
+  value?: readonly string[];
   /**
    * Initial selection in uncontrolled mode; also the form-reset target (the latest value).
    *
    * @defaultValue `[]`
    */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Runs inside the Root's transition for every change of the selection. `next` is the whole
    * intended selection as a fresh array; `details.added` / `details.removed` say what this
@@ -434,11 +436,19 @@ export function MultiSelectRoot(props: MultiSelectRootProps) {
     open: popover.optimistic,
     pending,
     disabled,
+    required,
   };
 
   return (
     <MultiSelectContext value={context}>
-      <HiddenValues name={name} form={form} values={multi.values} inputRef={hiddenRef} />
+      {/* A disabled MultiSelect is not submitted (conventions 3.6, design B.10). */}
+      <HiddenValues
+        name={name}
+        form={form}
+        values={multi.values}
+        inputRef={hiddenRef}
+        disabled={disabled}
+      />
       {resolveStateValue(children, state)}
     </MultiSelectContext>
   );

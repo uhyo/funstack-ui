@@ -35,7 +35,7 @@ export type {
   SliderValueChangeDetails,
   SliderValueCommitDetails,
 } from "./slider-root.js";
-export type { SliderLabelProps } from "./slider-label.js";
+export type { SliderLabelProps, SliderLabelState } from "./slider-label.js";
 export type { SliderTrackProps, SliderTrackState } from "./slider-track.js";
 export type { SliderIndicatorProps, SliderIndicatorState } from "./slider-indicator.js";
 export type { SliderThumbProps, SliderThumbState } from "./slider-thumb.js";

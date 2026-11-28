@@ -29,8 +29,13 @@ export const NumberField = {
 export type {
   NumberFieldRootProps,
   NumberFieldState,
+  NumberFieldRootState,
+  NumberFieldInputState,
+  NumberFieldLabelState,
   NumberFieldValueChangeDetails,
+  NumberFieldValueCommitDetails,
 } from "./number-field-root.js";
+export type { NumberFieldSource } from "./number-field-context.js";
 export type { NumberFieldLabelProps } from "./number-field-label.js";
 export type { NumberFieldInputProps } from "./number-field-input.js";
 export type {

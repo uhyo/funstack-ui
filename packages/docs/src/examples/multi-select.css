@@ -19,7 +19,7 @@
   text-align: start;
   cursor: pointer;
 }
-.demo-multi-select-trigger > [data-placeholder] {
+.demo-multi-select-trigger > [data-empty] {
   color: var(--color-text-secondary);
 }
 /* The summary is one line: long selections are cut with an ellipsis. */

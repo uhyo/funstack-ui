@@ -38,7 +38,7 @@ import type {
   ComboboxInputValueChangeDetails,
   ComboboxOpenChangeDetails,
   ComboboxPopupProps,
-  ComboboxSingleProps,
+  ComboboxRootSingleProps,
   ComboboxTriggerProps,
   ComboboxValueChangeDetails,
 } from "./index.js";
@@ -87,7 +87,7 @@ const optionStyle = { padding: "2px 4px" } as const;
 const labelStyle = { display: "inline-block", padding: 8 } as const;
 
 interface HarnessProps {
-  root?: Partial<ComboboxSingleProps>;
+  root?: Partial<ComboboxRootSingleProps>;
   popup?: Partial<ComboboxPopupProps>;
   results?: (query: string) => ReactNode;
   trigger?: Partial<ComboboxTriggerProps>;
@@ -292,7 +292,30 @@ describe("Combobox (browser)", () => {
       expect(input()).toHaveAttribute("aria-expanded", "false");
     });
 
-    it("inside a Dialog: the first Escape closes the listbox, the second the Dialog", async () => {
+    // Conventions 15, design 8: with the listbox open Escape is the listbox's and the text stays;
+    // with it closed, edited text reverts (`"dismiss"`) and the key is consumed.
+    it("the first Escape closes the listbox and keeps the text, the second reverts it", async () => {
+      const onText = vi.fn<TextAction>();
+      render(
+        <Harness
+          root={{ defaultValue: "jp", defaultInputValue: "Japan", onInputValueChange: onText }}
+        />,
+      );
+      await typeInto("x");
+      await settle(() => expect(isOpen()).toBe(true));
+      await user.keyboard("{Escape}");
+      await settle(() => expect(isOpen()).toBe(false));
+      expect(input().value).toBe("Japanx");
+      onText.mockClear();
+      await user.keyboard("{Escape}");
+      await settle(() => expect(input().value).toBe("Japan"));
+      expect(onText.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+        ["Japan", "dismiss"],
+      ]);
+      expect(isOpen()).toBe(false);
+    });
+
+    it("inside a modal Dialog: the listbox closes, the text reverts, then the Dialog closes", async () => {
       render(
         <Dialog.Root>
           <Dialog.Trigger data-testid="dialog-trigger">Edit</Dialog.Trigger>
@@ -311,11 +334,16 @@ describe("Combobox (browser)", () => {
       await user.keyboard("{Escape}");
       await settle(() => expect(isOpen()).toBe(false));
       expect(dialog.open).toBe(true);
+      // The edited text "j" reverts to "" (no selection): consumed, the Dialog stays open.
+      await user.keyboard("{Escape}");
+      await settle(() => expect(input().value).toBe(""));
+      await quietPeriod(80, "the Dialog must not close on the reverting Escape");
+      expect(dialog.open).toBe(true);
       await user.keyboard("{Escape}");
       await settle(() => expect(dialog.open).toBe(false));
     });
 
-    it("inside a Popover: the first Escape closes the listbox, the second the Popover", async () => {
+    it("inside a Popover: the listbox closes, the text reverts, then the Popover closes", async () => {
       render(<InPopover />);
       await user.click(screen.getByTestId("popover-trigger"));
       await flushFor();
@@ -326,6 +354,10 @@ describe("Combobox (browser)", () => {
       expect(isOpen(outer)).toBe(true);
       await user.keyboard("{Escape}");
       await settle(() => expect(isOpen()).toBe(false));
+      expect(isOpen(outer)).toBe(true);
+      await user.keyboard("{Escape}");
+      await settle(() => expect(input().value).toBe(""));
+      await quietPeriod(80, "the Popover must not close on the reverting Escape");
       expect(isOpen(outer)).toBe(true);
       await user.keyboard("{Escape}");
       await settle(() => expect(isOpen(outer)).toBe(false));
@@ -1261,7 +1293,7 @@ describe("Combobox (browser)", () => {
     const TEXT = "Wide Words";
 
     /** Opens by typing TEXT with every option listed, then leaves the act environment. */
-    async function openWithText(root: Partial<ComboboxSingleProps> = {}) {
+    async function openWithText(root: Partial<ComboboxRootSingleProps> = {}) {
       render(<Harness root={root} results={() => <Options query="" />} />);
       await typeInto(TEXT);
       await settle(() => expect(isOpen()).toBe(true));

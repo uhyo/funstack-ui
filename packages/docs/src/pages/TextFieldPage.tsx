@@ -168,7 +168,7 @@ export function TextFieldPage() {
           },
           {
             name: "valueCommitAction",
-            type: "ChangeAction<string, TextFieldValueChangeDetails>",
+            type: "ChangeAction<string, TextFieldValueCommitDetails>",
             description:
               "Once per edit (blur, Enter in an input, Ctrl+Enter or Cmd+Enter in a textarea), and for a form reset or text adopted at mount. Runs in the field's transition and is awaited, with `data-pending`. Uncontrolled state is committed when it resolves. May be a Server Function.",
           },
@@ -214,13 +214,13 @@ export function TextFieldPage() {
       />
       <PartFacts
         state={
-          "`TextFieldState` is `{ value, text, pending, disabled, readOnly, required }`: `value` is the shown value (optimistic), `text` the shown text (the draft while the user is editing, else `value`), `pending` a `valueCommitAction` in flight."
+          "`TextFieldState` is `{ value, text, pending, disabled, readOnly, required, invalid }`: `value` is the shown value (optimistic), `text` the shown text (the draft while the user is editing, else `value`), `pending` a `valueCommitAction` in flight, `invalid` an error shown by an enclosing `Field.Root` (`data-invalid`; `false` outside one)."
         }
         owned={
           "`value` (the shown text), `onChange`, `onKeyDown`, `onBlur` (not in the props type; `onInput`, `onFocus`, `onKeyUp` and the rest pass through), `data-pending`, `data-disabled`; inside a Field also `id`, `name`, `disabled`, `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`."
         }
         note={
-          '`TextFieldValueChangeDetails` is `{ reason, event }`: `"activate"` for a commit (`event` is the `focusout` or the `keydown` of the commit key), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`). Serialisable: a Server Function receives `{ reason }`.'
+          '`TextFieldValueCommitDetails` is `{ reason, event }`: `"activate"` for a commit (`event` is the `focusout` or the `keydown` of the commit key), `"platform"` for a form reset (the `reset` event) and text adopted at mount (`undefined`). Serialisable: a Server Function receives `{ reason }`. In development a field with no accessible name (no `<label>`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning.'
         }
       />
 

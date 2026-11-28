@@ -32,9 +32,9 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { isEscapeRequest } from "../internal/escape-key.js";
 import { TextField } from "./index.js";
-import type { TextFieldProps, TextFieldState, TextFieldValueChangeDetails } from "./index.js";
+import type { TextFieldProps, TextFieldState, TextFieldValueCommitDetails } from "./index.js";
 
-type Fn = (next: string, details: TextFieldValueChangeDetails) => unknown;
+type Fn = (next: string, details: TextFieldValueCommitDetails) => unknown;
 
 describeValueAction(textFieldDriver);
 describeNativeGroupPlatform(textFieldDriver);
@@ -1080,5 +1080,68 @@ describe("TextField", () => {
       expect(screen.getByTestId("custom")).toBe(field());
       expect(seen.at(-1)).toMatchObject({ value: "Draft", text: "Draft" });
     });
+  });
+});
+
+// #200, the consistency alignment (conventions 3.6, 4.1 rule 5, 9.5).
+describe("TextField alignment rows", () => {
+  it("state.invalid equals data-invalid", async () => {
+    const className = vi.fn((s: TextFieldState) => (s.invalid ? "bad" : "ok"));
+    render(
+      <form>
+        <Field.Root name="title" required>
+          <Field.Label>Title</Field.Label>
+          <TextField className={className} />
+          <Field.Error />
+        </Field.Root>
+        <button type="submit">Save</button>
+      </form>,
+    );
+    await act(async () => {});
+    expect(field()).toHaveClass("ok");
+    await setupUser().click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(field()).toHaveAttribute("data-invalid", "");
+    expect(field()).toHaveClass("bad");
+  });
+
+  it.each(["own", "field"] as const)(
+    "disabled submission (%s): the text is not posted",
+    async (source) => {
+      const ui =
+        source === "own" ? (
+          <TextField aria-label="Title" name="title" defaultValue="Draft" disabled />
+        ) : (
+          <Field.Root name="title" disabled>
+            <Field.Label>Title</Field.Label>
+            <TextField defaultValue="Draft" />
+          </Field.Root>
+        );
+      render(<form data-testid="form">{ui}</form>);
+      await act(async () => {});
+      expect(field()).toBeDisabled();
+      expect([...new FormData(screen.getByTestId("form") as HTMLFormElement)]).toEqual([]);
+    },
+  );
+
+  it("warns once when the field has no accessible name; a label names it", async () => {
+    const error = silenceErrors();
+    render(
+      <>
+        <TextField />
+        <label>
+          Named <TextField />
+        </label>
+        <TextField aria-label="Named too" />
+        <Field.Root>
+          <Field.Label>Named by the Field</Field.Label>
+          <TextField />
+        </Field.Root>
+      </>,
+    );
+    await act(async () => {});
+    const calls = error.mock.calls.filter(([m]) => String(m).includes("no accessible name"));
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toMatch(/^TextField: /);
   });
 });

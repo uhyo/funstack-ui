@@ -7,6 +7,8 @@ export interface SelectContextValue {
   readonly pending: boolean;
   /** `Root disabled` (natively disables the whole `<select>`). */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field. `false` outside. */
+  readonly invalid: boolean;
   /** Inside a `Select.Group disabled` (`false` outside groups): Options match `:disabled`. */
   readonly groupDisabled: boolean;
   /**

@@ -29,7 +29,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ms-trigger [data-placeholder] {
+.ms-trigger [data-empty] {
   color: GrayText;
 }
 .ms-trigger[data-open] {

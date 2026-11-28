@@ -282,6 +282,11 @@ export { Select } from "./select/index.js";
 export type {
   SelectRootProps,
   SelectRootState,
+  SelectTriggerState,
+  SelectValueState,
+  SelectGroupState,
+  SelectGroupLabelState,
+  SelectSeparatorState,
   SelectValueChangeDetails,
   SelectTriggerProps,
   SelectValueProps,
@@ -323,8 +328,9 @@ export type {
 } from "./multi-select/index.js";
 export type {
   ComboboxRootProps,
-  ComboboxSingleProps,
-  ComboboxMultipleProps,
+  ComboboxRootBaseProps,
+  ComboboxRootSingleProps,
+  ComboboxRootMultipleProps,
   ComboboxRootState,
   ComboboxMultipleRootState,
   ComboboxValueChangeDetails,
@@ -391,6 +397,7 @@ export type {
   SliderValueChangeDetails,
   SliderValueCommitDetails,
   SliderLabelProps,
+  SliderLabelState,
   SliderTrackProps,
   SliderTrackState,
   SliderIndicatorProps,
@@ -407,6 +414,8 @@ export { OTPField } from "./otp-field/index.js";
 export type {
   OTPFieldRootProps,
   OTPFieldState,
+  OTPFieldRootState,
+  OTPFieldInputState,
   OTPFieldValueChangeDetails,
   OTPFieldCompleteDetails,
   OTPFieldInputProps,
@@ -417,7 +426,12 @@ export type {
 export type {
   NumberFieldRootProps,
   NumberFieldState,
+  NumberFieldRootState,
+  NumberFieldInputState,
+  NumberFieldLabelState,
   NumberFieldValueChangeDetails,
+  NumberFieldValueCommitDetails,
+  NumberFieldSource,
   NumberFieldLabelProps,
   NumberFieldInputProps,
   NumberFieldIncrementProps,
@@ -429,7 +443,7 @@ export { TextField } from "./text-field/index.js";
 export type {
   TextFieldProps,
   TextFieldState,
-  TextFieldValueChangeDetails,
+  TextFieldValueCommitDetails,
 } from "./text-field/index.js";
 
 export { Field } from "./field/index.js";

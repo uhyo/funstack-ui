@@ -48,7 +48,7 @@ export interface SliderTrackProps extends Omit<
  * The rail the thumbs move along. A press moves the nearest thumb, focuses its input and starts
  * its drag; its box is the geometry reference for the pointer math (its computed `direction`
  * mirrors a horizontal slider). Owned keys: `onPointerDown`, `data-orientation`,
- * `data-disabled`, and `touch-action` in `style` (`pan-y` horizontal, `pan-x` vertical; the
+ * `data-dragging`, `data-disabled`, and `touch-action` in `style` (`pan-y` horizontal, `pan-x` vertical; the
  * consumer's entry wins).
  *
  * @see https://ui.funstack.work/components/slider
@@ -86,6 +86,7 @@ export function SliderTrack({ className, style, children, render, ...rest }: Sli
     ref: libraryRef,
     libraryProps: {
       "data-orientation": ctx.orientation,
+      "data-dragging": dataAttr(state.dragging),
       "data-disabled": dataAttr(ctx.disabled),
       onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => {
         // A press on a Thumb bubbles here after the Thumb began its gesture; the Root ignores it.

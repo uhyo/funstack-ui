@@ -8,13 +8,13 @@
 import { act, fireEvent, screen } from "@testing-library/react";
 import { expect } from "vitest";
 import { TextField } from "../../text-field/index.js";
-import type { TextFieldValueChangeDetails } from "../../text-field/index.js";
+import type { TextFieldValueCommitDetails } from "../../text-field/index.js";
 import type { NativeGroupPlatformDriver } from "../native-group-platform-suite.js";
 import { definedProps } from "../value-action-suite.js";
 
 export const field = () => screen.getByRole("textbox") as HTMLInputElement;
 
-export const textFieldDriver: NativeGroupPlatformDriver<string, TextFieldValueChangeDetails> = {
+export const textFieldDriver: NativeGroupPlatformDriver<string, TextFieldValueCommitDetails> = {
   name: "TextField",
   render: ({ value, defaultValue, changeAction, extra }) => (
     <TextField

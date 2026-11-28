@@ -1,3 +1,6 @@
+// Ships the platform typings with this subpath (conventions 7.4). Type-only: the built JS has no
+// import of it.
+import "../internal/platform-attributes.js";
 import { OTPFieldInput } from "./otp-field-input.js";
 import { OTPFieldRoot } from "./otp-field-root.js";
 import { OTPFieldSlot } from "./otp-field-slot.js";
@@ -21,6 +24,8 @@ export const OTPField = {
 export type {
   OTPFieldRootProps,
   OTPFieldState,
+  OTPFieldRootState,
+  OTPFieldInputState,
   OTPFieldValueChangeDetails,
   OTPFieldCompleteDetails,
 } from "./otp-field-root.js";

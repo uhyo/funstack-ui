@@ -7,5 +7,8 @@
  *
  * @see https://ui.funstack.work/components/text-field
  */
+// Ships the platform typings with this subpath (conventions 7.4). Type-only: the built JS has no
+// import of it.
+import "../internal/platform-attributes.js";
 export { TextField } from "./text-field.js";
-export type { TextFieldProps, TextFieldState, TextFieldValueChangeDetails } from "./text-field.js";
+export type { TextFieldProps, TextFieldState, TextFieldValueCommitDetails } from "./text-field.js";

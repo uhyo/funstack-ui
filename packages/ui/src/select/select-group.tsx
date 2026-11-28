@@ -57,6 +57,7 @@ export function SelectGroup({
     value: ctx.optimistic,
     pending: ctx.pending,
     disabled: ctx.disabled,
+    invalid: ctx.invalid,
   };
   const { ref } = useSelectPartRef<HTMLOptGroupElement>("Select.Group", "optgroup");
   const element = useRender<ComponentPropsWithRef<"optgroup">, SelectRootState>({

@@ -33,7 +33,7 @@ import {
 import { Dialog } from "../dialog/index.js";
 import { Combobox } from "./index.js";
 import type {
-  ComboboxMultipleProps,
+  ComboboxRootMultipleProps,
   ComboboxMultipleValueChangeDetails,
   ComboboxOpenChangeDetails,
 } from "./index.js";
@@ -58,7 +58,13 @@ function Options({ query }: { query: string }) {
 const popupStyle = { margin: 0, inset: "auto", padding: 0, border: "1px solid" } as const;
 const chipStyle = { display: "inline-flex", gap: 4, padding: "2px 6px", margin: 2 } as const;
 
-function Box({ root, required }: { root?: Partial<ComboboxMultipleProps>; required?: boolean }) {
+function Box({
+  root,
+  required,
+}: {
+  root?: Partial<ComboboxRootMultipleProps>;
+  required?: boolean;
+}) {
   return (
     <Combobox.Root multiple name="countries" {...root}>
       <Combobox.Label>Countries</Combobox.Label>
@@ -90,7 +96,7 @@ function Box({ root, required }: { root?: Partial<ComboboxMultipleProps>; requir
   );
 }
 
-function Harness(props: { root?: Partial<ComboboxMultipleProps>; required?: boolean }) {
+function Harness(props: { root?: Partial<ComboboxRootMultipleProps>; required?: boolean }) {
   return (
     <>
       <input data-testid="before" aria-label="Before" />

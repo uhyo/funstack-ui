@@ -35,8 +35,17 @@ export interface ComboboxInputState {
   readonly pending: boolean;
   /** The results shown are for an older text. */
   readonly stale: boolean;
+  /**
+   * Nothing is selected (`data-empty`): the optimistic value is `null`, or has no entries with
+   * `multiple`. "Has a value" is `:not([data-empty])`.
+   */
+  readonly empty: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
+  /** The Input's own `required`, or the enclosing Field's. */
+  readonly required: boolean;
 }
 
 /**
@@ -62,6 +71,7 @@ export interface ComboboxInputProps extends Omit<
   | "aria-activedescendant"
   | "autoComplete"
   | "disabled"
+  | "readOnly"
   | "className"
   | "style"
   | "children"
@@ -84,13 +94,15 @@ export interface ComboboxInputProps extends Omit<
  * The text field: `<input role="combobox" aria-autocomplete="list" aria-expanded aria-controls
  * aria-activedescendant autocomplete="off">`. DOM focus stays here while the active option moves
  * virtually (design 7.1). Its text is the Root's urgent `inputValue`; typing opens the listbox.
+ * `readOnly` is not accepted (conventions 3.6): the options, the Trigger and `Clear` would still
+ * change the value.
  *
  * Owned keys (conventions 1.2): `id`, `type`, `role`, `value`, `autoComplete`,
  * `aria-autocomplete`, `aria-expanded`, `aria-controls` (token-merged), `aria-activedescendant`,
  * `disabled`, `onChange`, `onKeyDown`, `onFocus` and `onBlur` (focus arriving starts the press
  * watch that decides a focus loss), `onClick`, `onPointerDown` (a primary-button press while the
  * listbox is shown captures the pointer to the Popup, so it is no light dismiss), `data-open`,
- * `data-pending`, `data-selected`, `data-stale`, `data-disabled`; inside a `Field.Root` (whose
+ * `data-pending`, `data-empty`, `data-stale`, `data-disabled`; inside a `Field.Root` (whose
  * control id it takes) also `required` (own or the Field's), `aria-describedby` (token-merged),
  * `aria-invalid` and `data-invalid`; with `multiple`, `required` (only while nothing is selected)
  * and `aria-required`. `onFocusCapture` passes through.
@@ -101,16 +113,6 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
   const ctx = useComboboxContext("Combobox.Input");
   const { popover, ids, inputRef } = ctx;
   const { triggerRef } = popover;
-
-  const state: ComboboxInputState = {
-    value: ctx.value,
-    values: ctx.values,
-    inputValue: ctx.inputValue,
-    open: popover.optimistic,
-    pending: ctx.pending,
-    stale: ctx.stale,
-    disabled: ctx.disabled,
-  };
 
   const checkElement = useElementCheck(
     isDev &&
@@ -160,6 +162,19 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     ? { required: required && ctx.values.length === 0, "aria-required": required || undefined }
     : field.inField && { required: field.required };
 
+  const state: ComboboxInputState = {
+    value: ctx.value,
+    values: ctx.values,
+    inputValue: ctx.inputValue,
+    open: popover.optimistic,
+    pending: ctx.pending,
+    stale: ctx.stale,
+    empty: ctx.values.length === 0,
+    disabled: ctx.disabled,
+    invalid: field.state?.invalid ?? false,
+    required,
+  };
+
   const libraryProps: ComponentPropsWithRef<"input"> & DataAttributes = {
     ...field.attributes,
     ...requiredProps,
@@ -195,7 +210,7 @@ export function ComboboxInput({ className, style, render, ...rest }: ComboboxInp
     },
     "data-open": dataAttr(popover.optimistic),
     "data-pending": dataAttr(state.pending),
-    "data-selected": dataAttr(ctx.values.length > 0),
+    "data-empty": dataAttr(state.empty),
     "data-stale": dataAttr(ctx.stale),
     "data-disabled": dataAttr(ctx.disabled),
   };

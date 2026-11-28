@@ -18,6 +18,8 @@ export interface MultiSelectValueState {
    * saw one (a default value before the listbox first opened, and always in the server HTML).
    */
   readonly labels: readonly (string | undefined)[];
+  /** Nothing is selected: `value.length === 0` (`data-empty`). */
+  readonly empty: boolean;
   /** The Root's `disabled` (or the Field's). */
   readonly disabled: boolean;
 }
@@ -31,7 +33,7 @@ export interface MultiSelectValueProps extends Omit<
   ComponentPropsWithRef<"span">,
   "className" | "style" | "children"
 > {
-  /** Rendered by the default content while the selection is empty (`data-placeholder`). */
+  /** Rendered by the default content while the selection is empty (`data-empty`). */
   placeholder?: ReactNode;
   /** Class name, or a function of the part's state that returns one. */
   className?: StateValue<string | undefined, MultiSelectValueState>;
@@ -50,12 +52,12 @@ export interface MultiSelectValueProps extends Omit<
 
 /**
  * What the Trigger shows (design/components/multi-select.md B.7): a `<span>` inside
- * `MultiSelect.Trigger`, with `data-placeholder` while the selection is empty. Without
+ * `MultiSelect.Trigger`, with `data-empty` while the selection is empty. Without
  * `children` it renders `placeholder` while the selection is empty, else the labels of the label
  * cache joined with `", "`, the raw value for a value whose option was never mounted. The Trigger's text content is the combobox's value
  * for assistive technology.
  *
- * Owned key (conventions 1.2): `data-placeholder`.
+ * Owned keys (conventions 1.2): `data-empty`, `data-disabled`.
  *
  * @see https://ui.funstack.work/components/multi-select
  */
@@ -68,14 +70,16 @@ export function MultiSelectValue({
   ...rest
 }: MultiSelectValueProps) {
   const ctx = useMultiSelectContext("MultiSelect.Value");
+  const empty = ctx.values.length === 0;
   const state: MultiSelectValueState = {
     value: ctx.values,
     labels: ctx.labels,
+    empty,
     disabled: ctx.disabled,
   };
-  const empty = state.value.length === 0;
   const libraryProps: ComponentPropsWithRef<"span"> & DataAttributes = {
-    "data-placeholder": dataAttr(empty),
+    "data-empty": dataAttr(empty),
+    "data-disabled": dataAttr(ctx.disabled),
   };
   return useRender<ComponentPropsWithRef<"span">, MultiSelectValueState>({
     defaultElement: "span",

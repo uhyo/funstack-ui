@@ -53,6 +53,7 @@ export function SelectGroupLabel({
     value: ctx.optimistic,
     pending: ctx.pending,
     disabled: ctx.disabled,
+    invalid: ctx.invalid,
   };
   const { ref } = useSelectPartRef<HTMLLegendElement>(
     "Select.GroupLabel",

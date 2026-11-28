@@ -143,13 +143,13 @@ export function MultiSelectPage() {
         rows={[
           {
             name: "value",
-            type: "string[]",
+            type: "readonly string[]",
             description:
               "Controlled selection. `[]`: nothing selected. `undefined` means uncontrolled. Duplicates are ignored.",
           },
           {
             name: "defaultValue",
-            type: "string[]",
+            type: "readonly string[]",
             default: "[]",
             description:
               "Initial selection when uncontrolled; what a form reset returns to (the latest value).",
@@ -182,7 +182,7 @@ export function MultiSelectPage() {
             name: "onOpenChange",
             type: "UrgentChangeHandler<boolean, MultiSelectOpenChangeDetails>",
             description:
-              'Facts only: the listbox was closed without the library closing it on request (Escape, a click outside, focus leaving the Trigger, another popover opening, script). Always `false`, `reason: "dismiss"`. Called synchronously, outside any transition, and not awaited. In controlled mode set state directly here (`onOpenChange={setOpen}`). May return a promise; a rejection or a throw goes to `reportError`.',
+              'Facts only: the listbox was closed without the library closing it on request. Always `false`. `details.reason`: `"dismiss"` (Escape, a click outside, focus leaving the Trigger, another popover opening, script) or `"activate"` (a [foreign invoker](/concepts/browser-owned-state#foreign-invoker): a `popovertarget` / `commandfor` button of yours that toggles the listbox). Called synchronously, outside any transition, and not awaited. In controlled mode set state directly here (`onOpenChange={setOpen}`). May return a promise; a rejection or a throw goes to `reportError`.',
           },
           {
             name: "loop",
@@ -213,7 +213,7 @@ export function MultiSelectPage() {
             type: "boolean",
             default: "false",
             description:
-              "Disables the Trigger natively; nothing opens or dispatches. The hidden inputs stay enabled, so the selection still posts (wrap in `<fieldset disabled>` to drop it).",
+              "Disables the Trigger natively; nothing opens or dispatches. A disabled MultiSelect (this prop or the Field's) is not submitted: every hidden input is `disabled` too, as a disabled native `<select>` posts nothing. A form reset still reaches it.",
           },
           {
             name: "children",
@@ -224,7 +224,7 @@ export function MultiSelectPage() {
       />
       <PartFacts
         state={
-          "`MultiSelectRootState` is `{ value, activeValue, open, pending, disabled }`; `value` (pick order) and `open` are optimistic; `pending` covers the value and the open transitions."
+          "`MultiSelectRootState` is `{ value, activeValue, open, pending, disabled, required }`; `value` (pick order) and `open` are optimistic; `pending` covers the value and the open transitions; `required` is the prop or the Field's."
         }
         owned={
           "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden inputs when `name` is given."
@@ -249,7 +249,9 @@ export function MultiSelectPage() {
         ]}
       />
       <PartFacts
-        state={"`MultiSelectLabelState` is `{ disabled }`."}
+        state={
+          "`MultiSelectLabelState` is `{ disabled, pending }`, the Root's; the Label renders them as `data-disabled` and `data-pending`."
+        }
         owned={"`id`, `htmlFor`, `onClick`."}
         note={
           "A `<label for>` of the Trigger whose click focuses the Trigger without opening the listbox, as a label on a `<select>` does. Its id also names the List, only while a Label is mounted. Inside a `Field.Root`, `Field.Label` takes its role and does the same."
@@ -276,10 +278,10 @@ export function MultiSelectPage() {
       />
       <PartFacts
         state={
-          "`MultiSelectTriggerState` is `{ value, open, pending, disabled }`; `value` and `open` are optimistic, `pending` is the Root's."
+          "`MultiSelectTriggerState` is `{ value, open, pending, disabled, invalid, required }`; `value` and `open` are optimistic, `pending` is the Root's; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the Root's or the Field's (`data-required`: a button has no `:required`)."
         }
         owned={
-          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget` (written as an attribute after hydration), `form` (from the Root), `onClick`, `onKeyDown`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (not in its props type).'
+          '`id`, `type` (`"button"`), `role` (`"combobox"`), `disabled`, `aria-expanded` (the shown listbox), `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget` (written as an attribute after hydration), `form` (from the Root), `onClick`, `onKeyDown`, `onFocus`, `onBlur`, `data-open`, `data-pending`, `data-disabled`, `data-required`; inside a `Field.Root` also `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. Never written: `popoverTarget`, `popoverTargetAction`, `commandfor`, `command` (not in its props type).'
         }
         note={
           "With `required` it renders the validity element right after itself: a visually hidden one-option `<select>` with no name. A `render` element must stay a `<button>` (development warns). `ref` goes to the button."
@@ -308,8 +310,12 @@ export function MultiSelectPage() {
         ]}
       />
       <PartFacts
-        state={"`MultiSelectValueState` is `{ value, labels, disabled }`; `value` is optimistic."}
-        owned={"`data-placeholder` (while the selection is empty)."}
+        state={
+          "`MultiSelectValueState` is `{ value, labels, empty, disabled }`; `value` is optimistic; `empty` is `value.length === 0`."
+        }
+        owned={
+          "`data-empty` (while the selection is empty, the library's one word for it: there is no `data-placeholder`), `data-disabled`."
+        }
         note={
           "Optional: any Trigger content rendered from the Trigger's state works. A function cannot come from a Server Component; render the Trigger's content from a client component, or use the default content."
         }
@@ -452,9 +458,11 @@ export function MultiSelectPage() {
           ["`data-pending`", "Option", "This option is being added or removed."],
           ["`data-selected`", "Option", "In the optimistic selection."],
           ["`data-active`", "Option", "`aria-activedescendant` points here (keyboard or hover)."],
-          ["`data-placeholder`", "Value", "Nothing is selected."],
+          ["`data-empty`", "Value", "Nothing is selected (`:not([data-empty])`: something is)."],
           ["`data-empty`", "List", "No options and not loading."],
-          ["`data-disabled`", "Trigger, Option", "Disabled."],
+          ["`data-disabled`", "Label, Trigger, Value, Option", "Disabled."],
+          ["`data-pending`", "Label", "The Root's `pending`."],
+          ["`data-required`", "Trigger", "`required` (the Root's or the Field's)."],
           ["`data-invalid`", "Trigger", "Inside a `Field.Root`, while its error is shown."],
           ["`:popover-open`", "Popup", "The listbox is shown (browser-owned, no attribute)."],
         ]}
@@ -594,16 +602,15 @@ export function MultiSelectPage() {
           and <code>required</code> default from the Field.
         </li>
         <li>
-          <code>disabled</code> keeps the hidden inputs enabled, so the selection still posts (a
-          disabled native select posts nothing); wrap in <code>{"<fieldset disabled>"}</code> to
-          drop it.
+          A disabled MultiSelect (its <code>disabled</code> or the Field's) is not submitted, as a
+          disabled native select posts nothing: the hidden inputs are <code>disabled</code> too.
         </li>
       </ul>
 
       <h3 id="styling">Styling</h3>
       <CodeBlock language="css">{`.select[data-open] { outline: 2px solid Highlight; }
 .select[data-pending] { cursor: progress; }
-.select [data-placeholder] { color: GrayText; }
+.select [data-empty] { color: GrayText; }                 /* MultiSelect.Value: nothing chosen */
 .select[data-invalid] { border-color: var(--danger); }   /* inside a Field */
 
 .listbox { margin: 0; inset: auto; max-block-size: 20rem; overflow: auto; }

@@ -96,6 +96,11 @@ export interface SliderRootState<T extends SliderValue = number> {
   readonly orientation: SliderOrientation;
   /** The `disabled` prop, or the enclosing Field's. */
   readonly disabled: boolean;
+  /**
+   * Inside a `Field.Root`: an error is shown for the field (`data-invalid` on the Root and the
+   * Thumbs). `false` outside.
+   */
+  readonly invalid: boolean;
   /** The `min` prop. */
   readonly min: number;
   /** The `max` prop. */
@@ -671,6 +676,7 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
 
   const shownValue = fromArray(shown);
   const dragging = gestureThumb !== null;
+  const invalid = fieldInvalid === "true";
   const state = useMemo<SliderRootState<T>>(
     () => ({
       value: shownValue,
@@ -679,11 +685,12 @@ function SliderRootImpl<T extends SliderValue = number>(props: SliderRootProps<T
       dragging,
       orientation,
       disabled,
+      invalid,
       min,
       max,
       step,
     }),
-    [shownValue, shown, pending, dragging, orientation, disabled, min, max, step],
+    [shownValue, shown, pending, dragging, orientation, disabled, invalid, min, max, step],
   );
 
   // Memoised: the functions are stable, so this changes only with the state below.

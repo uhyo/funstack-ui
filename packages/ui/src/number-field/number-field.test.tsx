@@ -1692,3 +1692,84 @@ describe("NumberField", () => {
     });
   });
 });
+
+// #200, the consistency alignment (conventions 3.6, 4.1 rule 5, 9.5).
+describe("NumberField alignment rows", () => {
+  it("state.invalid equals data-invalid on the Root and the Input", async () => {
+    let seen: NumberFieldState | undefined;
+    render(
+      <Form.Root errors={{ qty: "Too many" }}>
+        <Field.Root name="qty">
+          <Field.Label>Quantity</Field.Label>
+          <NumberField.Root
+            data-testid="root"
+            className={(s: NumberFieldState) => {
+              seen = s;
+              return "";
+            }}
+          >
+            <NumberField.Input data-testid="input" />
+          </NumberField.Root>
+        </Field.Root>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    expect(root()).toHaveAttribute("data-invalid", "");
+    expect(input()).toHaveAttribute("data-invalid", "");
+    expect(seen?.invalid).toBe(true);
+  });
+
+  it("state.invalid is false outside a Field", () => {
+    const className = vi.fn<(s: NumberFieldState) => string>(() => "");
+    render(
+      <NumberField.Root className={className}>
+        <NumberField.Input aria-label="Quantity" />
+      </NumberField.Root>,
+    );
+    expect(className).toHaveBeenLastCalledWith(expect.objectContaining({ invalid: false }));
+  });
+
+  it.each(["own", "field"] as const)(
+    "disabled submission (%s): the hidden input posts nothing",
+    async (source) => {
+      const field = (disabled: boolean) => (
+        <NumberField.Root name="qty" defaultValue={3} disabled={disabled}>
+          <NumberField.Input aria-label="Quantity" />
+        </NumberField.Root>
+      );
+      const ui =
+        source === "own" ? (
+          field(true)
+        ) : (
+          <Field.Root name="qty" disabled>
+            {field(false)}
+          </Field.Root>
+        );
+      render(<form data-testid="form">{ui}</form>);
+      await act(async () => {});
+      expect([...new FormData(screen.getByTestId("form") as HTMLFormElement)]).toEqual([]);
+    },
+  );
+
+  it("an Input with no NumberField.Label and no other name warns once", async () => {
+    const error = silenceErrors();
+    render(
+      <>
+        <NumberField.Root>
+          <NumberField.Input />
+        </NumberField.Root>
+        <NumberField.Root>
+          <NumberField.Label>Named</NumberField.Label>
+          <NumberField.Input />
+        </NumberField.Root>
+        <NumberField.Root>
+          <NumberField.Input aria-label="Named too" />
+        </NumberField.Root>
+      </>,
+    );
+    await act(async () => {});
+    const calls = error.mock.calls.filter(([m]) => String(m).includes("no accessible name"));
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toMatch(/^NumberField\.Input: /);
+  });
+});

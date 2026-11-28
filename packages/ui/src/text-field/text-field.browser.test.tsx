@@ -24,9 +24,9 @@ import { Dialog } from "../dialog/index.js";
 import { NumberField } from "../number-field/index.js";
 import { Popover } from "../popover/index.js";
 import { TextField } from "./index.js";
-import type { TextFieldValueChangeDetails } from "./index.js";
+import type { TextFieldValueCommitDetails } from "./index.js";
 
-type Fn = (next: string, details: TextFieldValueChangeDetails) => unknown;
+type Fn = (next: string, details: TextFieldValueCommitDetails) => unknown;
 
 const field = () => screen.getByTestId("field") as HTMLInputElement;
 

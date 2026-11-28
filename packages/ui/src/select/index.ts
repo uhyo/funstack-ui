@@ -30,7 +30,16 @@ export const Select = {
   Separator: SelectSeparator,
 } as const;
 
-export type { SelectRootProps, SelectRootState, SelectValueChangeDetails } from "./select-root.js";
+export type {
+  SelectRootProps,
+  SelectRootState,
+  SelectTriggerState,
+  SelectValueState,
+  SelectGroupState,
+  SelectGroupLabelState,
+  SelectSeparatorState,
+  SelectValueChangeDetails,
+} from "./select-root.js";
 export type { SelectTriggerProps } from "./select-trigger.js";
 export type { SelectValueProps } from "./select-value.js";
 export type { SelectOptionProps, SelectOptionState } from "./select-option.js";

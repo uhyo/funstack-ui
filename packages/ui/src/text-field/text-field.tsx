@@ -29,6 +29,7 @@ import type {
   StateValue,
 } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
+import { CONTROL_NAME, useNameWarning } from "../internal/use-name-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useMergedRefs } from "../internal/use-merged-refs.js";
 import { useRender } from "../internal/use-render.js";
@@ -36,8 +37,11 @@ import type { DataAttributes } from "../internal/use-render.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-/** Details passed as the second argument of `valueCommitAction`. */
-export interface TextFieldValueChangeDetails extends ActionDetails {
+/**
+ * Details passed as the second argument of `valueCommitAction` (conventions 9.4: a commit
+ * action's details are `<Component>ValueCommitDetails`; TextField has no change action).
+ */
+export interface TextFieldValueCommitDetails extends ActionDetails {
   /**
    * `"activate"`: the user committed an edit (`details.event` is the `focusout` or the commit
    * key's `keydown`: Enter in an `<input>`, Ctrl+Enter or Cmd+Enter in a `<textarea>`).
@@ -61,6 +65,8 @@ export interface TextFieldState {
   readonly readOnly: boolean;
   /** The `required` prop, or the enclosing Field's. */
   readonly required: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
 }
 
 /**
@@ -94,7 +100,7 @@ export interface TextFieldProps extends Omit<
    * reset, text adopted at mount). Where the save goes: uncontrolled state is committed when it
    * resolves; a rejection shows the saved text again. May be a Server Function.
    */
-  valueCommitAction?: ChangeAction<string, TextFieldValueChangeDetails>;
+  valueCommitAction?: ChangeAction<string, TextFieldValueCommitDetails>;
   /**
    * Native `name`.
    *
@@ -180,12 +186,13 @@ export function TextField(props: TextFieldProps) {
     component: "TextField",
   });
   const { disabled, required } = field;
+  const invalid = field.state?.invalid ?? false;
 
   // --- State (design 2) -----------------------------------------------------------------------
 
   const { optimistic, pending, dispatch, latestInFlight } = useControllableAction<
     string,
-    TextFieldValueChangeDetails
+    TextFieldValueCommitDetails
   >({
     controlled: value,
     defaultValue,
@@ -202,8 +209,8 @@ export function TextField(props: TextFieldProps) {
   const text = draft ?? optimistic;
 
   const state = useMemo<TextFieldState>(
-    () => ({ value: optimistic, text, pending, disabled, readOnly, required }),
-    [optimistic, text, pending, disabled, readOnly, required],
+    () => ({ value: optimistic, text, pending, disabled, readOnly, required, invalid }),
+    [optimistic, text, pending, disabled, readOnly, required, invalid],
   );
 
   // An Escape revert, a rollback and a controlled change move the text with no event the Field
@@ -338,7 +345,15 @@ export function TextField(props: TextFieldProps) {
     },
     [checkElement],
   );
-  const ref = useMergedRefs<HTMLElement>(libraryRef, field.ref);
+  // Development check (conventions 9.5): the field needs a name, from a `<label for>`, a
+  // wrapping `<label>` (a `Field.Label` included), `aria-label` or `aria-labelledby`.
+  const checkName = useNameWarning(
+    isDev &&
+      "TextField: the field has no accessible name. Associate a <label for>, use Field.Label, " +
+        "or give it aria-label / aria-labelledby.",
+    CONTROL_NAME,
+  );
+  const ref = useMergedRefs<HTMLElement>(libraryRef, field.ref, checkName);
 
   const libraryProps: ComponentPropsWithRef<"input"> & DataAttributes = {
     ...field.attributes,

@@ -230,6 +230,7 @@ describe("rendering", () => {
       disabled: false,
       readOnly: false,
       invalid: false,
+      required: false,
     });
     expect(slotStates.find((s) => s.index === 0)).toMatchObject({
       index: 0,
@@ -1372,4 +1373,63 @@ describe("development warnings", () => {
       "OTPField.Slot must be rendered inside an OTPField.Root.",
     );
   });
+});
+
+// #200, the consistency alignment (conventions 3.1 mode warnings of an urgent state, 3.6 disabled
+// submission, 4.1 rule 5).
+describe("alignment rows", () => {
+  it("mode warnings for value: both set warns once; a switch after mount warns once", () => {
+    const error = silenceErrors();
+    const { rerender } = render(<Code value="12" defaultValue="34" />);
+    rerender(<Code value="12" defaultValue="34" />);
+    const both = error.mock.calls.filter(([m]) =>
+      String(m).includes("both `value` and `defaultValue`"),
+    );
+    expect(both).toHaveLength(1);
+    expect(String(both[0]?.[0])).toMatch(/^OTPField\.Root: /);
+    error.mockClear();
+    rerender(<Code key="s" />);
+    rerender(<Code key="s" value="1" />);
+    rerender(<Code key="s" />);
+    expect(
+      error.mock.calls.filter(([m]) => String(m).includes("`value` changed from")),
+    ).toHaveLength(1);
+  });
+
+  it("state.required is the own prop or the Field's", () => {
+    const own = vi.fn<(s: OTPFieldState) => string>(() => "");
+    const { unmount } = render(<Code required className={own} />);
+    expect(own).toHaveBeenLastCalledWith(expect.objectContaining({ required: true }));
+    unmount();
+    const field = vi.fn<(s: OTPFieldState) => string>(() => "");
+    render(
+      <Field.Root name="code" required>
+        <Field.Label>Code</Field.Label>
+        <OTPField.Root length={4} className={field}>
+          <OTPField.Input />
+        </OTPField.Root>
+      </Field.Root>,
+    );
+    expect(field).toHaveBeenLastCalledWith(
+      expect.objectContaining({ required: true, invalid: false }),
+    );
+  });
+
+  it.each(["own", "field"] as const)(
+    "disabled submission (%s): the code is not posted",
+    async (source) => {
+      const ui =
+        source === "own" ? (
+          <Code name="code" defaultValue="1234" length={4} disabled />
+        ) : (
+          <Field.Root name="code" disabled>
+            <Code defaultValue="1234" length={4} />
+          </Field.Root>
+        );
+      render(<form data-testid="form">{ui}</form>);
+      await act(async () => {});
+      expect(input()).toBeDisabled();
+      expect([...new FormData(screen.getByTestId("form") as HTMLFormElement)]).toEqual([]);
+    },
+  );
 });

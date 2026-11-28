@@ -34,6 +34,7 @@ export function SelectSeparator({ className, style, render, ...rest }: SelectSep
     value: ctx.optimistic,
     pending: ctx.pending,
     disabled: ctx.disabled,
+    invalid: ctx.invalid,
   };
   return useRender<ComponentPropsWithRef<"hr">, SelectRootState>({
     defaultElement: "hr",

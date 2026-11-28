@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import { announce, canAnnounce } from "../internal/announce.js";
 import { FieldContext } from "../internal/form/field-context.js";
+import { isComposingKey } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import { capturePointer } from "../internal/pointer-capture.js";
 import { resolveFieldDefaults, useFieldValueChange } from "../internal/form/use-field-control.js";
@@ -70,7 +71,8 @@ export interface ComboboxValueChangeDetails extends ActionDetails {
 export interface ComboboxInputValueChangeDetails extends ActionDetails {
   /**
    * `"activate"`: typing (the `input` event), an accepted option's label, Clear.
-   * `"dismiss"`: a revert: focus left with unmatched text, or the selection rolled back.
+   * `"dismiss"`: a revert: focus left with unmatched text, the selection rolled back, or Escape
+   * with the listbox closed and edited text (the `keydown`).
    * `"platform"`: form reset (the `reset` event), or text found in the input at mount
    * (`undefined`).
    */
@@ -231,9 +233,9 @@ export interface ComboboxRootBaseProps {
  *
  * @see https://ui.funstack.work/components/combobox
  */
-export interface ComboboxSingleProps extends ComboboxRootBaseProps {
+export interface ComboboxRootSingleProps extends ComboboxRootBaseProps {
   /**
-   * `true` switches to multiple selection (see `ComboboxMultipleProps`). Fixed at mount.
+   * `true` switches to multiple selection (see `ComboboxRootMultipleProps`). Fixed at mount.
    *
    * @defaultValue `false`
    */
@@ -274,20 +276,20 @@ export interface ComboboxSingleProps extends ComboboxRootBaseProps {
  *
  * @see https://ui.funstack.work/components/combobox
  */
-export interface ComboboxMultipleProps extends ComboboxRootBaseProps {
+export interface ComboboxRootMultipleProps extends ComboboxRootBaseProps {
   /** The selection is a list of values, shown as chips. Fixed at mount. */
   multiple: true;
   /**
    * Controlled selection. `[]`: nothing selected. `undefined`: uncontrolled. The order is the
    * chip order; duplicates are ignored.
    */
-  value?: string[];
+  value?: readonly string[];
   /**
    * Initial selection in uncontrolled mode; also the form-reset target (the latest value).
    *
    * @defaultValue `[]`
    */
-  defaultValue?: string[];
+  defaultValue?: readonly string[];
   /**
    * Runs inside the Root's transition for every change of the selection. `next` is the whole
    * intended selection as a fresh array; `details.added` / `details.removed` say what this
@@ -304,7 +306,7 @@ export interface ComboboxMultipleProps extends ComboboxRootBaseProps {
    * @defaultValue English: the labels joined with `", "`, then `" removed"`
    */
   announceRemoved?: (labels: readonly string[], state: ComboboxMultipleRootState) => string | null;
-  /** See {@link ComboboxSingleProps.announce}. */
+  /** See {@link ComboboxRootSingleProps.announce}. */
   announce?: (count: number, state: ComboboxMultipleRootState) => string | null;
   /** The parts, or a function of the Root's state. */
   children?: StateValue<ReactNode, ComboboxMultipleRootState>;
@@ -315,13 +317,13 @@ export interface ComboboxMultipleProps extends ComboboxRootBaseProps {
  *
  * @see https://ui.funstack.work/components/combobox
  */
-export type ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps;
+export type ComboboxRootProps = ComboboxRootSingleProps | ComboboxRootMultipleProps;
 
 /** Both variants as one shape, for the implementation. */
 interface InternalProps extends ComboboxRootBaseProps {
   multiple?: boolean;
-  value?: string | null | string[];
-  defaultValue?: string | null | string[];
+  value?: string | null | readonly string[];
+  defaultValue?: string | null | readonly string[];
   valueChangeAction?: (next: never, details: never) => unknown;
   announce?: (count: number, state: never) => string | null;
   announceRemoved?: (labels: readonly string[], state: ComboboxMultipleRootState) => string | null;
@@ -580,8 +582,8 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     part: "Combobox.Root",
     resetFields: { custom: false },
     enabled: multiple,
-    value: multiple ? (valueProp as string[] | undefined) : undefined,
-    defaultValue: multiple ? (defaultValueProp as string[] | undefined) : undefined,
+    value: multiple ? (valueProp as readonly string[] | undefined) : undefined,
+    defaultValue: multiple ? (defaultValueProp as readonly string[] | undefined) : undefined,
     valueChangeAction: multiple
       ? (props.valueChangeAction as
           | ChangeAction<string[], ComboboxMultipleValueChangeDetails>
@@ -738,7 +740,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     writeText,
     resetValue: (event) => {
       if (multiple) {
-        multi.reset(toSet((resetTarget as string[] | undefined) ?? []), event);
+        multi.reset(toSet((resetTarget as readonly string[] | undefined) ?? []), event);
         return;
       }
       const next = (resetTarget as string | null | undefined) ?? null;
@@ -1025,6 +1027,19 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     clearText: clearSearch,
   };
 
+  /**
+   * Escape with the listbox closed (design 8, conventions 15): the text goes back to what a blur
+   * would leave. Single: the optimistic selection's label (with `allowCustomValue`, the committed
+   * custom value is its own label), `""` with no selection; `multiple`: `""`, the search is
+   * cleared and the chips stay. Urgent, `"dismiss"`, no value dispatched.
+   */
+  const revertText = (event: Event): boolean => {
+    const target = multiple ? "" : labelFor(selection.optimistic);
+    if (textRef.current === target) return false;
+    writeText(target, "dismiss", event);
+    return true;
+  };
+
   // The factory only builds the `keydown` handler: the refs the `multiple` keys read are read when
   // a key is pressed, never during render.
   // oxlint-disable-next-line react/refs
@@ -1037,6 +1052,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     active,
     accept,
     commitText,
+    revertText,
     multiple: multiple ? multipleKeys : undefined,
   });
 
@@ -1078,7 +1094,7 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
     // (an astral character is one code point, two code units). An IME start (`"Process"`,
     // keyCode 229) hands over the same way, so the composition runs in the Input. Space does
     // nothing (a chip has no action of its own).
-    if (event.key === "Process" || event.keyCode === 229) {
+    if (isComposingKey(event)) {
       focusInput();
       return;
     }
@@ -1212,7 +1228,9 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
 
   // The form value (design 11.1, 15.8): one hidden input, or with `multiple` one per value, in
   // value order. An empty multiple selection keeps one nameless input, which posts nothing but is
-  // the form-associated element of the reset listener and an enclosing Field.
+  // the form-associated element of the reset listener and an enclosing Field. A disabled Combobox
+  // (its own prop or the Field's) is not submitted: the hidden inputs are `disabled` too
+  // (conventions 3.6, design 11.1).
   let hidden: ReactNode = null;
   if (name !== undefined) {
     if (!multiple) {
@@ -1223,10 +1241,19 @@ export function ComboboxRoot(publicProps: ComboboxRootProps) {
           name={name}
           form={form}
           value={selection.optimistic ?? ""}
+          disabled={disabled}
         />
       );
     } else {
-      hidden = <HiddenValues name={name} form={form} values={multi.values} inputRef={hiddenRef} />;
+      hidden = (
+        <HiddenValues
+          name={name}
+          form={form}
+          values={multi.values}
+          inputRef={hiddenRef}
+          disabled={disabled}
+        />
+      );
     }
   }
 

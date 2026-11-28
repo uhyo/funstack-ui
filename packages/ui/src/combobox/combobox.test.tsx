@@ -44,8 +44,10 @@ import type {
   ComboboxOptionState,
   ComboboxPopupProps,
   ComboboxPopupState,
+  ComboboxRootBaseProps,
+  ComboboxRootMultipleProps,
   ComboboxRootProps,
-  ComboboxSingleProps,
+  ComboboxRootSingleProps,
   ComboboxRootState,
   ComboboxTriggerProps,
   ComboboxTriggerState,
@@ -95,7 +97,7 @@ function Options({ query }: { query: string }) {
 }
 
 interface HarnessProps {
-  root?: Partial<ComboboxSingleProps>;
+  root?: Partial<ComboboxRootSingleProps>;
   trigger?: Partial<ComboboxTriggerProps>;
   popup?: Partial<ComboboxPopupProps>;
   /** List content for a query; default: the countries matching it. */
@@ -447,7 +449,7 @@ describe("Combobox", () => {
       expect(option("jm")).toHaveAttribute("aria-selected", "true");
       expect(option("jm")).toHaveAttribute("data-selected", "");
       expect(option("jp")).toHaveAttribute("aria-selected", "false");
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
       expect(input().value).toBe("Jamaica");
     });
 
@@ -1024,7 +1026,7 @@ describe("Combobox", () => {
       expectPending(option("jm"));
       expectNotPending(option("jp"));
       expectPending(input());
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
       expect(hidden()!.value).toBe("jm");
       expect(isOpen()).toBe(true);
       expect(hide).not.toHaveBeenCalled();
@@ -1035,7 +1037,7 @@ describe("Combobox", () => {
       expect(hide).toHaveBeenCalledTimes(1);
       expect(isOpen()).toBe(false);
       expectNotPending(input());
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
       expect(hidden()!.value).toBe("jm");
       expect(document.activeElement).toBe(input());
       if (mode === "controlled") expect(screen.getByTestId("parent-value")).toHaveTextContent("jm");
@@ -1118,7 +1120,7 @@ describe("Combobox", () => {
       await act(async () => save.resolve());
       await flushTasks(2);
       expect(isOpen()).toBe(true);
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
     });
   });
 
@@ -1243,7 +1245,7 @@ describe("Combobox", () => {
     expect(texts.mock.lastCall).toEqual(["France", expect.anything()]);
     expect(texts.mock.lastCall![1].reason).toBe("dismiss");
     expect(hidden()!.value).toBe("fr");
-    expect(input()).toHaveAttribute("data-selected", "");
+    expect(input()).not.toHaveAttribute("data-empty");
     // The close is part of the action's commit: adoption cannot be known before it, so the
     // listbox closes (unlike a rejection, which skips the close).
     expect(isOpen()).toBe(false);
@@ -1274,7 +1276,7 @@ describe("Combobox", () => {
       await act(async () => first.resolve());
       await flushTasks(2);
       expect(hide).toHaveBeenCalledTimes(1);
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
       if (mode === "controlled") {
         // "Update on success" parents land writes in completion order (conventions 2.5): the
         // older intent wins, and the text follows the committed value.
@@ -1323,7 +1325,7 @@ describe("Combobox", () => {
       expect(reportError).toHaveBeenCalledTimes(1);
       // The newer accept stands: the older one never reached the parent.
       expect(input().value).toBe("Jamaica");
-      expect(input()).toHaveAttribute("data-selected", "");
+      expect(input()).not.toHaveAttribute("data-empty");
     });
   });
 
@@ -2142,7 +2144,7 @@ describe("Combobox", () => {
       expect(action.mock.calls[0]![1].custom).toBe(false);
       expect(action.mock.calls[0]![1].event?.type).toBe("click");
       expect(hidden()!.value).toBe("");
-      expect(input()).not.toHaveAttribute("data-selected");
+      expect(input()).toHaveAttribute("data-empty", "");
       expect(document.activeElement).toBe(input());
       await user.click(clearButton());
       expect(action).toHaveBeenCalledTimes(1);
@@ -2899,7 +2901,7 @@ describe("Combobox", () => {
     const action = vi.fn<ValueAction>();
     const texts = vi.fn<TextAction>();
     const form = () => screen.getByTestId("form") as HTMLFormElement;
-    const ui = (root: Partial<ComboboxSingleProps>) => (
+    const ui = (root: Partial<ComboboxRootSingleProps>) => (
       <form data-testid="form">
         <Harness
           root={{ name: "c", valueChangeAction: action, onInputValueChange: texts, ...root }}
@@ -3123,7 +3125,10 @@ describe("Combobox", () => {
         open: true,
         pending: true,
         stale: false,
+        empty: false,
         disabled: false,
+        invalid: false,
+        required: false,
       });
       expect(seen.trigger).toEqual({ open: true, pending: false, disabled: false });
       expect(seen.clear).toEqual({
@@ -3500,5 +3505,336 @@ describe("Combobox: a remount during a hide (#159)", () => {
       expect.objectContaining({ reason: "dismiss" }),
     );
     expect(second.matches(":popover-open")).toBe(false);
+  });
+});
+
+// #200, the consistency alignment (conventions 3.1, 3.6, 4.1, 15; testing.md 10.1 "Draft revert",
+// "Disabled submission", "Mode warnings", "Types", "Function props"). The Escape rows with an open
+// listbox and inside a Dialog need a close watcher: combobox.browser.test.tsx.
+describe("Combobox alignment rows", () => {
+  /** A closed listbox (controlled `open={false}`) with the selection Japan and its text. */
+  function ClosedHarness(props: {
+    root?: Partial<ComboboxRootSingleProps>;
+    onText?: TextAction;
+    onValue?: ValueAction;
+  }) {
+    return (
+      <Harness
+        root={{
+          open: false,
+          onOpenChange: () => {},
+          defaultValue: "jp",
+          defaultInputValue: "Japan",
+          onInputValueChange: props.onText,
+          valueChangeAction: props.onValue,
+          ...props.root,
+        }}
+      />
+    );
+  }
+
+  describe("Escape with the listbox closed (draft revert)", () => {
+    it("reverts edited text to the selection's label, dispatches no value, is consumed", async () => {
+      const onText = vi.fn<TextAction>();
+      const onValue = vi.fn<ValueAction>();
+      render(<ClosedHarness onText={onText} onValue={onValue} />);
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("x");
+      expect(input().value).toBe("Japanx");
+      onText.mockClear();
+      const seen: KeyboardEvent[] = [];
+      document.addEventListener("keydown", (e) => seen.push(e), { once: true });
+      await user.keyboard("{Escape}");
+      expect(input().value).toBe("Japan");
+      expect(onText).toHaveBeenCalledTimes(1);
+      const [next, details] = onText.mock.calls[0]!;
+      expect(next).toBe("Japan");
+      expect(details.reason).toBe("dismiss");
+      expect(details.event?.type).toBe("keydown");
+      expect(seen[0]?.defaultPrevented).toBe(true);
+      expect(onValue).not.toHaveBeenCalled();
+      expect(input()).not.toHaveAttribute("data-empty");
+    });
+
+    it('with no selection the text reverts to ""', async () => {
+      const onText = vi.fn<TextAction>();
+      render(
+        <ClosedHarness onText={onText} root={{ defaultValue: null, defaultInputValue: "" }} />,
+      );
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("ja{Escape}");
+      expect(input().value).toBe("");
+      expect(onText.mock.lastCall?.[1].reason).toBe("dismiss");
+    });
+
+    it("with allowCustomValue the committed custom value is the target", async () => {
+      render(
+        <ClosedHarness
+          root={{ allowCustomValue: true, defaultValue: null, defaultInputValue: "" }}
+        />,
+      );
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("Atlantis{Enter}");
+      await flushTasks(2);
+      await user.keyboard("x{Escape}");
+      expect(input().value).toBe("Atlantis");
+    });
+
+    it("text that a blur would leave as it is: the key is untouched", async () => {
+      const onText = vi.fn<TextAction>();
+      render(<ClosedHarness onText={onText} />);
+      const user = setupUser();
+      await user.click(input());
+      const seen: KeyboardEvent[] = [];
+      document.addEventListener("keydown", (e) => seen.push(e), { once: true });
+      await user.keyboard("{Escape}");
+      expect(seen[0]?.defaultPrevented).toBe(false);
+      expect(onText).not.toHaveBeenCalled();
+    });
+
+    it("while composing, or already prevented, the key is untouched", async () => {
+      render(
+        <div onKeyDownCapture={(e) => e.key === "Escape" && e.shiftKey && e.preventDefault()}>
+          <ClosedHarness />
+        </div>,
+      );
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("x");
+      fireEvent.keyDown(input(), { key: "Escape", isComposing: true });
+      expect(input().value).toBe("Japanx");
+      fireEvent.keyDown(input(), { key: "Escape", keyCode: 229 });
+      expect(input().value).toBe("Japanx");
+      fireEvent.keyDown(input(), { key: "Escape", shiftKey: true });
+      expect(input().value).toBe("Japanx");
+    });
+
+    it("with multiple: leftover search text is cleared and the chips stay", async () => {
+      const onText = vi.fn<TextAction>();
+      const onValue = vi.fn();
+      render(
+        <Combobox.Root
+          multiple
+          open={false}
+          onOpenChange={() => {}}
+          defaultValue={["jp"]}
+          onInputValueChange={onText}
+          valueChangeAction={onValue}
+        >
+          <Combobox.Label>Country</Combobox.Label>
+          <Combobox.Chips data-testid="chips">
+            {({ value }) => value.map((v) => <Combobox.Chip key={v} value={v} label={v} />)}
+          </Combobox.Chips>
+          <Combobox.Input data-testid="input" />
+          <Combobox.Popup>
+            <Combobox.List />
+          </Combobox.Popup>
+        </Combobox.Root>,
+      );
+      const user = setupUser();
+      await user.click(input());
+      await user.keyboard("fr{Escape}");
+      expect(input().value).toBe("");
+      expect(onText.mock.lastCall).toEqual(["", expect.objectContaining({ reason: "dismiss" })]);
+      expect(onValue).not.toHaveBeenCalled();
+      expect(screen.getAllByRole("listitem")).toHaveLength(1);
+    });
+  });
+
+  it.each(["own", "field"] as const)(
+    "disabled submission (%s): the hidden input is disabled and posts nothing; a reset still dispatches",
+    async (source) => {
+      const onValue = vi.fn<ValueAction>();
+      const root = (defaultValue: string | null) => (
+        <Combobox.Root
+          name="country"
+          defaultValue={defaultValue}
+          defaultInputValue=""
+          disabled={source === "own"}
+          valueChangeAction={onValue}
+        >
+          <Combobox.Label>Country</Combobox.Label>
+          <Combobox.Input />
+        </Combobox.Root>
+      );
+      const ui = (defaultValue: string | null) => (
+        <form data-testid="form">
+          {source === "field" ? (
+            <Field.Root name="country" disabled>
+              {root(defaultValue)}
+            </Field.Root>
+          ) : (
+            root(defaultValue)
+          )}
+        </form>
+      );
+      silenceErrors();
+      const { rerender } = render(ui("jp"));
+      const form = screen.getByTestId("form") as HTMLFormElement;
+      expect(hidden()).toBeDisabled();
+      expect([...new FormData(form)]).toEqual([]);
+      rerender(ui("fr"));
+      await act(async () => form.reset());
+      await flushTasks(2);
+      expect(onValue.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([["fr", "platform"]]);
+      expect([...new FormData(form)]).toEqual([]);
+    },
+  );
+
+  it("disabled submission with multiple: every hidden input, the unnamed one included, is disabled", () => {
+    render(
+      <form data-testid="form">
+        <Combobox.Root multiple name="c" defaultValue={["jp", "fr"]} disabled>
+          <Combobox.Input aria-label="c" />
+        </Combobox.Root>
+      </form>,
+    );
+    const inputs = () => [...document.querySelectorAll<HTMLInputElement>('input[type="hidden"]')];
+    expect(inputs()).toHaveLength(2);
+    expect(inputs().every((i) => i.disabled)).toBe(true);
+    expect([...new FormData(screen.getByTestId("form") as HTMLFormElement)]).toEqual([]);
+    render(
+      <Combobox.Root multiple name="e" defaultValue={[]} disabled>
+        <Combobox.Input aria-label="e" />
+      </Combobox.Root>,
+    );
+    const unnamed = inputs().filter((i) => i.name === "");
+    expect(unnamed).toHaveLength(1);
+    expect(unnamed[0]).toBeDisabled();
+  });
+
+  it("mode warnings for inputValue: both set warns once; a switch after mount warns once", () => {
+    const error = silenceErrors();
+    const { rerender } = render(
+      <Combobox.Root inputValue="a" defaultInputValue="b">
+        <Combobox.Input aria-label="c" />
+      </Combobox.Root>,
+    );
+    rerender(
+      <Combobox.Root inputValue="a" defaultInputValue="b">
+        <Combobox.Input aria-label="c" />
+      </Combobox.Root>,
+    );
+    const both = error.mock.calls.filter(([m]) =>
+      String(m).includes("both `inputValue` and `defaultInputValue`"),
+    );
+    expect(both).toHaveLength(1);
+    expect(String(both[0]?.[0])).toMatch(/^Combobox\.Root: /);
+    error.mockClear();
+    const switching = (inputValue: string | undefined) => (
+      <Combobox.Root inputValue={inputValue} key="s">
+        <Combobox.Input aria-label="c" />
+      </Combobox.Root>
+    );
+    const second = render(switching(undefined));
+    second.rerender(switching("x"));
+    second.rerender(switching(undefined));
+    expect(
+      error.mock.calls.filter(([m]) => String(m).includes("`inputValue` changed from")),
+    ).toHaveLength(1);
+  });
+
+  it("the Label carries the Root's data-disabled and data-pending, with the state fields", async () => {
+    const d = deferred();
+    const labelClass = vi.fn(
+      (s: { disabled: boolean; pending: boolean }) =>
+        `${s.disabled ? "off" : "on"}${s.pending ? " busy" : ""}`,
+    );
+    render(
+      <Combobox.Root valueChangeAction={() => d.promise}>
+        <Combobox.Label data-testid="label" className={labelClass}>
+          Country
+        </Combobox.Label>
+        <Combobox.Input data-testid="input" />
+        <Combobox.Popup data-testid="popup">
+          <Combobox.List>
+            <Options query="" />
+          </Combobox.List>
+        </Combobox.Popup>
+      </Combobox.Root>,
+    );
+    const label = screen.getByTestId("label");
+    expect(label).not.toHaveAttribute("data-pending");
+    expect(label).not.toHaveAttribute("data-disabled");
+    const user = setupUser();
+    await typeText(user, "ja");
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(label).toHaveAttribute("data-pending", "");
+    expect(label).toHaveClass("on", "busy");
+    await act(async () => d.resolve());
+    expect(label).not.toHaveAttribute("data-pending");
+    render(
+      <Combobox.Root disabled>
+        <Combobox.Label data-testid="label-off" className={labelClass}>
+          Off
+        </Combobox.Label>
+        <Combobox.Input />
+      </Combobox.Root>,
+    );
+    expect(screen.getByTestId("label-off")).toHaveAttribute("data-disabled", "");
+    expect(screen.getByTestId("label-off")).toHaveClass("off");
+  });
+
+  it("Input: data-empty and state.empty while nothing is selected; state.required and state.invalid", async () => {
+    let seen: ComboboxInputState | undefined;
+    render(
+      <form>
+        <Field.Root name="country" required>
+          <Field.Label>Country</Field.Label>
+          <Combobox.Root>
+            <Combobox.Input
+              data-testid="input"
+              className={(s: ComboboxInputState) => {
+                seen = s;
+                return "";
+              }}
+            />
+          </Combobox.Root>
+          <Field.Error />
+        </Field.Root>
+        <button type="submit">Save</button>
+      </form>,
+    );
+    await act(async () => {});
+    expect(input()).toHaveAttribute("data-empty", "");
+    expect(seen).toMatchObject({ empty: true, required: true, invalid: false });
+    await setupUser().click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(input()).toHaveAttribute("data-invalid", "");
+    expect(seen?.invalid).toBe(true);
+  });
+
+  it("Chips: state.empty equals data-empty", () => {
+    let seen: { empty: boolean } | undefined;
+    render(
+      <Combobox.Root multiple defaultValue={[]}>
+        <Combobox.Label>Country</Combobox.Label>
+        <Combobox.Chips
+          data-testid="chips"
+          className={(s) => {
+            seen = s;
+            return "";
+          }}
+        />
+        <Combobox.Input />
+      </Combobox.Root>,
+    );
+    expect(screen.getByTestId("chips")).toHaveAttribute("data-empty", "");
+    expect(seen?.empty).toBe(true);
+  });
+
+  it("types: readOnly is not an Input prop; the multiple value is a readonly string[]", () => {
+    // @ts-expect-error The attribute would block typing while the options still change the value.
+    const readOnly: ComboboxInputProps = { readOnly: true };
+    const list = ["jp", "fr"] as const;
+    const multiple: ComboboxRootMultipleProps = { multiple: true, value: list, defaultValue: list };
+    expectTypeOf<ComboboxRootProps>().toEqualTypeOf<
+      ComboboxRootSingleProps | ComboboxRootMultipleProps
+    >();
+    expectTypeOf<ComboboxRootSingleProps>().toMatchTypeOf<ComboboxRootBaseProps>();
+    expect([readOnly, multiple]).toHaveLength(2);
   });
 });

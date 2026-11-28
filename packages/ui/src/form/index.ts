@@ -1,3 +1,6 @@
+// Ships the platform typings with this subpath (conventions 7.4). Type-only: the built JS has no
+// import of it.
+import "../internal/platform-attributes.js";
 import { FormRoot } from "./form-root.js";
 import { FormSubmit } from "./form-submit.js";
 

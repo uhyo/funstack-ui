@@ -285,7 +285,8 @@ import { Form } from "@funstack/ui/form";
             name: "disabled",
             type: "boolean",
             default: "false",
-            description: "Natively disables the control and marks every part `data-disabled`.",
+            description:
+              "Disables the control, marks every part `data-disabled`, and keeps the control out of the submission: a native control is natively disabled, and Combobox and MultiSelect disable their hidden inputs too.",
           },
           {
             name: "validate",

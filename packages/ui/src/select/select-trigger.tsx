@@ -57,6 +57,7 @@ export function SelectTrigger({ className, style, children, render, ...rest }: S
     value: ctx.optimistic,
     pending: ctx.pending,
     disabled: ctx.disabled,
+    invalid: ctx.invalid,
   };
   const { ref } = useSelectPartRef<HTMLButtonElement>(
     "Select.Trigger",

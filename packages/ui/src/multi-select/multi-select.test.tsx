@@ -33,7 +33,9 @@ import type {
   MultiSelectOpenChangeDetails,
   MultiSelectRootProps,
   MultiSelectRootState,
+  MultiSelectTriggerState,
   MultiSelectValueChangeDetails,
+  MultiSelectValueState,
 } from "./index.js";
 
 describeValueAction(multiSelectDriver);
@@ -177,7 +179,7 @@ describe("MultiSelect (jsdom)", () => {
       expect(inputs[0]!.name).toBe("");
       expect(formValues()).toEqual([]);
       expect(shown()).toBe("Choose toppings");
-      expect(screen.getByTestId("value")).toHaveAttribute("data-placeholder", "");
+      expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
     });
 
     it("server-renders no popovertarget, the Value and the validity element", () => {
@@ -698,7 +700,7 @@ describe("MultiSelect (jsdom)", () => {
       expect(seen.at(-1)).toEqual(["Ham"]);
       await user.click(option("ham"));
       expect(shown()).toBe("Any");
-      expect(screen.getByTestId("value")).toHaveAttribute("data-placeholder", "");
+      expect(screen.getByTestId("value")).toHaveAttribute("data-empty", "");
     });
 
     it("the Root's and the Trigger's function children receive the state", async () => {
@@ -851,10 +853,10 @@ describe("MultiSelect (jsdom)", () => {
       expect(shown()).toBe("Corn");
     });
 
-    it("disabled: the Trigger is natively disabled and the hidden inputs still post", () => {
+    it("disabled: the Trigger is natively disabled and nothing is posted (conventions 3.6)", () => {
       render(<Harness root={{ name: "toppings", defaultValue: ["ham"], disabled: true }} />);
       expect(trigger()).toBeDisabled();
-      expect(formValues()).toEqual(["ham"]);
+      expect(formValues()).toEqual([]);
     });
 
     it("controlled, update on success with a functional update of the diff", async () => {
@@ -983,5 +985,157 @@ describe("MultiSelect (jsdom)", () => {
         "@funstack/ui/multi-select",
       );
     });
+  });
+});
+
+// #200, the consistency alignment (conventions 3.1, 3.6, 4.1; testing.md 10.1 "Disabled
+// submission", "Function props", "Types").
+describe("MultiSelect alignment rows", () => {
+  it("disabled by the Field: every hidden input is disabled and nothing posts; a reset still dispatches", async () => {
+    const action = vi.fn<Action>();
+    const ui = (defaultValue: readonly string[]) => (
+      <form data-testid="form">
+        <Field.Root name="toppings" disabled>
+          <Field.Label>Toppings</Field.Label>
+          <MultiSelect.Root defaultValue={defaultValue} valueChangeAction={action}>
+            <MultiSelect.Trigger data-testid="trigger">
+              <MultiSelect.Value />
+            </MultiSelect.Trigger>
+          </MultiSelect.Root>
+        </Field.Root>
+      </form>
+    );
+    const { rerender } = render(ui(["ham", "olive"]));
+    const hiddenInputs = () => [
+      ...document.querySelectorAll<HTMLInputElement>('input[type="hidden"]'),
+    ];
+    expect(trigger()).toBeDisabled();
+    expect(hiddenInputs()).toHaveLength(2);
+    expect(hiddenInputs().every((i) => i.disabled)).toBe(true);
+    expect(formValues()).toEqual([]);
+    rerender(ui(["corn"]));
+    await act(async () => (screen.getByTestId("form") as HTMLFormElement).reset());
+    await flushTasks(2);
+    expect(action.mock.calls.map(([next, d]) => [next, d.reason])).toEqual([
+      [["corn"], "platform"],
+    ]);
+    expect(formValues()).toEqual([]);
+  });
+
+  it("an empty disabled selection keeps one unnamed, disabled input", () => {
+    render(<Harness root={{ name: "toppings", disabled: true }} />);
+    const inputs = [...document.querySelectorAll<HTMLInputElement>('input[type="hidden"]')];
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]!.name).toBe("");
+    expect(inputs[0]).toBeDisabled();
+  });
+
+  it("the Label carries the Root's data-disabled and data-pending, with the state fields", async () => {
+    const d = deferred();
+    const labelState = vi.fn();
+    const user = setupUser();
+    const { rerender } = render(<Harness root={{ valueChangeAction: () => d.promise }} />);
+    const label = screen.getByTestId("label");
+    expect(label).not.toHaveAttribute("data-pending");
+    expect(label).not.toHaveAttribute("data-disabled");
+    await openWithClick(user);
+    await user.click(option("ham"));
+    expect(label).toHaveAttribute("data-pending", "");
+    await act(async () => d.resolve());
+    expect(label).not.toHaveAttribute("data-pending");
+    rerender(
+      <MultiSelect.Root disabled>
+        <MultiSelect.Label data-testid="label" className={labelState}>
+          Toppings
+        </MultiSelect.Label>
+        <MultiSelect.Trigger data-testid="trigger" />
+      </MultiSelect.Root>,
+    );
+    expect(screen.getByTestId("label")).toHaveAttribute("data-disabled", "");
+    expect(labelState).toHaveBeenLastCalledWith({ disabled: true, pending: false });
+  });
+
+  it("Value: data-empty and state.empty while nothing is selected; data-disabled", async () => {
+    const valueState = vi.fn((s: MultiSelectValueState) => (s.empty ? "none" : "some"));
+    const user = setupUser();
+    render(
+      <Harness
+        value={
+          <MultiSelect.Value data-testid="value" placeholder="Choose" className={valueState} />
+        }
+      />,
+    );
+    const value = screen.getByTestId("value");
+    expect(value).toHaveAttribute("data-empty", "");
+    expect(value).not.toHaveAttribute("data-placeholder");
+    expect(value).toHaveClass("none");
+    await openWithClick(user);
+    await user.click(option("ham"));
+    expect(value).not.toHaveAttribute("data-empty");
+    expect(value).toHaveClass("some");
+    render(
+      <MultiSelect.Root disabled>
+        <MultiSelect.Trigger aria-label="t">
+          <MultiSelect.Value data-testid="value-off" />
+        </MultiSelect.Trigger>
+      </MultiSelect.Root>,
+    );
+    expect(screen.getByTestId("value-off")).toHaveAttribute("data-disabled", "");
+  });
+
+  it("Trigger: state.required with data-required; state.invalid with data-invalid", async () => {
+    let seen: MultiSelectTriggerState | undefined;
+    render(
+      <form>
+        <Field.Root name="toppings" required>
+          <Field.Label>Toppings</Field.Label>
+          <MultiSelect.Root>
+            <MultiSelect.Trigger
+              data-testid="trigger"
+              className={(s: MultiSelectTriggerState) => {
+                seen = s;
+                return "";
+              }}
+            >
+              <MultiSelect.Value />
+            </MultiSelect.Trigger>
+            <MultiSelect.Popup>
+              <MultiSelect.List>
+                <Options />
+              </MultiSelect.List>
+            </MultiSelect.Popup>
+          </MultiSelect.Root>
+          <Field.Error />
+        </Field.Root>
+        <button type="submit">Save</button>
+      </form>,
+    );
+    await act(async () => {});
+    expect(trigger()).toHaveAttribute("data-required", "");
+    expect(seen).toMatchObject({ required: true, invalid: false });
+    await setupUser().click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(trigger()).toHaveAttribute("data-invalid", "");
+    expect(seen?.invalid).toBe(true);
+  });
+
+  it("Root: state.required is the prop or the Field's", () => {
+    let seen: MultiSelectRootState | undefined;
+    render(
+      <MultiSelect.Root required>
+        {(s) => {
+          seen = s;
+          return <MultiSelect.Trigger aria-label="t" />;
+        }}
+      </MultiSelect.Root>,
+    );
+    expect(seen?.required).toBe(true);
+    expect(trigger).toBeDefined();
+  });
+
+  it("types: value and defaultValue accept a readonly string[]", () => {
+    const list = ["ham", "olive"] as const;
+    const props: MultiSelectRootProps = { value: list, defaultValue: list };
+    expect(props.value).toBe(list);
   });
 });

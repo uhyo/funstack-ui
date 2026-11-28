@@ -259,13 +259,13 @@ export function ComboboxPage() {
           },
           {
             name: "value",
-            type: "string | null; string[] with multiple",
+            type: "string | null; readonly string[] with multiple",
             description:
               "Controlled selection. `null`: nothing selected. `undefined` means uncontrolled. With `multiple`: `string[]`, `[]` for nothing; the order is the chip order, duplicates are ignored.",
           },
           {
             name: "defaultValue",
-            type: "string | null; string[] with multiple",
+            type: "string | null; readonly string[] with multiple",
             default: "null",
             description:
               "Initial selection when uncontrolled; what a form reset returns to. With `multiple`: `string[]`, default `[]`.",
@@ -374,7 +374,7 @@ export function ComboboxPage() {
             type: "boolean",
             default: "false",
             description:
-              "Disables the Input, Trigger and Clear (and every `ChipRemove`); nothing dispatches for user interaction. The hidden input stays enabled, so the selection still posts (wrap in `<fieldset disabled>` to drop it).",
+              "Disables the Input, Trigger and Clear (and every `ChipRemove`); nothing dispatches for user interaction. A disabled Combobox (this prop or the Field's) is not submitted: the hidden input(s) are `disabled` too. A form reset still reaches it.",
           },
           {
             name: "children",
@@ -392,7 +392,7 @@ export function ComboboxPage() {
           "nothing rendered: the Root has no element (no `ref`, `className` or `style`), only the hidden input(s) when `name` is given."
         }
         note={
-          "The props type is `ComboboxRootProps = ComboboxSingleProps | ComboboxMultipleProps`, discriminated on `multiple`. `Partial<ComboboxRootProps>` is not assignable to either member, so a wrapper that spreads one into `Combobox.Root` types it as `Partial<ComboboxSingleProps>` (or the multiple one) instead."
+          "The props type is `ComboboxRootProps = ComboboxRootSingleProps | ComboboxRootMultipleProps`, discriminated on `multiple`; the props both share are `ComboboxRootBaseProps`. `Partial<ComboboxRootProps>` is not assignable to either member, so a wrapper that spreads one into `Combobox.Root` types it as `Partial<ComboboxRootSingleProps>` (or the multiple one) instead."
         }
       />
       <p>
@@ -402,10 +402,11 @@ export function ComboboxPage() {
         the <code>click</code>) or <code>"platform"</code> (a form reset: the <code>reset</code>{" "}
         event). <code>ComboboxInputValueChangeDetails</code>: <code>{"{ reason, event }"}</code>,
         with <code>"activate"</code> for typing (the <code>input</code> event), an accepted label
-        and Clear, <code>"dismiss"</code> for a revert, <code>"platform"</code> for a reset or text
-        found at mount (no event). <code>ComboboxOpenChangeDetails</code>:{" "}
-        <code>{"{ reason, event }"}</code>; the reasons are listed with{" "}
-        <code>openChangeAction</code> and <code>onOpenChange</code> above.
+        and Clear, <code>"dismiss"</code> for a revert (focus leaving with unmatched text, a
+        rolled-back selection, Escape on edited text with the listbox closed: the{" "}
+        <code>keydown</code>), <code>"platform"</code> for a reset or text found at mount (no
+        event). <code>ComboboxOpenChangeDetails</code>: <code>{"{ reason, event }"}</code>; the
+        reasons are listed with <code>openChangeAction</code> and <code>onOpenChange</code> above.
       </p>
       <p>
         <code>ComboboxMultipleValueChangeDetails</code> (with <code>multiple</code>):{" "}
@@ -417,8 +418,8 @@ export function ComboboxPage() {
         <code>click</code> of <code>ChipRemove</code>; Clear; free text: the <code>keydown</code> or{" "}
         <code>focusout</code>) or <code>"platform"</code> (a form reset, dispatched whole with the
         diff). With <code>multiple</code> the library writes the text on typing, a pick (
-        <code>""</code>, <code>"activate"</code>), Clear, focus leaving (<code>""</code>,{" "}
-        <code>"dismiss"</code>), a reset and at mount.
+        <code>""</code>, <code>"activate"</code>), Clear, focus leaving and Escape with the listbox
+        closed (<code>""</code>, <code>"dismiss"</code>), a reset and at mount.
       </p>
 
       <h4>
@@ -428,7 +429,9 @@ export function ComboboxPage() {
         rows={[...functionProps("ComboboxLabelState"), renderProp("label", "ComboboxLabelState")]}
       />
       <PartFacts
-        state={"`ComboboxLabelState` is `{ disabled }`."}
+        state={
+          "`ComboboxLabelState` is `{ disabled, pending }`, the Root's; the Label renders them as `data-disabled` and `data-pending`."
+        }
         owned={"`id`, `htmlFor`."}
         note={
           "A `<label for>` of the Input; its id also names the List (`aria-labelledby`), only while a Label is mounted. Inside a `Field.Root`, `Field.Label` takes that role instead."
@@ -456,13 +459,13 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxInputState` is `{ value, values, inputValue, open, pending, stale, disabled }`. `values` is the optimistic selection as a list (`[value]` or `[]` in single mode); with `multiple`, `value` is always `null`."
+          "`ComboboxInputState` is `{ value, values, inputValue, open, pending, stale, empty, disabled, invalid, required }`. `values` is the optimistic selection as a list (`[value]` or `[]` in single mode); with `multiple`, `value` is always `null`. `empty`: nothing is selected (`data-empty`). `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field; `required` is the Input's own or the Field's."
         }
         owned={
-          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-selected`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. With `multiple` also `required` and `aria-required`.'
+          '`id`, `type` (`"text"`, or `"search"` when a `render` element says so), `role`, `value`, `autoComplete` (`"off"`), `aria-autocomplete`, `aria-expanded`, `aria-controls`, `aria-activedescendant`, `disabled`, `onChange`, `onKeyDown`, `onFocus`, `onBlur`, `onClick`, `onPointerDown`, `data-open`, `data-pending`, `data-empty`, `data-stale`, `data-disabled`. Inside a `Field.Root` also `required`, `aria-invalid`, `aria-describedby` (token-merged) and `data-invalid`. With `multiple` also `required` and `aria-required`.'
         }
         note={
-          "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search."
+          "`placeholder`, `name` (a second field with the raw text), `aria-describedby`, `onFocusCapture` (to react to focus) and other input props pass through. During a primary mouse or pen press while the listbox is open, the Input's `onPointerUp`, `onMouseUp` and `onDoubleClick` go to the Popup instead (the press is captured to it), and the Input gets pointer and mouse leave (then enter) events. A `render` element must stay an `<input>` of type text or search. `readOnly` is not accepted (a type error): it would block typing while the options, the Trigger and Clear still changed the value."
         }
       />
 
@@ -632,7 +635,7 @@ export function ComboboxPage() {
       />
       <PartFacts
         state={
-          "`ComboboxChipsState` is `{ value, pending, disabled }`; `value` is the optimistic selection in pick order, `pending` the value action in flight."
+          "`ComboboxChipsState` is `{ value, pending, empty, disabled }`; `value` is the optimistic selection in pick order, `pending` the value action in flight, `empty` no chips (`data-empty`)."
         }
         owned={
           '`role` (`"list"`, absent while empty), `aria-labelledby` (the Label, token-merged; absent while empty), `onKeyDown` (the chip keys), `onPointerDown`, `onMouseDown`, `onClick` (a press keeps focus where it is; a click focuses the Input), `onFocus`, `onBlur` (a chip is inside the combobox: focus on it closes the listbox and keeps the text), `data-empty`, `data-pending`, `data-disabled`.'
@@ -726,9 +729,9 @@ export function ComboboxPage() {
           ],
           ["`data-pending`", "Chips", "With `multiple`: a value action is in flight."],
           [
-            "`data-selected`",
+            "`data-empty`",
             "Input",
-            "A value is selected (optimistic, not `null`; with `multiple`, at least one).",
+            "Nothing is selected (optimistic `null`; with `multiple`, no values). A value is selected: `:not([data-empty])`.",
           ],
           ["`data-selected`", "Option", "This option is the optimistic selection."],
           ["`data-active`", "Option", "`aria-activedescendant` points here (keyboard or hover)."],
@@ -739,9 +742,10 @@ export function ComboboxPage() {
           ],
           ["`data-empty`", "List", "Settled with no options."],
           ["`data-empty`", "Chips", "With `multiple`: nothing is selected."],
+          ["`data-pending`", "Label", "The Root's `pending`."],
           [
             "`data-disabled`",
-            "Input, Trigger, Clear, Option, Chips, Chip, ChipRemove",
+            "Label, Input, Trigger, Clear, Option, Chips, Chip, ChipRemove",
             "Disabled.",
           ],
           ["`:popover-open`", "Popup", "The listbox is shown (browser-owned, no attribute)."],
@@ -775,10 +779,16 @@ export function ComboboxPage() {
             "closed",
             "Not handled (a form submits); commits changed free text first with `allowCustomValue`.",
           ],
+          ["Escape", "open", "The platform closes the listbox; focus and text stay."],
           [
             "Escape",
-            "open",
-            "The platform closes the listbox; focus and text stay. A second Escape reaches an enclosing Dialog or Popover.",
+            "closed, edited text",
+            'Reverts the text to what a blur would leave (the selection\'s label, the committed custom value with `allowCustomValue`, `""` with no selection; with `multiple` the search text is cleared and the chips stay), through `onInputValueChange` with `reason: "dismiss"`; no value is dispatched. The key is consumed: an enclosing Dialog or Popover stays open.',
+          ],
+          [
+            "Escape",
+            "closed, text unchanged",
+            "Not handled: reaches an enclosing Dialog or Popover.",
           ],
           [
             "Tab / Shift+Tab",
@@ -871,7 +881,7 @@ export function ComboboxPage() {
       <BehaviourSection
         id="optimistic-and-pending"
         summary={
-          "The selected value and the open state are optimistic (`data-selected` on the Input and the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. With `multiple` the chips render from the optimistic value: a removed chip disappears at once and returns if its save fails, an added chip has `data-pending` until it is committed. The typed text is urgent, not optimistic (a [fact](/concepts/action-props#fact), reported to `onInputValueChange`)."
+          "The selected value and the open state are optimistic (`data-empty` on the Input, `data-selected` on the Option). `data-pending` is on the Input while a selection or an open is in flight, on the Trigger while an open or close is, and on the Option being chosen. With `multiple` the chips render from the optimistic value: a removed chip disappears at once and returns if its save fails, an added chip has `data-pending` until it is committed. The typed text is urgent, not optimistic (a [fact](/concepts/action-props#fact), reported to `onInputValueChange`)."
         }
       >
         <h4 id="slow-open-change-action">
@@ -1009,9 +1019,9 @@ export function ComboboxPage() {
         </li>
         <li>
           Inside a Dialog or a Popover the listbox nests in the top layer: the first Escape closes
-          the listbox, the next the outer overlay; an outside click closes the stack. Inside a{" "}
-          <code>Menu.Popup</code> a combobox is not supported (the menu's typeahead and focus
-          handling compete with the input).
+          the listbox, the next reverts edited text, the next the outer overlay; an outside click
+          closes the stack. Inside a <code>Menu.Popup</code> a combobox is not supported (the menu's
+          typeahead and focus handling compete with the input).
         </li>
         <li>
           Safari: a WebKit bug (302008) can hang a page that opens a popover with position fallbacks

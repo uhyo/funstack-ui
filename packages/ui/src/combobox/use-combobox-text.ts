@@ -4,6 +4,7 @@ import type { RefObject } from "react";
 import { createActionDetails } from "../internal/action/action-details.js";
 import { callUrgentHandler } from "../internal/action/call-urgent-handler.js";
 import type { ChangeReason, UrgentChangeHandler } from "../internal/types.js";
+import { useModeWarnings } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import type { ComboboxInputValueChangeDetails } from "./combobox-root.js";
 
@@ -40,6 +41,11 @@ export function useComboboxText({
   onInputValueChange,
 }: ComboboxTextOptions): ComboboxText {
   const latest = useLatest({ inputValue, onInputValueChange });
+  // An urgent state warns like every controllable state (conventions 3.1).
+  useModeWarnings(inputValue !== undefined, defaultInputValue !== undefined, {
+    component: "Combobox.Root",
+    prop: "inputValue",
+  });
 
   const [internalText, setInternalText] = useState(() => defaultInputValue ?? inputValue ?? "");
   const text = inputValue ?? internalText;

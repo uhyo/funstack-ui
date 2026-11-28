@@ -1,13 +1,18 @@
 "use client";
 import { useLayoutEffect } from "react";
 import type { ComponentPropsWithRef, CSSProperties, ReactNode } from "react";
+import { dataAttr } from "../internal/data-attr.js";
 import type { RenderProp, StateValue } from "../internal/types.js";
 import { useElementCheck } from "../internal/use-element-check.js";
 import { useRender } from "../internal/use-render.js";
+import type { DataAttributes } from "../internal/use-render.js";
 import { useSliderContext } from "./slider-context.js";
 import type { SliderRootState, SliderValue } from "./slider-root.js";
 
 const isDev = process.env.NODE_ENV !== "production";
+
+/** State of `Slider.Label`: the Root's (conventions 9.4). */
+export type SliderLabelState<T extends SliderValue = SliderValue> = SliderRootState<T>;
 
 /**
  * Props of `Slider.Label`. `T` defaults to `SliderValue`; pass it to narrow the state
@@ -20,19 +25,20 @@ export interface SliderLabelProps<T extends SliderValue = SliderValue> extends O
   "htmlFor" | "id" | "className" | "style" | "children"
 > {
   /** Class name, or a function of the part's state that returns one. */
-  className?: StateValue<string | undefined, SliderRootState<T>>;
+  className?: StateValue<string | undefined, SliderLabelState<T>>;
   /** Inline style, or a function of the part's state that returns one. */
-  style?: StateValue<CSSProperties | undefined, SliderRootState<T>>;
+  style?: StateValue<CSSProperties | undefined, SliderLabelState<T>>;
   /** Content, or a function of the part's state. */
-  children?: StateValue<ReactNode, SliderRootState<T>>;
+  children?: StateValue<ReactNode, SliderLabelState<T>>;
   /** Must stay a `<label>` when the slider has one thumb (the `for` association). */
-  render?: RenderProp<ComponentPropsWithRef<"label">, SliderRootState<T>>;
+  render?: RenderProp<ComponentPropsWithRef<"label">, SliderLabelState<T>>;
 }
 
 /**
  * The visible name of the slider: `<label for>` naming the only thumb's input, or, with several
  * thumbs, the element whose `id` the Root's `aria-labelledby` (`role="group"`) points at, emitted
- * only while a Label is mounted. Owned keys: `id`, `htmlFor`.
+ * only while a Label is mounted. Owned keys: `id`, `htmlFor`, `data-disabled`, `data-pending`
+ * (the Root's, conventions 4.1 rule 4).
  *
  * @see https://ui.funstack.work/components/slider
  */
@@ -70,7 +76,9 @@ export function SliderLabel<T extends SliderValue = SliderValue>({
     libraryProps: {
       id: ctx.labelId,
       htmlFor: single ? ctx.thumbId(0) : undefined,
-    },
+      "data-disabled": dataAttr(ctx.state.disabled),
+      "data-pending": dataAttr(ctx.state.pending),
+    } as ComponentPropsWithRef<"label"> & DataAttributes,
   });
 }
 

@@ -1,6 +1,6 @@
 "use client";
 import { flushSync } from "react-dom";
-import { isComposingKey } from "../internal/escape-key.js";
+import { consumeEscape, isComposingKey, isEscapeRequest } from "../internal/escape-key.js";
 import { isPopoverOpen } from "../internal/overlay/popover-open.js";
 import type { RefObject } from "react";
 import type { PopoverRootValue } from "../internal/overlay/use-overlay-root.js";
@@ -22,6 +22,11 @@ export interface ComboboxKeyboardOptions {
   readonly accept: (optionValue: string, event: Event) => void;
   /** Free text as the value (design 5.3). Returns whether it dispatched. */
   readonly commitText: (event: Event, close: boolean) => boolean;
+  /**
+   * Escape with the listbox closed (design 8, conventions 15): writes back the text a blur would
+   * leave, when the text differs from it. Returns whether it wrote.
+   */
+  readonly revertText: (event: Event) => boolean;
   /** With `multiple` (design 15.6): the keys that differ, and the chips. */
   readonly multiple: ComboboxMultipleKeys | undefined;
 }
@@ -71,6 +76,7 @@ export function createComboboxKeyDown({
   active,
   accept,
   commitText,
+  revertText,
   multiple,
 }: ComboboxKeyboardOptions): (event: KeyboardEvent) => boolean {
   const { registry, orderedOptions } = options;
@@ -212,6 +218,13 @@ export function createComboboxKeyDown({
         }
         if (activeRef.current !== null) setActive(null);
         return false;
+      case "Escape":
+        // Open: the listbox's close watcher takes it and the text stays (design 8). Closed, with
+        // edited text: the text reverts and the key is consumed, so an enclosing Dialog or
+        // Popover stays open for this Escape (conventions 15).
+        if (isOpen || !isEscapeRequest(event) || !revertText(event)) return false;
+        consumeEscape(event);
+        return true;
       case "Home":
       case "End":
         // APG: the caret keys move visual focus to the input (not prevented: the caret moves).

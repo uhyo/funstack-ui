@@ -34,7 +34,7 @@ import type {
   StateValue,
   UrgentChangeHandler,
 } from "../internal/types.js";
-import { useDevWarning } from "../internal/use-dev-warning.js";
+import { useDevWarning, useModeWarnings } from "../internal/use-dev-warning.js";
 import { useLatest } from "../internal/use-latest.js";
 import { useRender } from "../internal/use-render.js";
 import type { DataAttributes } from "../internal/use-render.js";
@@ -80,7 +80,14 @@ export interface OTPFieldState {
   readonly readOnly: boolean;
   /** Inside a `Field.Root`: an error is shown for the field. `false` outside. */
   readonly invalid: boolean;
+  /** The `required` prop, or the enclosing Field's. */
+  readonly required: boolean;
 }
+
+/** State of `OTPField.Root` (conventions 9.4). */
+export type OTPFieldRootState = OTPFieldState;
+/** State of `OTPField.Input`. */
+export type OTPFieldInputState = OTPFieldState;
 
 /**
  * Props of `OTPField.Root`.
@@ -292,6 +299,11 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
   // --- The text (design 3.2) ------------------------------------------------------------------
 
   const controlled = valueProp !== undefined;
+  // An urgent state warns like every controllable state (conventions 3.1).
+  useModeWarnings(controlled, defaultValue !== undefined, {
+    component: "OTPField.Root",
+    prop: "value",
+  });
   const controlledValue = controlled ? normalizeCode(valueProp, charset, length) : undefined;
   useDevWarning(
     controlled && controlledValue !== valueProp,
@@ -633,8 +645,9 @@ export function OTPFieldRoot(props: OTPFieldRootProps) {
       disabled,
       readOnly,
       invalid: fieldInvalid === true,
+      required,
     }),
-    [value, length, pending, disabled, readOnly, fieldInvalid],
+    [value, length, pending, disabled, readOnly, fieldInvalid, required],
   );
 
   const [activeFrom, activeTo] = activeRange(

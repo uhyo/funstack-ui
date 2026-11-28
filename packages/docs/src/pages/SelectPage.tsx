@@ -137,12 +137,14 @@ export function SelectPage() {
         ]}
       />
       <PartFacts
-        state={"`SelectRootState` is `{ value, pending, disabled }`; `value` is optimistic."}
+        state={
+          "`SelectRootState` is `{ value, pending, disabled, invalid }`; `value` is optimistic; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid`), `false` outside a Field. The other parts receive the same object; their state types are aliases of it: `SelectTriggerState`, `SelectValueState`, `SelectGroupState`, `SelectGroupLabelState`, `SelectSeparatorState`."
+        }
         owned={
           "`value`, `disabled`, `onChange`, `data-pending`, `data-disabled`. Inside a `Field.Root` also `id`, `name`, `required`, `aria-invalid`, `aria-describedby` and `data-invalid`."
         }
         note={
-          "`multiple` and `size` are not accepted (a type error; `multiple` is dropped with a development warning): for several values see [Several values](#several-values). `id`, `aria-*`, `onFocus` and other select props pass through."
+          "`multiple` and `size` are not accepted (a type error; `multiple` is dropped with a development warning): for several values see [Several values](#several-values). `id`, `aria-*`, `onFocus` and other select props pass through. In development a `<select>` with no accessible name (no `<label>`, `Field.Label`, `aria-label` or `aria-labelledby`) logs a warning."
         }
       />
       <p>

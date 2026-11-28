@@ -21,7 +21,7 @@ import { act, render, screen } from "@testing-library/react";
 import { createPortal } from "react-dom";
 import { StrictMode, Suspense, startTransition, use, useLayoutEffect, useState } from "react";
 import type { ComponentPropsWithRef, ReactNode } from "react";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   createSuspender,
   deferred,
@@ -45,10 +45,15 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { Select } from "./index.js";
 import type {
+  SelectGroupLabelState,
+  SelectGroupState,
   SelectOptionState,
   SelectRootProps,
   SelectRootState,
+  SelectSeparatorState,
+  SelectTriggerState,
   SelectValueChangeDetails,
+  SelectValueState,
 } from "./index.js";
 
 type Details = SelectValueChangeDetails;
@@ -1538,5 +1543,90 @@ describe("Select inside a Field.Root", () => {
     );
     await act(async () => {});
     expect(screen.getByTestId("select")).toBeDisabled();
+  });
+});
+
+// #200, the consistency alignment (conventions 4.1 rule 5, 9.4, 9.5).
+describe("Select alignment rows", () => {
+  it("state.invalid equals data-invalid on the Root and reaches every part's state", async () => {
+    let rootState: SelectRootState | undefined;
+    let triggerState: SelectTriggerState | undefined;
+    render(
+      <form>
+        <Field.Root name="plan" required>
+          <Field.Label>Plan</Field.Label>
+          <Select.Root
+            data-testid="select"
+            defaultValue=""
+            className={(s: SelectRootState) => {
+              rootState = s;
+              return "";
+            }}
+          >
+            <Select.Trigger
+              className={(s: SelectTriggerState) => {
+                triggerState = s;
+                return "";
+              }}
+            >
+              <Select.Value />
+            </Select.Trigger>
+            <Select.Option value="">Choose</Select.Option>
+            <Select.Option value="pro">Pro</Select.Option>
+          </Select.Root>
+          <Field.Error />
+        </Field.Root>
+        <button type="submit">Save</button>
+      </form>,
+    );
+    await act(async () => {});
+    expect(rootState?.invalid).toBe(false);
+    await setupUser().click(screen.getByRole("button", { name: "Save" }));
+    await act(async () => {});
+    expect(screen.getByTestId("select")).toHaveAttribute("data-invalid", "");
+    expect(rootState?.invalid).toBe(true);
+    expect(triggerState?.invalid).toBe(true);
+  });
+
+  it("state.invalid is false outside a Field", () => {
+    const className = vi.fn<(s: SelectRootState) => string>(() => "");
+    render(
+      <Select.Root aria-label="Plan" className={className}>
+        <Select.Option value="a">A</Select.Option>
+      </Select.Root>,
+    );
+    expect(className).toHaveBeenLastCalledWith(expect.objectContaining({ invalid: false }));
+  });
+
+  it("warns once when the <select> has no accessible name; a label names it", async () => {
+    const error = silenceErrors();
+    render(
+      <>
+        <Select.Root>
+          <Select.Option value="a">A</Select.Option>
+        </Select.Root>
+        <label>
+          Named{" "}
+          <Select.Root>
+            <Select.Option value="b">B</Select.Option>
+          </Select.Root>
+        </label>
+        <Select.Root aria-label="Named too">
+          <Select.Option value="c">C</Select.Option>
+        </Select.Root>
+      </>,
+    );
+    await act(async () => {});
+    const calls = error.mock.calls.filter(([m]) => String(m).includes("no accessible name"));
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toMatch(/^Select\.Root: /);
+  });
+
+  it("types: every part has an exported state type (aliases of the Root's)", () => {
+    expectTypeOf<SelectTriggerState>().toEqualTypeOf<SelectRootState>();
+    expectTypeOf<SelectValueState>().toEqualTypeOf<SelectRootState>();
+    expectTypeOf<SelectGroupState>().toEqualTypeOf<SelectRootState>();
+    expectTypeOf<SelectGroupLabelState>().toEqualTypeOf<SelectRootState>();
+    expectTypeOf<SelectSeparatorState>().toEqualTypeOf<SelectRootState>();
   });
 });

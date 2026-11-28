@@ -7,8 +7,11 @@ import type { NumberFieldState } from "./number-field-root.js";
 /** A step button's direction. */
 export type StepDirection = "increment" | "decrement";
 
-/** What produced a step or a commit (`details.source`). */
-export type NumberFieldSource = "input" | "increment" | "decrement" | "keyboard" | "wheel" | null;
+/**
+ * What produced a step or a commit (`details.source`, `null` for a platform change and a
+ * revert). Exported (conventions 9.4: every type a public member names is).
+ */
+export type NumberFieldSource = "input" | "increment" | "decrement" | "keyboard" | "wheel";
 
 export interface NumberFieldContextValue {
   /** The state every part's function props receive. */
@@ -17,7 +20,7 @@ export interface NumberFieldContextValue {
   /** What a button steps from: the parsed draft while one is open, else the shown value. */
   readonly stepBase: number | null;
   /** The Root is pending and the latest step or commit came from this source. */
-  readonly pendingSource: NumberFieldSource;
+  readonly pendingSource: NumberFieldSource | null;
   /** Ids: the visible input (the Root's, or a Field's control id) and the Label. */
   readonly inputId: string;
   readonly labelId: string;

@@ -37,6 +37,10 @@ export interface MultiSelectTriggerState {
   readonly pending: boolean;
   /** Disabled by its own prop or by the Root. */
   readonly disabled: boolean;
+  /** Inside a `Field.Root`: an error is shown for the field (`data-invalid`). `false` outside. */
+  readonly invalid: boolean;
+  /** The Root's `required`, or the enclosing Field's (`data-required`). */
+  readonly required: boolean;
 }
 
 /**
@@ -115,8 +119,8 @@ const preventDefault = (event: { preventDefault(): void }) => event.preventDefau
  * Owned keys (conventions 1.2): `id`, `type`, `role`, `disabled`, `aria-expanded`,
  * `aria-controls` (token-merged), `aria-activedescendant`, `aria-required`, `popovertarget`
  * (written after hydration), `form`, `onClick`, `onKeyDown`, `onFocus`, `onBlur`,
- * `data-open`, `data-pending`, `data-disabled`; inside a `Field.Root` also `aria-describedby`
- * (token-merged), `aria-invalid` and `data-invalid`.
+ * `data-open`, `data-pending`, `data-disabled`, `data-required`; inside a `Field.Root` also
+ * `aria-describedby` (token-merged), `aria-invalid` and `data-invalid`.
  *
  * @see https://ui.funstack.work/components/multi-select
  */
@@ -225,6 +229,8 @@ export function MultiSelectTrigger({
     open: popover.optimistic,
     pending: ctx.pending,
     disabled,
+    invalid: field.state?.invalid ?? false,
+    required,
   };
 
   const libraryProps: ComponentPropsWithRef<"button"> & DataAttributes = {
@@ -259,6 +265,8 @@ export function MultiSelectTrigger({
     "data-open": dataAttr(popover.optimistic),
     "data-pending": dataAttr(ctx.pending),
     "data-disabled": dataAttr(disabled),
+    // A `<button>` has no `:required` (conventions 4.1 rule 2).
+    "data-required": dataAttr(required),
   };
 
   const button = useRender<ComponentPropsWithRef<"button">, MultiSelectTriggerState>({

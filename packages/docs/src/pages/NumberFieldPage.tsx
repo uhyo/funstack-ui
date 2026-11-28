@@ -201,7 +201,7 @@ export function NumberFieldPage() {
           },
           {
             name: "valueCommitAction",
-            type: "ChangeAction<number | null, NumberFieldValueChangeDetails>",
+            type: "ChangeAction<number | null, NumberFieldValueCommitDetails>",
             description:
               "Runs in the Root's commit transition once per gesture. Awaited; the field keeps the gesture's value with `data-pending` until it settles. Uncontrolled, the value is committed when it resolves and reverts when it rejects. May be a Server Function.",
           },
@@ -281,13 +281,13 @@ export function NumberFieldPage() {
       />
       <PartFacts
         state={
-          "`NumberFieldState` (every part but the buttons) is `{ value, text, pending, disabled, readOnly, required }`; `value` is the shown value (the gesture's while one is open or in flight) and `text` the shown text (the draft while editing)."
+          "`NumberFieldState` (every part but the buttons; aliased as `NumberFieldRootState`, `NumberFieldInputState` and `NumberFieldLabelState`) is `{ value, text, pending, disabled, readOnly, required, invalid }`; `value` is the shown value (the gesture's while one is open or in flight) and `text` the shown text (the draft while editing); `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid` on the Root and the Input), `false` outside a Field."
         }
         owned={
           "`role` (`\"group\"`), `aria-labelledby` (your tokens, then the Label's id while one is mounted, then a Field label's), `data-pending`, `data-disabled`, `data-invalid` (inside a Field)."
         }
         note={
-          'Details are `{ reason, source, event }`: `reason` is `"activate"`, `"platform"` (a form reset, text found at hydration) or `"dismiss"` (the revert after a failed save, steps only); `source` is one of `"input"`, `"increment"`, `"decrement"`, `"keyboard"`, `"wheel"`, or `null` on platform paths and the revert; `event` is the DOM event, and `undefined` for the repeats of a held button, a hold that ended at its bound, hydration and the revert. There is no `transition` prop on any part; the dispatches carry the types `fsui-number-field` plus `fsui-number-field-change` (step) or `fsui-number-field-commit` (gesture) for your own boundaries.'
+          'Details are `{ reason, source, event }`, typed `NumberFieldValueChangeDetails` for `valueChangeAction` and `NumberFieldValueCommitDetails` for `valueCommitAction` (never `"dismiss"`): `reason` is `"activate"`, `"platform"` (a form reset, text found at hydration) or `"dismiss"` (the revert after a failed save, steps only); `source` is a `NumberFieldSource` (`"input"`, `"increment"`, `"decrement"`, `"keyboard"`, `"wheel"`), or `null` on platform paths and the revert; `event` is the DOM event, and `undefined` for the repeats of a held button, a hold that ended at its bound, hydration and the revert. There is no `transition` prop on any part; the dispatches carry the types `fsui-number-field` plus `fsui-number-field-change` (step) or `fsui-number-field-commit` (gesture) for your own boundaries.'
         }
       />
 
@@ -319,7 +319,7 @@ export function NumberFieldPage() {
           "on the visible input: `id`, `type` (`text`, or `search` / `tel` from a `render` element; a `number` element logs a warning), `value`, `disabled`, `readOnly`, `onChange`, `onKeyDown`, `onBlur`, `aria-invalid` and `aria-describedby` (inside a Field), `data-pending`, `data-disabled`, `data-invalid`. `name`, `min`, `max`, `step`, `required` and `pattern` are not props: constraints live on the hidden input."
         }
         note={
-          "`placeholder`, `aria-*`, `onFocus`, `onPaste`, `onCompositionStart` / `onCompositionEnd` and the rest pass through. A constraint on the visible input would make it invalid for a reason nobody reports."
+          "`placeholder`, `aria-*`, `onFocus`, `onPaste`, `onCompositionStart` / `onCompositionEnd` and the rest pass through. A constraint on the visible input would make it invalid for a reason nobody reports. In development an Input with no accessible name (no `NumberField.Label`, `Field.Label`, `<label>`, `aria-label` or `aria-labelledby`) logs a warning."
         }
       />
 

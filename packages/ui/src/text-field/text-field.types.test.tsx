@@ -1,7 +1,7 @@
 import type { ChangeAction, ChangeReason } from "../internal/types.js";
 import { describe, expectTypeOf, it } from "vitest";
 import { TextField } from "./index.js";
-import type { TextFieldProps, TextFieldState, TextFieldValueChangeDetails } from "./index.js";
+import type { TextFieldProps, TextFieldState, TextFieldValueCommitDetails } from "./index.js";
 
 /**
  * Type-level checks (design/components/text-field.md 14 "Types"). `expectTypeOf` is a no-op at
@@ -12,7 +12,7 @@ describe("TextField types", () => {
     expectTypeOf<TextFieldProps["value"]>().toEqualTypeOf<string | undefined>();
     expectTypeOf<TextFieldProps["defaultValue"]>().toEqualTypeOf<string | undefined>();
     expectTypeOf<TextFieldProps["valueCommitAction"]>().toEqualTypeOf<
-      ChangeAction<string, TextFieldValueChangeDetails> | undefined
+      ChangeAction<string, TextFieldValueCommitDetails> | undefined
     >();
     const element = (
       <TextField
@@ -29,6 +29,10 @@ describe("TextField types", () => {
       />
     );
     void element;
+  });
+
+  it("state.invalid is a boolean (conventions 4.1 rule 5)", () => {
+    expectTypeOf<TextFieldState["invalid"]>().toEqualTypeOf<boolean>();
   });
 
   it("no step action, no handler, no transition; the library's handlers are not accepted", () => {

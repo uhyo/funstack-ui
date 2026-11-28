@@ -219,7 +219,7 @@ export function SliderPage() {
       />
       <PartFacts
         state={
-          "`SliderRootState<T>` is `{ value, values, pending, dragging, orientation, disabled, min, max, step }`; `T` is `number` or `readonly number[]`, inferred from `value` / `defaultValue`; `value` is the shown value and `values` the same as an array."
+          "`SliderRootState<T>` is `{ value, values, pending, dragging, orientation, disabled, invalid, min, max, step }`; `invalid` is `true` while the enclosing `Field.Root` shows an error (`data-invalid` on the Root and the Thumbs), `false` outside a Field; `T` is `number` or `readonly number[]`, inferred from `value` / `defaultValue`; `value` is the shown value and `values` the same as an array."
         }
         owned={
           '`role` (`"group"` with several thumbs), `aria-labelledby` (the Label\'s id while a Label is mounted and there are several thumbs; merged with yours), `data-pending`, `data-dragging`, `data-orientation`, `data-disabled`, and the `--slider-*` custom properties in `style` (your entries win).'
@@ -277,7 +277,7 @@ export function SliderPage() {
       />
       <PartFacts
         state={
-          "`SliderThumbState` is `{ index, value, pending, dragging, orientation, disabled }`."
+          "`SliderThumbState` is `{ index, value, pending, dragging, orientation, disabled, invalid }`."
         }
         owned={
           "on the styled element: `onPointerDown`, `data-index`, `data-orientation`, `data-dragging`, `data-pending`, `data-disabled`, and `--slider-value` / `touch-action` in `style` (your entries win). On the input: every attribute (`type`, `min`, `max`, `step`, `value`, `aria-valuetext`, …) except `aria-label`, `aria-labelledby`, `aria-describedby`, `name`, `form` and `autoFocus`, which are yours."
@@ -296,7 +296,7 @@ export function SliderPage() {
           "`SliderTrackState` and `SliderIndicatorState` are `{ orientation, dragging, disabled }`."
         }
         owned={
-          "Track: `onPointerDown`, `data-orientation`, `data-disabled`, and `touch-action` in `style` (your entry wins); Indicator: `data-orientation`, `data-disabled`."
+          "Track: `onPointerDown`, `data-orientation`, `data-dragging`, `data-disabled`, and `touch-action` in `style` (your entry wins); Indicator: `data-orientation`, `data-dragging`, `data-disabled`."
         }
         note={
           "A press on the Track moves the nearest thumb, focuses its input and starts dragging it; its box is the reference for the pointer maths. When two thumbs share a value (stacked), the one that can move toward the pointer moves, whichever of them was pressed; a press exactly on the value lets the first move decide. The commit uses the release position. The Indicator renders no position: place it from `--slider-start` / `--slider-end`."
@@ -307,11 +307,11 @@ export function SliderPage() {
         <code>Slider.Label</code>
       </h4>
       <PropsTable
-        rows={[...functionProps("SliderRootState"), renderProp("label", "SliderRootState")]}
+        rows={[...functionProps("SliderLabelState"), renderProp("label", "SliderLabelState")]}
       />
       <PartFacts
-        state={"`SliderRootState`."}
-        owned={"`id`, `htmlFor`."}
+        state={"`SliderLabelState`, an alias of `SliderRootState`."}
+        owned={"`id`, `htmlFor`, `data-disabled`, `data-pending` (the Root's)."}
         note={
           "The Label must stay a `<label>` with one thumb (it names the input through `for`); with several thumbs the Root is named by the Label's id. Its state is not tied to the Root's value type: `value` is typed `number | readonly number[]`; narrow it with `<Slider.Label<number>>` or read `values`."
         }
@@ -350,7 +350,12 @@ export function SliderPage() {
             "A step (with a `valueChangeAction`) or commit is in flight. Even a synchronous step action makes each pointer move a short pending render; for a spinner use `[data-pending]:not([data-dragging])`.",
           ],
           ["`data-pending`", "Thumb", "The Root is pending and this is the thumb that moved."],
-          ["`data-dragging`", "Root, Thumb", "A pointer is captured (on this thumb)."],
+          ["`data-pending`", "Label", "The Root's `pending`."],
+          [
+            "`data-dragging`",
+            "Root, Track, Indicator, Thumb",
+            "A pointer is captured (on the Thumb: on this thumb).",
+          ],
           ["`data-orientation`", "every part", "`horizontal` or `vertical`."],
           ["`data-disabled`", "every part", "The Root's `disabled`."],
           ["`data-index`", "Thumb", "`0`, `1`, …"],

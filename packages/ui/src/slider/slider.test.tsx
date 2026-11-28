@@ -9,7 +9,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Suspense, startTransition, useState } from "react";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import {
   CommitFixture,
   describeCommitAction,
@@ -39,9 +39,11 @@ import { Field } from "../field/index.js";
 import { Form } from "../form/index.js";
 import { Slider } from "./index.js";
 import type {
+  SliderLabelState,
   SliderRootProps,
   SliderRootState,
   SliderThumbState,
+  SliderTrackState,
   SliderValueChangeDetails,
   SliderValueCommitDetails,
 } from "./index.js";
@@ -425,6 +427,7 @@ describe("Slider", () => {
         dragging: false,
         orientation: "horizontal",
         disabled: true,
+        invalid: false,
         min: 10,
         max: 90,
         step: 5,
@@ -1724,5 +1727,95 @@ describe("Slider", () => {
       expect(thumbInput(0).validationMessage).toBe("Too high");
       expect(thumbInput(1).validationMessage).toBe("");
     });
+  });
+});
+
+// #200, the consistency alignment (conventions 4.1 rules 1, 2, 4, 5; 9.4).
+describe("Slider alignment rows", () => {
+  it("Track and Indicator render data-dragging with state.dragging", async () => {
+    const trackState = vi.fn((s: SliderTrackState) => (s.dragging ? "drag" : ""));
+    render(
+      <Slider.Root data-testid="root" defaultValue={40}>
+        <Slider.Label>Volume</Slider.Label>
+        <Slider.Track data-testid="track" className={trackState}>
+          <Slider.Indicator data-testid="indicator" className={trackState} />
+          <Slider.Thumb data-testid="thumb-0" />
+        </Slider.Track>
+      </Slider.Root>,
+    );
+    const track = mockTrack();
+    const indicator = screen.getByTestId("indicator");
+    expect(track).not.toHaveAttribute("data-dragging");
+    expect(indicator).not.toHaveAttribute("data-dragging");
+    pointer("pointerDown", track, 60);
+    expect(track).toHaveAttribute("data-dragging", "");
+    expect(indicator).toHaveAttribute("data-dragging", "");
+    expect(track).toHaveClass("drag");
+    expect(indicator).toHaveClass("drag");
+    pointer("pointerUp", track, 60);
+    await flushMicrotasks();
+    expect(track).not.toHaveAttribute("data-dragging");
+    expect(indicator).not.toHaveAttribute("data-dragging");
+  });
+
+  it("the Label carries the Root's data-disabled and data-pending", async () => {
+    const d = deferred();
+    const { rerender } = render(
+      <Slider.Root defaultValue={40} valueCommitAction={() => d.promise}>
+        <Slider.Label data-testid="label">Volume</Slider.Label>
+        <Slider.Thumb data-testid="thumb-0" />
+      </Slider.Root>,
+    );
+    const label = screen.getByTestId("label");
+    expect(label).not.toHaveAttribute("data-pending");
+    expect(label).not.toHaveAttribute("data-disabled");
+    press(thumbInput(), 41);
+    expect(label).toHaveAttribute("data-pending", "");
+    await act(async () => d.resolve());
+    expect(label).not.toHaveAttribute("data-pending");
+    rerender(
+      <Slider.Root defaultValue={40} disabled>
+        <Slider.Label data-testid="label">Volume</Slider.Label>
+        <Slider.Thumb data-testid="thumb-0" />
+      </Slider.Root>,
+    );
+    expect(label).toHaveAttribute("data-disabled", "");
+  });
+
+  it("state.invalid on the Root and the Thumb equals data-invalid", async () => {
+    let rootState: SliderRootState<number> | undefined;
+    let thumbState: SliderThumbState | undefined;
+    render(
+      <Form.Root errors={{ volume: "Too loud" }}>
+        <Field.Root name="volume">
+          <Field.Label>Volume</Field.Label>
+          <Slider.Root
+            data-testid="root"
+            defaultValue={40}
+            className={(s: SliderRootState<number>) => {
+              rootState = s;
+              return "";
+            }}
+          >
+            <Slider.Thumb
+              data-testid="thumb-0"
+              className={(s: SliderThumbState) => {
+                thumbState = s;
+                return "";
+              }}
+            />
+          </Slider.Root>
+        </Field.Root>
+      </Form.Root>,
+    );
+    await act(async () => {});
+    expect(root()).toHaveAttribute("data-invalid", "");
+    expect(thumb()).toHaveAttribute("data-invalid", "");
+    expect(rootState?.invalid).toBe(true);
+    expect(thumbState?.invalid).toBe(true);
+  });
+
+  it("types: Slider.Label has its state type", () => {
+    expectTypeOf<SliderLabelState<number>>().toEqualTypeOf<SliderRootState<number>>();
   });
 });

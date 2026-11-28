@@ -36,7 +36,7 @@ import { createNumberFormatter, formatKey } from "./number-field-format.js";
 import type { NumberFormatter } from "./number-field-format.js";
 import { useNumberFieldDevWarnings } from "./use-number-field-dev-warnings.js";
 
-/** Details passed as the second argument of both NumberField actions. */
+/** Details passed as the second argument of `valueChangeAction` (a step). */
 export interface NumberFieldValueChangeDetails extends ActionDetails {
   /**
    * `"activate"`: the user typed, pressed a key, a button or turned the wheel (`details.event` is
@@ -48,7 +48,22 @@ export interface NumberFieldValueChangeDetails extends ActionDetails {
    */
   readonly reason: ChangeReason;
   /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform" and "dismiss". */
-  readonly source: NumberFieldSource;
+  readonly source: NumberFieldSource | null;
+}
+
+/**
+ * Details passed as the second argument of `valueCommitAction`: a type of its own, as Slider's
+ * (conventions 9.4). Never `"dismiss"`.
+ */
+export interface NumberFieldValueCommitDetails extends ActionDetails {
+  /**
+   * `"activate"`: the user committed a gesture (a typed value's blur or Enter, a hold's release,
+   * a key press, a wheel event). `"platform"`: a form reset (the `reset` event) or text typed
+   * before hydration (`undefined`).
+   */
+  readonly reason: ChangeReason;
+  /** What produced the value: typed text, a button, a key, the wheel; `null` for "platform". */
+  readonly source: NumberFieldSource | null;
 }
 
 /** The state every NumberField part's function props receive (one object, Field's precedent). */
@@ -65,7 +80,19 @@ export interface NumberFieldState {
   readonly readOnly: boolean;
   /** The `required` prop, or the enclosing Field's. */
   readonly required: boolean;
+  /**
+   * Inside a `Field.Root`: an error is shown for the field (`data-invalid` on the Root and the
+   * Input). `false` outside.
+   */
+  readonly invalid: boolean;
 }
+
+/** State of `NumberField.Root` (conventions 9.4). */
+export type NumberFieldRootState = NumberFieldState;
+/** State of `NumberField.Input`. */
+export type NumberFieldInputState = NumberFieldState;
+/** State of `NumberField.Label`. */
+export type NumberFieldLabelState = NumberFieldState;
 
 /**
  * Props of `NumberField.Root`.
@@ -97,7 +124,7 @@ export interface NumberFieldRootProps extends Omit<
    * Where the save goes; uncontrolled state is committed when it resolves and reverts when it
    * rejects. May be a Server Function.
    */
-  valueCommitAction?: ChangeAction<number | null, NumberFieldValueChangeDetails>;
+  valueCommitAction?: ChangeAction<number | null, NumberFieldValueCommitDetails>;
   /** Native `min` on the hidden input (a constraint) and the lower bound of stepping. */
   min?: number;
   /** Native `max` on the hidden input (a constraint) and the upper bound of stepping. */
@@ -186,7 +213,7 @@ function sanitize(value: number | null | undefined): number | null | undefined {
 }
 
 /** The `details` fields of both actions. */
-function numberFieldDetails(reason: ChangeReason, source: NumberFieldSource) {
+function numberFieldDetails(reason: ChangeReason, source: NumberFieldSource | null) {
   return { reason, source };
 }
 
@@ -355,7 +382,7 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   } = useStepCommit<
     number | null,
     number | null,
-    NumberFieldSource,
+    NumberFieldSource | null,
     ReturnType<typeof numberFieldDetails>
   >({
     controlled: value,
@@ -390,9 +417,10 @@ export function NumberFieldRoot(props: NumberFieldRootProps) {
   const parsedDraft = draft === null ? undefined : formatter.parse(draft);
   const stepBase = parsedDraft === undefined ? shown : parsedDraft;
 
+  const invalid = fieldInvalid === true;
   const state = useMemo<NumberFieldState>(
-    () => ({ value: shown, text, pending, disabled, readOnly, required }),
-    [shown, text, pending, disabled, readOnly, required],
+    () => ({ value: shown, text, pending, disabled, readOnly, required, invalid }),
+    [shown, text, pending, disabled, readOnly, required, invalid],
   );
 
   // A step, a key and a typed commit fire no `input` / `change` on the element the Field hears

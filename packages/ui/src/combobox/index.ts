@@ -49,8 +49,9 @@ export const Combobox = {
 
 export type {
   ComboboxRootProps,
-  ComboboxSingleProps,
-  ComboboxMultipleProps,
+  ComboboxRootBaseProps,
+  ComboboxRootSingleProps,
+  ComboboxRootMultipleProps,
   ComboboxRootState,
   ComboboxMultipleRootState,
   ComboboxValueChangeDetails,
