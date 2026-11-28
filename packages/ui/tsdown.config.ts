@@ -38,6 +38,8 @@ export default defineConfig({
     "src/separator/index.ts",
     "src/avatar/index.ts",
     "src/csp/index.ts",
+    // The shared types (conventions 9.2): a types-only entry, an empty module at runtime.
+    "src/types/index.ts",
     // The `funstack-ui-skill-installer` bin, not a module of the package.
     "src/bin/skill-installer.ts",
   ],

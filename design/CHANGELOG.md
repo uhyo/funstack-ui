@@ -16788,6 +16788,22 @@ Then the implementation:
   skill's import rule, and any page that imports a shared type from the root.
 - [ ] If the script that checks 7.4's "every component `index.ts` imports the platform
   typings" exists by then, exempt the types entry as `csp` is.
+
+## 2026-11-28, #204: `@funstack/ui/types` implemented
+
+Developer. The #204 checklist of the entry "2026-11-28, #203, #204: `readOnly` on every form
+value control; a subpath for the shared types (design, accepted)" is implemented as written,
+with no deviation; the marker in conventions 9.2 is removed. `src/types/index.ts` re-exports
+the nine shared types from `internal/types.ts` with `export type` only; `src/index.ts` now
+re-exports them from it. tsdown emits `dist/types/index.mjs` (`export {};`) and its `.d.mts`,
+and writes `"./types"` into the exports map. `directives.test.ts` lists the entry as
+directive-free and checks that its JavaScript is an empty module; `check-pack.mjs` requires
+the two files and the `"./types"` export. `src/types/types.test.ts` checks each type against
+the root's with `toEqualTypeOf` and that the entry has no value export. The 7.4 check the last
+item names does not exist, so there is nothing to exempt. Also changed: conventions 2.2 and the
+9.1 layout name the new home. Docs: the Getting Started page imports the shared types from the
+subpath and lists them; the skill's import rule says the same.
+
 ## 2026-11-28, #203: `readOnly` on every form value control (implemented)
 
 Developer. The design of the entry "2026-11-28, #203, #204: `readOnly` on every form value

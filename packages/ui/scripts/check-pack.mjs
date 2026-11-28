@@ -4,10 +4,17 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
-// tsdown writes `bin` into package.json on every build (tsdown.config.ts).
-const { bin } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+// tsdown writes `bin` and `exports` into package.json on every build (tsdown.config.ts).
+const { bin, exports } = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+);
 if (bin?.["funstack-ui-skill-installer"] !== "./dist/bin/skill-installer.mjs") {
   console.error(`check-pack: unexpected bin field ${JSON.stringify(bin)}`);
+  process.exit(1);
+}
+// The types-only subpath (conventions 9.2).
+if (exports?.["./types"] !== "./dist/types/index.mjs") {
+  console.error(`check-pack: unexpected "./types" export ${JSON.stringify(exports?.["./types"])}`);
   process.exit(1);
 }
 
@@ -18,6 +25,8 @@ const paths = new Set(files.map((file) => file.path));
 const required = [
   "skills/funstack-ui-knowledge/SKILL.md",
   "dist/bin/skill-installer.mjs",
+  "dist/types/index.mjs",
+  "dist/types/index.d.mts",
   "dist/docs/index.md",
   "dist/docs/getting-started.md",
   "dist/docs/components/dialog.md",

@@ -68,6 +68,7 @@
     "./toggle-group": "./dist/toggle-group/index.mjs",
     "./toolbar": "./dist/toolbar/index.mjs",
     "./tooltip": "./dist/tooltip/index.mjs",
+    "./types": "./dist/types/index.mjs",
     "./package.json": "./package.json"
   },
   "scripts": {
