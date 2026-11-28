@@ -733,6 +733,13 @@ html:has(dialog:modal) { overflow: hidden; }`}</CodeBlock>
             the dialog (see the callout above).
           </p>
         </Callout>
+        <p>
+          Library mode: an open also waits for any other action pending in the app (a JS-free dialog
+          does not). To open a controlled dialog from your own code while a save runs, a keyboard
+          shortcut for example, set <code>open</code> with an urgent update. See{" "}
+          <a href="/concepts/action-props#urgent-open">Open your own controlled overlay urgently</a>
+          .
+        </p>
       </BehaviourSection>
 
       <BehaviourSection

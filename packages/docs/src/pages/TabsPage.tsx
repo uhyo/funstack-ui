@@ -354,6 +354,15 @@ export function TabsPage() {
             promise (<code>{"(next) => { void save(next); }"}</code>).
           </p>
         </Callout>
+        <p>
+          A switch also waits for any other action pending in the app, even without a{" "}
+          <code>valueChangeAction</code>: the Tab moves at once, the Root shows{" "}
+          <code>data-pending</code>, and the Panel switches when that action settles. See{" "}
+          <a href="/concepts/action-props#pending-actions-hold-transitions">
+            Pending actions hold other transitions
+          </a>
+          .
+        </p>
       </BehaviourSection>
 
       <BehaviourSection
