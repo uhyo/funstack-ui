@@ -36,12 +36,13 @@ Requirements: `react` and `react-dom` `>=19.3.0`. ESM only. Latest stable Chrome
 10. **`className`, `style` and `children` may be functions of state**: `className={({ pending }) => ...}`. A trigger's `children` must not suspend.
 11. **Panels never get `data-pending`.** Select through the Root: `.tabs[data-pending] .panel { opacity: .6 }`. Dialog and Popover Roots render no element; use the Trigger's `data-pending`.
 12. **Import from subpaths**: `import { Tabs } from "@funstack/ui/tabs"`. Shared types (`ChangeReason`, `Rejectable`, `WhilePending`, ...) come from `@funstack/ui/types`; a component's own types from its subpath.
-13. **Combobox: typing then Enter picks nothing** (APG manual selection). Pass `autoHighlight` on the Root to make the first match active.
+13. **Combobox: typing then Enter picks nothing** (APG manual selection). Pass `autoHighlight` on the Root to make the first match active. A tag picker (`multiple` with `allowCustomValue`) needs `autoHighlight` too: without it, typing "ja" then Enter adds a "ja" tag instead of picking "Java".
 14. **A Close part with `action` does nothing before hydration.** For work that must run without JavaScript, use `Dialog.Form` / `AlertDialog.Form` with a Server Function.
 15. **Error Boundary for a toast's Undo**: put it around `Toast.Action`, inside the Root (or one per `Toast.Root`). A boundary around `Toast.Viewport` removes the whole region. `components/toast.md`
 16. **No polyfills** for the Popover API, `<dialog>`, Anchor Positioning or Invoker Commands. Features not in every engine are `experimental_*` props.
 17. **A Server Function can be passed directly to any action prop**, also from a Server Component; a plain function cannot. `concepts/server-components.md`
 18. **No direction or locale provider.** Use the `dir` attribute; `locale` is a prop of `NumberField.Root`, `Progress.Root` and `Meter.Root`. `concepts/direction-and-locales.md`
+19. **Render a Popup right after its Trigger, and never inside a `<p>`.** Popups are `<div>`s or `<dialog>`s; the HTML parser closes the paragraph before one, and hydration fails. In running text give `Tooltip.Popup` or `HoverCard.Popup` `render={<span />}`; for any other popup, put the text in a `<div>` or render the Popup after the `<p>`.
 
 ## Component index
 

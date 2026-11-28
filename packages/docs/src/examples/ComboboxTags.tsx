@@ -32,6 +32,9 @@ export function ComboboxTags() {
           name="languages"
           defaultValue={["TypeScript"]}
           allowCustomValue
+          // With free text, Enter on no active option adds the typed text as a tag: make the first
+          // match active, so "ja" then Enter picks Java rather than adding "ja".
+          autoHighlight
           valueChangeAction={async (_next, { added, removed }) => {
             // Persist the diff, not `next`: an earlier change may still fail.
             await fakeSave(`+${added.join(",")} -${removed.join(",")}`, { fail });

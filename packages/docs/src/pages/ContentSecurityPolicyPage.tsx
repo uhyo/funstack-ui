@@ -32,12 +32,94 @@ export function ContentSecurityPolicyPage() {
           [
             "Inline `style` in server-rendered HTML",
             "`position-area` of an anchored popup, Tooltip's `interest-delay-*`",
-            "Blocked without `style-src-attr 'unsafe-inline'` (as for every library that renders inline styles). Blocked, the popup is placed by your stylesheet only until React updates the attribute, and a custom tooltip delay falls back to the browser's.",
+            "Blocked without `style-src-attr 'unsafe-inline'` (as for every library that renders inline styles), and in practice for good: see below.",
           ],
           [
             "Hoisted `<style>` elements",
             "the two stylesheets below",
             "Blocked unless the text matches a `'sha256-…'` source or the element carries your nonce.",
+          ],
+        ]}
+      />
+
+      <h3 id="server-rendered-inline-styles">Inline styles in server-rendered HTML</h3>
+      <p>
+        A blocked <code>style</code> attribute stays in the DOM, but the browser ignores its
+        declarations. Hydration does not write it again: React adopts the server's attributes as
+        they are. After hydration React writes, through the CSSOM, only the style properties whose
+        value changed between renders. So a blocked property whose value never changes (a popup's{" "}
+        <code>position-area</code> for a fixed <code>side</code>) is never applied, and one that
+        does change (a slider's value) is applied from its first change on. Parts that first render
+        on the client are not affected.
+      </p>
+      <p>
+        These parts render an inline <code>style</code>; it matters where the part is in your
+        server-rendered HTML. If you cannot allow <code>style-src-attr 'unsafe-inline'</code>, set
+        the same properties in your own stylesheet. A <code>style</code> prop of your own does not
+        help: it ends up in the same blocked attribute.
+      </p>
+      <Table
+        head={["Part", "Inline style", "Blocked"]}
+        rows={[
+          [
+            "`Tooltip.Popup`, `HoverCard.Popup`, `Popover.Popup`, `Menu.Popup`, `NavigationMenu.Popup`, unless `side={null}`",
+            "`position-area`, `position-try-fallbacks`",
+            "The popup is not placed next to its trigger. With `side={null}` the part renders none, and the placement is your stylesheet's.",
+          ],
+          [
+            "`Combobox.Popup`, `MultiSelect.Popup`",
+            "`position-area`, `position-try-fallbacks`, `min-width: anchor-size(width)`",
+            "The listbox is not placed under the input or trigger, nor as wide as it.",
+          ],
+          [
+            "`Tooltip.Trigger`, `HoverCard.Trigger` with `experimental_interestFor`",
+            "`interest-delay-start`, `interest-delay-end`",
+            "A custom `delay` or `closeDelay` falls back to the browser's delays.",
+          ],
+          [
+            "`Menu.ContextTrigger`",
+            "`-webkit-touch-callout: none`",
+            "On iOS a long-press on a link or image in the region shows the system's preview next to the menu.",
+          ],
+          [
+            "`Tabs.Tab`, `Tabs.Indicator`",
+            "`anchor-name`, `position-anchor`",
+            "The Indicator is not anchored to the selected Tab.",
+          ],
+          [
+            "`Slider.Root`, `Slider.Thumb`, `Slider.Track`",
+            "`--slider-start`, `--slider-end`, `--slider-value-<i>`, `--slider-value`; `touch-action` (Thumb, Track)",
+            "The range and thumbs use your CSS fallbacks until the value changes, and a touch drag may pan the page.",
+          ],
+          [
+            "The native range input inside `Slider.Thumb`",
+            "absolutely positioned over the Thumb, `opacity: 0`",
+            "The native slider shows inside your Thumb.",
+          ],
+          [
+            "`Progress.Root`, `Meter.Root`",
+            "`--progress-value`; `--meter-value`, `--meter-low`, `--meter-high`, `--meter-optimum`",
+            "The Indicator uses your CSS fallback until the value changes.",
+          ],
+          [
+            "`OTPField.Root`, `OTPField.Input`, `OTPField.Slot`",
+            "`position: relative` (Root); the Input over the Root with transparent text and caret; `pointer-events: none` (Slot)",
+            "The Input shows as a plain text box next to the slots.",
+          ],
+          [
+            "`NumberField.Input`'s hidden `<input type=\"number\">`, `MultiSelect.Trigger`'s validity `<select>` (with `required`)",
+            "visually hidden (1 px, `opacity: 0`)",
+            "The hidden control is visible.",
+          ],
+          [
+            "`Drawer.Popup` with `swipeDismiss`",
+            "`touch-action`",
+            "A touch swipe along the drawer's axis may pan the page instead of dragging the drawer.",
+          ],
+          [
+            "`Accordion.Root`, `Collapsible.Root` with `experimental_interpolateSize`",
+            "`interpolate-size: allow-keywords`",
+            "A panel's height no longer animates to and from `auto`.",
           ],
         ]}
       />

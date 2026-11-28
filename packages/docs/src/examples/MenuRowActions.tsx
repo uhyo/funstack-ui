@@ -20,7 +20,7 @@ export function MenuRowActions() {
   const recordFact = (open: boolean, { reason }: MenuOpenChangeDetails) => {
     setLast(`onOpenChange(${open}, "${reason}")`);
   };
-  const done = (text: string) => () => startTransition(() => setStatus(text));
+  const done = (text: string) => () => setStatus(text);
 
   return (
     <div className="demo-stack">
@@ -43,7 +43,8 @@ export function MenuRowActions() {
               <Menu.Item
                 action={async () => {
                   await fakeSave("the archive", { ms: 1200, fail });
-                  done("Report.pdf (archived)")();
+                  // After an await: wrap the update in startTransition (React limitation).
+                  startTransition(done("Report.pdf (archived)"));
                 }}
               >
                 {({ pending }) => (pending ? "Archiving…" : "Archive")}

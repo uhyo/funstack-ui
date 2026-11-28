@@ -229,6 +229,17 @@ export function ComboboxPage() {
           <code>allowCustomValue</code>, Enter (prevented, the form does not submit) and focus
           leaving add the text as a value instead.
         </li>
+        <li>
+          <strong>
+            A tag picker with <code>allowCustomValue</code> needs <code>autoHighlight</code>.
+          </strong>{" "}
+          Typing makes no option active, and Enter with no active option adds the typed text. So
+          without <code>autoHighlight</code>, typing "ja" then Enter adds a "ja" tag instead of
+          picking Java, and users create typo tags. The example above passes it: Enter picks the
+          first match, and text that matches nothing is still added. To add text that does match an
+          option as it is, press End (or Escape, which closes the listbox) before Enter: End clears
+          the active option and nothing highlights it again until the next edit.
+        </li>
       </ul>
       <CodeBlock>{`<Combobox.Root multiple name="countries" defaultValue={["jp"]} valueChangeAction={saveCountries}>
   <Combobox.Label>Countries</Combobox.Label>

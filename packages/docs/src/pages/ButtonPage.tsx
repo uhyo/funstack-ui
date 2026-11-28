@@ -206,7 +206,9 @@ export function ButtonPage() {
         that replaces the button, or <code>ariaNotify</code> from the action. <code>aria-busy</code>{" "}
         is not set by default (screen readers either ignore it or may hide the button's name); pass
         it yourself if you want it. A label that changes with <code>pending</code> ("Saving…") is
-        your choice, and like any name change on the focused element it is not reliably spoken.
+        your choice, and like any name change on the focused element it is not reliably spoken. It
+        also breaks a test that finds the button by name (see{" "}
+        <a href="/concepts/pending-and-optimistic#testing">Testing pending state</a>).
       </p>
 
       <BehaviourSection
