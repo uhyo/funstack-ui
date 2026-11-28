@@ -490,6 +490,16 @@ export function NumberFieldPage() {
           each step is <strong>announced</strong>.
         </li>
         <li>
+          <strong>The label names two elements</strong>, on purpose: the Root group and the visible
+          input (inside a Field, <code>Field.Label</code> names both). The group's name tells a
+          screen-reader user in browse mode what the Increase and Decrease buttons change, so their
+          names stay short. The cost: entering the group can read the label twice ("Quantity, group;
+          Quantity, edit text, 1"). In tests, find the input by role,{" "}
+          <code>{'getByRole("textbox", { name: "Quantity" })'}</code>: a query by label (Testing
+          Library's <code>getByLabelText</code>, Playwright's <code>getByLabel</code>) matches both
+          elements.
+        </li>
+        <li>
           <strong>Announcements</strong> go through <code>ariaNotify()</code> on the input (every
           supported browser has it; no live region is rendered). The default is the formatted text (
           <code>"2"</code>, <code>"1,50 €"</code>, <code>"50%"</code>); override with{" "}
@@ -598,7 +608,8 @@ export function NumberFieldPage() {
         <li>
           The visible input is the Field's control: it takes the Field's id (so{" "}
           <code>Field.Label</code>'s <code>for</code> names it), its description and error, and the
-          focus of a blocked submission. The Root's group is named by <code>Field.Label</code> too.
+          focus of a blocked submission. The Root's group is named by <code>Field.Label</code> too (
+          <a href="#keyboard-and-aria">the label names two elements</a>).
         </li>
         <li>
           The validity is the <strong>hidden input's</strong>: <code>Field.Error</code>'s function{" "}

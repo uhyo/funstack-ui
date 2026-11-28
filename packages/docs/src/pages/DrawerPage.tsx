@@ -580,6 +580,19 @@ html:has(.drawer:modal) .app { scale: .96; border-radius: 12px; }
         selection. Use it on regions that are not focusable and hold no text to select (a map, a
         canvas, a custom slider that handles its own focus), not on a form or a list of links.
       </p>
+      <h4 id="toasts">Toasts over a bottom drawer</h4>
+      <p>
+        A <a href="/components/toast">Toast</a> region stays in the top layer above an open drawer
+        (inside a modal one, so that an Undo stays clickable). Toasts placed at the bottom of the
+        screen therefore cover a bottom drawer's buttons. Move them while the drawer is open:
+      </p>
+      <CodeBlock language="css">{`html:has(dialog[data-side="bottom"][open]) .toasts {
+  inset-block: 1rem auto;
+}`}</CodeBlock>
+      <p>
+        The other effects of the move (inherited styles, <code>textContent</code>) are on the{" "}
+        <a href="/components/toast#styling">Toast page</a>.
+      </p>
     </DocPage>
   );
 }

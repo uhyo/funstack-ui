@@ -24,6 +24,12 @@ export function ComboboxPage() {
         nesting inside dialogs. The library filters nothing: you render the options for a query,
         synchronously or with <code>use()</code> under your own <code>&lt;Suspense&gt;</code>.
       </p>
+      <p>
+        Typing makes no option active, so by default Enter right after typing picks nothing: the
+        user moves to an option with ArrowDown first (the APG default, "manual selection"). Pass{" "}
+        <code>autoHighlight</code> to make the first match active when the results settle, so that
+        typing then Enter picks it (APG "automatic selection").
+      </p>
 
       <Example file="ComboboxCountry.tsx" css="combobox.css">
         <ComboboxCountry />
@@ -1067,7 +1073,9 @@ export function ComboboxPage() {
         <li>
           Want the listbox as wide as an input-plus-buttons group? Give the group an{" "}
           <code>anchor-name</code> and pass <code>positionAnchor</code> and{" "}
-          <code>minWidth: "anchor-size(--group width)"</code> through <code>style</code>.
+          <code>minWidth: "anchor-size(--group width)"</code> through <code>style</code>, as the
+          first example does. Give each group on a page its own name: with a shared one, every
+          listbox anchors to the last group.
         </li>
       </ul>
     </DocPage>

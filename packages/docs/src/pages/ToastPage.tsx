@@ -645,6 +645,20 @@ toast({ title: "Link copied" });`}</CodeBlock>
         to the toasts; stack visually with <code>flex-direction: column-reverse</code> and{" "}
         <code>:nth-last-child()</code>.
       </p>
+      <p>
+        While a modal Dialog, AlertDialog or Drawer is open, the region is a DOM child of that
+        dialog (<a href="#browser-owned-state">Top layer and modal dialogs</a>). It is still in the
+        top layer, above the dialog and placed against the viewport, so toasts at the bottom of the
+        screen can cover a bottom drawer's buttons. Being inside the dialog, the toasts inherit its{" "}
+        <code>font</code> and <code>color</code>, match its descendant selectors (
+        <code>.dialog p</code>) and are part of its <code>textContent</code>. Set the properties the
+        toasts rely on, on the region or the toasts themselves. To move them out of a bottom
+        drawer's way:
+      </p>
+      <CodeBlock language="css">{`/* .toasts is your Viewport's className; Drawer.Popup has data-side. */
+html:has(dialog[data-side="bottom"][open]) .toasts {
+  inset-block: 1rem auto; /* top of the screen while a bottom drawer is open */
+}`}</CodeBlock>
 
       <h3 id="browser-notes">Browser notes</h3>
       <ul>
