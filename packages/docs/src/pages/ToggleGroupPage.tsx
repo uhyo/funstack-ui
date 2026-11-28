@@ -351,8 +351,10 @@ export function ToggleGroupPage() {
       <p>
         A slow awaited <code>valueChangeAction</code> holds every other transition in the app until
         it settles (
-        <a href="/concepts/action-props#await-only">Await only what the UI must wait for</a>); for a
-        fire-and-forget save, call <code>void save(next)</code> without awaiting it.
+        <a href="/concepts/action-props#await-only">
+          Return the promise only when the UI must wait for it
+        </a>
+        ); for a fire-and-forget save, call <code>void save(next)</code> without awaiting it.
       </p>
     </DocPage>
   );

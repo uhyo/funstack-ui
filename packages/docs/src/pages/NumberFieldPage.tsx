@@ -87,7 +87,7 @@ export function NumberFieldPage() {
       <Callout title="The save goes in valueCommitAction">
         <p>
           A held button steps every 60 ms, and an awaited action holds every transition in the app (
-          <a href="/concepts/action-props#await-only">Action props</a>). Keep{" "}
+          <a href="/concepts/action-props#pending-actions-hold-transitions">Action props</a>). Keep{" "}
           <code>valueChangeAction</code> cheap and put the network call in{" "}
           <code>valueCommitAction</code>, which runs once per gesture. A typed value and a key press
           fire both, with the same value; only a held button separates them.

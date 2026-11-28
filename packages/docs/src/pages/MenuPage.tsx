@@ -771,6 +771,15 @@ export function MenuPage() {
           The readout under the example is plain text, not a live region, so it does not interrupt a
           screen reader.
         </p>
+        <p>
+          An open also waits for any other action pending in the app, even without an{" "}
+          <code>openChangeAction</code>: the Trigger shows <code>data-open</code> and{" "}
+          <code>data-pending</code>, and the menu is shown when that action settles. See{" "}
+          <a href="/concepts/action-props#pending-actions-hold-transitions">
+            Pending actions hold other transitions
+          </a>
+          .
+        </p>
       </BehaviourSection>
 
       <BehaviourSection
